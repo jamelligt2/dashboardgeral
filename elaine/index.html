@@ -27,6 +27,12 @@ body{background:#1a1a2e;color:#e8e6f0;font-family:'DM Sans',sans-serif;min-heigh
 .preset-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;transition:all .2s;white-space:nowrap}
 .preset-btn:hover,.preset-btn.active{background:rgba(255,107,43,.2);border-color:#ff6b2b;color:#ff6b2b;font-weight:600}
 .range-info{font-size:11px;color:rgba(255,107,43,.75);font-family:'DM Mono',monospace;white-space:nowrap;padding-left:4px}
+.desafio-bar{display:flex;align-items:center;gap:8px;padding:8px 28px;background:#0d0d17;border-bottom:1px solid rgba(255,255,255,.05);overflow-x:auto}
+.desafio-bar-label{font-size:11px;color:rgba(255,255,255,.4);white-space:nowrap;margin-right:2px}
+.desafio-btn{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.55);padding:5px 14px;border-radius:16px;cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;transition:all .2s;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.desafio-btn:hover{background:rgba(255,255,255,.1);color:#e8e6f0}
+.desafio-btn.active{font-weight:600;color:#fff}
+.desafio-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .tabs{display:flex;border-bottom:1px solid rgba(255,255,255,0.07);background:#12121f;padding:0 28px;overflow-x:auto}
 .tab{padding:12px 20px;cursor:pointer;font-size:13px;color:rgba(255,255,255,0.5);border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
 .tab:hover{color:#e8e6f0}.tab.active{color:#ff6b2b;border-bottom-color:#ff6b2b;font-weight:600}
@@ -146,6 +152,10 @@ tr:hover td{background:rgba(255,255,255,.025)}
     <button class="preset-btn active" id="btn-all" onclick="setPreset('all',this)">Tudo</button>
     <span class="range-info" id="range-info"></span>
   </div>
+</div>
+
+<div class="desafio-bar" id="desafio-bar">
+  <span class="desafio-bar-label">Desafio:</span>
 </div>
 
 <div class="tabs">
@@ -764,6 +774,49 @@ function statusBadge(inv,fat){
   return '<span class="badge corrigir">Corrigir</span>';
 }
 
+// ========== FILTRO DESAFIO ==========
+var activeDesafio = null;
+function initDesafioBar(){
+  var bar = document.getElementById('desafio-bar');
+  // Limpa botões antigos (mantém só o label)
+  while(bar.children.length > 1) bar.removeChild(bar.lastChild);
+  // Botão "Todos"
+  var allBtn = document.createElement('button');
+  allBtn.className = 'desafio-btn active';
+  allBtn.setAttribute('data-desafio','all');
+  allBtn.textContent = 'Todos';
+  allBtn.onclick = function(){ setDesafio('all'); };
+  bar.appendChild(allBtn);
+  // Botões por desafio
+  DESAFIOS_RANGES.forEach(function(d, i){
+    var btn = document.createElement('button');
+    btn.className = 'desafio-btn';
+    btn.setAttribute('data-desafio', i);
+    btn.innerHTML = '<span class="desafio-dot" style="background:'+d.cor+'"></span>' + d.nome;
+    btn.onclick = function(){ setDesafio(i); };
+    bar.appendChild(btn);
+  });
+}
+function setDesafio(idx){
+  activeDesafio = idx === 'all' ? null : idx;
+  document.querySelectorAll('.desafio-btn').forEach(function(b){ b.classList.remove('active'); });
+  document.querySelector('.desafio-btn[data-desafio="'+idx+'"]').classList.add('active');
+  if(idx === 'all'){
+    var dates = DIAS.map(function(d){return toISO(d.data)}).sort();
+    document.getElementById('dateFrom').value = dates[0];
+    document.getElementById('dateTo').value = dates[dates.length-1];
+  } else {
+    var range = DESAFIOS_RANGES[idx];
+    document.getElementById('dateFrom').value = range.de;
+    document.getElementById('dateTo').value = range.ate;
+  }
+  document.querySelectorAll('.preset-btn').forEach(function(b){ b.classList.remove('active'); });
+  if(idx === 'all') document.getElementById('btn-all').classList.add('active');
+  dateFrom = document.getElementById('dateFrom').value;
+  dateTo = document.getElementById('dateTo').value;
+  updateRangeInfo(); renderAll();
+}
+
 // ========== FILTRO GLOBAL ==========
 function initDatePickers(){
   const dates=DIAS.map(function(d){return toISO(d.data)}).sort();
@@ -773,6 +826,9 @@ function initDatePickers(){
 }
 function setPreset(days,btn){
   document.querySelectorAll('.preset-btn').forEach(function(b){b.classList.remove('active')});btn.classList.add('active');
+  document.querySelectorAll('.desafio-btn').forEach(function(b){ b.classList.remove('active'); });
+  document.querySelector('.desafio-btn[data-desafio="all"]').classList.add('active');
+  activeDesafio = null;
   var dates=DIAS.map(function(d){return toISO(d.data)}).sort(),last=dates[dates.length-1];
   if(days==='all'){document.getElementById('dateFrom').value=dates[0];document.getElementById('dateTo').value=last;}
   else{var from=new Date(last);from.setDate(from.getDate()-(days-1));document.getElementById('dateFrom').value=from.toISOString().slice(0,10);document.getElementById('dateTo').value=last;}
@@ -781,6 +837,8 @@ function setPreset(days,btn){
 }
 function onDateChange(){
   document.querySelectorAll('.preset-btn').forEach(function(b){b.classList.remove('active')});
+  document.querySelectorAll('.desafio-btn').forEach(function(b){ b.classList.remove('active'); });
+  activeDesafio = null;
   dateFrom=document.getElementById('dateFrom').value;dateTo=document.getElementById('dateTo').value;
   updateRangeInfo();renderAll();
 }
@@ -1418,7 +1476,8 @@ function renderPaginas(){
 var DESAFIOS_RANGES = [
   {nome:"Desafio A", de:"2026-02-17", ate:"2026-03-01", cor:"#ff6b2b", comprasAds:66, fatAds:2310, obCompras:27, obFat:890.61},
   {nome:"Desafio B", de:"2026-03-02", ate:"2026-03-15", cor:"#3b82f6", comprasAds:65, fatAds:2275, obCompras:15, obFat:266.58},
-  {nome:"Desafio C", de:"2026-03-16", ate:"2026-03-28", cor:"#2ecc71", comprasAds:30, fatAds:1131, obCompras:12, obFat:260}
+  {nome:"Desafio C", de:"2026-03-16", ate:"2026-04-05", cor:"#2ecc71", comprasAds:30, fatAds:1131, obCompras:12, obFat:260},
+  {nome:"Desafio D", de:"2026-04-06", ate:"2026-04-20", cor:"#e74c3c", comprasAds:0, fatAds:0, obCompras:0, obFat:0}
 ];
 
 function calcDesafioData(){
@@ -1833,6 +1892,7 @@ function fetchLiveData(){
     fixFatFromDias();
 
     // Re-render everything
+    initDesafioBar();
     initDatePickers();
     renderAll();
 
@@ -1843,6 +1903,7 @@ function fetchLiveData(){
     console.error('Erro ao buscar dados:',err);
     statusEl.textContent='Offline (dados históricos)';
     fixFatFromDias();
+    initDesafioBar();
     initDatePickers();
     renderAll();
   });
@@ -1850,6 +1911,7 @@ function fetchLiveData(){
 
 // Init: render historical data immediately, then fetch live
 fixFatFromDias();
+initDesafioBar();
 initDatePickers();
 renderAll();
 fetchLiveData();
