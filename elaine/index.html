@@ -1657,29 +1657,29 @@ function fetchLiveData(){
       var whCriSales={};
       for(var i=1;i<whLines.length;i++){
         var vals=parseCSVLine(whLines[i]);
-        // Status column can shift per row due to variable CSV fields (PIX data etc.)
-        // Search for APPROVED in the row instead of fixed column
+        // PIX data inserts extra cols at position 26+, shifting only status (col 33→36).
+        // Cols 0-25 (sck, approved_date, price) are ALWAYS at expected positions.
+        // So: use fixed cols for sck/ts/price, search for APPROVED anywhere.
         var hasApproved=false;
         for(var si=0;si<vals.length;si++){if(vals[si]==='APPROVED'){hasApproved=true;break;}}
         if(!hasApproved)continue;
 
-        // approved_date: find timestamp near expected column (search +-5 cols)
-        var ts=0;
-        for(var ai=Math.max(0,wColApproved-5);ai<=Math.min(vals.length-1,wColApproved+5);ai++){
-          var candidate=parseInt(vals[ai]);
-          if(!isNaN(candidate)&&candidate>1700000000000&&candidate<1900000000000){ts=candidate;break;}
+        // Cols 0-25 are normally fixed. For rare edge cases (USD transactions),
+        // cols shift early. Use fixed col first, fallback to nearby search.
+        var ts=parseInt(vals[wColApproved]); // col 20
+        if(isNaN(ts)||ts<1700000000000||ts>1900000000000){
+          // Fallback: search nearby for timestamp
+          for(var ti=15;ti<=30&&!ts;ti++){var tc=parseInt(vals[ti]);if(!isNaN(tc)&&tc>1700000000000&&tc<1900000000000)ts=tc;}
         }
-        if(!ts)continue;
-        // Adjust UTC to Brazil (UTC-3)
+        if(!ts||isNaN(ts))continue;
         var dtObj=new Date(ts - 3*3600000);
         var ymd=dtObj.getUTCFullYear()+'-'+String(dtObj.getUTCMonth()+1).padStart(2,'0')+'-'+String(dtObj.getUTCDate()).padStart(2,'0');
-        if(ymd<CUTOFF)continue; // só dados novos
+        if(ymd<CUTOFF)continue;
 
-        // Price: search near expected column for a plausible price value (1-9999)
-        var price=0;
-        for(var pi=Math.max(0,wColPrice-5);pi<=Math.min(vals.length-1,wColPrice+5);pi++){
-          var pCandidate=parseFloat((vals[pi]||'').replace(',','.'));
-          if(!isNaN(pCandidate)&&pCandidate>0&&pCandidate<10000){price=pCandidate;break;}
+        var price=parseFloat((vals[wColPrice]||'0').replace(',','.'))||0; // col 25
+        if(price<=0){
+          // Fallback: search nearby for a plausible product price (>=30)
+          for(var pi=20;pi<=35&&price<=0;pi++){var pc=parseFloat((vals[pi]||'').replace(',','.'));if(!isNaN(pc)&&pc>=30&&pc<10000)price=pc;}
         }
         if(price<=0)continue;
 
@@ -1688,11 +1688,10 @@ function fetchLiveData(){
         whDaySales[ddmmyyyy].compras++;
         whDaySales[ddmmyyyy].fat+=price;
 
-        // SCK: search near expected column for meta_ads or bio_ string
-        var sck='';
-        for(var sci=Math.max(0,wColSck-5);sci<=Math.min(vals.length-1,wColSck+5);sci++){
-          var sCandidate=vals[sci]||'';
-          if(sCandidate.indexOf('meta_ads')>=0||sCandidate.indexOf('bio_')>=0||sCandidate.indexOf('biolink')>=0||sCandidate.indexOf('grupovip')>=0||sCandidate.indexOf('PAGINA')>=0){sck=sCandidate;break;}
+        var sck=vals[wColSck]||''; // col 18
+        if(!sck||sck==='FALSE'||sck==='TRUE'){
+          // Fallback: search nearby for sck value
+          for(var sci=15;sci<=25;sci++){var sv=vals[sci]||'';if(sv.indexOf('meta_ads')>=0||sv.indexOf('bio')>=0||sv.indexOf('grupovip')>=0||sv.indexOf('PAGINA')>=0||sv.indexOf('HOTMART')>=0){sck=sv;break;}}
         }
         var criMatch=sck.match(/DES-\w+/);
         if(criMatch){
@@ -1727,8 +1726,10 @@ function fetchLiveData(){
         });
         if(!_pgFound && sck.indexOf('meta_ads')>=0){
           PAGE_TOTALS["Ads (sem tag)"].compras++;PAGE_TOTALS["Ads (sem tag)"].fat+=price;
-        } else if(!_pgFound && sck){
+        } else if(!_pgFound && (sck.indexOf('bio')>=0||sck.indexOf('grupovip')>=0)){
           PAGE_TOTALS["Orgânico"].compras++;PAGE_TOTALS["Orgânico"].fat+=price;
+        } else if(!_pgFound && sck){
+          PAGE_TOTALS["Outros"].compras++;PAGE_TOTALS["Outros"].fat+=price;
         } else if(!_pgFound){
           PAGE_TOTALS["Outros"].compras++;PAGE_TOTALS["Outros"].fat+=price;
         }
