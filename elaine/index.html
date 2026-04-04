@@ -1365,11 +1365,12 @@ var DESAFIOS_RANGES = [
 function calcDesafioData(){
   var fd=filteredDias();
   return DESAFIOS_RANGES.map(function(range){
-    var inv=0,cliq=0,imps=0,pvs=0,cks=0,dias=0;
+    var inv=0,cliq=0,imps=0,pvs=0,cks=0,dias=0,comprasTotal=0;
     fd.forEach(function(d){
       var iso=toISO(d.data);
       if(iso>=range.de && iso<=range.ate){
         inv+=d.inv; cliq+=d.cliques; imps+=d.imp; pvs+=d.pv; cks+=d.ck; dias++;
+        comprasTotal+=(d.compras||0);
       }
     });
     // Compute compras/fat from SALE_LOG (has all sales: pre-CUTOFF hardcoded + post-CUTOFF from webhook)
@@ -1389,18 +1390,18 @@ function calcDesafioData(){
     var cpc=cliq>0?(inv/cliq):0;
     var cpm=imps>0?(inv/imps*1000):0;
     var taxaEntrada=cliq>0?(pvs/cliq*100):0;
-    var taxaCompra=pvs>0?(comp/pvs*100):0;
-    var cac=comp>0?(inv/comp):0;
-    var ticket=comp>0?(fatTotal/comp):0;
+    var taxaCompra=pvs>0?(comprasTotal/pvs*100):0;
+    var cac=comprasTotal>0?(inv/comprasTotal):0;
+    var ticket=comprasTotal>0?(fatTotal/comprasTotal):0;
     var roas=inv>0?(fatTotal/inv):0;
     var upsellQtd=range.upsellQtd||0;
     var upsellFat=upsellQtd*(range.upsellTicket||0);
-    var taxaUpsell=comp>0?(upsellQtd/comp*100):0;
+    var taxaUpsell=comprasTotal>0?(upsellQtd/comprasTotal*100):0;
     var fatGeral=fatTotal+upsellFat;
     var roasGeral=inv>0?(fatGeral/inv):0;
     return {nome:range.nome, cor:range.cor, de:range.de, ate:range.ate, dias:dias,
       inv:inv, fatAds:fatAds, obCompras:obComp, obFat:obFat, fatTotal:fatTotal,
-      compras:comp, cliques:cliq, imp:imps, pv:pvs, ck:cks,
+      compras:comp, comprasTotal:comprasTotal, cliques:cliq, imp:imps, pv:pvs, ck:cks,
       ctr:ctr, cpc:cpc, cpm:cpm, taxaEntrada:taxaEntrada, taxaCompra:taxaCompra,
       cac:cac, ticket:ticket, roas:roas,
       upsellQtd:upsellQtd, upsellTicket:range.upsellTicket||0, upsellFat:upsellFat,
@@ -1428,15 +1429,15 @@ function makeDesChart(canvasId, chartVar, data, nomes, cores, coresBg, valuesFn,
 function renderDesafios(){
   var data=calcDesafioData();
   // KPIs do acumulado geral
-  var totInv=0,totFat=0,totComp=0,totOb=0,totObFat=0,totCliq=0,totImp=0,totPv=0;
-  data.forEach(function(d){totInv+=d.inv;totFat+=d.fatTotal;totComp+=d.compras;totOb+=d.obCompras;totObFat+=d.obFat;totCliq+=d.cliques;totImp+=d.imp;totPv+=d.pv});
+  var totInv=0,totFat=0,totComp=0,totCompTotal=0,totOb=0,totObFat=0,totCliq=0,totImp=0,totPv=0;
+  data.forEach(function(d){totInv+=d.inv;totFat+=d.fatTotal;totComp+=d.compras;totCompTotal+=d.comprasTotal;totOb+=d.obCompras;totObFat+=d.obFat;totCliq+=d.cliques;totImp+=d.imp;totPv+=d.pv});
   var totRoas=totInv>0?totFat/totInv:0;
-  var totCac=totComp>0?totInv/totComp:0;
+  var totCac=totCompTotal>0?totInv/totCompTotal:0;
   document.getElementById('kpi-desafios').innerHTML=
     '<div class="kpi-card"><div class="kpi-label">Investimento Total</div><div class="kpi-value orange">'+brl(totInv)+'</div></div>'+
     '<div class="kpi-card"><div class="kpi-label">Faturamento (Ads + OB)</div><div class="kpi-value green">'+brl(totFat)+'</div></div>'+
     '<div class="kpi-card"><div class="kpi-label">ROAS (Ads + OB)</div><div class="kpi-value '+(totRoas>=1.7?'green':totRoas>=1?'yellow':'red')+'">'+br(totRoas)+'x</div></div>'+
-    '<div class="kpi-card"><div class="kpi-label">Compras</div><div class="kpi-value orange">'+num(totComp)+'</div></div>'+
+    '<div class="kpi-card"><div class="kpi-label">Compras (Total)</div><div class="kpi-value orange">'+num(totCompTotal)+'</div></div>'+
     '<div class="kpi-card"><div class="kpi-label">CAC</div><div class="kpi-value '+(totCac>0&&totCac<=35?'green':totCac<=50?'yellow':'red')+'">'+brl(totCac)+'</div></div>'+
     '<div class="kpi-card"><div class="kpi-label">Order Bumps</div><div class="kpi-value">'+num(totOb)+' · '+brl(totObFat)+'</div></div>';
 
@@ -1459,7 +1460,7 @@ function renderDesafios(){
     function(d){return Math.round(d.cpm*100)/100},function(v){return 'R$ '+Number(v).toFixed(2)});
 
   chartDesCac=makeDesChart('chartDesCac',chartDesCac,data,nomes,cores,coresBg,
-    function(d){return d.compras>0?Math.round(d.cac*100)/100:0},function(v){return 'R$ '+Number(v).toFixed(2)});
+    function(d){return d.comprasTotal>0?Math.round(d.cac*100)/100:0},function(v){return 'R$ '+Number(v).toFixed(2)});
 
   chartDesTxConv=makeDesChart('chartDesTxConv',chartDesTxConv,data,nomes,cores,coresBg,
     function(d){return Math.round(d.taxaCompra*100)/100},function(v){return v+'%'});
@@ -1468,7 +1469,7 @@ function renderDesafios(){
     function(d){return Math.round(d.taxaEntrada*100)/100},function(v){return v+'%'});
 
   chartDesTicket=makeDesChart('chartDesTicket',chartDesTicket,data,nomes,cores,coresBg,
-    function(d){return d.compras>0?Math.round(d.ticket*100)/100:0},function(v){return 'R$ '+Number(v).toFixed(2)});
+    function(d){return d.comprasTotal>0?Math.round(d.ticket*100)/100:0},function(v){return 'R$ '+Number(v).toFixed(2)});
 
   // Inv vs Fat chart (grouped bar)
   if(chartDesInvFat){chartDesInvFat.destroy()}
@@ -1562,14 +1563,15 @@ function renderDebriefing(){
   row('Taxa de Entrada', function(d){return pct(d.taxaEntrada)});
   row('Taxa de Conversão', function(d){return pct(d.taxaCompra)});
   row('CPM', function(d){return brl(d.cpm)});
-  row('Ticket Médio', function(d){return d.compras>0?brl(d.ticket):'—'});
+  row('Ticket Médio', function(d){return d.comprasTotal>0?brl(d.ticket):'—'});
   row('ROAS (Ingressos + OB)', function(d){return br(d.roas)+'x'}, {bold:true, cls:function(d){return d.roas>=1.7?'green':d.roas>=1?'yellow':'red'}});
-  row('CAC', function(d){return d.compras>0?brl(d.cac):'—'}, {cls:function(d){return d.cac>0&&d.cac<=35?'green':d.cac<=50?'yellow':'red'}});
+  row('CAC', function(d){return d.comprasTotal>0?brl(d.cac):'—'}, {cls:function(d){return d.cac>0&&d.cac<=35?'green':d.cac<=50?'yellow':'red'}});
 
   // SEÇÃO: Financeiro Ingressos
   sep('Financeiro — Ingressos');
   row('Investimento', function(d){return brl(d.inv)}, {bold:true});
-  row('Vendas Ingressos', function(d){return num(d.compras)});
+  row('Vendas Ingressos (Total)', function(d){return num(d.comprasTotal)}, {bold:true});
+  row('  └ Via Ads', function(d){return num(d.compras)});
   row('Faturamento Ingressos', function(d){return brl(d.fatAds)}, {bold:true});
 
   // SEÇÃO: Order Bumps
