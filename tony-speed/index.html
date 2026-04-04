@@ -1,0 +1,1247 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tony Belleza - Speed to Lead Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica Neue', sans-serif;
+            background: #1a1a2e;
+            color: #ffffff;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            color: #ff6b35;
+        }
+
+        .subtitle {
+            color: #b0b0b0;
+            font-size: 0.95rem;
+        }
+
+        /* TABS */
+        .tab-container {
+            display: flex;
+            gap: 0;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid #3a3a5e;
+            flex-wrap: wrap;
+        }
+
+        .tab-button {
+            padding: 1rem 1.5rem;
+            background: transparent;
+            border: none;
+            color: #b0b0b0;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 600;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .tab-button:hover {
+            color: #ffffff;
+        }
+
+        .tab-button.active {
+            color: #ff6b35;
+            border-bottom-color: #ff6b35;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* FILTER BAR */
+        .filter-bar {
+            background: linear-gradient(135deg, #2a2a4e 0%, #1e1e3f 100%);
+            padding: 1.5rem 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+            border: 1px solid #3a3a5e;
+        }
+
+        .filter-label {
+            color: #b0b0b0;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .filter-date-input {
+            padding: 0.75rem 0.75rem;
+            background: #1a1a2e;
+            border: 1px solid #3a3a5e;
+            color: #ffffff;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        .filter-date-input::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+            cursor: pointer;
+        }
+
+        .filter-date-input:focus {
+            outline: none;
+            border-color: #ff6b35;
+            box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
+        }
+
+        .filter-range-display {
+            color: #b0b0b0;
+            font-size: 0.9rem;
+            margin-left: auto;
+        }
+
+        .filter-button-group {
+            display: flex;
+            gap: 0.5rem;
+            margin-left: auto;
+        }
+
+        .filter-apply-btn {
+            padding: 0.75rem 1.5rem;
+            background: #ff6b35;
+            border: 1px solid #ff6b35;
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: background 0.3s ease;
+        }
+
+        .filter-apply-btn:hover {
+            background: #ff5a1f;
+        }
+
+        .filter-reset-btn {
+            padding: 0.75rem 1rem;
+            background: transparent;
+            border: 1px solid #3a3a5e;
+            color: #b0b0b0;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+
+        .filter-reset-btn:hover {
+            border-color: #ff6b35;
+            color: #ff6b35;
+        }
+
+        /* KPI CARDS */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .kpi-card {
+            background: linear-gradient(135deg, #2a2a4e 0%, #1e1e3f 100%);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid #3a3a5e;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .kpi-card:hover {
+            border-color: #ff6b35;
+            transform: translateY(-2px);
+        }
+
+        .kpi-label {
+            color: #b0b0b0;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+
+        .kpi-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        .kpi-value.positive {
+            color: #00c853;
+        }
+
+        .kpi-value.negative {
+            color: #ff1744;
+        }
+
+        .kpi-subtext {
+            color: #b0b0b0;
+            font-size: 0.75rem;
+            margin-top: 0.3rem;
+        }
+
+        /* FUNNEL */
+        .funnel-container {
+            background: linear-gradient(135deg, #2a2a4e 0%, #1e1e3f 100%);
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            border: 1px solid #3a3a5e;
+        }
+
+        .funnel-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            color: #ff6b35;
+        }
+
+        .funnel-chart {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .funnel-row {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .funnel-stage {
+            flex: 1;
+        }
+
+        .funnel-bar {
+            background: linear-gradient(135deg, #ff6b35, #ff9a6b);
+            border-radius: 8px;
+            padding: 1rem 1.5rem;
+            color: white;
+            font-weight: 700;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 50px;
+            transition: all 0.3s;
+        }
+
+        .funnel-bar.stage-2 {
+            background: linear-gradient(135deg, #ff8c42, #ffb07a);
+        }
+
+        .funnel-bar.stage-3 {
+            background: linear-gradient(135deg, #ffa726, #ffc976);
+        }
+
+        .funnel-bar.stage-4 {
+            background: linear-gradient(135deg, #00c853, #69f0ae);
+        }
+
+        .funnel-label {
+            font-size: 0.9rem;
+            color: #b0b0b0;
+            font-weight: 600;
+            margin-bottom: 0.3rem;
+        }
+
+        .funnel-metrics {
+            text-align: right;
+            min-width: 180px;
+        }
+
+        .funnel-metrics .rate {
+            font-size: 0.85rem;
+            color: #00c853;
+            font-weight: 600;
+        }
+
+        .funnel-metrics .rate.alert {
+            color: #ff1744;
+        }
+
+        .funnel-metrics .rate-label {
+            font-size: 0.75rem;
+            color: #7a7a9e;
+        }
+
+        .funnel-arrow {
+            text-align: center;
+            padding: 0.3rem 0;
+            color: #3a3a5e;
+            font-size: 1.5rem;
+            margin-left: 60px;
+        }
+
+        /* CHARTS */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-container {
+            background: linear-gradient(135deg, #2a2a4e 0%, #1e1e3f 100%);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid #3a3a5e;
+            position: relative;
+            height: 400px;
+        }
+
+        .chart-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #ff6b35;
+        }
+
+        canvas {
+            max-height: 350px;
+        }
+
+        /* TABLE */
+        .table-container {
+            background: linear-gradient(135deg, #2a2a4e 0%, #1e1e3f 100%);
+            border-radius: 12px;
+            border: 1px solid #3a3a5e;
+            overflow: hidden;
+            margin-bottom: 2rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        thead {
+            background: #1e1e3f;
+            border-bottom: 2px solid #3a3a5e;
+        }
+
+        th {
+            padding: 1rem;
+            text-align: left;
+            color: #ff6b35;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid #3a3a5e;
+            color: #ffffff;
+        }
+
+        tbody tr:hover {
+            background: rgba(255, 107, 53, 0.05);
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* STATUS BADGES */
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-escalar {
+            background: rgba(0, 200, 83, 0.2);
+            color: #00c853;
+        }
+
+        .status-testar {
+            background: rgba(255, 107, 53, 0.2);
+            color: #ff6b35;
+        }
+
+        .status-pausar {
+            background: rgba(255, 23, 68, 0.2);
+            color: #ff1744;
+        }
+
+        /* INSIGHT BOX */
+        .insight-box {
+            background: linear-gradient(135deg, #2a2a4e 0%, #1e1e3f 100%);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border-left: 4px solid #ff6b35;
+            margin-bottom: 2rem;
+            border: 1px solid #3a3a5e;
+            border-left: 4px solid #ff6b35;
+        }
+
+        .insight-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #ff6b35;
+            margin-bottom: 0.5rem;
+        }
+
+        .insight-content {
+            color: #b0b0b0;
+            line-height: 1.8;
+            font-size: 0.95rem;
+        }
+
+        .insight-content strong {
+            color: #ffffff;
+        }
+
+        .insight-highlight {
+            background: rgba(255, 107, 53, 0.1);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            color: #ff6b35;
+            font-weight: 600;
+        }
+
+        /* DAILY ANALYSIS */
+        .daily-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .daily-card {
+            background: linear-gradient(135deg, #2a2a4e 0%, #1e1e3f 100%);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid #3a3a5e;
+        }
+
+        .daily-date {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #ff6b35;
+            margin-bottom: 1rem;
+        }
+
+        .daily-metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #3a3a5e;
+        }
+
+        .daily-metric:last-child {
+            border-bottom: none;
+        }
+
+        .daily-metric-label {
+            color: #b0b0b0;
+            font-size: 0.9rem;
+        }
+
+        .daily-metric-value {
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        /* RESPONSIVE */
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            .kpi-grid {
+                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+                gap: 0.75rem;
+            }
+
+            .kpi-card {
+                padding: 1rem;
+            }
+
+            .kpi-value {
+                font-size: 1.2rem;
+            }
+
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .filter-bar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .filter-button-group {
+                margin-left: 0;
+            }
+
+            .filter-range-display {
+                margin-left: 0;
+                text-align: center;
+            }
+
+            .tab-button {
+                padding: 0.75rem 1rem;
+                font-size: 0.85rem;
+            }
+
+            .daily-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .funnel-row {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .funnel-metrics {
+                text-align: left;
+                min-width: auto;
+            }
+
+            .funnel-arrow {
+                margin-left: 0;
+            }
+        }
+
+        /* UTILITY */
+        .hidden {
+            display: none;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .mt-2 {
+            margin-top: 2rem;
+        }
+
+        .color-positive {
+            color: #00c853;
+        }
+
+        .color-negative {
+            color: #ff1744;
+        }
+
+        .color-warning {
+            color: #ff6b35;
+        }
+
+        .section-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #ff6b35;
+            margin-bottom: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .section-title:first-child {
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Tony Belleza - Speed to Lead</h1>
+            <p class="subtitle">Dashboard de Campanha Meta Ads - Análise de Performance</p>
+        </header>
+
+        <!-- TABS -->
+        <div class="tab-container">
+            <button class="tab-button active" onclick="showTab('overview')">Visão Geral</button>
+            <button class="tab-button" onclick="showTab('creatives')">Criativos</button>
+            <button class="tab-button" onclick="showTab('audiences')">Públicos</button>
+            <button class="tab-button" onclick="showTab('daily')">Análise Diária</button>
+            <button class="tab-button" onclick="showTab('diagnosis')">Diagnóstico & Ação</button>
+        </div>
+
+        <!-- FILTER BAR -->
+        <div class="filter-bar">
+            <span class="filter-label">De:</span>
+            <input type="date" id="dateFrom" class="filter-date-input" value="2026-03-26" onchange="applyFilter()">
+
+            <span class="filter-label" style="margin-left: 1rem;">Até:</span>
+            <input type="date" id="dateTo" class="filter-date-input" value="2026-03-31" onchange="applyFilter()">
+
+            <span class="filter-range-display" id="filterDisplay">26/03 - 31/03 (6 dias)</span>
+
+            <div class="filter-button-group">
+                <button class="filter-apply-btn" onclick="applyFilter()">Filtrar</button>
+                <button class="filter-reset-btn" onclick="resetFilter()">Todos</button>
+            </div>
+        </div>
+
+        <!-- TAB 1: VISÃO GERAL -->
+        <div id="overview" class="tab-content active">
+            <!-- KPI CARDS -->
+            <div class="kpi-grid" id="kpiGrid"></div>
+
+            <!-- FUNNEL -->
+            <div class="funnel-container">
+                <div class="funnel-title">Funil de Conversão</div>
+                <div class="funnel-chart" id="funnelChart"></div>
+            </div>
+
+            <!-- CHARTS -->
+            <div class="charts-grid">
+                <div class="chart-container">
+                    <div class="chart-title">CPL e Investimento Diário (Dual Y-Axis)</div>
+                    <canvas id="cplInvestmentChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-title">Evolução de Gasto Diário</div>
+                    <canvas id="spendChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: CRIATIVOS -->
+        <div id="creatives" class="tab-content">
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Criativo</th>
+                            <th>Link</th>
+                            <th>Gasto Total</th>
+                            <th>Impressões</th>
+                            <th>Cliques</th>
+                            <th>CTR</th>
+                            <th>CPC</th>
+                            <th>Leads</th>
+                            <th>CPL</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="creativesTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB 3: PÚBLICOS -->
+        <div id="audiences" class="tab-content">
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Público</th>
+                            <th>Gasto Total</th>
+                            <th>Alcance</th>
+                            <th>Impressões</th>
+                            <th>Cliques</th>
+                            <th>CTR</th>
+                            <th>CPC</th>
+                            <th>Leads</th>
+                            <th>CPL</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="audiencesTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB 4: ANÁLISE DIÁRIA -->
+        <div id="daily" class="tab-content">
+            <div class="daily-grid" id="dailyGrid"></div>
+        </div>
+
+        <!-- TAB 5: DIAGNÓSTICO & AÇÃO (removido por análise interna) -->
+        <div id="diagnosis" class="tab-content">
+            <p style="color:#7a7a9e; text-align:center; padding:3rem;">Análise de diagnóstico realizada internamente pela equipe.</p>
+        </div>
+    </div>
+
+    <script>
+        // GOOGLE SHEETS CONFIG
+        const SHEET_ID = '1NDBG9l_vy2Se7VGOhRhDUcjSCMUlyhi7Ks1FxfDJMqI';
+        const SHEET_NAME = 'Capta%C3%A7%C3%A3o';
+        const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${SHEET_NAME}`;
+
+        let rawData = [];
+        let currentData = [];
+
+        // PARSE CSV FROM GOOGLE SHEETS
+        function parseCSV(csv) {
+            const lines = csv.split('\n').filter(l => l.trim());
+            const data = [];
+            for (let i = 1; i < lines.length; i++) {
+                const vals = lines[i].match(/(".*?"|[^,]+)/g);
+                if (!vals || vals.length < 11) continue;
+                const clean = vals.map(v => v.replace(/^"|"$/g, '').trim());
+                // Parse spend: "R$ 0,01" or "$0.01" or plain number
+                let spend = clean[5];
+                spend = spend.replace('R$', '').replace('$', '').trim();
+                spend = spend.replace(/\./g, '').replace(',', '.');
+                spend = parseFloat(spend) || 0;
+
+                // Extract campaign type (CBO or ABO) from campaign name
+                const campName = clean[1];
+                const campType = campName.includes('ABO') ? 'ABO' : campName.includes('CBO') ? 'CBO' : campName;
+
+                // Clean adset name (remove "00 - " prefix)
+                const adset = clean[2].replace(/^\d+\s*-\s*/, '');
+
+                data.push({
+                    date: clean[0],
+                    campaign: campType,
+                    adset: adset,
+                    ad: clean[3],
+                    url: clean[4],
+                    spend: spend,
+                    reach: parseInt(clean[6]) || 0,
+                    impressions: parseInt(clean[7]) || 0,
+                    clicks: parseInt(clean[8]) || 0,
+                    pageviews: parseInt(clean[9]) || 0,
+                    leads: parseInt(clean[10]) || 0
+                });
+            }
+            return data;
+        }
+
+        // FETCH DATA FROM GOOGLE SHEETS
+        async function fetchData() {
+            try {
+                document.getElementById('kpiGrid').innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#ff6b35;padding:2rem;font-size:1.2rem;">Carregando dados da planilha...</div>';
+                const response = await fetch(CSV_URL);
+                const csv = await response.text();
+                rawData = parseCSV(csv);
+
+                if (rawData.length === 0) {
+                    document.getElementById('kpiGrid').innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#ff1744;padding:2rem;">Erro: nenhum dado encontrado na planilha.</div>';
+                    return;
+                }
+
+                // Set date range from actual data
+                const dates = rawData.map(r => r.date).sort();
+                const minDate = dates[0];
+                const maxDate = dates[dates.length - 1];
+                document.getElementById('dateFrom').value = minDate;
+                document.getElementById('dateFrom').min = minDate;
+                document.getElementById('dateFrom').max = maxDate;
+                document.getElementById('dateTo').value = maxDate;
+                document.getElementById('dateTo').min = minDate;
+                document.getElementById('dateTo').max = maxDate;
+
+                currentData = [...rawData];
+                updateFilterDisplay();
+                render();
+            } catch (error) {
+                document.getElementById('kpiGrid').innerHTML = `<div style="grid-column:1/-1;text-align:center;color:#ff1744;padding:2rem;">Erro ao carregar planilha: ${error.message}<br><small style="color:#7a7a9e;">Verifique se a planilha está com acesso público.</small></div>`;
+            }
+        }
+        let chartInstances = {
+            cplInvestment: null,
+            spend: null
+        };
+
+        // HELPER FUNCTIONS
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }).format(value);
+        }
+
+        function formatPercent(value) {
+            return (value * 100).toFixed(2) + '%';
+        }
+
+        function formatNumber(value) {
+            return value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        }
+
+        function getDateRange() {
+            const from = document.getElementById('dateFrom').value;
+            const to = document.getElementById('dateTo').value;
+            const fromDate = new Date(from);
+            const toDate = new Date(to);
+            const diffTime = Math.abs(toDate - fromDate);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+            const fromStr = fromDate.toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit' });
+            const toStr = toDate.toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit' });
+            return { from, to, fromStr, toStr, diffDays };
+        }
+
+        function updateFilterDisplay() {
+            const range = getDateRange();
+            document.getElementById('filterDisplay').textContent = `${range.fromStr} - ${range.toStr} (${range.diffDays} dias)`;
+        }
+
+        function filterData() {
+            const { from, to } = getDateRange();
+            currentData = rawData.filter(row => row.date >= from && row.date <= to);
+            updateFilterDisplay();
+            render();
+        }
+
+        function applyFilter() {
+            filterData();
+        }
+
+        function resetFilter() {
+            if (rawData.length === 0) return;
+            const dates = rawData.map(r => r.date).sort();
+            document.getElementById('dateFrom').value = dates[0];
+            document.getElementById('dateTo').value = dates[dates.length - 1];
+            filterData();
+        }
+
+        function calcKPIs(data) {
+            const totalSpend = data.reduce((sum, row) => sum + row.spend, 0);
+            const totalImpressions = data.reduce((sum, row) => sum + row.impressions, 0);
+            const totalClicks = data.reduce((sum, row) => sum + row.clicks, 0);
+            const totalPageviews = data.reduce((sum, row) => sum + row.pageviews, 0);
+            const totalLeads = data.reduce((sum, row) => sum + row.leads, 0);
+            const totalReach = data.reduce((sum, row) => sum + row.reach, 0);
+
+            const ctr = totalClicks / totalImpressions || 0;
+            const cpc = totalClicks > 0 ? totalSpend / totalClicks : 0;
+            const cpm = totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : 0;
+            const cpl = totalLeads > 0 ? totalSpend / totalLeads : 0;
+            const pvRate = totalClicks > 0 ? totalPageviews / totalClicks : 0;
+            const leadRate = totalPageviews > 0 ? totalLeads / totalPageviews : 0;
+
+            return {
+                totalSpend, totalImpressions, totalClicks, totalPageviews, totalLeads, totalReach,
+                ctr, cpc, cpm, cpl, pvRate, leadRate
+            };
+        }
+
+        function getStatusBadge(data) {
+            const { leads, clicks, ctr, cpm } = data;
+            if (leads > 0) return { status: 'ESCALAR', class: 'status-escalar' };
+            if (clicks < 2 || cpm > 50) return { status: 'TESTAR', class: 'status-testar' };
+            return { status: 'PAUSAR', class: 'status-pausar' };
+        }
+
+        function aggregateByAd(data) {
+            const agg = {};
+            data.forEach(row => {
+                if (!agg[row.ad]) agg[row.ad] = { ad: row.ad, spend: 0, impressions: 0, clicks: 0, leads: 0, urls: new Set() };
+                agg[row.ad].spend += row.spend;
+                agg[row.ad].impressions += row.impressions;
+                agg[row.ad].clicks += row.clicks;
+                agg[row.ad].leads += row.leads;
+                if (row.url) agg[row.ad].urls.add(row.url);
+            });
+            return Object.values(agg).sort((a, b) => b.leads - a.leads || b.spend - a.spend);
+        }
+
+        function aggregateByAdset(data) {
+            const agg = {};
+            data.forEach(row => {
+                if (!agg[row.adset]) agg[row.adset] = { adset: row.adset, spend: 0, reach: 0, impressions: 0, clicks: 0, leads: 0 };
+                agg[row.adset].spend += row.spend;
+                agg[row.adset].reach += row.reach;
+                agg[row.adset].impressions += row.impressions;
+                agg[row.adset].clicks += row.clicks;
+                agg[row.adset].leads += row.leads;
+            });
+            return Object.values(agg).sort((a, b) => b.leads - a.leads || b.spend - a.spend);
+        }
+
+        function aggregateByDate(data) {
+            const agg = {};
+            data.forEach(row => {
+                if (!agg[row.date]) agg[row.date] = { date: row.date, spend: 0, impressions: 0, clicks: 0, pageviews: 0, leads: 0 };
+                agg[row.date].spend += row.spend;
+                agg[row.date].impressions += row.impressions;
+                agg[row.date].clicks += row.clicks;
+                agg[row.date].pageviews += row.pageviews;
+                agg[row.date].leads += row.leads;
+            });
+            return Object.values(agg).sort((a, b) => new Date(a.date) - new Date(b.date));
+        }
+
+        // RENDER FUNCTIONS
+        function renderKPIs() {
+            const kpis = calcKPIs(currentData);
+            const kpiGrid = document.getElementById('kpiGrid');
+            kpiGrid.innerHTML = `
+                <div class="kpi-card">
+                    <div class="kpi-label">Investimento Total</div>
+                    <div class="kpi-value">${formatCurrency(kpis.totalSpend)}</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">CTR Médio</div>
+                    <div class="kpi-value">${formatPercent(kpis.ctr)}</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">CPC Médio</div>
+                    <div class="kpi-value">${formatCurrency(kpis.cpc)}</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">CPM Médio</div>
+                    <div class="kpi-value">${formatCurrency(kpis.cpm)}</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">CPL Médio</div>
+                    <div class="kpi-value">${formatCurrency(kpis.cpl)}</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Cliques</div>
+                    <div class="kpi-value">${formatNumber(kpis.totalClicks)}</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Page Views</div>
+                    <div class="kpi-value">${formatNumber(kpis.totalPageviews)}</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Leads</div>
+                    <div class="kpi-value positive">${formatNumber(kpis.totalLeads)}</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Alcance Total</div>
+                    <div class="kpi-value">${formatNumber(kpis.totalReach)}</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Impressões Totais</div>
+                    <div class="kpi-value">${formatNumber(kpis.totalImpressions)}</div>
+                </div>
+            `;
+        }
+
+        function renderFunnel() {
+            const kpis = calcKPIs(currentData);
+            const imp = kpis.totalImpressions;
+            const cli = kpis.totalClicks;
+            const pvs = kpis.totalPageviews;
+            const leads = kpis.totalLeads;
+
+            const ctrPct = imp > 0 ? ((cli / imp) * 100).toFixed(2) : '0.00';
+            const pvPct = cli > 0 ? ((pvs / cli) * 100).toFixed(2) : '0.00';
+            const leadPct = pvs > 0 ? ((leads / pvs) * 100).toFixed(2) : '0.00';
+
+            const maxW = 100;
+            const cliW = Math.max(30, imp > 0 ? (cli / imp) * maxW : 30);
+            const pvW = Math.max(20, cli > 0 ? (pvs / cli) * cliW : 20);
+            const leadW = Math.max(15, pvs > 0 ? (leads / pvs) * pvW : 15);
+
+            const f = document.getElementById('funnelChart');
+            f.innerHTML = `
+                <div class="funnel-row">
+                    <div class="funnel-stage">
+                        <div class="funnel-label">Impressões</div>
+                        <div class="funnel-bar" style="width:100%">${formatNumber(imp)}</div>
+                    </div>
+                    <div class="funnel-metrics"></div>
+                </div>
+                <div class="funnel-arrow">↓</div>
+                <div class="funnel-row">
+                    <div class="funnel-stage">
+                        <div class="funnel-label">Cliques</div>
+                        <div class="funnel-bar stage-2" style="width:${cliW}%">${formatNumber(cli)}</div>
+                    </div>
+                    <div class="funnel-metrics">
+                        <div class="rate">${ctrPct}%</div>
+                        <div class="rate-label">Taxa de Clique (CTR)</div>
+                    </div>
+                </div>
+                <div class="funnel-arrow">↓</div>
+                <div class="funnel-row">
+                    <div class="funnel-stage">
+                        <div class="funnel-label">Page Views</div>
+                        <div class="funnel-bar stage-3" style="width:${pvW}%">${formatNumber(pvs)}</div>
+                    </div>
+                    <div class="funnel-metrics">
+                        <div class="rate ${pvs < cli ? 'alert' : ''}">${pvPct}%</div>
+                        <div class="rate-label">Taxa de Entrada</div>
+                    </div>
+                </div>
+                <div class="funnel-arrow">↓</div>
+                <div class="funnel-row">
+                    <div class="funnel-stage">
+                        <div class="funnel-label">Leads</div>
+                        <div class="funnel-bar stage-4" style="width:${leadW}%">${formatNumber(leads)}</div>
+                    </div>
+                    <div class="funnel-metrics">
+                        <div class="rate ${leads > pvs ? 'alert' : ''}">${leadPct}%</div>
+                        <div class="rate-label">Taxa de Cadastro</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function destroyCharts() {
+            if (chartInstances.cplInvestment) chartInstances.cplInvestment.destroy();
+            if (chartInstances.spend) chartInstances.spend.destroy();
+        }
+
+        function renderCharts() {
+            destroyCharts();
+            const dailyData = aggregateByDate(currentData);
+            const dates = dailyData.map(d => new Date(d.date).toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit' }));
+            const spends = dailyData.map(d => d.spend);
+            const cpls = dailyData.map(d => d.leads > 0 ? d.spend / d.leads : 0);
+
+            // CPL and Investment Chart
+            const ctx1 = document.getElementById('cplInvestmentChart').getContext('2d');
+            chartInstances.cplInvestment = new Chart(ctx1, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [
+                        {
+                            label: 'CPL (USD)',
+                            data: cpls,
+                            borderColor: '#ff6b35',
+                            backgroundColor: 'rgba(255, 107, 53, 0.1)',
+                            yAxisID: 'y',
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: 'Investimento (USD)',
+                            data: spends,
+                            borderColor: '#00c853',
+                            backgroundColor: 'rgba(0, 200, 83, 0.1)',
+                            yAxisID: 'y1',
+                            tension: 0.4,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: {
+                            labels: { color: '#b0b0b0', usePointStyle: true }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: { display: true, text: 'CPL (USD)', color: '#ff6b35' },
+                            ticks: { color: '#b0b0b0' },
+                            grid: { color: '#3a3a5e' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: { display: true, text: 'Investimento (USD)', color: '#00c853' },
+                            ticks: { color: '#b0b0b0' },
+                            grid: { drawOnChartArea: false }
+                        },
+                        x: {
+                            ticks: { color: '#b0b0b0' },
+                            grid: { color: '#3a3a5e' }
+                        }
+                    }
+                }
+            });
+
+            // Spend Chart
+            const ctx2 = document.getElementById('spendChart').getContext('2d');
+            chartInstances.spend = new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: 'Gasto (USD)',
+                        data: spends,
+                        backgroundColor: '#ff6b35',
+                        borderColor: '#ff5a1f',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#b0b0b0' }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            ticks: { color: '#b0b0b0' },
+                            grid: { color: '#3a3a5e' }
+                        },
+                        x: {
+                            ticks: { color: '#b0b0b0' },
+                            grid: { color: '#3a3a5e' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderCreatives() {
+            const ads = aggregateByAd(currentData);
+            const tbody = document.getElementById('creativesTableBody');
+            tbody.innerHTML = ads.map(ad => {
+                const ctr = ad.impressions > 0 ? ad.clicks / ad.impressions : 0;
+                const cpc = ad.clicks > 0 ? ad.spend / ad.clicks : 0;
+                const cpl = ad.leads > 0 ? ad.spend / ad.leads : 0;
+                const badge = getStatusBadge({ leads: ad.leads, clicks: ad.clicks, ctr, cpm: (ad.spend / ad.impressions) * 1000 });
+                const urlList = Array.from(ad.urls);
+                const linkHtml = urlList.length > 0
+                    ? `<a href="${urlList[0]}" target="_blank" style="color:#ff6b35;text-decoration:none;" title="${urlList[0]}">Ver anúncio</a>`
+                    : '-';
+                return `
+                    <tr>
+                        <td><strong>${ad.ad}</strong></td>
+                        <td>${linkHtml}</td>
+                        <td>${formatCurrency(ad.spend)}</td>
+                        <td>${formatNumber(ad.impressions)}</td>
+                        <td>${formatNumber(ad.clicks)}</td>
+                        <td>${formatPercent(ctr)}</td>
+                        <td>${formatCurrency(cpc)}</td>
+                        <td>${formatNumber(ad.leads)}</td>
+                        <td>${formatCurrency(cpl)}</td>
+                        <td><span class="status-badge ${badge.class}">${badge.status}</span></td>
+                    </tr>
+                `;
+            }).join('');
+
+        }
+
+        function renderAudiences() {
+            const adsets = aggregateByAdset(currentData);
+            const tbody = document.getElementById('audiencesTableBody');
+            tbody.innerHTML = adsets.map(adset => {
+                const ctr = adset.impressions > 0 ? adset.clicks / adset.impressions : 0;
+                const cpc = adset.clicks > 0 ? adset.spend / adset.clicks : 0;
+                const cpl = adset.leads > 0 ? adset.spend / adset.leads : 0;
+                const badge = getStatusBadge({ leads: adset.leads, clicks: adset.clicks, ctr, cpm: (adset.spend / adset.impressions) * 1000 });
+                return `
+                    <tr>
+                        <td><strong>${adset.adset}</strong></td>
+                        <td>${formatCurrency(adset.spend)}</td>
+                        <td>${formatNumber(adset.reach)}</td>
+                        <td>${formatNumber(adset.impressions)}</td>
+                        <td>${formatNumber(adset.clicks)}</td>
+                        <td>${formatPercent(ctr)}</td>
+                        <td>${formatCurrency(cpc)}</td>
+                        <td>${formatNumber(adset.leads)}</td>
+                        <td>${formatCurrency(cpl)}</td>
+                        <td><span class="status-badge ${badge.class}">${badge.status}</span></td>
+                    </tr>
+                `;
+            }).join('');
+
+        }
+
+        function renderDaily() {
+            const dailyData = aggregateByDate(currentData);
+            const dailyGrid = document.getElementById('dailyGrid');
+            dailyGrid.innerHTML = dailyData.map(day => {
+                const dateObj = new Date(day.date);
+                const dateStr = dateObj.toLocaleDateString('pt-BR', { weekday: 'short', month: '2-digit', day: '2-digit' });
+                return `
+                    <div class="daily-card">
+                        <div class="daily-date">${dateStr}</div>
+                        <div class="daily-metric">
+                            <span class="daily-metric-label">Investimento</span>
+                            <span class="daily-metric-value">${formatCurrency(day.spend)}</span>
+                        </div>
+                        <div class="daily-metric">
+                            <span class="daily-metric-label">Impressões</span>
+                            <span class="daily-metric-value">${formatNumber(day.impressions)}</span>
+                        </div>
+                        <div class="daily-metric">
+                            <span class="daily-metric-label">Cliques</span>
+                            <span class="daily-metric-value">${formatNumber(day.clicks)}</span>
+                        </div>
+                        <div class="daily-metric">
+                            <span class="daily-metric-label">Page Views</span>
+                            <span class="daily-metric-value">${formatNumber(day.pageviews)}</span>
+                        </div>
+                        <div class="daily-metric">
+                            <span class="daily-metric-label">Leads</span>
+                            <span class="daily-metric-value color-positive">${formatNumber(day.leads)}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+        }
+
+        function renderDiagnosis() {
+            // Análise interna - sem conteúdo automático
+        }
+
+        // TAB NAVIGATION
+        function showTab(tabName) {
+            const tabs = document.querySelectorAll('.tab-content');
+            const buttons = document.querySelectorAll('.tab-button');
+            tabs.forEach(tab => tab.classList.remove('active'));
+            buttons.forEach(btn => btn.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // MAIN RENDER
+        function render() {
+            renderKPIs();
+            renderFunnel();
+            renderCharts();
+            renderCreatives();
+            renderAudiences();
+            renderDaily();
+            renderDiagnosis();
+        }
+
+        // INIT - busca dados da planilha ao abrir
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchData();
+        });
+    </script>
+</body>
+</html>

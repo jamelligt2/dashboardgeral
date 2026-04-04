@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>RTG · Geize-RTG — Dashboard Jamelli GT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#1a1a2e;color:#e8e6f0;font-family:'DM Sans',sans-serif;min-height:100vh}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:#12121f}::-webkit-scrollbar-thumb{background:#ff6b2b55;border-radius:3px}
+.topbar{background:#12121f;padding:12px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.07);position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:10px}
+.brand{font-size:17px;font-weight:700;color:#ff6b2b}
+.subtitle{font-size:11px;color:rgba(255,255,255,0.4);margin-top:2px}
+.logo-jgt{display:flex;align-items:center;gap:10px}
+.logo-jgt svg{width:36px;height:36px;flex-shrink:0}
+.logo-text{display:flex;flex-direction:column}
+.logo-text strong{font-size:13px;font-weight:700;color:#ff6b2b;letter-spacing:.3px}
+.logo-text span{font-size:10px;color:rgba(255,255,255,.35);margin-top:1px}
+.period-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.period-bar label{font-size:11px;color:rgba(255,255,255,.45);white-space:nowrap}
+.date-input{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:#e8e6f0;padding:5px 10px;border-radius:6px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;outline:none;min-width:118px}
+.date-input:focus{border-color:#ff6b2b}
+.date-input::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;cursor:pointer}
+.period-sep{color:rgba(255,255,255,.2);font-size:13px;padding:0 2px}
+.preset-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;transition:all .2s;white-space:nowrap}
+.preset-btn:hover,.preset-btn.active{background:rgba(255,107,43,.2);border-color:#ff6b2b;color:#ff6b2b;font-weight:600}
+.range-info{font-size:11px;color:rgba(255,107,43,.75);font-family:'DM Mono',monospace;white-space:nowrap;padding-left:4px}
+.tabs{display:flex;border-bottom:1px solid rgba(255,255,255,0.07);background:#12121f;padding:0 28px;overflow-x:auto}
+.tab{padding:12px 20px;cursor:pointer;font-size:13px;color:rgba(255,255,255,0.5);border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
+.tab:hover{color:#e8e6f0}.tab.active{color:#ff6b2b;border-bottom-color:#ff6b2b;font-weight:600}
+.content{padding:24px 28px;display:none}.content.active{display:block}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:20px}
+.kpi-card{background:#12121f;border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:16px 18px}
+.kpi-label{font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.kpi-value{font-size:20px;font-weight:700;font-family:'DM Mono',monospace}
+.orange{color:#ff6b2b}.green{color:#2ecc71}.red{color:#e74c3c}.yellow{color:#f1c40f}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#12121f;color:rgba(255,255,255,.45);padding:8px 10px;text-align:right;font-weight:500;border-bottom:1px solid rgba(255,255,255,.07);white-space:nowrap}
+th:first-child{text-align:left}
+td{padding:7px 10px;text-align:right;border-bottom:1px solid rgba(255,255,255,.04);font-family:'DM Mono',monospace;font-size:11px;color:#e8e6f0}
+td:first-child{text-align:left;font-family:'DM Sans',sans-serif;font-size:12px}
+tr:hover td{background:rgba(255,255,255,.025)}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;font-family:'DM Sans',sans-serif}
+.badge.escalar{background:rgba(46,204,113,.15);color:#2ecc71;border:1px solid rgba(46,204,113,.3)}
+.badge.otimizar{background:rgba(241,196,15,.15);color:#f1c40f;border:1px solid rgba(241,196,15,.3)}
+.badge.corrigir{background:rgba(231,76,60,.15);color:#e74c3c;border:1px solid rgba(231,76,60,.3)}
+.badge.aguardar{background:rgba(255,255,255,.06);color:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.1)}
+.funil-section{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:16px 0}
+.funil-bar-wrap{margin-bottom:12px}
+.funil-label{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;color:rgba(255,255,255,.7)}
+.funil-bar-bg{background:rgba(255,255,255,.05);border-radius:4px;height:14px;overflow:hidden}
+.funil-bar-fill{background:linear-gradient(90deg,#ff6b2b,#ff9a3c);height:100%;border-radius:4px;transition:width .4s}
+.taxa-grid{display:grid;gap:8px}
+.taxa-item{background:rgba(255,255,255,.04);border-radius:8px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;font-size:12px;color:rgba(255,255,255,.7)}
+.taxa-val{font-family:'DM Mono',monospace;font-size:15px;font-weight:600;color:#ff6b2b}
+.chart-grid-2x2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0}
+.chart-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:16px}
+.chart-card h4{font-size:11px;color:rgba(255,255,255,.45);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
+.chart-card canvas{max-height:190px}
+.sec-title{font-size:13px;font-weight:600;color:rgba(255,255,255,.65);margin:20px 0 10px;border-left:3px solid #ff6b2b;padding-left:10px}
+.cri-filterbar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.cri-filter-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 12px;border-radius:5px;cursor:pointer;font-size:12px;transition:all .2s}
+.cri-filter-btn.active{background:rgba(255,107,43,.2);border-color:#ff6b2b;color:#ff6b2b}
+.cri-sort-label{font-size:11px;color:rgba(255,255,255,.4);white-space:nowrap}
+.cri-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
+@media(max-width:900px){.cri-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.cri-grid{grid-template-columns:1fr}.chart-grid-2x2{grid-template-columns:1fr}.funil-section{grid-template-columns:1fr}.period-bar{justify-content:flex-start}}
+.cri-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:14px}
+.cri-card.ativo{border-color:rgba(46,204,113,.25)}
+.cri-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.cri-name{font-size:11px;font-weight:600;word-break:break-all;flex:1;margin-right:6px;color:#e8e6f0}
+.cri-badge{font-size:10px;padding:2px 6px;border-radius:4px;white-space:nowrap}
+.cri-badge.ativo{background:rgba(46,204,113,.15);color:#2ecc71}
+.cri-badge.inativo{background:rgba(255,255,255,.08);color:rgba(255,255,255,.4)}
+.cri-metrics{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.cri-metric{display:flex;flex-direction:column}
+.cri-metric-label{color:rgba(255,255,255,.4);font-size:9px;margin-bottom:2px;text-transform:uppercase}
+.cri-metric-val{font-family:'DM Mono',monospace;font-size:12px;font-weight:600;color:#e8e6f0}
+.cri-metric-val.hl{color:#ff6b2b;font-size:14px}
+.cri-link{display:block;margin-top:8px;font-size:10px;color:rgba(255,107,43,.7);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cri-link:hover{color:#ff6b2b}
+.tbl-wrap{overflow-x:auto;border-radius:8px;border:1px solid rgba(255,255,255,.07)}
+.pub-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-bottom:24px}
+.pub-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:16px}
+.pub-card.ativo{border-color:rgba(46,204,113,.2)}
+.pub-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+.pub-name{font-size:12px;font-weight:600;flex:1;margin-right:8px;color:#e8e6f0;line-height:1.4}
+.pub-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.pub-metric{text-align:center;padding:8px 6px;background:rgba(255,255,255,.03);border-radius:6px}
+.pub-metric-val{font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:#ff6b2b}
+.pub-metric-val.neutral{color:#e8e6f0}
+.pub-metric-lbl{font-size:9px;color:rgba(255,255,255,.35);margin-top:2px;text-transform:uppercase;letter-spacing:.4px}
+.pub-bar-wrap{margin-top:8px}
+.pub-bar-label{display:flex;justify-content:space-between;font-size:10px;color:rgba(255,255,255,.35);margin-bottom:3px}
+.pub-bar-bg{height:5px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden}
+.pub-bar-fill{height:100%;background:linear-gradient(90deg,#ff6b2b,#ff9a3c);border-radius:3px;transition:width .5s}
+.loading-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:#1a1a2e;display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:16px}
+.loading-overlay .spinner{width:40px;height:40px;border:3px solid rgba(255,107,43,.2);border-top-color:#ff6b2b;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-overlay p{color:rgba(255,255,255,.5);font-size:13px}
+</style>
+</head>
+<body>
+<div class="loading-overlay" id="loading">
+  <div class="spinner"></div>
+  <p>Carregando dados...</p>
+</div>
+
+<div class="topbar">
+  <div style="display:flex;align-items:center;gap:16px">
+    <div class="logo-jgt">
+      <svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+        <rect width="36" height="36" rx="8" fill="#ff6b2b" fill-opacity="0.15"/>
+        <rect width="36" height="36" rx="8" stroke="#ff6b2b" stroke-opacity="0.4" stroke-width="1" fill="none"/>
+        <text x="18" y="24" text-anchor="middle" font-family="DM Sans" font-weight="700" font-size="13" fill="#ff6b2b">JGT</text>
+      </svg>
+      <div class="logo-text"><strong>Jamelli GT</strong><span>Tráfego Pago</span></div>
+    </div>
+    <div>
+      <div class="brand">RTG</div>
+      <div class="subtitle">Dashboard de Performance — Perpétuo · Jamelli GT · 2026</div>
+    </div>
+  </div>
+  <div class="period-bar">
+    <label>De</label>
+    <input type="date" id="dateFrom" class="date-input" onchange="onDateChange()">
+    <span class="period-sep">&rarr;</span>
+    <input type="date" id="dateTo" class="date-input" onchange="onDateChange()">
+    <button class="preset-btn" onclick="setPreset(7,this)">7d</button>
+    <button class="preset-btn" onclick="setPreset(14,this)">14d</button>
+    <button class="preset-btn" onclick="setPreset(30,this)">30d</button>
+    <button class="preset-btn active" id="btn-all" onclick="setPreset('all',this)">Tudo</button>
+    <span class="range-info" id="range-info"></span>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('visao',this)">Visão Geral</div>
+  <div class="tab" onclick="showTab('criativos',this)">Criativos</div>
+  <div class="tab" onclick="showTab('publicos',this)">Públicos</div>
+  <div class="tab" onclick="showTab('semanal',this)">Semana a Semana</div>
+  <div class="tab" onclick="showTab('mensal',this)">Mês a Mês</div>
+</div>
+
+<!-- ABA 1: VISÃO GERAL -->
+<div id="tab-visao" class="content active">
+  <div class="kpi-grid" id="kpi-visao"></div>
+  <div class="sec-title">Funil de Conversão</div>
+  <div class="funil-section">
+    <div id="funil-bars"></div>
+    <div class="taxa-grid" id="funil-taxas"></div>
+  </div>
+  <div class="chart-grid-2x2">
+    <div class="chart-card"><h4>Investimento x Faturamento</h4><canvas id="chartInvFat"></canvas></div>
+    <div class="chart-card"><h4>ROAS Diário</h4><canvas id="chartRoas"></canvas></div>
+    <div class="chart-card"><h4>Cliques x Pageviews</h4><canvas id="chartCliqPV"></canvas></div>
+    <div class="chart-card"><h4>Compras Diárias</h4><canvas id="chartCompras"></canvas></div>
+  </div>
+  <div class="sec-title">Dia a Dia</div>
+  <div class="tbl-wrap"><table><thead><tr>
+    <th>Data</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Cliques</th><th>PV</th><th>CK</th><th>Imp.</th><th>Status</th>
+  </tr></thead><tbody id="tbody-dias"></tbody></table></div>
+</div>
+
+<!-- ABA 2: CRIATIVOS -->
+<div id="tab-criativos" class="content">
+  <div class="cri-filterbar">
+    <button class="cri-st-btn cri-filter-btn active" onclick="setCriFiltro('todos',this)">Todos</button>
+    <button class="cri-st-btn cri-filter-btn" onclick="setCriFiltro('ativos',this)">&#9679; Ativos</button>
+    <button class="cri-st-btn cri-filter-btn" onclick="setCriFiltro('inativos',this)">&#9679; Inativos</button>
+    <span style="flex:1"></span>
+    <span class="cri-sort-label">Ordenar:</span>
+    <button class="cri-sort-btn cri-filter-btn active" onclick="setCriSort('inv',this)">Investimento</button>
+    <button class="cri-sort-btn cri-filter-btn" onclick="setCriSort('ctr',this)">CTR</button>
+    <button class="cri-sort-btn cri-filter-btn" onclick="setCriSort('cpc',this)">CPC</button>
+    <button class="cri-sort-btn cri-filter-btn" onclick="setCriSort('roas',this)">ROAS</button>
+    <button class="cri-sort-btn cri-filter-btn" onclick="setCriSort('vendas',this)">Vendas</button>
+  </div>
+  <div class="cri-grid" id="cri-cards"></div>
+  <div class="sec-title">Tabela de Criativos</div>
+  <div class="tbl-wrap"><table><thead><tr>
+    <th>Criativo</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>CTR</th><th>CPC</th><th>CPM</th><th>CAC</th><th>Ticket</th><th>Status</th>
+  </tr></thead><tbody id="tbody-criativos"></tbody></table></div>
+</div>
+
+<!-- ABA 3: PÚBLICOS -->
+<div id="tab-publicos" class="content">
+  <div class="cri-filterbar">
+    <button class="pub-filter-btn cri-filter-btn active" onclick="setPubFiltro('todos',this)">Todos</button>
+    <button class="pub-filter-btn cri-filter-btn" onclick="setPubFiltro('ativos',this)">&#9679; Ativos</button>
+    <button class="pub-filter-btn cri-filter-btn" onclick="setPubFiltro('inativos',this)">&#9679; Inativos</button>
+    <span style="flex:1"></span>
+    <span class="cri-sort-label">Ordenar:</span>
+    <button class="pub-sort-btn cri-filter-btn active" onclick="setPubSort('inv',this)">Investimento</button>
+    <button class="pub-sort-btn cri-filter-btn" onclick="setPubSort('ctr',this)">CTR</button>
+    <button class="pub-sort-btn cri-filter-btn" onclick="setPubSort('cpc',this)">CPC</button>
+    <button class="pub-sort-btn cri-filter-btn" onclick="setPubSort('cr',this)">Connect Rate</button>
+  </div>
+  <div class="pub-grid" id="pub-cards"></div>
+  <div class="sec-title">Tabela de Públicos</div>
+  <div class="tbl-wrap"><table><thead><tr>
+    <th>Público (Adset)</th><th>Invest.</th><th>Cliques</th><th>Imp.</th><th>PV</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Status</th>
+  </tr></thead><tbody id="tbody-publicos"></tbody></table></div>
+</div>
+
+<!-- ABA 4: SEMANA A SEMANA -->
+<div id="tab-semanal" class="content">
+  <div class="kpi-grid" id="kpi-semanal"></div>
+  <div class="chart-grid-2x2">
+    <div class="chart-card"><h4>Investimento por Semana</h4><canvas id="chartSemInv"></canvas></div>
+    <div class="chart-card"><h4>ROAS por Semana</h4><canvas id="chartSemRoas"></canvas></div>
+  </div>
+  <div class="sec-title">Detalhamento Semanal</div>
+  <div class="tbl-wrap"><table><thead><tr>
+    <th>Semana</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Retorno</th><th>Compras</th><th>Ticket</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Taxa Compra</th><th>Status</th>
+  </tr></thead><tbody id="tbody-semanal"></tbody></table></div>
+</div>
+
+<!-- ABA 5: MÊS A MÊS -->
+<div id="tab-mensal" class="content">
+  <div class="kpi-grid" id="kpi-mensal"></div>
+  <div class="sec-title">Detalhamento Mensal</div>
+  <div class="tbl-wrap"><table><thead><tr>
+    <th>Mês</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Retorno</th><th>Compras</th><th>Ticket</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Taxa Compra</th><th>Status</th>
+  </tr></thead><tbody id="tbody-mensal"></tbody></table></div>
+</div>
+
+<script>
+// ===== CONFIG =====
+const SHEET_ID = '1s3Fj8DDB94yZgRdnn1WgurxjGPedDf63OGxnPS5r2ec';
+const SHEET_GER = 'Gerenciador';
+const SHEET_WK = 'Webhook';
+const SHEET_VENDAS = 'Vendas';
+const GID_VENDAS = '1434914028';
+
+// ===== GLOBALS =====
+let DIAS = [], SEMANAL = [], MENSAL = [], CRIATIVOS = [], PUBLICOS = [];
+let dateFrom = null, dateTo = null;
+let chartInstances = {};
+
+// ===== HELPERS =====
+function toISO(d){const[dd,mm,yy]=d.split('/');return yy+'-'+mm+'-'+dd;}
+const ptMonFull=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+function dateToMonthKey(d){const[dd,mm,yy]=d.split('/').map(Number);return ptMonFull[mm-1];}
+function dateToWeekKey(d){
+  const[dd,mm,yy]=d.split('/').map(Number);
+  const dt=new Date(yy,mm-1,dd),jan1=new Date(yy,0,1);
+  const w=Math.ceil((Math.floor((dt-jan1)/86400000)+1)/7);
+  return String(yy).slice(-2)+String(w).padStart(2,'0');
+}
+function br(n,d2=2){if(n===null||n===undefined||isNaN(n))return '—';return new Intl.NumberFormat('pt-BR',{minimumFractionDigits:d2,maximumFractionDigits:d2}).format(n);}
+function brl(n){if(n===null||n===undefined)return '—';return 'R$ '+br(n,2);}
+function pct(n){if(n===null||n===undefined||isNaN(n))return '—';return br(n,2)+'%';}
+function statusBadge(inv,fat){
+  if(!inv||inv===0)return '<span class="badge aguardar">Aguardar</span>';
+  const r=inv>0?fat/inv:0;
+  if(r>=1.7)return '<span class="badge escalar">Escalar</span>';
+  if(r>=1)return '<span class="badge otimizar">Otimizar</span>';
+  return '<span class="badge corrigir">Corrigir</span>';
+}
+function roasColor(r){if(r>=1.7)return 'green';if(r>=1)return 'yellow';return 'red';}
+function num(s){if(!s)return 0;return parseFloat(String(s).replace(/\./g,'').replace(',','.'))||0;}
+function fmtDateISO(d){const[y,m,dd]=d.split('-');return dd+'/'+m+'/'+y;}
+
+// ===== CSV PARSER =====
+function parseCSV(text){
+  const rows=[];let i=0;
+  while(i<text.length){
+    const row=[];
+    while(i<text.length){
+      let val='';
+      if(text[i]==='"'){
+        i++;
+        while(i<text.length){
+          if(text[i]==='"'&&text[i+1]==='"'){val+='"';i+=2;}
+          else if(text[i]==='"'){i++;break;}
+          else{val+=text[i];i++;}
+        }
+        row.push(val);
+        if(text[i]===',')i++;
+        else{if(text[i]==='\r')i++;if(text[i]==='\n')i++;break;}
+      }else{
+        while(i<text.length&&text[i]!==','&&text[i]!=='\n'&&text[i]!=='\r'){val+=text[i];i++;}
+        row.push(val);
+        if(text[i]===',')i++;
+        else{if(text[i]==='\r')i++;if(text[i]==='\n')i++;break;}
+      }
+    }
+    if(row.length>1||(row.length===1&&row[0].trim()))rows.push(row);
+  }
+  return rows;
+}
+
+// ===== DATA FETCHING =====
+async function fetchSheet(name){
+  const url='https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/gviz/tq?tqx=out:csv&sheet='+encodeURIComponent(name);
+  const r=await fetch(url);
+  return await r.text();
+}
+async function fetchSheetRange(gid,range){
+  const url='https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/export?format=csv&gid='+gid+'&range='+encodeURIComponent(range);
+  const r=await fetch(url);
+  return await r.text();
+}
+
+async function loadData(){
+  try{
+    // Fetch Gerenciador, Webhook e Vendas (3 colunas separadas por range para pegar datas corretas)
+    const[gerCSV,wkCSV,vDates,vValues,vContent]=await Promise.all([
+      fetchSheet(SHEET_GER),
+      fetchSheet(SHEET_WK),
+      fetchSheetRange(GID_VENDAS,'K1:K500'),
+      fetchSheetRange(GID_VENDAS,'W1:W500'),
+      fetchSheetRange(GID_VENDAS,'AY1:AY500')
+    ]);
+    processData(gerCSV,wkCSV,vDates,vValues,vContent);
+  }catch(e){
+    console.warn('Fetch falhou, usando dados embarcados',e);
+    useFallbackData();
+  }
+  document.getElementById('loading').style.display='none';
+  initDatePickers();
+  renderAll();
+}
+
+function processData(gerCSV,wkCSV,vDatesCSV,vValuesCSV,vContentCSV){
+  // Parse Gerenciador
+  const gRows=parseCSV(gerCSV);
+  const gh=gRows[0];
+  const gData=gRows.slice(1).filter(r=>r.length>1&&r[0].trim());
+  const ci={date:gh.indexOf('Date'),spend:gh.findIndex(c=>c.includes('Spend')),clicks:gh.findIndex(c=>c.includes('Link Clicks')),pv:gh.findIndex(c=>c.includes('Landing Page')),ck:gh.findIndex(c=>c.includes('Initiated Checkout')),purchase:gh.findIndex(c=>c.includes('Purchase')),adset:gh.findIndex(c=>c.includes('Adset')),ad:gh.findIndex(c=>c.includes('Ad Name')),link:gh.findIndex(c=>c.includes('Instagram Permalink')),imp:gh.findIndex(c=>c.includes('Impressions'))};
+
+  const dayMap={},criMap={},pubMap={};
+  const d7ago=new Date();d7ago.setDate(d7ago.getDate()-7);
+
+  gData.forEach(r=>{
+    const date=r[ci.date];if(!date)return;
+    const inv=num(r[ci.spend]),cliques=num(r[ci.clicks]),pv=num(r[ci.pv]),ck=num(r[ci.ck]),imp=num(r[ci.imp]);
+    const adName=r[ci.ad]||'',adsetName=r[ci.adset]||'',link=r[ci.link]||'';
+    const dateKey=fmtDateISO(date);
+    const isRecent=new Date(date)>=d7ago;
+
+    if(!dayMap[dateKey])dayMap[dateKey]={data:dateKey,inv:0,fat:0,compras:0,cliques:0,pv:0,ck:0,imp:0};
+    const d=dayMap[dateKey];d.inv+=inv;d.cliques+=cliques;d.pv+=pv;d.ck+=ck;d.imp+=imp;
+
+    if(adName){
+      if(!criMap[adName])criMap[adName]={nome:adName,inv:0,cliques:0,imp:0,pv:0,ck:0,compras:0,fat:0,link:'',ativo:false};
+      const c=criMap[adName];c.inv+=inv;c.cliques+=cliques;c.imp+=imp;c.pv+=pv;c.ck+=ck;
+      if(link&&!c.link)c.link=link;if(isRecent&&inv>0)c.ativo=true;
+    }
+    if(adsetName){
+      if(!pubMap[adsetName])pubMap[adsetName]={nome:adsetName,inv:0,cliques:0,imp:0,pv:0,ck:0,ativo:false};
+      const p=pubMap[adsetName];p.inv+=inv;p.cliques+=cliques;p.imp+=imp;p.pv+=pv;p.ck+=ck;
+      if(isRecent&&inv>0)p.ativo=true;
+    }
+  });
+
+  // Parse Webhook
+  const wRows=parseCSV(wkCSV);
+  const wh=wRows[0];
+  const wData=wRows.slice(1).filter(r=>r.length>1&&r[0].trim());
+  // Detect offset (extra column in data)
+  let OFF=0;
+  if(wData.length>0){
+    const testStatus=wh.indexOf('data.status');
+    if(wData[0][testStatus]&&!/paid|refunded|pending/i.test(wData[0][testStatus]))OFF=1;
+  }
+  const wi={status:wh.indexOf('data.status')+OFF,source:wh.indexOf('data.utm.source')+OFF,value:wh.indexOf('data.price.value')+OFF,date:wh.indexOf('data.createdAt')+OFF,content:wh.indexOf('data.utm.content')+OFF};
+
+  const wkDayMap={},wkCriMap={};
+  wData.forEach(r=>{
+    if(!r[wi.status]||r[wi.status].toLowerCase()!=='paid')return;
+    if(!r[wi.source]||r[wi.source].toLowerCase().replace(/[\s_-]/g,'')!=='metaads')return;
+    const dateRaw=r[wi.date];if(!dateRaw)return;
+    const datePart=dateRaw.split('T')[0];
+    const[y,m,dd]=datePart.split('-');
+    const dateKey=dd+'/'+m+'/'+y;
+    const val=num(r[wi.value]);
+    const content=r[wi.content]||'';
+
+    if(!wkDayMap[dateKey])wkDayMap[dateKey]={fat:0,compras:0};
+    wkDayMap[dateKey].fat+=val;wkDayMap[dateKey].compras+=1;
+
+    if(content){
+      const cleanK=content.replace(/[{}]/g,'').trim();
+      if(!wkCriMap[cleanK])wkCriMap[cleanK]={fat:0,compras:0};
+      wkCriMap[cleanK].fat+=val;wkCriMap[cleanK].compras+=1;
+    }
+  });
+
+  // ===== PARSE ABA VENDAS (prioridade sobre webhook) =====
+  const vndDayMap={}, vndCriMap={};
+  if(vDatesCSV && vValuesCSV && vContentCSV){
+    const vDates=vDatesCSV.trim().split('\n').slice(1).map(s=>s.replace(/\r/g,'').trim());
+    const vVals=vValuesCSV.trim().split('\n').slice(1).map(s=>s.replace(/\r/g,'').replace(/"/g,'').trim());
+    const vConts=vContentCSV.trim().split('\n').slice(1).map(s=>s.replace(/\r/g,'').trim());
+    for(let i=0;i<vDates.length;i++){
+      const rawDate=vDates[i];if(!rawDate)continue;
+      const dateKey=rawDate.split(' ')[0]; // DD/MM/AAAA
+      const val=num(vVals[i]);
+      const cri=vConts[i]||'';
+      if(!vndDayMap[dateKey])vndDayMap[dateKey]={fat:0,compras:0};
+      vndDayMap[dateKey].fat+=val;vndDayMap[dateKey].compras+=1;
+      if(cri){
+        const cleanK=cri.replace(/[{}"\s]/g,'').trim();
+        if(cleanK && !cleanK.includes('E+') && cleanK!=='ad.name'){
+          if(!vndCriMap[cleanK])vndCriMap[cleanK]={fat:0,compras:0};
+          vndCriMap[cleanK].fat+=val;vndCriMap[cleanK].compras+=1;
+        }
+      }
+    }
+  }
+  const hasVendas=Object.keys(vndDayMap).length>0;
+
+  // Merge vendas/webhook into days — Vendas tem prioridade
+  const salesDayMap=hasVendas?vndDayMap:wkDayMap;
+  const salesCriMap=hasVendas?vndCriMap:wkCriMap;
+  Object.keys(dayMap).forEach(k=>{if(salesDayMap[k]){dayMap[k].fat=Math.round(salesDayMap[k].fat*100)/100;dayMap[k].compras=salesDayMap[k].compras;}});
+  Object.keys(salesDayMap).forEach(k=>{if(!dayMap[k])dayMap[k]={data:k,inv:0,fat:Math.round(salesDayMap[k].fat*100)/100,compras:salesDayMap[k].compras,cliques:0,pv:0,ck:0,imp:0};});
+
+  // Merge vendas/webhook into criativos
+  Object.keys(salesCriMap).forEach(k=>{if(criMap[k]){criMap[k].fat=Math.round(salesCriMap[k].fat*100)/100;criMap[k].compras=salesCriMap[k].compras;}});
+
+  // Calc criativo metrics
+  Object.values(criMap).forEach(c=>{
+    c.cpc=c.cliques>0?Math.round(c.inv/c.cliques*100)/100:0;
+    c.cpm=c.imp>0?Math.round(c.inv/c.imp*1000*100)/100:0;
+    c.ctr=c.imp>0?Math.round(c.cliques/c.imp*100*100)/100:0;
+    c.roas=c.inv>0?Math.round(c.fat/c.inv*100)/100:0;
+    c.cac=c.compras>0?Math.round(c.inv/c.compras*100)/100:0;
+    c.ticket=c.compras>0?Math.round(c.fat/c.compras*100)/100:0;
+  });
+
+  // Calc publico metrics
+  Object.values(pubMap).forEach(p=>{
+    p.cpc=p.cliques>0?Math.round(p.inv/p.cliques*100)/100:0;
+    p.cpm=p.imp>0?Math.round(p.inv/p.imp*1000*100)/100:0;
+    p.ctr=p.imp>0?Math.round(p.cliques/p.imp*100*100)/100:0;
+    p.connectRate=p.cliques>0?Math.round(p.pv/p.cliques*100*100)/100:0;
+  });
+
+  // Build sorted arrays
+  DIAS=Object.values(dayMap).sort((a,b)=>{const[d1,m1,y1]=a.data.split('/');const[d2,m2,y2]=b.data.split('/');return(y1+m1+d1).localeCompare(y2+m2+d2);});
+  CRIATIVOS=Object.values(criMap);
+  PUBLICOS=Object.values(pubMap);
+
+  // Build weekly
+  const wkM={};
+  DIAS.forEach(r=>{const k=dateToWeekKey(r.data);if(!wkM[k])wkM[k]={semana:k,inv:0,fat:0,compras:0,cliques:0,pv:0,ck:0,imp:0};const w=wkM[k];w.inv+=r.inv;w.fat+=r.fat;w.compras+=r.compras;w.cliques+=r.cliques;w.pv+=r.pv;w.ck+=r.ck;w.imp+=r.imp;});
+  SEMANAL=Object.values(wkM).sort((a,b)=>a.semana.localeCompare(b.semana));
+  SEMANAL.forEach(r=>{r.inv=Math.round(r.inv*100)/100;r.fat=Math.round(r.fat*100)/100;r.roas=r.inv>0?Math.round(r.fat/r.inv*100)/100:0;r.ticket=r.compras>0?Math.round(r.fat/r.compras*100)/100:0;r.retorno=Math.round((r.fat-r.inv)*100)/100;r.taxaCompra=r.pv>0?Math.round(r.compras/r.pv*100*100)/100:0;r.cpc=r.cliques>0?Math.round(r.inv/r.cliques*100)/100:0;r.cpm=r.imp>0?Math.round(r.inv/r.imp*1000*100)/100:0;r.connectRate=r.cliques>0?Math.round(r.pv/r.cliques*100*100)/100:0;});
+
+  // Build monthly
+  const moM={};
+  DIAS.forEach(r=>{const k=dateToMonthKey(r.data);if(!moM[k])moM[k]={mes:k,inv:0,fat:0,compras:0,cliques:0,pv:0,ck:0,imp:0};const m=moM[k];m.inv+=r.inv;m.fat+=r.fat;m.compras+=r.compras;m.cliques+=r.cliques;m.pv+=r.pv;m.ck+=r.ck;m.imp+=r.imp;});
+  MENSAL=Object.values(moM);
+  MENSAL.forEach(r=>{r.inv=Math.round(r.inv*100)/100;r.fat=Math.round(r.fat*100)/100;r.roas=r.inv>0?Math.round(r.fat/r.inv*100)/100:0;r.ticket=r.compras>0?Math.round(r.fat/r.compras*100)/100:0;r.retorno=Math.round((r.fat-r.inv)*100)/100;r.taxaCompra=r.pv>0?Math.round(r.compras/r.pv*100*100)/100:0;r.cpc=r.cliques>0?Math.round(r.inv/r.cliques*100)/100:0;r.cpm=r.imp>0?Math.round(r.inv/r.imp*1000*100)/100:0;r.connectRate=r.cliques>0?Math.round(r.pv/r.cliques*100*100)/100:0;});
+}
+
+function useFallbackData(){
+  DIAS=[{"data": "22/02/2026", "inv": 56.96, "fat": 34.9, "compras": 1, "cliques": 47, "pv": 42, "ck": 5, "imp": 1386}, {"data": "23/02/2026", "inv": 56.89, "fat": 34.9, "compras": 1, "cliques": 27, "pv": 24, "ck": 1, "imp": 1724}, {"data": "24/02/2026", "inv": 47.69, "fat": 110.4, "compras": 1, "cliques": 24, "pv": 22, "ck": 1, "imp": 1578}, {"data": "25/02/2026", "inv": 46.51, "fat": 69.8, "compras": 2, "cliques": 35, "pv": 34, "ck": 1, "imp": 1741}, {"data": "26/02/2026", "inv": 46.67, "fat": 34.9, "compras": 1, "cliques": 33, "pv": 31, "ck": 2, "imp": 1767}, {"data": "27/02/2026", "inv": 45.7, "fat": 0, "compras": 0, "cliques": 29, "pv": 22, "ck": 1, "imp": 1465}, {"data": "28/02/2026", "inv": 95.84, "fat": 82.6, "compras": 1, "cliques": 55, "pv": 49, "ck": 2, "imp": 2670}, {"data": "01/03/2026", "inv": 118.51, "fat": 64.7, "compras": 2, "cliques": 65, "pv": 53, "ck": 2, "imp": 3292}, {"data": "02/03/2026", "inv": 102.51, "fat": 69.8, "compras": 2, "cliques": 50, "pv": 43, "ck": 2, "imp": 3246}, {"data": "03/03/2026", "inv": 94.58, "fat": 34.9, "compras": 1, "cliques": 60, "pv": 47, "ck": 2, "imp": 2699}, {"data": "04/03/2026", "inv": 114.89, "fat": 119.6, "compras": 3, "cliques": 62, "pv": 44, "ck": 4, "imp": 2534}, {"data": "05/03/2026", "inv": 89.18, "fat": 219.8, "compras": 5, "cliques": 45, "pv": 39, "ck": 8, "imp": 2271}, {"data": "06/03/2026", "inv": 149.6, "fat": 147.4, "compras": 4, "cliques": 76, "pv": 61, "ck": 7, "imp": 3205}, {"data": "07/03/2026", "inv": 194.28, "fat": 308.9, "compras": 7, "cliques": 101, "pv": 87, "ck": 9, "imp": 4903}, {"data": "08/03/2026", "inv": 235.79, "fat": 174.4, "compras": 5, "cliques": 106, "pv": 84, "ck": 6, "imp": 6582}, {"data": "09/03/2026", "inv": 178.13, "fat": 299, "compras": 7, "cliques": 92, "pv": 79, "ck": 7, "imp": 4236}, {"data": "10/03/2026", "inv": 164.8, "fat": 175.1, "compras": 3, "cliques": 77, "pv": 63, "ck": 3, "imp": 3796}, {"data": "11/03/2026", "inv": 212.42, "fat": 204.3, "compras": 7, "cliques": 93, "pv": 77, "ck": 8, "imp": 4261}, {"data": "12/03/2026", "inv": 204.17, "fat": 69.8, "compras": 2, "cliques": 97, "pv": 81, "ck": 4, "imp": 4317}, {"data": "13/03/2026", "inv": 188.7, "fat": 152.5, "compras": 4, "cliques": 87, "pv": 73, "ck": 5, "imp": 3946}, {"data": "14/03/2026", "inv": 183.24, "fat": 314.6, "compras": 7, "cliques": 78, "pv": 65, "ck": 8, "imp": 3796}, {"data": "15/03/2026", "inv": 227.22, "fat": 169.4, "compras": 6, "cliques": 101, "pv": 91, "ck": 9, "imp": 4505}, {"data": "16/03/2026", "inv": 145.99, "fat": 356.5, "compras": 8, "cliques": 76, "pv": 65, "ck": 10, "imp": 3388}, {"data": "17/03/2026", "inv": 139.3, "fat": 164.3, "compras": 6, "cliques": 82, "pv": 72, "ck": 5, "imp": 3236}, {"data": "18/03/2026", "inv": 130.48, "fat": 84.7, "compras": 3, "cliques": 81, "pv": 70, "ck": 4, "imp": 2989}, {"data": "19/03/2026", "inv": 127.14, "fat": 235.1, "compras": 5, "cliques": 77, "pv": 68, "ck": 8, "imp": 4656}, {"data": "20/03/2026", "inv": 122.81, "fat": 79.6, "compras": 4, "cliques": 65, "pv": 56, "ck": 8, "imp": 3218}, {"data": "21/03/2026", "inv": 104.98, "fat": 139.5, "compras": 4, "cliques": 51, "pv": 40, "ck": 4, "imp": 2980}, {"data": "22/03/2026", "inv": 158.07, "fat": 447.1, "compras": 11, "cliques": 87, "pv": 78, "ck": 11, "imp": 3717}, {"data": "23/03/2026", "inv": 137.55, "fat": 269, "compras": 10, "cliques": 87, "pv": 67, "ck": 9, "imp": 3886}, {"data": "24/03/2026", "inv": 127.49, "fat": 99.6, "compras": 4, "cliques": 66, "pv": 52, "ck": 7, "imp": 4171}, {"data": "25/03/2026", "inv": 130.65, "fat": 69.8, "compras": 2, "cliques": 57, "pv": 46, "ck": 2, "imp": 4571}, {"data": "26/03/2026", "inv": 153.71, "fat": 84.7, "compras": 3, "cliques": 73, "pv": 50, "ck": 6, "imp": 5228}, {"data": "27/03/2026", "inv": 148.66, "fat": 44.7, "compras": 3, "cliques": 74, "pv": 59, "ck": 3, "imp": 4712}, {"data": "28/03/2026", "inv": 135.9, "fat": 187.3, "compras": 5, "cliques": 48, "pv": 35, "ck": 5, "imp": 3838}, {"data": "29/03/2026", "inv": 165.73, "fat": 286.8, "compras": 6, "cliques": 77, "pv": 64, "ck": 8, "imp": 4371}, {"data": "30/03/2026", "inv": 75.04, "fat": 84.7, "compras": 3, "cliques": 41, "pv": 37, "ck": 3, "imp": 2076}];
+  SEMANAL=[{"semana": "2607", "inv": 56.96, "fat": 34.9, "compras": 1, "cliques": 47, "pv": 42, "ck": 5, "imp": 1386, "roas": 0.61, "ticket": 34.9, "retorno": -22.06, "taxaCompra": 2.38, "cpc": 1.21, "cpm": 41.1, "connectRate": 89.36}, {"semana": "2608", "inv": 457.81, "fat": 397.3, "compras": 8, "cliques": 268, "pv": 235, "ck": 10, "imp": 14237, "roas": 0.87, "ticket": 49.66, "retorno": -60.51, "taxaCompra": 3.4, "cpc": 1.71, "cpm": 32.16, "connectRate": 87.69}, {"semana": "2609", "inv": 980.83, "fat": 1074.8, "compras": 27, "cliques": 500, "pv": 405, "ck": 38, "imp": 25440, "roas": 1.1, "ticket": 39.81, "retorno": 93.97, "taxaCompra": 6.67, "cpc": 1.96, "cpm": 38.55, "connectRate": 81.0}, {"semana": "2610", "inv": 1358.68, "fat": 1384.7, "compras": 36, "cliques": 625, "pv": 529, "ck": 44, "imp": 28857, "roas": 1.02, "ticket": 38.46, "retorno": 26.02, "taxaCompra": 6.81, "cpc": 2.17, "cpm": 47.08, "connectRate": 84.64}, {"semana": "2611", "inv": 928.77, "fat": 1506.8, "compras": 41, "cliques": 519, "pv": 449, "ck": 50, "imp": 24184, "roas": 1.62, "ticket": 36.75, "retorno": 578.03, "taxaCompra": 9.13, "cpc": 1.79, "cpm": 38.4, "connectRate": 86.51}, {"semana": "2612", "inv": 999.69, "fat": 1041.9, "compras": 33, "cliques": 482, "pv": 373, "ck": 40, "imp": 30777, "roas": 1.04, "ticket": 31.57, "retorno": 42.21, "taxaCompra": 8.85, "cpc": 2.07, "cpm": 32.48, "connectRate": 77.39}, {"semana": "2613", "inv": 75.04, "fat": 84.7, "compras": 3, "cliques": 41, "pv": 37, "ck": 3, "imp": 2076, "roas": 1.13, "ticket": 28.23, "retorno": 9.66, "taxaCompra": 8.11, "cpc": 1.83, "cpm": 36.15, "connectRate": 90.24}];
+  MENSAL=[{"mes": "Fevereiro", "inv": 396.26, "fat": 367.5, "compras": 7, "cliques": 250, "pv": 224, "ck": 13, "imp": 12331, "roas": 0.93, "ticket": 52.5, "retorno": -28.76, "taxaCompra": 3.12, "cpc": 1.59, "cpm": 32.14, "connectRate": 89.6}, {"mes": "Março", "inv": 4461.52, "fat": 5157.6, "compras": 142, "cliques": 2232, "pv": 1846, "ck": 177, "imp": 114626, "roas": 1.16, "ticket": 36.32, "retorno": 696.08, "taxaCompra": 7.69, "cpc": 2.0, "cpm": 38.92, "connectRate": 82.71}];
+  CRIATIVOS=[{"nome": "RTG-ADE01", "inv": 283.14, "fat": 97.6, "compras": 3, "cliques": 98, "imp": 5949, "pv": 86, "ck": 8, "link": "https://www.instagram.com/p/DVFbzXCAFDZ/", "ativo": true, "cpc": 2.89, "cpm": 47.59, "ctr": 1.65, "roas": 0.34, "cac": 94.38, "ticket": 32.53}, {"nome": "RTG-ADE03", "inv": 357.07, "fat": 334.7, "compras": 9, "cliques": 174, "imp": 8606, "pv": 149, "ck": 11, "link": "https://www.instagram.com/p/DVFby0XAKDC/", "ativo": true, "cpc": 2.05, "cpm": 41.49, "ctr": 2.02, "roas": 0.94, "cac": 39.67, "ticket": 37.19}, {"nome": "RTG-ADE04", "inv": 448.1, "fat": 49.8, "compras": 2, "cliques": 250, "imp": 13817, "pv": 219, "ck": 12, "link": "https://www.instagram.com/p/DVFbzUrAEx8/", "ativo": false, "cpc": 1.79, "cpm": 32.43, "ctr": 1.81, "roas": 0.11, "cac": 224.05, "ticket": 24.9}, {"nome": "RTG-ADE02", "inv": 1789.23, "fat": 2262.9, "compras": 64, "cliques": 841, "imp": 53583, "pv": 705, "ck": 90, "link": "https://www.instagram.com/p/DVFbzW8gI3X/", "ativo": true, "cpc": 2.13, "cpm": 33.39, "ctr": 1.57, "roas": 1.26, "cac": 27.96, "ticket": 35.36}, {"nome": "RTG-ADV01", "inv": 1940.05, "fat": 1191.5, "compras": 35, "cliques": 1097, "imp": 44059, "pv": 900, "ck": 67, "link": "https://www.instagram.com/p/DVbHEhnAKac/", "ativo": true, "cpc": 1.77, "cpm": 44.03, "ctr": 2.49, "roas": 0.61, "cac": 55.43, "ticket": 34.04}, {"nome": "RTG-ADV01 — Cópia", "inv": 40.19, "fat": 0, "compras": 0, "cliques": 22, "imp": 943, "pv": 11, "ck": 2, "link": "https://www.instagram.com/p/DVbHdwXAMUN/", "ativo": false, "cpc": 1.83, "cpm": 42.62, "ctr": 2.33, "roas": 0, "cac": 0, "ticket": 0}];
+  PUBLICOS=[{"nome": "00 - Advantage", "inv": 4280.68, "cliques": 2240, "imp": 114212, "pv": 1874, "ck": 175, "ativo": true, "cpc": 1.91, "cpm": 37.48, "ctr": 1.96, "connectRate": 83.66}, {"nome": "00 - Profissoes", "inv": 577.1, "cliques": 242, "imp": 12745, "pv": 196, "ck": 15, "ativo": false, "cpc": 2.38, "cpm": 45.28, "ctr": 1.9, "connectRate": 80.99}];
+}
+
+// ===== DATE FILTERS =====
+function initDatePickers(){
+  const dates=DIAS.map(d=>toISO(d.data)).sort();
+  document.getElementById('dateFrom').value=dates[0];
+  document.getElementById('dateTo').value=dates[dates.length-1];
+  dateFrom=dates[0];dateTo=dates[dates.length-1];updateRangeInfo();
+}
+function setPreset(days,btn){
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
+  const dates=DIAS.map(d=>toISO(d.data)).sort(),last=dates[dates.length-1];
+  if(days==='all'){document.getElementById('dateFrom').value=dates[0];document.getElementById('dateTo').value=last;}
+  else{const from=new Date(last);from.setDate(from.getDate()-(days-1));document.getElementById('dateFrom').value=from.toISOString().slice(0,10);document.getElementById('dateTo').value=last;}
+  dateFrom=document.getElementById('dateFrom').value;dateTo=document.getElementById('dateTo').value;
+  updateRangeInfo();renderAll();
+}
+function onDateChange(){
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+  dateFrom=document.getElementById('dateFrom').value;dateTo=document.getElementById('dateTo').value;
+  updateRangeInfo();renderAll();
+}
+function updateRangeInfo(){
+  if(!dateFrom||!dateTo){document.getElementById('range-info').textContent='';return;}
+  const diff=Math.round((new Date(dateTo+'T00:00:00')-new Date(dateFrom+'T00:00:00'))/86400000)+1;
+  document.getElementById('range-info').textContent=diff+(diff===1?' dia':' dias');
+}
+function filteredDias(){
+  return DIAS.filter(d=>{const iso=toISO(d.data);return(!dateFrom||iso>=dateFrom)&&(!dateTo||iso<=dateTo);});
+}
+function showTab(id,el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.content').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');document.getElementById('tab-'+id).classList.add('active');
+}
+
+// ===== CHART HELPERS =====
+function makeChart(canvasId,cfg){
+  if(chartInstances[canvasId]){chartInstances[canvasId].destroy();}
+  const ctx=document.getElementById(canvasId);
+  if(!ctx)return;
+  chartInstances[canvasId]=new Chart(ctx,cfg);
+}
+const chartDefaults={responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'rgba(255,255,255,0.5)',font:{size:10,family:'DM Sans'}}},tooltip:{backgroundColor:'#12121f',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleColor:'#ff6b2b',bodyColor:'#e8e6f0',titleFont:{family:'DM Sans'},bodyFont:{family:'DM Mono'}}},scales:{x:{ticks:{color:'rgba(255,255,255,0.4)',font:{size:9,family:'DM Mono'},maxRotation:45},grid:{color:'rgba(255,255,255,0.05)'}},y:{ticks:{color:'rgba(255,255,255,0.4)',font:{size:9,family:'DM Mono'}},grid:{color:'rgba(255,255,255,0.05)'}}}};
+
+// ===== RENDER ALL =====
+function renderAll(){
+  renderVisaoGeral();
+  renderCriativos();
+  renderPublicos();
+  renderSemanal();
+  renderMensal();
+}
+
+// ===== ABA 1: VISÃO GERAL =====
+function renderVisaoGeral(){
+  const fd=filteredDias();
+  const inv=fd.reduce((s,d)=>s+d.inv,0);
+  const fat=fd.reduce((s,d)=>s+d.fat,0);
+  const compras=fd.reduce((s,d)=>s+d.compras,0);
+  const cliques=fd.reduce((s,d)=>s+d.cliques,0);
+  const pv=fd.reduce((s,d)=>s+d.pv,0);
+  const ck=fd.reduce((s,d)=>s+d.ck,0);
+  const imp=fd.reduce((s,d)=>s+d.imp,0);
+  const roas=inv>0?fat/inv:0;
+  const cpc=cliques>0?inv/cliques:0;
+  const cpm=imp>0?inv/imp*1000:0;
+
+  document.getElementById('kpi-visao').innerHTML=`
+    <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${brl(inv)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Faturamento</div><div class="kpi-value green">${brl(fat)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">ROAS</div><div class="kpi-value ${roasColor(roas)}">${br(roas,2)}x</div></div>
+    <div class="kpi-card"><div class="kpi-label">Compras</div><div class="kpi-value orange">${br(compras,0)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value orange">${brl(compras>0?fat/compras:0)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Cliques</div><div class="kpi-value">${br(cliques,0)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Impressões</div><div class="kpi-value">${br(imp,0)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CPC</div><div class="kpi-value">${brl(cpc)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CPM</div><div class="kpi-value">${brl(cpm)}</div></div>`;
+
+  // Funil
+  const maxF=Math.max(cliques,1);
+  const steps=[{l:'Cliques',v:cliques},{l:'Pageviews',v:pv},{l:'Checkouts',v:ck},{l:'Compras',v:compras}];
+  document.getElementById('funil-bars').innerHTML=steps.map(s=>`
+    <div class="funil-bar-wrap"><div class="funil-label"><span>${s.l}</span><span>${br(s.v,0)}</span></div>
+    <div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${Math.max(2,s.v/maxF*100)}%"></div></div></div>`).join('');
+
+  const ctr=imp>0?cliques/imp*100:0;
+  const cr=cliques>0?pv/cliques*100:0;
+  const txCk=pv>0?ck/pv*100:0;
+  const txComp=pv>0?compras/pv*100:0;
+  document.getElementById('funil-taxas').innerHTML=`
+    <div class="taxa-item"><span>CTR</span><span class="taxa-val">${pct(ctr)}</span></div>
+    <div class="taxa-item"><span>Connect Rate</span><span class="taxa-val">${pct(cr)}</span></div>
+    <div class="taxa-item"><span>Taxa Checkout</span><span class="taxa-val">${pct(txCk)}</span></div>
+    <div class="taxa-item"><span>Taxa Compra</span><span class="taxa-val">${pct(txComp)}</span></div>`;
+
+  // Charts
+  const labels=fd.map(d=>d.data.substring(0,5));
+  makeChart('chartInvFat',{type:'line',data:{labels,datasets:[{label:'Investimento',data:fd.map(d=>d.inv),borderColor:'#ff6b2b',backgroundColor:'rgba(255,107,43,0.1)',fill:true,tension:.3,pointRadius:1},{label:'Faturamento',data:fd.map(d=>d.fat),borderColor:'#2ecc71',backgroundColor:'rgba(46,204,113,0.1)',fill:true,tension:.3,pointRadius:1}]},options:{...chartDefaults}});
+  makeChart('chartRoas',{type:'bar',data:{labels,datasets:[{label:'ROAS',data:fd.map(d=>d.inv>0?Math.round(d.fat/d.inv*100)/100:0),backgroundColor:fd.map(d=>{const r=d.inv>0?d.fat/d.inv:0;return r>=1.7?'rgba(46,204,113,0.6)':r>=1?'rgba(241,196,15,0.6)':'rgba(231,76,60,0.6)';}),borderRadius:3}]},options:{...chartDefaults,plugins:{...chartDefaults.plugins,legend:{display:false}}}});
+  makeChart('chartCliqPV',{type:'line',data:{labels,datasets:[{label:'Cliques',data:fd.map(d=>d.cliques),borderColor:'#ff6b2b',tension:.3,pointRadius:1},{label:'Pageviews',data:fd.map(d=>d.pv),borderColor:'#3498db',tension:.3,pointRadius:1}]},options:{...chartDefaults}});
+  makeChart('chartCompras',{type:'bar',data:{labels,datasets:[{label:'Compras',data:fd.map(d=>d.compras),backgroundColor:'rgba(255,107,43,0.5)',borderRadius:3}]},options:{...chartDefaults,plugins:{...chartDefaults.plugins,legend:{display:false}}}});
+
+  // Table
+  document.getElementById('tbody-dias').innerHTML=fd.map(d=>{
+    const r=d.inv>0?d.fat/d.inv:0;
+    return `<tr><td>${d.data}</td><td>${brl(d.inv)}</td><td>${brl(d.fat)}</td><td class="${roasColor(r)}">${br(r,2)}x</td><td>${br(d.compras,0)}</td><td>${br(d.cliques,0)}</td><td>${br(d.pv,0)}</td><td>${br(d.ck,0)}</td><td>${br(d.imp,0)}</td><td>${statusBadge(d.inv,d.fat)}</td></tr>`;
+  }).join('');
+}
+
+// ===== ABA 2: CRIATIVOS =====
+let criFilter='todos',criSort='inv';
+function setCriFiltro(f,btn){criFilter=f;document.querySelectorAll('.cri-st-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderCriativos();}
+function setCriSort(s,btn){criSort=s;document.querySelectorAll('.cri-sort-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderCriativos();}
+function renderCriativos(){
+  let cris=[...CRIATIVOS];
+  if(criFilter==='ativos')cris=cris.filter(c=>c.ativo);
+  if(criFilter==='inativos')cris=cris.filter(c=>!c.ativo);
+  if(criSort==='inv')cris.sort((a,b)=>b.inv-a.inv);
+  else if(criSort==='ctr')cris.sort((a,b)=>b.ctr-a.ctr);
+  else if(criSort==='cpc')cris.sort((a,b)=>(a.cpc||999)-(b.cpc||999));
+  else if(criSort==='roas')cris.sort((a,b)=>b.roas-a.roas);
+  else if(criSort==='vendas')cris.sort((a,b)=>b.compras-a.compras);
+
+  document.getElementById('cri-cards').innerHTML=cris.map(c=>`
+    <div class="cri-card ${c.ativo?'ativo':''}">
+      <div class="cri-card-header"><div class="cri-name">${c.nome}</div><div class="cri-badge ${c.ativo?'ativo':'inativo'}">${c.ativo?'Ativo':'Inativo'}</div></div>
+      <div class="cri-metrics">
+        <div class="cri-metric"><div class="cri-metric-label">Investimento</div><div class="cri-metric-val">${brl(c.inv)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">Faturamento</div><div class="cri-metric-val">${brl(c.fat)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">ROAS</div><div class="cri-metric-val hl ${roasColor(c.roas)}">${br(c.roas,2)}x</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">Compras</div><div class="cri-metric-val">${br(c.compras,0)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">CPC</div><div class="cri-metric-val">${brl(c.cpc)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">CPM</div><div class="cri-metric-val">${brl(c.cpm)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">CTR</div><div class="cri-metric-val">${pct(c.ctr)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">CAC</div><div class="cri-metric-val">${c.cac>0?brl(c.cac):'—'}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">Ticket Médio</div><div class="cri-metric-val orange">${c.ticket>0?brl(c.ticket):'—'}</div></div>
+      </div>
+      ${c.link?`<a class="cri-link" href="${c.link}" target="_blank">${c.link}</a>`:''}
+    </div>`).join('');
+
+  document.getElementById('tbody-criativos').innerHTML=cris.map(c=>`
+    <tr><td>${c.nome}</td><td>${brl(c.inv)}</td><td>${brl(c.fat)}</td><td class="${roasColor(c.roas)}">${br(c.roas,2)}x</td><td>${br(c.compras,0)}</td><td>${pct(c.ctr)}</td><td>${brl(c.cpc)}</td><td>${brl(c.cpm)}</td><td>${c.cac>0?brl(c.cac):'—'}</td><td>${c.ticket>0?brl(c.ticket):'—'}</td><td>${statusBadge(c.inv,c.fat)}</td></tr>`).join('');
+}
+
+// ===== ABA 3: PÚBLICOS =====
+let pubFilter='todos',pubSort='inv';
+function setPubFiltro(f,btn){pubFilter=f;document.querySelectorAll('.pub-filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderPublicos();}
+function setPubSort(s,btn){pubSort=s;document.querySelectorAll('.pub-sort-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderPublicos();}
+function renderPublicos(){
+  let pubs=[...PUBLICOS];
+  if(pubFilter==='ativos')pubs=pubs.filter(p=>p.ativo);
+  if(pubFilter==='inativos')pubs=pubs.filter(p=>!p.ativo);
+  if(pubSort==='inv')pubs.sort((a,b)=>b.inv-a.inv);
+  else if(pubSort==='ctr')pubs.sort((a,b)=>b.ctr-a.ctr);
+  else if(pubSort==='cpc')pubs.sort((a,b)=>(a.cpc||999)-(b.cpc||999));
+  else if(pubSort==='cr')pubs.sort((a,b)=>b.connectRate-a.connectRate);
+  if(!pubs.length){
+    document.getElementById('pub-cards').innerHTML='<div style="color:rgba(255,255,255,.3);font-size:13px;padding:20px 0">Nenhum público disponível.</div>';
+    document.getElementById('tbody-publicos').innerHTML='';return;
+  }
+  const totalInv=pubs.reduce((s,p)=>s+p.inv,0);
+  document.getElementById('pub-cards').innerHTML=pubs.map(p=>{
+    const pctInv=totalInv>0?p.inv/totalInv*100:0;
+    return `<div class="pub-card ${p.ativo?'ativo':''}">
+      <div class="pub-card-header"><div class="pub-name">${p.nome}</div><div class="cri-badge ${p.ativo?'ativo':'inativo'}">${p.ativo?'Ativo':'Inativo'}</div></div>
+      <div class="pub-metrics">
+        <div class="pub-metric"><div class="pub-metric-val">${brl(p.inv)}</div><div class="pub-metric-lbl">Invest.</div></div>
+        <div class="pub-metric"><div class="pub-metric-val neutral">${pct(p.ctr)}</div><div class="pub-metric-lbl">CTR</div></div>
+        <div class="pub-metric"><div class="pub-metric-val neutral">${pct(p.connectRate)}</div><div class="pub-metric-lbl">Connect Rate</div></div>
+      </div>
+      <div class="cri-metrics">
+        <div class="cri-metric"><div class="cri-metric-label">CPC</div><div class="cri-metric-val">${brl(p.cpc)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">CPM</div><div class="cri-metric-val">${brl(p.cpm)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">Cliques</div><div class="cri-metric-val">${br(p.cliques,0)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">Imp.</div><div class="cri-metric-val">${br(p.imp,0)}</div></div>
+      </div>
+      <div class="pub-bar-wrap">
+        <div class="pub-bar-label"><span>% do Investimento Total</span><span>${br(pctInv,1)}%</span></div>
+        <div class="pub-bar-bg"><div class="pub-bar-fill" style="width:${Math.min(100,pctInv)}%"></div></div>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('tbody-publicos').innerHTML=pubs.map(p=>`
+    <tr><td>${p.nome}</td><td>${brl(p.inv)}</td><td>${br(p.cliques,0)}</td><td>${br(p.imp,0)}</td>
+    <td>${br(p.pv||0,0)}</td><td>${pct(p.ctr)}</td><td>${brl(p.cpc)}</td><td>${brl(p.cpm)}</td>
+    <td>${pct(p.connectRate)}</td>
+    <td><span class="cri-badge ${p.ativo?'ativo':'inativo'}">${p.ativo?'Ativo':'Inativo'}</span></td></tr>`).join('');
+}
+
+// ===== ABA 4: SEMANA A SEMANA =====
+function renderSemanal(){
+  const inv=SEMANAL.reduce((s,w)=>s+w.inv,0);
+  const fat=SEMANAL.reduce((s,w)=>s+w.fat,0);
+  const compras=SEMANAL.reduce((s,w)=>s+w.compras,0);
+  const roas=inv>0?fat/inv:0;
+  document.getElementById('kpi-semanal').innerHTML=`
+    <div class="kpi-card"><div class="kpi-label">Investimento Total</div><div class="kpi-value orange">${brl(inv)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Faturamento Total</div><div class="kpi-value green">${brl(fat)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">ROAS Geral</div><div class="kpi-value ${roasColor(roas)}">${br(roas,2)}x</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total Compras</div><div class="kpi-value orange">${br(compras,0)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Retorno</div><div class="kpi-value ${fat-inv>=0?'green':'red'}">${brl(fat-inv)}</div></div>`;
+
+  const labels=SEMANAL.map(w=>'S'+w.semana);
+  makeChart('chartSemInv',{type:'bar',data:{labels,datasets:[{label:'Investimento',data:SEMANAL.map(w=>w.inv),backgroundColor:'rgba(255,107,43,0.5)',borderRadius:4},{label:'Faturamento',data:SEMANAL.map(w=>w.fat),backgroundColor:'rgba(46,204,113,0.5)',borderRadius:4}]},options:{...chartDefaults}});
+  makeChart('chartSemRoas',{type:'line',data:{labels,datasets:[{label:'ROAS',data:SEMANAL.map(w=>w.roas),borderColor:'#ff6b2b',backgroundColor:'rgba(255,107,43,0.1)',fill:true,tension:.3,pointRadius:3,pointBackgroundColor:SEMANAL.map(w=>w.roas>=1.7?'#2ecc71':w.roas>=1?'#f1c40f':'#e74c3c')}]},options:{...chartDefaults,plugins:{...chartDefaults.plugins,legend:{display:false}}}});
+
+  document.getElementById('tbody-semanal').innerHTML=SEMANAL.map(w=>`
+    <tr><td>S${w.semana}</td><td>${brl(w.inv)}</td><td>${brl(w.fat)}</td><td class="${roasColor(w.roas)}">${br(w.roas,2)}x</td><td class="${w.retorno>=0?'green':'red'}">${brl(w.retorno)}</td><td>${br(w.compras,0)}</td><td>${brl(w.ticket)}</td><td>${brl(w.cpc)}</td><td>${brl(w.cpm)}</td><td>${pct(w.connectRate)}</td><td>${pct(w.taxaCompra)}</td><td>${statusBadge(w.inv,w.fat)}</td></tr>`).join('');
+}
+
+// ===== ABA 5: MÊS A MÊS =====
+function renderMensal(){
+  const inv=MENSAL.reduce((s,m)=>s+m.inv,0);
+  const fat=MENSAL.reduce((s,m)=>s+m.fat,0);
+  const compras=MENSAL.reduce((s,m)=>s+m.compras,0);
+  const roas=inv>0?fat/inv:0;
+  document.getElementById('kpi-mensal').innerHTML=`
+    <div class="kpi-card"><div class="kpi-label">Investimento Total</div><div class="kpi-value orange">${brl(inv)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Faturamento Total</div><div class="kpi-value green">${brl(fat)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">ROAS Geral</div><div class="kpi-value ${roasColor(roas)}">${br(roas,2)}x</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total Compras</div><div class="kpi-value orange">${br(compras,0)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Retorno</div><div class="kpi-value ${fat-inv>=0?'green':'red'}">${brl(fat-inv)}</div></div>`;
+
+  document.getElementById('tbody-mensal').innerHTML=MENSAL.map(m=>`
+    <tr><td>${m.mes}</td><td>${brl(m.inv)}</td><td>${brl(m.fat)}</td><td class="${roasColor(m.roas)}">${br(m.roas,2)}x</td><td class="${m.retorno>=0?'green':'red'}">${brl(m.retorno)}</td><td>${br(m.compras,0)}</td><td>${brl(m.ticket)}</td><td>${brl(m.cpc)}</td><td>${brl(m.cpm)}</td><td>${pct(m.connectRate)}</td><td>${pct(m.taxaCompra)}</td><td>${statusBadge(m.inv,m.fat)}</td></tr>`).join('');
+}
+
+// ===== INIT =====
+document.addEventListener('DOMContentLoaded',()=>{loadData();});
+</script>
+</body>
+</html>

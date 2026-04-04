@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html><head><title>Debug Forms</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+</head><body style="background:#1a1a2e;color:#eee;font-family:monospace;padding:20px;">
+<h2>Debug - Dados das Planilhas</h2>
+<pre id="output">Carregando...</pre>
+<script>
+const SHEET_ID = '1O7xzXMxQuvQqsw3HXbc5d8q_FvLhi-hCHHrBqFwtk5E';
+
+async function debug() {
+    const out = document.getElementById('output');
+    let log = '';
+
+    try {
+        // Fetch Forms
+        const formsUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Forms`;
+        const formsRes = await fetch(formsUrl);
+        const formsCsv = await formsRes.text();
+        const formsParsed = Papa.parse(formsCsv);
+
+        log += '=== FORMS ===\n';
+        log += 'Total rows (inc header): ' + formsParsed.data.length + '\n';
+        log += 'Headers: ' + JSON.stringify(formsParsed.data[0]) + '\n\n';
+
+        // Show first 5 rows
+        log += 'First 5 data rows:\n';
+        for (let i = 1; i <= Math.min(5, formsParsed.data.length - 1); i++) {
+            log += 'Row ' + i + ': ' + JSON.stringify(formsParsed.data[i]) + '\n';
+        }
+
+        // Show last 3 rows
+        log += '\nLast 3 data rows:\n';
+        for (let i = Math.max(1, formsParsed.data.length - 3); i < formsParsed.data.length; i++) {
+            log += 'Row ' + i + ': ' + JSON.stringify(formsParsed.data[i]) + '\n';
+        }
+
+        // Test findCol
+        const headers = formsParsed.data[0];
+        function findCol(headers, keywords) {
+            for (let i = 0; i < headers.length; i++) {
+                const h = headers[i].toLowerCase().trim();
+                for (const kw of keywords) {
+                    if (h.includes(kw.toLowerCase())) return i;
+                }
+            }
+            return -1;
+        }
+
+        const colDate = findCol(headers, ['enviado às', 'timestamp', 'data']);
+        const colFaturamento = findCol(headers, ['faturamento', 'faturamento médio']);
+        const colUtmContent = findCol(headers, ['utm_content', 'utm content', 'ad name']);
+
+        log += '\n=== COLUMN MATCHING ===\n';
+        log += 'colDate (enviado às/timestamp/data): ' + colDate + ' → "' + (colDate >= 0 ? headers[colDate] : 'NOT FOUND') + '"\n';
+        log += 'colFaturamento: ' + colFaturamento + ' → "' + (colFaturamento >= 0 ? headers[colFaturamento] : 'NOT FOUND') + '"\n';
+        log += 'colUtmContent: ' + colUtmContent + ' → "' + (colUtmContent >= 0 ? headers[colUtmContent] : 'NOT FOUND') + '"\n';
+
+        // Test date parsing on first few rows
+        if (colDate >= 0) {
+            log += '\n=== DATE PARSING TEST ===\n';
+            for (let i = 1; i <= Math.min(3, formsParsed.data.length - 1); i++) {
+                const raw = formsParsed.data[i][colDate];
+                log += 'Raw: "' + raw + '" → ';
+                try {
+                    const [date, time] = raw.split(' ');
+                    const [d, m, y] = date.split('/');
+                    log += 'split: d=' + d + ' m=' + m + ' y=' + y + ' time=' + time;
+                    const parsed = new Date(y, m - 1, d);
+                    log += ' → Date: ' + parsed.toISOString() + '\n';
+                } catch(e) {
+                    log += 'ERROR: ' + e.message + '\n';
+                }
+            }
+        }
+
+        // Fetch Captação
+        log += '\n\n=== CAPTAÇÃO ===\n';
+        const capUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Capta%C3%A7%C3%A3o`;
+        const capRes = await fetch(capUrl);
+        const capCsv = await capRes.text();
+        const capParsed = Papa.parse(capCsv);
+
+        log += 'Total rows (inc header): ' + capParsed.data.length + '\n';
+        log += 'Headers: ' + JSON.stringify(capParsed.data[0]) + '\n\n';
+
+        log += 'First 3 data rows:\n';
+        for (let i = 1; i <= Math.min(3, capParsed.data.length - 1); i++) {
+            log += 'Row ' + i + ': ' + JSON.stringify(capParsed.data[i]) + '\n';
+        }
+
+        const capHeaders = capParsed.data[0];
+        const colSpend = findCol(capHeaders, ['spend', 'custo']);
+        log += '\ncolSpend: ' + colSpend + ' → "' + (colSpend >= 0 ? capHeaders[colSpend] : 'NOT FOUND') + '"\n';
+
+        if (colSpend >= 0) {
+            log += '\nSpend values (first 5):\n';
+            for (let i = 1; i <= Math.min(5, capParsed.data.length - 1); i++) {
+                log += '  "' + capParsed.data[i][colSpend] + '"\n';
+            }
+        }
+
+    } catch(e) {
+        log += 'FETCH ERROR: ' + e.message;
+    }
+
+    out.textContent = log;
+}
+
+debug();
+</script></body></html>

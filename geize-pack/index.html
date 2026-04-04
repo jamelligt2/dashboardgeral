@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jamelli GT - Traffic Management Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#1a1a2e;color:#e8e6f0;font-family:'DM Sans',sans-serif;min-height:100vh}
+    ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:#12121f}::-webkit-scrollbar-thumb{background:#ff6b2b55;border-radius:3px}
+    .topbar{background:#12121f;padding:12px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.07);position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:10px}
+    .brand{font-size:17px;font-weight:700;color:#ff6b2b}
+    .subtitle{font-size:11px;color:rgba(255,255,255,0.4);margin-top:2px}
+    .logo-jgt{display:flex;align-items:center;gap:10px}
+    .logo-jgt svg{width:36px;height:36px;flex-shrink:0}
+    .logo-text{display:flex;flex-direction:column}
+    .logo-text strong{font-size:13px;font-weight:700;color:#ff6b2b;letter-spacing:.3px}
+    .logo-text span{font-size:10px;color:rgba(255,255,255,.35);margin-top:1px}
+    .period-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .period-bar label{font-size:11px;color:rgba(255,255,255,.45);white-space:nowrap}
+    .date-input{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:#e8e6f0;padding:5px 10px;border-radius:6px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;outline:none;min-width:118px}
+    .date-input:focus{border-color:#ff6b2b}
+    .date-input::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;cursor:pointer}
+    .period-sep{color:rgba(255,255,255,.2);font-size:13px;padding:0 2px}
+    .preset-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;transition:all .2s;white-space:nowrap}
+    .preset-btn:hover,.preset-btn.active{background:rgba(255,107,43,.2);border-color:#ff6b2b;color:#ff6b2b;font-weight:600}
+    .range-info{font-size:11px;color:rgba(255,107,43,.75);font-family:'DM Mono',monospace;white-space:nowrap;padding-left:4px}
+    .tabs{display:flex;border-bottom:1px solid rgba(255,255,255,0.07);background:#12121f;padding:0 28px;overflow-x:auto}
+    .tab{padding:12px 20px;cursor:pointer;font-size:13px;color:rgba(255,255,255,0.5);border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
+    .tab:hover{color:#e8e6f0}.tab.active{color:#ff6b2b;border-bottom-color:#ff6b2b;font-weight:600}
+    .content{padding:24px 28px;display:none}.content.active{display:block}
+    .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:20px}
+    .kpi-card{background:#12121f;border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:16px 18px}
+    .kpi-label{font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+    .kpi-value{font-size:20px;font-weight:700;font-family:'DM Mono',monospace}
+    .orange{color:#ff6b2b}.green{color:#2ecc71}.red{color:#e74c3c}.yellow{color:#f1c40f}
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th{background:#12121f;color:rgba(255,255,255,.45);padding:8px 10px;text-align:right;font-weight:500;border-bottom:1px solid rgba(255,255,255,.07);white-space:nowrap}
+    th:first-child{text-align:left}
+    td{padding:7px 10px;text-align:right;border-bottom:1px solid rgba(255,255,255,.04);font-family:'DM Mono',monospace;font-size:11px;color:#e8e6f0}
+    td:first-child{text-align:left;font-family:'DM Sans',sans-serif;font-size:12px}
+    tr:hover td{background:rgba(255,255,255,.025)}
+    .badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;font-family:'DM Sans',sans-serif}
+    .badge.escalar{background:rgba(46,204,113,.15);color:#2ecc71;border:1px solid rgba(46,204,113,.3)}
+    .badge.otimizar{background:rgba(241,196,15,.15);color:#f1c40f;border:1px solid rgba(241,196,15,.3)}
+    .badge.corrigir{background:rgba(231,76,60,.15);color:#e74c3c;border:1px solid rgba(231,76,60,.3)}
+    .badge.aguardar{background:rgba(255,255,255,.06);color:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.1)}
+    .funil-section{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:16px 0}
+    .funil-bar-wrap{margin-bottom:12px}
+    .funil-label{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;color:rgba(255,255,255,.7)}
+    .funil-bar-bg{background:rgba(255,255,255,.05);border-radius:4px;height:14px;overflow:hidden}
+    .funil-bar-fill{background:linear-gradient(90deg,#ff6b2b,#ff9a3c);height:100%;border-radius:4px;transition:width .4s}
+    .taxa-grid{display:grid;gap:8px}
+    .taxa-item{background:rgba(255,255,255,.04);border-radius:8px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;font-size:12px;color:rgba(255,255,255,.7)}
+    .taxa-val{font-family:'DM Mono',monospace;font-size:15px;font-weight:600;color:#ff6b2b}
+    .chart-grid-2x2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0}
+    .chart-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:16px}
+    .chart-card h4{font-size:11px;color:rgba(255,255,255,.45);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
+    .chart-card canvas{max-height:190px}
+    .sec-title{font-size:13px;font-weight:600;color:rgba(255,255,255,.65);margin:20px 0 10px;border-left:3px solid #ff6b2b;padding-left:10px}
+    .cri-filterbar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+    .cri-filter-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 12px;border-radius:5px;cursor:pointer;font-size:12px;transition:all .2s}
+    .cri-filter-btn.active{background:rgba(255,107,43,.2);border-color:#ff6b2b;color:#ff6b2b}
+    .cri-sort-label{font-size:11px;color:rgba(255,255,255,.4);white-space:nowrap}
+    .cri-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
+    @media(max-width:900px){.cri-grid{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:600px){.cri-grid{grid-template-columns:1fr}.chart-grid-2x2{grid-template-columns:1fr}.funil-section{grid-template-columns:1fr}.period-bar{justify-content:flex-start}}
+    .cri-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:14px}
+    .cri-card.ativo{border-color:rgba(46,204,113,.25)}
+    .cri-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+    .cri-name{font-size:11px;font-weight:600;word-break:break-all;flex:1;margin-right:6px;color:#e8e6f0}
+    .cri-badge{font-size:10px;padding:2px 6px;border-radius:4px;white-space:nowrap}
+    .cri-badge.ativo{background:rgba(46,204,113,.15);color:#2ecc71}
+    .cri-badge.inativo{background:rgba(255,255,255,.08);color:rgba(255,255,255,.4)}
+    .cri-metrics{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+    .cri-metric{display:flex;flex-direction:column}
+    .cri-metric-label{color:rgba(255,255,255,.4);font-size:9px;margin-bottom:2px;text-transform:uppercase}
+    .cri-metric-val{font-family:'DM Mono',monospace;font-size:12px;font-weight:600;color:#e8e6f0}
+    .cri-metric-val.hl{color:#ff6b2b;font-size:14px}
+    .cri-link{display:block;margin-top:8px;font-size:10px;color:rgba(255,107,43,.7);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .cri-link:hover{color:#ff6b2b}
+    .tbl-wrap{overflow-x:auto;border-radius:8px;border:1px solid rgba(255,255,255,.07)}
+    .pub-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-bottom:24px}
+    .pub-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:16px}
+    .pub-card.ativo{border-color:rgba(46,204,113,.2)}
+    .pub-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+    .pub-name{font-size:12px;font-weight:600;flex:1;margin-right:8px;color:#e8e6f0;line-height:1.4}
+    .pub-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+    .pub-metric{text-align:center;padding:8px 6px;background:rgba(255,255,255,.03);border-radius:6px}
+    .pub-metric-val{font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:#ff6b2b}
+    .pub-metric-val.neutral{color:#e8e6f0}
+    .pub-metric-lbl{font-size:9px;color:rgba(255,255,255,.35);margin-top:2px;text-transform:uppercase;letter-spacing:.4px}
+    .pub-bar-wrap{margin-top:8px}
+    .pub-bar-label{display:flex;justify-content:space-between;font-size:10px;color:rgba(255,255,255,.35);margin-bottom:3px}
+    .pub-bar-bg{height:5px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden}
+    .pub-bar-fill{height:100%;background:linear-gradient(90deg,#ff6b2b,#ff9a3c);border-radius:3px;transition:width .5s}
+    .loading-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:#1a1a2e;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999}
+    .loading-spinner{width:40px;height:40px;border:3px solid rgba(255,107,43,.2);border-top-color:#ff6b2b;border-radius:50%;animation:spin 1s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .loading-text{margin-top:16px;color:rgba(255,255,255,.5);font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="loading-overlay" id="loading">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Carregando dados...</div>
+  </div>
+
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:16px">
+      <div class="logo-jgt">
+        <svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+          <rect width="36" height="36" rx="8" fill="#ff6b2b" fill-opacity="0.15"/>
+          <rect width="36" height="36" rx="8" stroke="#ff6b2b" stroke-opacity="0.4" stroke-width="1" fill="none"/>
+          <text x="18" y="24" text-anchor="middle" font-family="DM Sans" font-weight="700" font-size="13" fill="#ff6b2b">JGT</text>
+        </svg>
+        <div class="logo-text"><strong>Jamelli GT</strong><span>Tráfego Pago</span></div>
+      </div>
+      <div>
+        <div class="brand">📦 Pack · Geize-pack</div>
+        <div class="subtitle">Dashboard de Performance — Perpétuo · Jamelli GT · 2026</div>
+      </div>
+    </div>
+    <div class="period-bar">
+      <label>De</label>
+      <input type="date" id="dateFrom" class="date-input" onchange="onDateChange()">
+      <span class="period-sep">→</span>
+      <label>Até</label>
+      <input type="date" id="dateTo" class="date-input" onchange="onDateChange()">
+      <button class="preset-btn" onclick="setPreset(7,this)">7d</button>
+      <button class="preset-btn" onclick="setPreset(14,this)">14d</button>
+      <button class="preset-btn" onclick="setPreset(30,this)">30d</button>
+      <button class="preset-btn active" id="btn-all" onclick="setPreset('all',this)">Tudo</button>
+      <span class="range-info" id="range-info"></span>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="showTab('visao',this)">Visão Geral</div>
+    <div class="tab" onclick="showTab('criativos',this)">Criativos</div>
+    <div class="tab" onclick="showTab('publicos',this)">Públicos</div>
+    <div class="tab" onclick="showTab('semanal',this)">Semana a Semana</div>
+    <div class="tab" onclick="showTab('mensal',this)">Mês a Mês</div>
+  </div>
+
+  <!-- TAB 1: VISÃO GERAL -->
+  <div id="tab-visao" class="content active">
+    <div class="kpi-grid" id="kpi-visao"></div>
+    <div class="funil-section">
+      <div>
+        <h3 style="font-size:12px;margin-bottom:12px;color:rgba(255,255,255,.6)">Funil de Conversão</h3>
+        <div class="funil-bar-wrap">
+          <div class="funil-label"><span>Cliques</span><span id="vis-cliques">0</span></div>
+          <div class="funil-bar-bg"><div class="funil-bar-fill" id="bar-cliques" style="width:100%"></div></div>
+        </div>
+        <div class="funil-bar-wrap">
+          <div class="funil-label"><span>PV</span><span id="vis-pv">0</span></div>
+          <div class="funil-bar-bg"><div class="funil-bar-fill" id="bar-pv" style="width:80%"></div></div>
+        </div>
+        <div class="funil-bar-wrap">
+          <div class="funil-label"><span>Checkouts</span><span id="vis-ck">0</span></div>
+          <div class="funil-bar-bg"><div class="funil-bar-fill" id="bar-ck" style="width:60%"></div></div>
+        </div>
+        <div class="funil-bar-wrap">
+          <div class="funil-label"><span>Compras</span><span id="vis-compras">0</span></div>
+          <div class="funil-bar-bg"><div class="funil-bar-fill" id="bar-compras" style="width:40%"></div></div>
+        </div>
+      </div>
+      <div>
+        <h3 style="font-size:12px;margin-bottom:12px;color:rgba(255,255,255,.6)">Taxas & Métricas</h3>
+        <div class="taxa-grid">
+          <div class="taxa-item"><span>CTR</span><span class="taxa-val" id="vis-ctr">—</span></div>
+          <div class="taxa-item"><span>Connect Rate</span><span class="taxa-val" id="vis-connectRate">—</span></div>
+          <div class="taxa-item"><span>Taxa Checkout</span><span class="taxa-val" id="vis-taxaCk">—</span></div>
+          <div class="taxa-item"><span>Taxa Compra</span><span class="taxa-val" id="vis-taxaCompra">—</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="chart-grid-2x2">
+      <div class="chart-card">
+        <h4>Investimento vs Faturamento</h4>
+        <canvas id="chart-inv-fat"></canvas>
+      </div>
+      <div class="chart-card">
+        <h4>ROAS Diário</h4>
+        <canvas id="chart-roas"></canvas>
+      </div>
+      <div class="chart-card">
+        <h4>CPC Diário</h4>
+        <canvas id="chart-cpc"></canvas>
+      </div>
+      <div class="chart-card">
+        <h4>Compras Diário</h4>
+        <canvas id="chart-compras"></canvas>
+      </div>
+    </div>
+    <div class="sec-title">Desempenho Diário</div>
+    <div class="tbl-wrap">
+      <table id="table-dias"></table>
+    </div>
+  </div>
+
+  <!-- TAB 2: CRIATIVOS -->
+  <div id="tab-criativos" class="content">
+    <div class="cri-filterbar">
+      <button class="cri-filter-btn active" onclick="filterCriativos('todos',this)">Todos</button>
+      <button class="cri-filter-btn" onclick="filterCriativos('ativos',this)">Ativos</button>
+      <button class="cri-filter-btn" onclick="filterCriativos('inativos',this)">Inativos</button>
+      <span style="width:1px;height:16px;background:rgba(255,255,255,.1);margin:0 8px"></span>
+      <span class="cri-sort-label">Ordenar:</span>
+      <select id="cri-sort" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 8px;border-radius:5px;font-size:11px;font-family:'DM Sans',sans-serif;cursor:pointer" onchange="sortCriativos()">
+        <option value="invest">Investimento</option>
+        <option value="ctr">CTR</option>
+        <option value="cpc">CPC</option>
+        <option value="roas">ROAS</option>
+        <option value="vendas">Vendas</option>
+      </select>
+    </div>
+    <div class="cri-grid" id="grid-criativos"></div>
+    <div class="sec-title">Detalhes dos Criativos</div>
+    <div class="tbl-wrap">
+      <table id="table-criativos"></table>
+    </div>
+  </div>
+
+  <!-- TAB 3: PÚBLICOS -->
+  <div id="tab-publicos" class="content">
+    <div class="cri-filterbar">
+      <button class="cri-filter-btn active" onclick="filterPublicos('todos',this)">Todos</button>
+      <button class="cri-filter-btn" onclick="filterPublicos('ativos',this)">Ativos</button>
+      <button class="cri-filter-btn" onclick="filterPublicos('inativos',this)">Inativos</button>
+      <span style="width:1px;height:16px;background:rgba(255,255,255,.1);margin:0 8px"></span>
+      <span class="cri-sort-label">Ordenar:</span>
+      <select id="pub-sort" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 8px;border-radius:5px;font-size:11px;font-family:'DM Sans',sans-serif;cursor:pointer" onchange="sortPublicos()">
+        <option value="invest">Investimento</option>
+        <option value="ctr">CTR</option>
+        <option value="cpc">CPC</option>
+        <option value="connectRate">Connect Rate</option>
+      </select>
+    </div>
+    <div class="pub-grid" id="grid-publicos"></div>
+    <div class="sec-title">Detalhes dos Públicos</div>
+    <div class="tbl-wrap">
+      <table id="table-publicos"></table>
+    </div>
+  </div>
+
+  <!-- TAB 4: SEMANAL -->
+  <div id="tab-semanal" class="content">
+    <div class="kpi-grid" id="kpi-semanal"></div>
+    <div class="chart-grid-2x2">
+      <div class="chart-card">
+        <h4>Investimento por Semana</h4>
+        <canvas id="chart-inv-week"></canvas>
+      </div>
+      <div class="chart-card">
+        <h4>ROAS por Semana</h4>
+        <canvas id="chart-roas-week"></canvas>
+      </div>
+    </div>
+    <div class="sec-title">Desempenho Semanal</div>
+    <div class="tbl-wrap">
+      <table id="table-semanal"></table>
+    </div>
+  </div>
+
+  <!-- TAB 5: MENSAL -->
+  <div id="tab-mensal" class="content">
+    <div class="kpi-grid" id="kpi-mensal"></div>
+    <div class="sec-title">Desempenho Mensal</div>
+    <div class="tbl-wrap">
+      <table id="table-mensal"></table>
+    </div>
+  </div>
+
+  <script>
+    const SHEET_ID = '1wQ3TeNWpJcE8w4cKj5cov5FnjrFgKcSwMZt18r2KeC4';
+    const CREATIVE_MAP = {
+      'PACK-ADE01-020326': 'https://www.instagram.com/p/DWUiNmMgLJe/',
+      'PACK-ADE02-020326': 'https://www.instagram.com/p/DVfLoiFAJ3T/',
+      'PACK-ADE03-020326': 'https://www.instagram.com/p/DWUiS8SAEgY/',
+      'PACK-ADE04-020326': 'https://www.instagram.com/p/DWUiNp-gCcO/'
+    };
+
+    let DIAS = [], SEMANAL = [], MENSAL = [], CRIATIVOS = [], PUBLICOS = [];
+    let dateFrom = null, dateTo = null;
+    let charts = {};
+    let filterState = { criativos: 'todos', publicos: 'todos' };
+
+    function parseCSVLine(line) {
+      const result = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (c === '"') inQuotes = !inQuotes;
+        else if (c === ',' && !inQuotes) { result.push(current); current = ''; }
+        else current += c;
+      }
+      result.push(current);
+      return result;
+    }
+
+    function parseBR(v) {
+      return parseFloat((v || '0').replace(/\./g, '').replace(',', '.'));
+    }
+
+    function toISO(d) {
+      const [dd, mm, yy] = d.split('/');
+      return yy + '-' + mm + '-' + dd;
+    }
+
+    const ptMonFull = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+    function dateToMonthKey(d) {
+      const [dd, mm, yy] = d.split('/').map(Number);
+      return ptMonFull[mm - 1];
+    }
+
+    function dateToWeekKey(d) {
+      const [dd, mm, yy] = d.split('/').map(Number);
+      const dt = new Date(yy, mm - 1, dd);
+      const jan1 = new Date(yy, 0, 1);
+      const w = Math.ceil((Math.floor((dt - jan1) / 86400000) + 1) / 7);
+      return String(yy).slice(-2) + String(w).padStart(2, '0');
+    }
+
+    function br(n, d = 2) {
+      if (n === null || n === undefined || isNaN(n)) return '—';
+      return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d }).format(n);
+    }
+
+    function brl(n) {
+      if (n === null || n === undefined) return '—';
+      return 'R$ ' + br(n, 2);
+    }
+
+    function pct(n) {
+      if (n === null || n === undefined || isNaN(n)) return '—';
+      return br(n, 2) + '%';
+    }
+
+    function statusBadge(inv, fat) {
+      if (!inv || inv === 0) return '<span class="badge aguardar">Aguardar</span>';
+      const r = inv > 0 ? fat / inv : 0;
+      if (r >= 1.7) return '<span class="badge escalar">Escalar</span>';
+      if (r >= 1) return '<span class="badge otimizar">Otimizar</span>';
+      return '<span class="badge corrigir">Corrigir</span>';
+    }
+
+    function fixFatFromDias() {
+      const fatWk = {}, compWk = {}, cliqWk = {}, pvWk = {}, ckWk = {}, impWk = {}, invWk = {};
+      DIAS.forEach(r => {
+        const k = dateToWeekKey(r.data);
+        fatWk[k] = (fatWk[k] || 0) + (r.fat || 0);
+        compWk[k] = (compWk[k] || 0) + (r.compras || 0);
+        cliqWk[k] = (cliqWk[k] || 0) + (r.cliques || 0);
+        pvWk[k] = (pvWk[k] || 0) + (r.pv || 0);
+        ckWk[k] = (ckWk[k] || 0) + (r.ck || 0);
+        impWk[k] = (impWk[k] || 0) + (r.imp || 0);
+        invWk[k] = (invWk[k] || 0) + (r.inv || 0);
+      });
+      SEMANAL.forEach(r => {
+        const k = String(r.semana);
+        r.fat = Math.round((fatWk[k] || 0) * 100) / 100;
+        r.compras = compWk[k] || 0;
+        r.inv = Math.round((invWk[k] || 0) * 100) / 100;
+        r.cliques = cliqWk[k] || 0;
+        r.pv = pvWk[k] || 0;
+        r.ck = ckWk[k] || 0;
+        r.imp = impWk[k] || 0;
+        r.roas = r.inv > 0 ? Math.round(r.fat / r.inv * 100) / 100 : 0;
+        r.ticket = r.compras > 0 ? Math.round(r.fat / r.compras * 100) / 100 : 0;
+        r.retorno = Math.round((r.fat - r.inv) * 100) / 100;
+        r.taxaCompra = r.pv > 0 ? Math.round(r.compras / r.pv * 100 * 100) / 100 : 0;
+        r.cpc = r.cliques > 0 ? Math.round(r.inv / r.cliques * 100) / 100 : 0;
+        r.cpm = r.imp > 0 ? Math.round(r.inv / r.imp * 1000 * 100) / 100 : 0;
+        r.connectRate = r.cliques > 0 ? Math.round(r.pv / r.cliques * 100 * 100) / 100 : 0;
+      });
+      const fatMo = {}, compMo = {}, cliqMo = {}, pvMo = {}, ckMo = {}, impMo = {}, invMo = {};
+      DIAS.forEach(r => {
+        const k = dateToMonthKey(r.data);
+        fatMo[k] = (fatMo[k] || 0) + (r.fat || 0);
+        compMo[k] = (compMo[k] || 0) + (r.compras || 0);
+        cliqMo[k] = (cliqMo[k] || 0) + (r.cliques || 0);
+        pvMo[k] = (pvMo[k] || 0) + (r.pv || 0);
+        ckMo[k] = (ckMo[k] || 0) + (r.ck || 0);
+        impMo[k] = (impMo[k] || 0) + (r.imp || 0);
+        invMo[k] = (invMo[k] || 0) + (r.inv || 0);
+      });
+      MENSAL.forEach(r => {
+        if (fatMo[r.mes] !== undefined) {
+          r.fat = Math.round(fatMo[r.mes] * 100) / 100;
+          r.compras = compMo[r.mes] || 0;
+          r.inv = Math.round((invMo[r.mes] || 0) * 100) / 100;
+          r.cliques = cliqMo[r.mes] || 0;
+          r.pv = pvMo[r.mes] || 0;
+          r.ck = ckMo[r.mes] || 0;
+          r.imp = impMo[r.mes] || 0;
+          r.roas = r.inv > 0 ? Math.round(r.fat / r.inv * 100) / 100 : 0;
+          r.ticket = r.compras > 0 ? Math.round(r.fat / r.compras * 100) / 100 : 0;
+          r.retorno = Math.round((r.fat - r.inv) * 100) / 100;
+          r.taxaCompra = r.pv > 0 ? Math.round(r.compras / r.pv * 100 * 100) / 100 : 0;
+          r.cpc = r.cliques > 0 ? Math.round(r.inv / r.cliques * 100) / 100 : 0;
+          r.cpm = r.imp > 0 ? Math.round(r.inv / r.imp * 1000 * 100) / 100 : 0;
+          r.connectRate = r.cliques > 0 ? Math.round(r.pv / r.cliques * 100 * 100) / 100 : 0;
+        }
+      });
+    }
+
+    async function fetchData() {
+      try {
+        const gerURL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent('Gerenciador')}`;
+        const webURL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent('Vendas')}`;
+
+        const gerRes = await fetch(gerURL);
+        const gerText = await gerRes.text();
+        const gerLines = gerText.split('\n').filter(l => l.trim());
+
+        const webRes = await fetch(webURL);
+        const webText = await webRes.text();
+        const webLines = webText.split('\n').filter(l => l.trim());
+
+        const gerData = gerLines.slice(1).map(l => parseCSVLine(l));
+        const webData = webLines.slice(1).map(l => parseCSVLine(l));
+
+        const diaMap = {};
+        gerData.forEach(row => {
+          if (!row[0] || row[0] === 'Date') return;
+          const [y, m, d] = row[0].split('-');
+          const data = `${d}/${m}/${y}`;
+          const spend = parseBR(row[1]);
+          const clicks = parseInt(row[2]) || 0;
+          const pv = parseInt(row[3]) || 0;
+          const ck = parseInt(row[4]) || 0;
+          const adset = row[6] || '';
+          const adName = row[7] || '';
+          const link = row[9] || '';
+          const imp = parseInt(row[11]) || 0;
+
+          if (!diaMap[data]) {
+            diaMap[data] = { data, inv: 0, fat: 0, compras: 0, cliques: 0, pv: 0, ck: 0, imp: 0, items: [] };
+          }
+          diaMap[data].inv += spend;
+          diaMap[data].cliques += clicks;
+          diaMap[data].pv += pv;
+          diaMap[data].ck += ck;
+          diaMap[data].imp += imp;
+          diaMap[data].items.push({ adName, adset, spend, clicks, pv, ck, link, imp });
+        });
+
+        // Aba Vendas: col1=Status, col10=Data Pagamento (DD/MM/AAAA HH:MM), col22=Valor da Venda, col47=UTM Source
+        const webPaid = webData.filter(row => {
+          const status = (row[1] || '').trim().toLowerCase();
+          const source = (row[47] || '').toLowerCase().replace(/[\s_-]/g, '');
+          return status === 'paga' && source === 'metaads';
+        });
+
+        const webByDate = {};
+        const webCountByDate = {};
+        webPaid.forEach(row => {
+          const datePag = (row[10] || '').trim();
+          if (!datePag) return;
+          const dateParts = datePag.split(' ')[0]; // "DD/MM/AAAA"
+          const value = parseBR(row[22]);
+          if (!webByDate[dateParts]) { webByDate[dateParts] = 0; webCountByDate[dateParts] = 0; }
+          webByDate[dateParts] += value;
+          webCountByDate[dateParts] += 1;
+        });
+
+        // Include dates that exist in Vendas but not in Gerenciador
+        Object.keys(webByDate).forEach(data => {
+          if (!diaMap[data]) {
+            diaMap[data] = { data, inv: 0, fat: 0, compras: 0, cliques: 0, pv: 0, ck: 0, imp: 0, items: [] };
+          }
+        });
+
+        Object.keys(diaMap).forEach(data => {
+          diaMap[data].fat = webByDate[data] || 0;
+          diaMap[data].compras = webCountByDate[data] || 0;
+          diaMap[data].inv = Math.round(diaMap[data].inv * 100) / 100;
+          diaMap[data].fat = Math.round(diaMap[data].fat * 100) / 100;
+          diaMap[data].roas = diaMap[data].inv > 0 ? Math.round(diaMap[data].fat / diaMap[data].inv * 100) / 100 : 0;
+          diaMap[data].cpc = diaMap[data].cliques > 0 ? Math.round(diaMap[data].inv / diaMap[data].cliques * 100) / 100 : 0;
+          diaMap[data].cpm = diaMap[data].imp > 0 ? Math.round(diaMap[data].inv / diaMap[data].imp * 1000 * 100) / 100 : 0;
+          diaMap[data].ctr = diaMap[data].imp > 0 ? Math.round(diaMap[data].cliques / diaMap[data].imp * 100 * 100) / 100 : 0;
+          diaMap[data].connectRate = diaMap[data].cliques > 0 ? Math.round(diaMap[data].pv / diaMap[data].cliques * 100 * 100) / 100 : 0;
+          diaMap[data].taxaCompra = diaMap[data].pv > 0 ? Math.round(diaMap[data].compras / diaMap[data].pv * 100 * 100) / 100 : 0;
+          diaMap[data].ticket = diaMap[data].compras > 0 ? Math.round(diaMap[data].fat / diaMap[data].compras * 100) / 100 : 0;
+        });
+
+        DIAS = Object.values(diaMap).sort((a, b) => toISO(a.data).localeCompare(toISO(b.data)));
+
+        const maxDate = DIAS.length > 0 ? DIAS[DIAS.length - 1].data : null;
+        const maxDateObj = maxDate ? new Date(toISO(maxDate)) : new Date();
+        const sevenDaysAgo = new Date(maxDateObj.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+        const criMap = {};
+        DIAS.forEach(dia => {
+          dia.items.forEach(item => {
+            if (!criMap[item.adName]) {
+              criMap[item.adName] = {
+                nome: item.adName,
+                inv: 0, fat: 0, compras: 0, cliques: 0, pv: 0, ck: 0, imp: 0, link: CREATIVE_MAP[item.adName] || '',
+                lastSpend: new Date(0)
+              };
+            }
+            criMap[item.adName].inv += item.spend;
+            criMap[item.adName].cliques += item.clicks;
+            criMap[item.adName].pv += item.pv;
+            criMap[item.adName].ck += item.ck;
+            criMap[item.adName].imp += item.imp;
+            const diaDate = new Date(toISO(dia.data));
+            if (item.spend > 0 && diaDate > criMap[item.adName].lastSpend) {
+              criMap[item.adName].lastSpend = diaDate;
+            }
+          });
+        });
+
+        const totalInvByDay = {};
+        DIAS.forEach(dia => {
+          totalInvByDay[dia.data] = dia.inv;
+        });
+
+        // Distribute fat/compras to creatives proportionally by daily spend
+        const totalWebCompras = Object.values(webCountByDate).reduce((a, b) => a + b, 0);
+        Object.keys(criMap).forEach(nome => {
+          const cri = criMap[nome];
+          let criFat = 0, criComp = 0;
+          DIAS.forEach(dia => {
+            if (dia.fat > 0 && dia.inv > 0) {
+              const dayItems = dia.items.filter(it => it.adName === nome);
+              const daySpend = dayItems.reduce((s, it) => s + it.spend, 0);
+              const ratio = daySpend / dia.inv;
+              criFat += dia.fat * ratio;
+              criComp += dia.compras * ratio;
+            }
+          });
+          cri.fat = Math.round(criFat * 100) / 100;
+          cri.compras = Math.round(criComp);
+          cri.inv = Math.round(cri.inv * 100) / 100;
+          cri.fat = Math.round(cri.fat * 100) / 100;
+          cri.roas = cri.inv > 0 ? Math.round(cri.fat / cri.inv * 100) / 100 : 0;
+          cri.cpc = cri.cliques > 0 ? Math.round(cri.inv / cri.cliques * 100) / 100 : 0;
+          cri.cpm = cri.imp > 0 ? Math.round(cri.inv / cri.imp * 1000 * 100) / 100 : 0;
+          cri.ctr = cri.imp > 0 ? Math.round(cri.cliques / cri.imp * 100 * 100) / 100 : 0;
+          cri.cac = cri.compras > 0 ? Math.round(cri.inv / cri.compras * 100) / 100 : 0;
+          cri.ativo = cri.lastSpend >= sevenDaysAgo;
+        });
+        CRIATIVOS = Object.values(criMap).sort((a, b) => b.inv - a.inv);
+
+        const pubMap = {};
+        DIAS.forEach(dia => {
+          dia.items.forEach(item => {
+            if (!pubMap[item.adset]) {
+              pubMap[item.adset] = {
+                nome: item.adset,
+                inv: 0, fat: 0, compras: 0, cliques: 0, pv: 0, ck: 0, imp: 0, lastSpend: new Date(0)
+              };
+            }
+            pubMap[item.adset].inv += item.spend;
+            pubMap[item.adset].cliques += item.clicks;
+            pubMap[item.adset].pv += item.pv;
+            pubMap[item.adset].ck += item.ck;
+            pubMap[item.adset].imp += item.imp;
+            const diaDate = new Date(toISO(dia.data));
+            if (item.spend > 0 && diaDate > pubMap[item.adset].lastSpend) {
+              pubMap[item.adset].lastSpend = diaDate;
+            }
+          });
+        });
+
+        Object.keys(pubMap).forEach(nome => {
+          const pub = pubMap[nome];
+          let pubFat = 0, pubComp = 0;
+          DIAS.forEach(dia => {
+            if (dia.fat > 0 && dia.inv > 0) {
+              const dayItems = dia.items.filter(it => it.adset === nome);
+              const daySpend = dayItems.reduce((s, it) => s + it.spend, 0);
+              const ratio = daySpend / dia.inv;
+              pubFat += dia.fat * ratio;
+              pubComp += dia.compras * ratio;
+            }
+          });
+          pub.fat = Math.round(pubFat * 100) / 100;
+          pub.compras = Math.round(pubComp);
+          pub.inv = Math.round(pub.inv * 100) / 100;
+          pub.fat = Math.round(pub.fat * 100) / 100;
+          pub.roas = pub.inv > 0 ? Math.round(pub.fat / pub.inv * 100) / 100 : 0;
+          pub.cpc = pub.cliques > 0 ? Math.round(pub.inv / pub.cliques * 100) / 100 : 0;
+          pub.cpm = pub.imp > 0 ? Math.round(pub.inv / pub.imp * 1000 * 100) / 100 : 0;
+          pub.ctr = pub.imp > 0 ? Math.round(pub.cliques / pub.imp * 100 * 100) / 100 : 0;
+          pub.connectRate = pub.cliques > 0 ? Math.round(pub.pv / pub.cliques * 100 * 100) / 100 : 0;
+          pub.ativo = pub.lastSpend >= sevenDaysAgo;
+        });
+        PUBLICOS = Object.values(pubMap).sort((a, b) => b.inv - a.inv);
+
+        const weekMap = {};
+        DIAS.forEach(dia => {
+          const wk = dateToWeekKey(dia.data);
+          if (!weekMap[wk]) {
+            weekMap[wk] = { semana: wk, inv: 0, fat: 0, compras: 0, cliques: 0, pv: 0, ck: 0, imp: 0 };
+          }
+          weekMap[wk].inv += dia.inv;
+          weekMap[wk].fat += dia.fat;
+          weekMap[wk].compras += dia.compras;
+          weekMap[wk].cliques += dia.cliques;
+          weekMap[wk].pv += dia.pv;
+          weekMap[wk].ck += dia.ck;
+          weekMap[wk].imp += dia.imp;
+        });
+        SEMANAL = Object.values(weekMap).sort((a, b) => a.semana.localeCompare(b.semana));
+
+        const monMap = {};
+        ptMonFull.forEach(m => {
+          monMap[m] = { mes: m, inv: 0, fat: 0, compras: 0, cliques: 0, pv: 0, ck: 0, imp: 0 };
+        });
+        DIAS.forEach(dia => {
+          const m = dateToMonthKey(dia.data);
+          monMap[m].inv += dia.inv;
+          monMap[m].fat += dia.fat;
+          monMap[m].compras += dia.compras;
+          monMap[m].cliques += dia.cliques;
+          monMap[m].pv += dia.pv;
+          monMap[m].ck += dia.ck;
+          monMap[m].imp += dia.imp;
+        });
+        MENSAL = ptMonFull.map(m => monMap[m]);
+
+        fixFatFromDias();
+        initDatePickers();
+        renderAll();
+      } catch (e) {
+        console.error('Erro ao carregar dados:', e);
+        alert('Erro ao carregar dados. Verifique a URL da planilha.');
+      } finally {
+        document.getElementById('loading').style.display = 'none';
+      }
+    }
+
+    function initDatePickers() {
+      const dates = DIAS.map(d => toISO(d.data)).sort();
+      if (dates.length > 0) {
+        document.getElementById('dateFrom').value = dates[0];
+        document.getElementById('dateTo').value = dates[dates.length - 1];
+        dateFrom = dates[0];
+        dateTo = dates[dates.length - 1];
+        updateRangeInfo();
+      }
+    }
+
+    function setPreset(days, btn) {
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const dates = DIAS.map(d => toISO(d.data)).sort();
+      const last = dates[dates.length - 1];
+      if (days === 'all') {
+        document.getElementById('dateFrom').value = dates[0];
+        document.getElementById('dateTo').value = last;
+      } else {
+        const from = new Date(last);
+        from.setDate(from.getDate() - (days - 1));
+        document.getElementById('dateFrom').value = from.toISOString().slice(0, 10);
+        document.getElementById('dateTo').value = last;
+      }
+      dateFrom = document.getElementById('dateFrom').value;
+      dateTo = document.getElementById('dateTo').value;
+      updateRangeInfo();
+      renderAll();
+    }
+
+    function onDateChange() {
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+      dateFrom = document.getElementById('dateFrom').value;
+      dateTo = document.getElementById('dateTo').value;
+      updateRangeInfo();
+      renderAll();
+    }
+
+    function updateRangeInfo() {
+      if (!dateFrom || !dateTo) {
+        document.getElementById('range-info').textContent = '';
+        return;
+      }
+      const diff = Math.round((new Date(dateTo + 'T00:00:00') - new Date(dateFrom + 'T00:00:00')) / 86400000) + 1;
+      document.getElementById('range-info').textContent = diff + (diff === 1 ? ' dia' : ' dias');
+    }
+
+    function filteredDias() {
+      return DIAS.filter(d => {
+        const iso = toISO(d.data);
+        return (!dateFrom || iso >= dateFrom) && (!dateTo || iso <= dateTo);
+      });
+    }
+
+    function filteredSemanal() {
+      const filtered = [];
+      SEMANAL.forEach(s => {
+        const daysInWeek = DIAS.filter(d => dateToWeekKey(d.data) === s.semana && toISO(d.data) >= dateFrom && toISO(d.data) <= dateTo);
+        if (daysInWeek.length > 0) filtered.push(s);
+      });
+      return filtered;
+    }
+
+    function filteredMensal() {
+      const filtered = [];
+      MENSAL.forEach(m => {
+        const daysInMonth = DIAS.filter(d => dateToMonthKey(d.data) === m.mes && toISO(d.data) >= dateFrom && toISO(d.data) <= dateTo);
+        if (daysInMonth.length > 0) filtered.push(m);
+      });
+      return filtered;
+    }
+
+    function showTab(id, el) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      document.getElementById('tab-' + id).classList.add('active');
+    }
+
+    function renderAll() {
+      renderVisao();
+      renderCriativos();
+      renderPublicos();
+      renderSemanal();
+      renderMensal();
+    }
+
+    function renderVisao() {
+      const dias = filteredDias();
+      const totInv = dias.reduce((a, d) => a + d.inv, 0);
+      const totFat = dias.reduce((a, d) => a + d.fat, 0);
+      const totCompras = dias.reduce((a, d) => a + d.compras, 0);
+      const totCliques = dias.reduce((a, d) => a + d.cliques, 0);
+      const totPv = dias.reduce((a, d) => a + d.pv, 0);
+      const totCk = dias.reduce((a, d) => a + d.ck, 0);
+      const totImp = dias.reduce((a, d) => a + d.imp, 0);
+      const roas = totInv > 0 ? Math.round(totFat / totInv * 100) / 100 : 0;
+      const cpc = totCliques > 0 ? Math.round(totInv / totCliques * 100) / 100 : 0;
+      const cpm = totImp > 0 ? Math.round(totInv / totImp * 1000 * 100) / 100 : 0;
+      const ctr = totImp > 0 ? Math.round(totCliques / totImp * 100 * 100) / 100 : 0;
+      const connectRate = totCliques > 0 ? Math.round(totPv / totCliques * 100 * 100) / 100 : 0;
+      const taxaCk = totPv > 0 ? Math.round(totCk / totPv * 100 * 100) / 100 : 0;
+      const taxaCompra = totPv > 0 ? Math.round(totCompras / totPv * 100 * 100) / 100 : 0;
+      const ticket = totCompras > 0 ? Math.round(totFat / totCompras * 100) / 100 : 0;
+      const cac = totCompras > 0 ? Math.round(totInv / totCompras * 100) / 100 : 0;
+      const retorno = Math.round((totFat - totInv) * 100) / 100;
+
+      let roasColor = 'orange';
+      if (roas >= 1.7) roasColor = 'green';
+      else if (roas >= 1) roasColor = 'yellow';
+      else roasColor = 'red';
+
+      document.getElementById('kpi-visao').innerHTML = `
+        <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${brl(totInv)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Faturamento</div><div class="kpi-value green">${brl(totFat)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">ROAS</div><div class="kpi-value ${roasColor}">${br(roas, 2)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Compras</div><div class="kpi-value green">${totCompras}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Cliques</div><div class="kpi-value">${totCliques}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Impressões</div><div class="kpi-value">${totImp}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value green">${brl(ticket)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">CAC</div><div class="kpi-value orange">${brl(cac)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Retorno</div><div class="kpi-value ${retorno >= 0 ? 'green' : 'red'}">${brl(retorno)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">CPC</div><div class="kpi-value orange">${brl(cpc)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">CPM</div><div class="kpi-value orange">${brl(cpm)}</div></div>
+      `;
+
+      document.getElementById('vis-cliques').textContent = totCliques;
+      document.getElementById('vis-pv').textContent = totPv;
+      document.getElementById('vis-ck').textContent = totCk;
+      document.getElementById('vis-compras').textContent = totCompras;
+      document.getElementById('vis-ctr').textContent = pct(ctr);
+      document.getElementById('vis-connectRate').textContent = pct(connectRate);
+      document.getElementById('vis-taxaCk').textContent = pct(taxaCk);
+      document.getElementById('vis-taxaCompra').textContent = pct(taxaCompra);
+
+      if (totCliques > 0) {
+        const pvPct = totPv / totCliques * 100;
+        const ckPct = (totPv > 0 ? totCk / totPv : 0) * 100;
+        const compPct = (totPv > 0 ? totCompras / totPv : 0) * 100;
+        document.getElementById('bar-pv').style.width = pvPct + '%';
+        document.getElementById('bar-ck').style.width = ckPct + '%';
+        document.getElementById('bar-compras').style.width = compPct + '%';
+      }
+
+      renderDiasTable(dias);
+      renderDiasCharts(dias);
+    }
+
+    function renderDiasTable(dias) {
+      let html = '<thead><tr><th>Data</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Cliques</th><th>PV</th><th>CK</th><th>Imp.</th><th>CPC</th><th>CPM</th><th>Status</th></tr></thead><tbody>';
+      dias.forEach(d => {
+        html += `<tr>
+          <td>${d.data}</td>
+          <td>${brl(d.inv)}</td>
+          <td>${brl(d.fat)}</td>
+          <td>${br(d.roas)}</td>
+          <td>${d.compras}</td>
+          <td>${d.cliques}</td>
+          <td>${d.pv}</td>
+          <td>${d.ck}</td>
+          <td>${d.imp}</td>
+          <td>${brl(d.cpc)}</td>
+          <td>${brl(d.cpm)}</td>
+          <td>${statusBadge(d.inv, d.fat)}</td>
+        </tr>`;
+      });
+      html += '</tbody>';
+      document.getElementById('table-dias').innerHTML = html;
+    }
+
+    function renderDiasCharts(dias) {
+      const labels = dias.map(d => d.data);
+      const invData = dias.map(d => d.inv);
+      const fatData = dias.map(d => d.fat);
+      const roasData = dias.map(d => d.roas);
+      const cpcData = dias.map(d => d.cpc);
+      const comprasData = dias.map(d => d.compras);
+
+      if (charts['inv-fat']) charts['inv-fat'].destroy();
+      charts['inv-fat'] = new Chart(document.getElementById('chart-inv-fat'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            { label: 'Investimento', data: invData, backgroundColor: '#ff6b2b', borderRadius: 4 },
+            { label: 'Faturamento', data: fatData, backgroundColor: '#2ecc71', borderRadius: 4 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: 'rgba(255,255,255,.5)', font: { family: "'DM Sans'" } } } },
+          scales: { y: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: 'rgba(255,255,255,.5)' } }, x: { ticks: { color: 'rgba(255,255,255,.5)' } } }
+        }
+      });
+
+      if (charts['roas']) charts['roas'].destroy();
+      charts['roas'] = new Chart(document.getElementById('chart-roas'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{ label: 'ROAS', data: roasData, borderColor: '#ff6b2b', backgroundColor: 'rgba(255,107,43,.1)', tension: 0.3, borderWidth: 2 }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: 'rgba(255,255,255,.5)' } } },
+          scales: { y: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: 'rgba(255,255,255,.5)' } }, x: { ticks: { color: 'rgba(255,255,255,.5)' } } }
+        }
+      });
+
+      if (charts['cpc']) charts['cpc'].destroy();
+      charts['cpc'] = new Chart(document.getElementById('chart-cpc'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{ label: 'CPC', data: cpcData, borderColor: '#ff6b2b', backgroundColor: 'rgba(255,107,43,.1)', tension: 0.3, borderWidth: 2 }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: 'rgba(255,255,255,.5)' } } },
+          scales: { y: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: 'rgba(255,255,255,.5)' } }, x: { ticks: { color: 'rgba(255,255,255,.5)' } } }
+        }
+      });
+
+      if (charts['compras']) charts['compras'].destroy();
+      charts['compras'] = new Chart(document.getElementById('chart-compras'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{ label: 'Compras', data: comprasData, backgroundColor: '#2ecc71', borderRadius: 4 }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: 'rgba(255,255,255,.5)' } } },
+          scales: { y: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: 'rgba(255,255,255,.5)' } }, x: { ticks: { color: 'rgba(255,255,255,.5)' } } }
+        }
+      });
+    }
+
+    function filterCriativos(type, btn) {
+      document.querySelectorAll('.cri-filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      filterState.criativos = type;
+      renderCriativos();
+    }
+
+    function sortCriativos() {
+      renderCriativos();
+    }
+
+    function renderCriativos() {
+      const dias = filteredDias();
+      const criByName = {};
+      CRIATIVOS.forEach(c => {
+        criByName[c.nome] = { ...c };
+      });
+
+      dias.forEach(dia => {
+        dia.items.forEach(item => {
+          if (criByName[item.adName]) {
+            criByName[item.adName].inv += item.spend;
+            criByName[item.adName].cliques += item.clicks;
+            criByName[item.adName].pv += item.pv;
+            criByName[item.adName].ck += item.ck;
+            criByName[item.adName].imp += item.imp;
+          }
+        });
+      });
+
+      Object.keys(criByName).forEach(nome => {
+        const c = criByName[nome];
+        c.inv = Math.round(c.inv * 100) / 100;
+        c.roas = c.inv > 0 ? Math.round(c.fat / c.inv * 100) / 100 : 0;
+        c.cpc = c.cliques > 0 ? Math.round(c.inv / c.cliques * 100) / 100 : 0;
+        c.cpm = c.imp > 0 ? Math.round(c.inv / c.imp * 1000 * 100) / 100 : 0;
+        c.ctr = c.imp > 0 ? Math.round(c.cliques / c.imp * 100 * 100) / 100 : 0;
+        c.cac = c.compras > 0 ? Math.round(c.inv / c.compras * 100) / 100 : 0;
+      });
+
+      let criativos = Object.values(criByName);
+      if (filterState.criativos === 'ativos') {
+        criativos = criativos.filter(c => c.ativo);
+      } else if (filterState.criativos === 'inativos') {
+        criativos = criativos.filter(c => !c.ativo);
+      }
+
+      const sortBy = document.getElementById('cri-sort').value;
+      if (sortBy === 'invest') criativos.sort((a, b) => b.inv - a.inv);
+      else if (sortBy === 'ctr') criativos.sort((a, b) => b.ctr - a.ctr);
+      else if (sortBy === 'cpc') criativos.sort((a, b) => a.cpc - b.cpc);
+      else if (sortBy === 'roas') criativos.sort((a, b) => b.roas - a.roas);
+      else if (sortBy === 'vendas') criativos.sort((a, b) => b.fat - a.fat);
+
+      let gridHtml = '';
+      criativos.forEach(c => {
+        gridHtml += `<div class="cri-card ${c.ativo ? 'ativo' : ''}">
+          <div class="cri-card-header">
+            <div class="cri-name">${c.nome}</div>
+            <span class="cri-badge ${c.ativo ? 'ativo' : 'inativo'}">${c.ativo ? 'Ativo' : 'Inativo'}</span>
+          </div>
+          <div class="cri-metrics">
+            <div class="cri-metric"><div class="cri-metric-label">Inv.</div><div class="cri-metric-val">${brl(c.inv)}</div></div>
+            <div class="cri-metric"><div class="cri-metric-label">ROAS</div><div class="cri-metric-val hl">${br(c.roas)}</div></div>
+            <div class="cri-metric"><div class="cri-metric-label">Fat.</div><div class="cri-metric-val">${brl(c.fat)}</div></div>
+            <div class="cri-metric"><div class="cri-metric-label">Compras</div><div class="cri-metric-val">${c.compras}</div></div>
+            <div class="cri-metric"><div class="cri-metric-label">CPC</div><div class="cri-metric-val">${brl(c.cpc)}</div></div>
+            <div class="cri-metric"><div class="cri-metric-label">CPM</div><div class="cri-metric-val">${brl(c.cpm)}</div></div>
+            <div class="cri-metric"><div class="cri-metric-label">CTR</div><div class="cri-metric-val">${pct(c.ctr)}</div></div>
+            <div class="cri-metric"><div class="cri-metric-label">CAC</div><div class="cri-metric-val">${brl(c.cac)}</div></div>
+          </div>
+          ${c.link ? `<a href="${c.link}" target="_blank" class="cri-link">${c.link.substring(0, 50)}...</a>` : ''}
+        </div>`;
+      });
+      document.getElementById('grid-criativos').innerHTML = gridHtml;
+
+      let tblHtml = '<thead><tr><th>Criativo</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Cliques</th><th>Imp.</th><th>CPC</th><th>CPM</th><th>CTR</th><th>CAC</th></tr></thead><tbody>';
+      criativos.forEach(c => {
+        tblHtml += `<tr>
+          <td>${c.nome}</td>
+          <td>${brl(c.inv)}</td>
+          <td>${brl(c.fat)}</td>
+          <td>${br(c.roas)}</td>
+          <td>${c.compras}</td>
+          <td>${c.cliques}</td>
+          <td>${c.imp}</td>
+          <td>${brl(c.cpc)}</td>
+          <td>${brl(c.cpm)}</td>
+          <td>${pct(c.ctr)}</td>
+          <td>${brl(c.cac)}</td>
+        </tr>`;
+      });
+      tblHtml += '</tbody>';
+      document.getElementById('table-criativos').innerHTML = tblHtml;
+    }
+
+    function filterPublicos(type, btn) {
+      document.querySelectorAll('[onclick*="filterPublicos"]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      filterState.publicos = type;
+      renderPublicos();
+    }
+
+    function sortPublicos() {
+      renderPublicos();
+    }
+
+    function renderPublicos() {
+      const dias = filteredDias();
+      const pubByName = {};
+      PUBLICOS.forEach(p => {
+        pubByName[p.nome] = { ...p };
+      });
+
+      dias.forEach(dia => {
+        dia.items.forEach(item => {
+          if (pubByName[item.adset]) {
+            pubByName[item.adset].inv += item.spend;
+            pubByName[item.adset].cliques += item.clicks;
+            pubByName[item.adset].pv += item.pv;
+            pubByName[item.adset].ck += item.ck;
+            pubByName[item.adset].imp += item.imp;
+          }
+        });
+      });
+
+      Object.keys(pubByName).forEach(nome => {
+        const p = pubByName[nome];
+        p.inv = Math.round(p.inv * 100) / 100;
+        p.roas = p.inv > 0 ? Math.round(p.fat / p.inv * 100) / 100 : 0;
+        p.cpc = p.cliques > 0 ? Math.round(p.inv / p.cliques * 100) / 100 : 0;
+        p.cpm = p.imp > 0 ? Math.round(p.inv / p.imp * 1000 * 100) / 100 : 0;
+        p.ctr = p.imp > 0 ? Math.round(p.cliques / p.imp * 100 * 100) / 100 : 0;
+        p.connectRate = p.cliques > 0 ? Math.round(p.pv / p.cliques * 100 * 100) / 100 : 0;
+      });
+
+      let publicos = Object.values(pubByName);
+      if (filterState.publicos === 'ativos') {
+        publicos = publicos.filter(p => p.ativo);
+      } else if (filterState.publicos === 'inativos') {
+        publicos = publicos.filter(p => !p.ativo);
+      }
+
+      const sortBy = document.getElementById('pub-sort').value;
+      if (sortBy === 'invest') publicos.sort((a, b) => b.inv - a.inv);
+      else if (sortBy === 'ctr') publicos.sort((a, b) => b.ctr - a.ctr);
+      else if (sortBy === 'cpc') publicos.sort((a, b) => a.cpc - b.cpc);
+      else if (sortBy === 'connectRate') publicos.sort((a, b) => b.connectRate - a.connectRate);
+
+      let gridHtml = '';
+      publicos.forEach(p => {
+        const maxInv = Math.max(...publicos.map(x => x.inv), 1);
+        const maxFat = Math.max(...publicos.map(x => x.fat), 1);
+        gridHtml += `<div class="pub-card ${p.ativo ? 'ativo' : ''}">
+          <div class="pub-card-header">
+            <div class="pub-name">${p.nome}</div>
+            <span class="cri-badge ${p.ativo ? 'ativo' : 'inativo'}">${p.ativo ? 'Ativo' : 'Inativo'}</span>
+          </div>
+          <div class="pub-metrics">
+            <div class="pub-metric"><div class="pub-metric-val neutral">${p.cliques}</div><div class="pub-metric-lbl">Cliques</div></div>
+            <div class="pub-metric"><div class="pub-metric-val neutral">${p.pv}</div><div class="pub-metric-lbl">PV</div></div>
+            <div class="pub-metric"><div class="pub-metric-val">${br(p.roas)}</div><div class="pub-metric-lbl">ROAS</div></div>
+          </div>
+          <div class="pub-bar-wrap">
+            <div class="pub-bar-label"><span>Invest.</span><span>${brl(p.inv)}</span></div>
+            <div class="pub-bar-bg"><div class="pub-bar-fill" style="width:${(p.inv / maxInv) * 100}%"></div></div>
+          </div>
+          <div class="pub-bar-wrap">
+            <div class="pub-bar-label"><span>Faturamento</span><span>${brl(p.fat)}</span></div>
+            <div class="pub-bar-bg"><div class="pub-bar-fill" style="width:${(p.fat / maxFat) * 100}%"></div></div>
+          </div>
+        </div>`;
+      });
+      document.getElementById('grid-publicos').innerHTML = gridHtml;
+
+      let tblHtml = '<thead><tr><th>Público</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Cliques</th><th>PV</th><th>Imp.</th><th>CPC</th><th>CPM</th><th>CTR</th><th>Connect Rate</th></tr></thead><tbody>';
+      publicos.forEach(p => {
+        tblHtml += `<tr>
+          <td>${p.nome}</td>
+          <td>${brl(p.inv)}</td>
+          <td>${brl(p.fat)}</td>
+          <td>${br(p.roas)}</td>
+          <td>${p.cliques}</td>
+          <td>${p.pv}</td>
+          <td>${p.imp}</td>
+          <td>${brl(p.cpc)}</td>
+          <td>${brl(p.cpm)}</td>
+          <td>${pct(p.ctr)}</td>
+          <td>${pct(p.connectRate)}</td>
+        </tr>`;
+      });
+      tblHtml += '</tbody>';
+      document.getElementById('table-publicos').innerHTML = tblHtml;
+    }
+
+    function renderSemanal() {
+      const semanas = filteredSemanal();
+      const totInv = semanas.reduce((a, s) => a + s.inv, 0);
+      const totFat = semanas.reduce((a, s) => a + s.fat, 0);
+      const totCompras = semanas.reduce((a, s) => a + s.compras, 0);
+      const roas = totInv > 0 ? Math.round(totFat / totInv * 100) / 100 : 0;
+
+      document.getElementById('kpi-semanal').innerHTML = `
+        <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${brl(totInv)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Faturamento</div><div class="kpi-value green">${brl(totFat)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">ROAS</div><div class="kpi-value">${br(roas)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Compras</div><div class="kpi-value green">${totCompras}</div></div>
+      `;
+
+      const labels = semanas.map(s => 'Sem ' + s.semana);
+      const invData = semanas.map(s => s.inv);
+      const roasData = semanas.map(s => s.roas);
+
+      if (charts['inv-week']) charts['inv-week'].destroy();
+      charts['inv-week'] = new Chart(document.getElementById('chart-inv-week'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{ label: 'Investimento', data: invData, backgroundColor: '#ff6b2b', borderRadius: 4 }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: 'rgba(255,255,255,.5)' } } },
+          scales: { y: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: 'rgba(255,255,255,.5)' } }, x: { ticks: { color: 'rgba(255,255,255,.5)' } } }
+        }
+      });
+
+      if (charts['roas-week']) charts['roas-week'].destroy();
+      charts['roas-week'] = new Chart(document.getElementById('chart-roas-week'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{ label: 'ROAS', data: roasData, borderColor: '#ff6b2b', backgroundColor: 'rgba(255,107,43,.1)', tension: 0.3, borderWidth: 2 }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: 'rgba(255,255,255,.5)' } } },
+          scales: { y: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: 'rgba(255,255,255,.5)' } }, x: { ticks: { color: 'rgba(255,255,255,.5)' } } }
+        }
+      });
+
+      let tblHtml = '<thead><tr><th>Semana</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Cliques</th><th>PV</th><th>CK</th><th>Imp.</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Retorno</th><th>Status</th></tr></thead><tbody>';
+      semanas.forEach(s => {
+        tblHtml += `<tr>
+          <td>Sem ${s.semana}</td>
+          <td>${brl(s.inv)}</td>
+          <td>${brl(s.fat)}</td>
+          <td>${br(s.roas)}</td>
+          <td>${s.compras}</td>
+          <td>${s.cliques}</td>
+          <td>${s.pv}</td>
+          <td>${s.ck}</td>
+          <td>${s.imp}</td>
+          <td>${brl(s.cpc)}</td>
+          <td>${brl(s.cpm)}</td>
+          <td>${pct(s.connectRate)}</td>
+          <td>${brl(s.retorno)}</td>
+          <td>${statusBadge(s.inv, s.fat)}</td>
+        </tr>`;
+      });
+      tblHtml += '</tbody>';
+      document.getElementById('table-semanal').innerHTML = tblHtml;
+    }
+
+    function renderMensal() {
+      const meses = filteredMensal();
+      const totInv = meses.reduce((a, m) => a + m.inv, 0);
+      const totFat = meses.reduce((a, m) => a + m.fat, 0);
+      const totCompras = meses.reduce((a, m) => a + m.compras, 0);
+      const roas = totInv > 0 ? Math.round(totFat / totInv * 100) / 100 : 0;
+
+      document.getElementById('kpi-mensal').innerHTML = `
+        <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${brl(totInv)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Faturamento</div><div class="kpi-value green">${brl(totFat)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">ROAS</div><div class="kpi-value">${br(roas)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Compras</div><div class="kpi-value green">${totCompras}</div></div>
+      `;
+
+      let tblHtml = '<thead><tr><th>Mês</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Cliques</th><th>PV</th><th>CK</th><th>Imp.</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Retorno</th><th>Status</th></tr></thead><tbody>';
+      meses.forEach(m => {
+        tblHtml += `<tr>
+          <td>${m.mes}</td>
+          <td>${brl(m.inv)}</td>
+          <td>${brl(m.fat)}</td>
+          <td>${br(m.roas)}</td>
+          <td>${m.compras}</td>
+          <td>${m.cliques}</td>
+          <td>${m.pv}</td>
+          <td>${m.ck}</td>
+          <td>${m.imp}</td>
+          <td>${brl(m.cpc)}</td>
+          <td>${brl(m.cpm)}</td>
+          <td>${pct(m.connectRate)}</td>
+          <td>${brl(m.retorno)}</td>
+          <td>${statusBadge(m.inv, m.fat)}</td>
+        </tr>`;
+      });
+      tblHtml += '</tbody>';
+      document.getElementById('table-mensal').innerHTML = tblHtml;
+    }
+
+    window.addEventListener('DOMContentLoaded', fetchData);
+  </script>
+</body>
+</html>

@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dashboard — Protocolo de 12 Semanas · Geize · Jamelli GT</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#1a1a2e;color:#e8e6f0;font-family:'DM Sans',sans-serif;min-height:100vh}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:#12121f}::-webkit-scrollbar-thumb{background:#ff6b2b55;border-radius:3px}
+.topbar{background:#12121f;padding:12px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.07);position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:10px}
+.brand{font-size:17px;font-weight:700;color:#ff6b2b}
+.subtitle{font-size:11px;color:rgba(255,255,255,0.4);margin-top:2px}
+.logo-jgt{display:flex;align-items:center;gap:10px}
+.logo-jgt svg{width:36px;height:36px;flex-shrink:0}
+.logo-text{display:flex;flex-direction:column}
+.logo-text strong{font-size:13px;font-weight:700;color:#ff6b2b;letter-spacing:.3px}
+.logo-text span{font-size:10px;color:rgba(255,255,255,.35);margin-top:1px}
+.period-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.period-bar label{font-size:11px;color:rgba(255,255,255,.45);white-space:nowrap}
+.date-input{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:#e8e6f0;padding:5px 10px;border-radius:6px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;outline:none;min-width:118px}
+.date-input:focus{border-color:#ff6b2b}
+.date-input::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;cursor:pointer}
+.period-sep{color:rgba(255,255,255,.2);font-size:13px;padding:0 2px}
+.preset-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;transition:all .2s;white-space:nowrap}
+.preset-btn:hover,.preset-btn.active{background:rgba(255,107,43,.2);border-color:#ff6b2b;color:#ff6b2b;font-weight:600}
+.range-info{font-size:11px;color:rgba(255,107,43,.75);font-family:'DM Mono',monospace;white-space:nowrap;padding-left:4px}
+.tabs{display:flex;border-bottom:1px solid rgba(255,255,255,0.07);background:#12121f;padding:0 28px;overflow-x:auto}
+.tab{padding:12px 20px;cursor:pointer;font-size:13px;color:rgba(255,255,255,0.5);border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
+.tab:hover{color:#e8e6f0}.tab.active{color:#ff6b2b;border-bottom-color:#ff6b2b;font-weight:600}
+.content{padding:24px 28px;display:none}.content.active{display:block}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:20px}
+.kpi-card{background:#12121f;border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:16px 18px}
+.kpi-label{font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.kpi-value{font-size:20px;font-weight:700;font-family:'DM Mono',monospace}
+.orange{color:#ff6b2b}.green{color:#2ecc71}.red{color:#e74c3c}.yellow{color:#f1c40f}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#12121f;color:rgba(255,255,255,.45);padding:8px 10px;text-align:right;font-weight:500;border-bottom:1px solid rgba(255,255,255,.07);white-space:nowrap}
+th:first-child{text-align:left}
+td{padding:7px 10px;text-align:right;border-bottom:1px solid rgba(255,255,255,.04);font-family:'DM Mono',monospace;font-size:11px;color:#e8e6f0}
+td:first-child{text-align:left;font-family:'DM Sans',sans-serif;font-size:12px}
+tr:hover td{background:rgba(255,255,255,.025)}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;font-family:'DM Sans',sans-serif}
+.badge.escalar{background:rgba(46,204,113,.15);color:#2ecc71;border:1px solid rgba(46,204,113,.3)}
+.badge.otimizar{background:rgba(241,196,15,.15);color:#f1c40f;border:1px solid rgba(241,196,15,.3)}
+.badge.corrigir{background:rgba(231,76,60,.15);color:#e74c3c;border:1px solid rgba(231,76,60,.3)}
+.badge.aguardar{background:rgba(255,255,255,.06);color:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.1)}
+.funil-section{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:16px 0}
+.funil-bar-wrap{margin-bottom:12px}
+.funil-label{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;color:rgba(255,255,255,.7)}
+.funil-bar-bg{background:rgba(255,255,255,.05);border-radius:4px;height:14px;overflow:hidden}
+.funil-bar-fill{background:linear-gradient(90deg,#ff6b2b,#ff9a3c);height:100%;border-radius:4px;transition:width .4s}
+.taxa-grid{display:grid;gap:8px}
+.taxa-item{background:rgba(255,255,255,.04);border-radius:8px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;font-size:12px;color:rgba(255,255,255,.7)}
+.taxa-val{font-family:'DM Mono',monospace;font-size:15px;font-weight:600;color:#ff6b2b}
+.chart-grid-2x2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0}
+.chart-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:16px}
+.chart-card h4{font-size:11px;color:rgba(255,255,255,.45);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
+.chart-card canvas{max-height:190px}
+.sec-title{font-size:13px;font-weight:600;color:rgba(255,255,255,.65);margin:20px 0 10px;border-left:3px solid #ff6b2b;padding-left:10px}
+.cri-filterbar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.cri-filter-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 12px;border-radius:5px;cursor:pointer;font-size:12px;transition:all .2s}
+.cri-filter-btn.active{background:rgba(255,107,43,.2);border-color:#ff6b2b;color:#ff6b2b}
+.cri-sort-label{font-size:11px;color:rgba(255,255,255,.4);white-space:nowrap}
+.cri-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
+@media(max-width:900px){.cri-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.cri-grid{grid-template-columns:1fr}.chart-grid-2x2{grid-template-columns:1fr}.funil-section{grid-template-columns:1fr}.period-bar{justify-content:flex-start}}
+.cri-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:14px}
+.cri-card.ativo{border-color:rgba(46,204,113,.25)}
+.cri-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.cri-name{font-size:11px;font-weight:600;word-break:break-all;flex:1;margin-right:6px;color:#e8e6f0}
+.cri-badge{font-size:10px;padding:2px 6px;border-radius:4px;white-space:nowrap}
+.cri-badge.ativo{background:rgba(46,204,113,.15);color:#2ecc71}
+.cri-badge.inativo{background:rgba(255,255,255,.08);color:rgba(255,255,255,.4)}
+.cri-metrics{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.cri-metric{display:flex;flex-direction:column}
+.cri-metric-label{color:rgba(255,255,255,.4);font-size:9px;margin-bottom:2px;text-transform:uppercase}
+.cri-metric-val{font-family:'DM Mono',monospace;font-size:12px;font-weight:600;color:#e8e6f0}
+.cri-metric-val.hl{color:#ff6b2b;font-size:14px}
+.cri-link{display:block;margin-top:8px;font-size:10px;color:rgba(255,107,43,.7);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cri-link:hover{color:#ff6b2b}
+.tbl-wrap{overflow-x:auto;border-radius:8px;border:1px solid rgba(255,255,255,.07)}
+.pub-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-bottom:24px}
+.pub-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:16px}
+.pub-card.ativo{border-color:rgba(46,204,113,.2)}
+.pub-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+.pub-name{font-size:12px;font-weight:600;flex:1;margin-right:8px;color:#e8e6f0;line-height:1.4}
+.pub-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.pub-metric{text-align:center;padding:8px 6px;background:rgba(255,255,255,.03);border-radius:6px}
+.pub-metric-val{font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:#ff6b2b}
+.pub-metric-val.neutral{color:#e8e6f0}
+.pub-metric-lbl{font-size:9px;color:rgba(255,255,255,.35);margin-top:2px;text-transform:uppercase;letter-spacing:.4px}
+.pub-bar-wrap{margin-top:8px}
+.pub-bar-label{display:flex;justify-content:space-between;font-size:10px;color:rgba(255,255,255,.35);margin-bottom:3px}
+.pub-bar-bg{height:5px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden}
+.pub-bar-fill{height:100%;background:linear-gradient(90deg,#ff6b2b,#ff9a3c);border-radius:3px;transition:width .5s}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div style="display:flex;align-items:center;gap:16px">
+    <div class="logo-jgt">
+      <svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+        <rect width="36" height="36" rx="8" fill="#ff6b2b" fill-opacity="0.15"/>
+        <rect width="36" height="36" rx="8" stroke="#ff6b2b" stroke-opacity="0.4" stroke-width="1" fill="none"/>
+        <text x="18" y="24" text-anchor="middle" font-family="DM Sans" font-weight="700" font-size="13" fill="#ff6b2b">JGT</text>
+      </svg>
+      <div class="logo-text"><strong>Jamelli GT</strong><span>Tráfego Pago</span></div>
+    </div>
+    <div>
+      <div class="brand">&#128200; Protocolo · Geize</div>
+      <div class="subtitle">Dashboard de Performance — Perpétuo · Jamelli GT · 2026</div>
+    </div>
+  </div>
+  <div class="period-bar">
+    <label>De</label>
+    <input type="date" id="dateFrom" class="date-input" onchange="onDateChange()">
+    <span class="period-sep">→</span>
+    <input type="date" id="dateTo" class="date-input" onchange="onDateChange()">
+    <button class="preset-btn" onclick="setPreset(7,this)">7d</button>
+    <button class="preset-btn" onclick="setPreset(14,this)">14d</button>
+    <button class="preset-btn" onclick="setPreset(30,this)">30d</button>
+    <button class="preset-btn active" id="btn-all" onclick="setPreset('all',this)">Tudo</button>
+    <span class="range-info" id="range-info"></span>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('visao',this)">Visão Geral</div>
+  <div class="tab" onclick="showTab('criativos',this)">Criativos</div>
+  <div class="tab" onclick="showTab('publicos',this)">Públicos</div>
+  <div class="tab" onclick="showTab('semanal',this)">Semana a Semana</div>
+  <div class="tab" onclick="showTab('mensal',this)">Mês a Mês</div>
+</div>
+
+<!-- ABA 1: VISÃO GERAL -->
+<div id="tab-visao" class="content active">
+  <div class="kpi-grid" id="kpi-visao"></div>
+  <div class="funil-section">
+    <div id="funil-bars"></div>
+    <div class="taxa-grid" id="taxa-grid"></div>
+  </div>
+  <div class="chart-grid-2x2">
+    <div class="chart-card"><h4>Investimento x Faturamento (Diário)</h4><canvas id="chartInvFat"></canvas></div>
+    <div class="chart-card"><h4>ROAS Diário</h4><canvas id="chartRoas"></canvas></div>
+  </div>
+  <div class="sec-title">Dia a Dia</div>
+  <div class="tbl-wrap"><table><thead><tr>
+    <th>Data</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Cliques</th><th>PV</th><th>CK</th><th>Imp.</th><th>CPC</th><th>CPM</th><th>Status</th>
+  </tr></thead><tbody id="tbody-dias"></tbody></table></div>
+</div>
+
+<!-- ABA 2: CRIATIVOS -->
+<div id="tab-criativos" class="content">
+  <div class="cri-filterbar">
+    <button class="cri-status-btn cri-filter-btn active" onclick="setCriFiltro('todos',this)">Todos</button>
+    <button class="cri-status-btn cri-filter-btn" onclick="setCriFiltro('ativos',this)">&#9679; Ativos</button>
+    <button class="cri-status-btn cri-filter-btn" onclick="setCriFiltro('inativos',this)">&#9679; Inativos</button>
+    <span style="flex:1"></span>
+    <span class="cri-sort-label">Ordenar:</span>
+    <button class="cri-sort-btn cri-filter-btn active" onclick="setCriSort('inv',this)">Investimento</button>
+    <button class="cri-sort-btn cri-filter-btn" onclick="setCriSort('ctr',this)">CTR</button>
+    <button class="cri-sort-btn cri-filter-btn" onclick="setCriSort('cpc',this)">CPC</button>
+    <button class="cri-sort-btn cri-filter-btn" onclick="setCriSort('roas',this)">ROAS</button>
+    <button class="cri-sort-btn cri-filter-btn" onclick="setCriSort('vendas',this)">Vendas</button>
+  </div>
+  <div class="cri-grid" id="cri-cards"></div>
+  <div class="sec-title">Tabela de Criativos</div>
+  <div class="tbl-wrap"><table><thead><tr>
+    <th>Criativo</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Vendas</th><th>Ticket</th><th>CAC</th><th>Cliques</th><th>PV</th><th>CK</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Status</th>
+  </tr></thead><tbody id="tbody-criativos"></tbody></table></div>
+</div>
+
+<!-- ABA 3: PÚBLICOS -->
+<div id="tab-publicos" class="content">
+  <div class="cri-filterbar">
+    <button class="pub-filter-btn cri-filter-btn active" onclick="setPubFiltro('todos',this)">Todos</button>
+    <button class="pub-filter-btn cri-filter-btn" onclick="setPubFiltro('ativos',this)">&#9679; Ativos</button>
+    <button class="pub-filter-btn cri-filter-btn" onclick="setPubFiltro('inativos',this)">&#9679; Inativos</button>
+    <span style="flex:1"></span>
+    <span class="cri-sort-label">Ordenar:</span>
+    <button class="pub-sort-btn cri-filter-btn active" onclick="setPubSort('inv',this)">Investimento</button>
+    <button class="pub-sort-btn cri-filter-btn" onclick="setPubSort('ctr',this)">CTR</button>
+    <button class="pub-sort-btn cri-filter-btn" onclick="setPubSort('cpc',this)">CPC</button>
+    <button class="pub-sort-btn cri-filter-btn" onclick="setPubSort('cr',this)">Connect Rate</button>
+  </div>
+  <div class="pub-grid" id="pub-cards"></div>
+  <div class="sec-title">Tabela de Públicos</div>
+  <div class="tbl-wrap"><table><thead><tr>
+    <th>Público (Adset)</th><th>Invest.</th><th>Cliques</th><th>Imp.</th><th>PV</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Status</th>
+  </tr></thead><tbody id="tbody-publicos"></tbody></table></div>
+</div>
+
+<!-- ABA 4: SEMANAL -->
+<div id="tab-semanal" class="content">
+  <div class="kpi-grid" id="kpi-semanal"></div>
+  <div class="chart-grid-2x2">
+    <div class="chart-card"><h4>Investimento por Semana</h4><canvas id="chartSemInv"></canvas></div>
+    <div class="chart-card"><h4>CTR por Semana</h4><canvas id="chartSemCtr"></canvas></div>
+  </div>
+  <div class="sec-title">Semana a Semana</div>
+  <div class="tbl-wrap"><table><thead><tr>
+    <th>Semana</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Ticket</th><th>Retorno</th><th>Cliques</th><th>PV</th><th>CK</th><th>CPC</th><th>CPM</th><th>CTR</th><th>Connect Rate</th><th>Status</th>
+  </tr></thead><tbody id="tbody-semanal"></tbody></table></div>
+</div>
+
+<!-- ABA 5: MENSAL -->
+<div id="tab-mensal" class="content">
+  <div class="kpi-grid" id="kpi-mensal"></div>
+  <div class="sec-title">Mês a Mês</div>
+  <div class="tbl-wrap"><table><thead><tr>
+    <th>Mês</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Ticket</th><th>Retorno</th><th>Cliques</th><th>PV</th><th>CK</th><th>Imp.</th><th>CPC</th><th>CPM</th><th>CTR</th><th>Connect Rate</th><th>Taxa Compra</th><th>Status</th>
+  </tr></thead><tbody id="tbody-mensal"></tbody></table></div>
+</div>
+
+<script>
+// === DADOS ===
+const DIAS = [{"data":"23/03/2026","inv":23.91,"fat":0,"compras":0,"cliques":10,"pv":6,"ck":0,"imp":792},{"data":"24/03/2026","inv":19.78,"fat":86.9,"compras":1,"cliques":9,"pv":8,"ck":0,"imp":748},{"data":"25/03/2026","inv":19.25,"fat":0,"compras":0,"cliques":7,"pv":5,"ck":0,"imp":681},{"data":"26/03/2026","inv":18.05,"fat":0,"compras":0,"cliques":6,"pv":4,"ck":0,"imp":571},{"data":"27/03/2026","inv":17.91,"fat":0,"compras":0,"cliques":4,"pv":4,"ck":0,"imp":346},{"data":"28/03/2026","inv":20.01,"fat":134,"compras":2,"cliques":8,"pv":3,"ck":0,"imp":455},{"data":"29/03/2026","inv":19.81,"fat":146.9,"compras":2,"cliques":7,"pv":5,"ck":0,"imp":406}];
+
+const CRIATIVOS = [{"nome":"PROT-ADE04","inv":0.16,"cliques":0,"imp":13,"pv":0,"ck":0,"compras":0,"fat":0,"link":"https://www.instagram.com/p/DWUh2JHgBR1/","cpc":0,"cpm":12.31,"ctr":0,"cac":0,"ticket":0,"roas":0,"ativo":true},{"nome":"PROT-ADE01","inv":28.41,"cliques":12,"imp":705,"pv":6,"ck":0,"compras":0,"fat":0,"link":"https://www.instagram.com/p/DWUh5C4QugHYi/","cpc":2.37,"cpm":40.3,"ctr":1.7,"cac":0,"ticket":0,"roas":0,"ativo":true},{"nome":"PROT-ADE06","inv":4.56,"cliques":3,"imp":125,"pv":3,"ck":0,"compras":0,"fat":0,"link":"https://www.instagram.com/p/DWUh6gCAKzi/","cpc":1.52,"cpm":36.48,"ctr":2.4,"cac":0,"ticket":0,"roas":0,"ativo":true},{"nome":"PROT-ADE07","inv":10.21,"cliques":3,"imp":138,"pv":2,"ck":0,"compras":0,"fat":0,"link":"https://www.instagram.com/p/DWUh6FUgKv6/","cpc":3.4,"cpm":73.99,"ctr":2.17,"cac":0,"ticket":0,"roas":0,"ativo":true},{"nome":"PROT-ADE05","inv":22.3,"cliques":7,"imp":465,"pv":6,"ck":0,"compras":0,"fat":0,"link":"https://www.instagram.com/p/DWUh1C9AD3P/","cpc":3.19,"cpm":47.96,"ctr":1.51,"cac":0,"ticket":0,"roas":0,"ativo":true},{"nome":"PROT-ADE03","inv":10.31,"cliques":3,"imp":195,"pv":0,"ck":0,"compras":0,"fat":0,"link":"https://www.instagram.com/p/DWUh1XfAIFq/","cpc":3.44,"cpm":52.87,"ctr":1.54,"cac":0,"ticket":0,"roas":0,"ativo":true},{"nome":"PROT-ADE02","inv":62.77,"cliques":23,"imp":2358,"pv":18,"ck":0,"compras":0,"fat":0,"link":"https://www.instagram.com/p/DWUh5DzgNqQ/","cpc":2.73,"cpm":26.62,"ctr":0.98,"cac":0,"ticket":0,"roas":0,"ativo":true}];
+
+const PUBLICOS = [{"nome":"Advantage","inv":138.72,"cliques":51,"imp":3999,"pv":35,"ck":0,"cpc":2.72,"cpm":34.69,"ctr":1.28,"connectRate":68.63,"ativo":true}];
+
+// === HELPERS ===
+function toISO(d){const[dd,mm,yy]=d.split('/');return `${yy}-${mm}-${dd}`;}
+const ptMonFull=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+function dateToMonthKey(d){const[dd,mm,yy]=d.split('/').map(Number);return ptMonFull[mm-1];}
+function dateToWeekKey(d){
+  const[dd,mm,yy]=d.split('/').map(Number);
+  const dt=new Date(yy,mm-1,dd),jan1=new Date(yy,0,1);
+  const w=Math.ceil((Math.floor((dt-jan1)/86400000)+1)/7);
+  return String(yy).slice(-2)+String(w).padStart(2,'0');
+}
+function br(n,d=2){if(n===null||n===undefined||isNaN(n))return '—';return new Intl.NumberFormat('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}).format(n);}
+function brl(n){if(n===null||n===undefined)return '—';return 'R$ '+br(n,2);}
+function pct(n){if(n===null||n===undefined||isNaN(n))return '—';return br(n,2)+'%';}
+function statusBadge(inv,fat){
+  if(!inv||inv===0)return '<span class="badge aguardar">Aguardar</span>';
+  const r=inv>0?fat/inv:0;
+  if(r>=1.7)return '<span class="badge escalar">Escalar</span>';
+  if(r>=1)return '<span class="badge otimizar">Otimizar</span>';
+  return '<span class="badge corrigir">Corrigir</span>';
+}
+
+// === COMPUTE SEMANAL & MENSAL FROM DIAS ===
+function computeAggregated(){
+  const weekMap={}, monthMap={};
+  DIAS.forEach(r=>{
+    const wk=dateToWeekKey(r.data);
+    if(!weekMap[wk]) weekMap[wk]={semana:wk,inv:0,fat:0,compras:0,cliques:0,pv:0,ck:0,imp:0};
+    const w=weekMap[wk];
+    w.inv+=r.inv;w.fat+=r.fat;w.compras+=r.compras;w.cliques+=r.cliques;w.pv+=r.pv;w.ck+=r.ck;w.imp+=r.imp;
+
+    const mo=dateToMonthKey(r.data);
+    if(!monthMap[mo]) monthMap[mo]={mes:mo,inv:0,fat:0,compras:0,cliques:0,pv:0,ck:0,imp:0};
+    const m=monthMap[mo];
+    m.inv+=r.inv;m.fat+=r.fat;m.compras+=r.compras;m.cliques+=r.cliques;m.pv+=r.pv;m.ck+=r.ck;m.imp+=r.imp;
+  });
+  function calc(o){
+    o.inv=Math.round(o.inv*100)/100;o.fat=Math.round(o.fat*100)/100;
+    o.roas=o.inv>0?Math.round(o.fat/o.inv*100)/100:0;
+    o.ticket=o.compras>0?Math.round(o.fat/o.compras*100)/100:0;
+    o.retorno=Math.round((o.fat-o.inv)*100)/100;
+    o.taxaCompra=o.pv>0?Math.round(o.compras/o.pv*100*100)/100:0;
+    o.cpc=o.cliques>0?Math.round(o.inv/o.cliques*100)/100:0;
+    o.cpm=o.imp>0?Math.round(o.inv/o.imp*1000*100)/100:0;
+    o.ctr=o.imp>0?Math.round(o.cliques/o.imp*100*100)/100:0;
+    o.connectRate=o.cliques>0?Math.round(o.pv/o.cliques*100*100)/100:0;
+  }
+  window.SEMANAL=Object.values(weekMap).sort((a,b)=>a.semana.localeCompare(b.semana));
+  window.SEMANAL.forEach(calc);
+  window.MENSAL=Object.values(monthMap);
+  const moOrder=ptMonFull;
+  window.MENSAL.sort((a,b)=>moOrder.indexOf(a.mes)-moOrder.indexOf(b.mes));
+  window.MENSAL.forEach(calc);
+}
+computeAggregated();
+
+// === DATE FILTER ===
+let dateFrom=null,dateTo=null;
+function initDatePickers(){
+  const dates=DIAS.map(d=>toISO(d.data)).sort();
+  document.getElementById('dateFrom').value=dates[0];
+  document.getElementById('dateTo').value=dates[dates.length-1];
+  dateFrom=dates[0];dateTo=dates[dates.length-1];updateRangeInfo();
+}
+function setPreset(days,btn){
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
+  const dates=DIAS.map(d=>toISO(d.data)).sort(),last=dates[dates.length-1];
+  if(days==='all'){document.getElementById('dateFrom').value=dates[0];document.getElementById('dateTo').value=last;}
+  else{const from=new Date(last);from.setDate(from.getDate()-(days-1));document.getElementById('dateFrom').value=from.toISOString().slice(0,10);document.getElementById('dateTo').value=last;}
+  dateFrom=document.getElementById('dateFrom').value;dateTo=document.getElementById('dateTo').value;
+  updateRangeInfo();renderAll();
+}
+function onDateChange(){
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+  dateFrom=document.getElementById('dateFrom').value;dateTo=document.getElementById('dateTo').value;
+  updateRangeInfo();renderAll();
+}
+function updateRangeInfo(){
+  if(!dateFrom||!dateTo){document.getElementById('range-info').textContent='';return;}
+  const diff=Math.round((new Date(dateTo+'T00:00:00')-new Date(dateFrom+'T00:00:00'))/86400000)+1;
+  document.getElementById('range-info').textContent=diff+(diff===1?' dia':' dias');
+}
+function filteredDias(){
+  return DIAS.filter(d=>{const iso=toISO(d.data);return(!dateFrom||iso>=dateFrom)&&(!dateTo||iso<=dateTo);});
+}
+function showTab(id,el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.content').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');document.getElementById('tab-'+id).classList.add('active');
+}
+
+// === RENDER VISÃO GERAL ===
+let chartInvFat=null, chartRoas=null;
+function renderVisao(){
+  const fd=filteredDias();
+  const inv=fd.reduce((s,r)=>s+r.inv,0);
+  const fat=fd.reduce((s,r)=>s+r.fat,0);
+  const comp=fd.reduce((s,r)=>s+r.compras,0);
+  const cliq=fd.reduce((s,r)=>s+r.cliques,0);
+  const imp=fd.reduce((s,r)=>s+r.imp,0);
+  const pvt=fd.reduce((s,r)=>s+r.pv,0);
+  const ckt=fd.reduce((s,r)=>s+r.ck,0);
+  const roas=inv>0?fat/inv:0;
+  const cpc=cliq>0?inv/cliq:0;
+  const cpm=imp>0?inv/imp*1000:0;
+  const ctr=imp>0?cliq/imp*100:0;
+  const cr=cliq>0?pvt/cliq*100:0;
+  const taxaCk=pvt>0?ckt/pvt*100:0;
+  const taxaComp=pvt>0?comp/pvt*100:0;
+  const ticket=comp>0?fat/comp:0;
+
+  document.getElementById('kpi-visao').innerHTML=`
+    <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${brl(inv)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Faturamento</div><div class="kpi-value green">${brl(fat)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">ROAS</div><div class="kpi-value ${roas>=1.7?'green':roas>=1?'yellow':'red'}">${br(roas,2)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Compras</div><div class="kpi-value orange">${comp}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value green">${brl(ticket)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Cliques</div><div class="kpi-value">${br(cliq,0)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CPC</div><div class="kpi-value">${brl(cpc)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CPM</div><div class="kpi-value">${brl(cpm)}</div></div>`;
+
+  // Funil
+  const maxF=Math.max(cliq,pvt,ckt,comp,1);
+  document.getElementById('funil-bars').innerHTML=`
+    <div class="funil-bar-wrap"><div class="funil-label"><span>Cliques</span><span>${br(cliq,0)}</span></div><div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${cliq/maxF*100}%"></div></div></div>
+    <div class="funil-bar-wrap"><div class="funil-label"><span>Pageviews</span><span>${br(pvt,0)}</span></div><div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${pvt/maxF*100}%"></div></div></div>
+    <div class="funil-bar-wrap"><div class="funil-label"><span>Checkouts</span><span>${br(ckt,0)}</span></div><div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${ckt/maxF*100}%"></div></div></div>
+    <div class="funil-bar-wrap"><div class="funil-label"><span>Compras</span><span>${br(comp,0)}</span></div><div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${comp/maxF*100}%"></div></div></div>`;
+
+  document.getElementById('taxa-grid').innerHTML=`
+    <div class="taxa-item"><span>CTR (Cliques/Imp.)</span><span class="taxa-val">${pct(ctr)}</span></div>
+    <div class="taxa-item"><span>Connect Rate (PV/Cliques)</span><span class="taxa-val">${pct(cr)}</span></div>
+    <div class="taxa-item"><span>Taxa Checkout (CK/PV)</span><span class="taxa-val">${pct(taxaCk)}</span></div>
+    <div class="taxa-item"><span>Taxa Compra (Compras/PV)</span><span class="taxa-val">${pct(taxaComp)}</span></div>`;
+
+  // Tabela dias
+  document.getElementById('tbody-dias').innerHTML=fd.map(r=>{
+    const rr=r.inv>0?r.fat/r.inv:0;
+    const cp=r.cliques>0?r.inv/r.cliques:0;
+    const cm=r.imp>0?r.inv/r.imp*1000:0;
+    return `<tr><td>${r.data}</td><td>${brl(r.inv)}</td><td>${brl(r.fat)}</td><td>${br(rr,2)}</td><td>${r.compras}</td><td>${br(r.cliques,0)}</td><td>${br(r.pv,0)}</td><td>${br(r.ck,0)}</td><td>${br(r.imp,0)}</td><td>${brl(cp)}</td><td>${brl(cm)}</td><td>${statusBadge(r.inv,r.fat)}</td></tr>`;
+  }).join('');
+
+  // Charts
+  const labels=fd.map(r=>r.data.slice(0,5));
+  const invData=fd.map(r=>r.inv);
+  const fatData=fd.map(r=>r.fat);
+  const roasData=fd.map(r=>r.inv>0?+(r.fat/r.inv).toFixed(2):0);
+
+  if(chartInvFat){chartInvFat.destroy();}
+  if(chartRoas){chartRoas.destroy();}
+
+  const ctx1=document.getElementById('chartInvFat').getContext('2d');
+  chartInvFat=new Chart(ctx1,{type:'bar',data:{labels,datasets:[
+    {label:'Investimento',data:invData,backgroundColor:'rgba(255,107,43,.6)',borderRadius:3,barPercentage:.45},
+    {label:'Faturamento',data:fatData,backgroundColor:'rgba(46,204,113,.6)',borderRadius:3,barPercentage:.45}
+  ]},options:{responsive:true,plugins:{legend:{labels:{color:'rgba(255,255,255,.5)',font:{size:10}}}},scales:{x:{ticks:{color:'rgba(255,255,255,.3)',font:{size:9}},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'rgba(255,255,255,.3)',font:{size:9}},grid:{color:'rgba(255,255,255,.06)'}}}}});
+
+  const ctx2=document.getElementById('chartRoas').getContext('2d');
+  chartRoas=new Chart(ctx2,{type:'line',data:{labels,datasets:[
+    {label:'ROAS',data:roasData,borderColor:'#ff6b2b',backgroundColor:'rgba(255,107,43,.1)',fill:true,tension:.3,pointRadius:2}
+  ]},options:{responsive:true,plugins:{legend:{labels:{color:'rgba(255,255,255,.5)',font:{size:10}}}},scales:{x:{ticks:{color:'rgba(255,255,255,.3)',font:{size:9}},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'rgba(255,255,255,.3)',font:{size:9}},grid:{color:'rgba(255,255,255,.06)'}}}}});
+}
+
+// === RENDER CRIATIVOS ===
+let criFilter='todos',criSort='inv';
+function setCriFiltro(f,btn){criFilter=f;document.querySelectorAll('.cri-status-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderCriativos();}
+function setCriSort(s,btn){criSort=s;document.querySelectorAll('.cri-sort-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderCriativos();}
+function renderCriativos(){
+  let cris=[...CRIATIVOS];
+  if(criFilter==='ativos')cris=cris.filter(c=>c.ativo);
+  if(criFilter==='inativos')cris=cris.filter(c=>!c.ativo);
+  if(criSort==='inv')cris.sort((a,b)=>b.inv-a.inv);
+  else if(criSort==='ctr')cris.sort((a,b)=>b.ctr-a.ctr);
+  else if(criSort==='cpc')cris.sort((a,b)=>(a.cpc||999)-(b.cpc||999));
+  else if(criSort==='roas')cris.sort((a,b)=>b.roas-a.roas);
+  else if(criSort==='vendas')cris.sort((a,b)=>b.compras-a.compras);
+
+  document.getElementById('cri-cards').innerHTML=cris.map(c=>`
+    <div class="cri-card ${c.ativo?'ativo':''}">
+      <div class="cri-card-header"><div class="cri-name">${c.nome}</div><div class="cri-badge ${c.ativo?'ativo':'inativo'}">${c.ativo?'Ativo':'Inativo'}</div></div>
+      <div class="cri-metrics">
+        <div class="cri-metric"><div class="cri-metric-label">Invest.</div><div class="cri-metric-val hl">${brl(c.inv)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">ROAS</div><div class="cri-metric-val ${c.roas>=1.7?'green':c.roas>=1?'yellow':'red'}" style="color:${c.roas>=1.7?'#2ecc71':c.roas>=1?'#f1c40f':'#e74c3c'}">${br(c.roas,2)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">Vendas</div><div class="cri-metric-val">${c.compras}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">Fat.</div><div class="cri-metric-val">${brl(c.fat)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">CTR</div><div class="cri-metric-val">${pct(c.ctr)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">CPC</div><div class="cri-metric-val">${brl(c.cpc)}</div></div>
+      </div>
+      ${c.link?`<a class="cri-link" href="${c.link}" target="_blank">${c.link}</a>`:''}
+    </div>`).join('');
+
+  document.getElementById('tbody-criativos').innerHTML=cris.map(c=>`
+    <tr><td>${c.nome}</td><td>${brl(c.inv)}</td><td>${brl(c.fat)}</td><td>${br(c.roas,2)}</td><td>${c.compras}</td><td>${brl(c.ticket)}</td><td>${brl(c.cac)}</td><td>${br(c.cliques,0)}</td><td>${br(c.pv,0)}</td><td>${br(c.ck,0)}</td><td>${pct(c.ctr)}</td><td>${brl(c.cpc)}</td><td>${brl(c.cpm)}</td><td>${statusBadge(c.inv,c.fat)}</td></tr>`).join('');
+}
+
+// === RENDER PÚBLICOS ===
+let pubFilter='todos',pubSort='inv';
+function setPubFiltro(f,btn){pubFilter=f;document.querySelectorAll('.pub-filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderPublicos();}
+function setPubSort(s,btn){pubSort=s;document.querySelectorAll('.pub-sort-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderPublicos();}
+function renderPublicos(){
+  let pubs=[...PUBLICOS];
+  if(pubFilter==='ativos')pubs=pubs.filter(p=>p.ativo);
+  if(pubFilter==='inativos')pubs=pubs.filter(p=>!p.ativo);
+  if(pubSort==='inv')pubs.sort((a,b)=>b.inv-a.inv);
+  else if(pubSort==='ctr')pubs.sort((a,b)=>b.ctr-a.ctr);
+  else if(pubSort==='cpc')pubs.sort((a,b)=>(a.cpc||999)-(b.cpc||999));
+  else if(pubSort==='cr')pubs.sort((a,b)=>b.connectRate-a.connectRate);
+  if(!pubs.length){
+    document.getElementById('pub-cards').innerHTML='<div style="color:rgba(255,255,255,.3);font-size:13px;padding:20px 0">Nenhum público disponível.</div>';
+    document.getElementById('tbody-publicos').innerHTML='';return;
+  }
+  const totalInv=pubs.reduce((s,p)=>s+p.inv,0);
+  document.getElementById('pub-cards').innerHTML=pubs.map(p=>{
+    const pctInv=totalInv>0?p.inv/totalInv*100:0;
+    return `<div class="pub-card ${p.ativo?'ativo':''}">
+      <div class="pub-card-header"><div class="pub-name">${p.nome}</div><div class="cri-badge ${p.ativo?'ativo':'inativo'}">${p.ativo?'Ativo':'Inativo'}</div></div>
+      <div class="pub-metrics">
+        <div class="pub-metric"><div class="pub-metric-val">${brl(p.inv)}</div><div class="pub-metric-lbl">Invest.</div></div>
+        <div class="pub-metric"><div class="pub-metric-val neutral">${pct(p.ctr)}</div><div class="pub-metric-lbl">CTR</div></div>
+        <div class="pub-metric"><div class="pub-metric-val neutral">${pct(p.connectRate)}</div><div class="pub-metric-lbl">Connect Rate</div></div>
+      </div>
+      <div class="cri-metrics">
+        <div class="cri-metric"><div class="cri-metric-label">CPC</div><div class="cri-metric-val">${brl(p.cpc)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">CPM</div><div class="cri-metric-val">${brl(p.cpm)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">Cliques</div><div class="cri-metric-val">${br(p.cliques,0)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">Imp.</div><div class="cri-metric-val">${br(p.imp,0)}</div></div>
+      </div>
+      <div class="pub-bar-wrap">
+        <div class="pub-bar-label"><span>% do Investimento Total</span><span>${br(pctInv,1)}%</span></div>
+        <div class="pub-bar-bg"><div class="pub-bar-fill" style="width:${Math.min(100,pctInv)}%"></div></div>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('tbody-publicos').innerHTML=pubs.map(p=>`
+    <tr><td>${p.nome}</td><td>${brl(p.inv)}</td><td>${br(p.cliques,0)}</td><td>${br(p.imp,0)}</td>
+    <td>${br(p.pv||0,0)}</td><td>${pct(p.ctr)}</td><td>${brl(p.cpc)}</td><td>${brl(p.cpm)}</td>
+    <td>${pct(p.connectRate)}</td>
+    <td><span class="cri-badge ${p.ativo?'ativo':'inativo'}">${p.ativo?'Ativo':'Inativo'}</span></td></tr>`).join('');
+}
+
+// === RENDER SEMANAL ===
+let chartSemInv=null,chartSemCtr=null;
+function renderSemanal(){
+  const s=SEMANAL;
+  const inv=s.reduce((t,r)=>t+r.inv,0);
+  const fat=s.reduce((t,r)=>t+r.fat,0);
+  const comp=s.reduce((t,r)=>t+r.compras,0);
+  const roas=inv>0?fat/inv:0;
+
+  document.getElementById('kpi-semanal').innerHTML=`
+    <div class="kpi-card"><div class="kpi-label">Investimento Total</div><div class="kpi-value orange">${brl(inv)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Faturamento Total</div><div class="kpi-value green">${brl(fat)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">ROAS Geral</div><div class="kpi-value ${roas>=1.7?'green':roas>=1?'yellow':'red'}">${br(roas,2)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total Compras</div><div class="kpi-value orange">${comp}</div></div>`;
+
+  document.getElementById('tbody-semanal').innerHTML=s.map(r=>`
+    <tr><td>S${r.semana}</td><td>${brl(r.inv)}</td><td>${brl(r.fat)}</td><td>${br(r.roas,2)}</td><td>${r.compras}</td><td>${brl(r.ticket)}</td><td>${brl(r.retorno)}</td><td>${br(r.cliques,0)}</td><td>${br(r.pv,0)}</td><td>${br(r.ck,0)}</td><td>${brl(r.cpc)}</td><td>${brl(r.cpm)}</td><td>${pct(r.ctr)}</td><td>${pct(r.connectRate)}</td><td>${statusBadge(r.inv,r.fat)}</td></tr>`).join('');
+
+  const labels=s.map(r=>'S'+r.semana);
+  if(chartSemInv)chartSemInv.destroy();
+  if(chartSemCtr)chartSemCtr.destroy();
+
+  chartSemInv=new Chart(document.getElementById('chartSemInv').getContext('2d'),{type:'bar',data:{labels,datasets:[
+    {label:'Investimento',data:s.map(r=>r.inv),backgroundColor:'rgba(255,107,43,.6)',borderRadius:3},
+    {label:'Faturamento',data:s.map(r=>r.fat),backgroundColor:'rgba(46,204,113,.6)',borderRadius:3}
+  ]},options:{responsive:true,plugins:{legend:{labels:{color:'rgba(255,255,255,.5)',font:{size:10}}}},scales:{x:{ticks:{color:'rgba(255,255,255,.3)',font:{size:9}},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'rgba(255,255,255,.3)',font:{size:9}},grid:{color:'rgba(255,255,255,.06)'}}}}});
+
+  chartSemCtr=new Chart(document.getElementById('chartSemCtr').getContext('2d'),{type:'line',data:{labels,datasets:[
+    {label:'CTR %',data:s.map(r=>r.ctr),borderColor:'#ff6b2b',backgroundColor:'rgba(255,107,43,.1)',fill:true,tension:.3,pointRadius:3}
+  ]},options:{responsive:true,plugins:{legend:{labels:{color:'rgba(255,255,255,.5)',font:{size:10}}}},scales:{x:{ticks:{color:'rgba(255,255,255,.3)',font:{size:9}},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'rgba(255,255,255,.3)',font:{size:9}},grid:{color:'rgba(255,255,255,.06)'}}}}});
+}
+
+// === RENDER MENSAL ===
+function renderMensal(){
+  const m=MENSAL;
+  const inv=m.reduce((t,r)=>t+r.inv,0);
+  const fat=m.reduce((t,r)=>t+r.fat,0);
+  const comp=m.reduce((t,r)=>t+r.compras,0);
+  const roas=inv>0?fat/inv:0;
+
+  document.getElementById('kpi-mensal').innerHTML=`
+    <div class="kpi-card"><div class="kpi-label">Investimento Total</div><div class="kpi-value orange">${brl(inv)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Faturamento Total</div><div class="kpi-value green">${brl(fat)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">ROAS Geral</div><div class="kpi-value ${roas>=1.7?'green':roas>=1?'yellow':'red'}">${br(roas,2)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total Compras</div><div class="kpi-value orange">${comp}</div></div>`;
+
+  document.getElementById('tbody-mensal').innerHTML=m.map(r=>`
+    <tr><td>${r.mes}</td><td>${brl(r.inv)}</td><td>${brl(r.fat)}</td><td>${br(r.roas,2)}</td><td>${r.compras}</td><td>${brl(r.ticket)}</td><td>${brl(r.retorno)}</td><td>${br(r.cliques,0)}</td><td>${br(r.pv,0)}</td><td>${br(r.ck,0)}</td><td>${br(r.imp,0)}</td><td>${brl(r.cpc)}</td><td>${brl(r.cpm)}</td><td>${pct(r.ctr)}</td><td>${pct(r.connectRate)}</td><td>${pct(r.taxaCompra)}</td><td>${statusBadge(r.inv,r.fat)}</td></tr>`).join('');
+}
+
+// === RENDER ALL ===
+function renderAll(){
+  renderVisao();renderCriativos();renderPublicos();renderSemanal();renderMensal();
+}
+
+// === INIT ===
+initDatePickers();
+renderAll();
+</script>
+</body>
+</html>

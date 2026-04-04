@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Dashboard — PP258 · Ju Gomes · Conteúdos que Vendem</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#1a1a2e;color:#e8e6f0;font-family:'DM Sans',sans-serif;min-height:100vh}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:#12121f}::-webkit-scrollbar-thumb{background:#ff6b2b55;border-radius:3px}
+.topbar{background:#12121f;padding:12px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.07);position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:10px}
+.brand{font-size:17px;font-weight:700;color:#ff6b2b}
+.subtitle{font-size:11px;color:rgba(255,255,255,0.4);margin-top:2px}
+.logo-jgt{display:flex;align-items:center;gap:10px}
+.logo-jgt svg{width:36px;height:36px;flex-shrink:0}
+.logo-text{display:flex;flex-direction:column}
+.logo-text strong{font-size:13px;font-weight:700;color:#ff6b2b;letter-spacing:.3px}
+.logo-text span{font-size:10px;color:rgba(255,255,255,.35);margin-top:1px}
+.period-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.period-bar label{font-size:11px;color:rgba(255,255,255,.45);white-space:nowrap}
+.date-input{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:#e8e6f0;padding:5px 10px;border-radius:6px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;outline:none;min-width:118px}
+.date-input:focus{border-color:#ff6b2b}
+.date-input::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;cursor:pointer}
+.period-sep{color:rgba(255,255,255,.2);font-size:13px;padding:0 2px}
+.preset-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;transition:all .2s;white-space:nowrap}
+.preset-btn:hover,.preset-btn.active{background:rgba(255,107,43,.2);border-color:#ff6b2b;color:#ff6b2b;font-weight:600}
+.range-info{font-size:11px;color:rgba(255,107,43,.75);font-family:'DM Mono',monospace;white-space:nowrap;padding-left:4px}
+.tabs{display:flex;border-bottom:1px solid rgba(255,255,255,0.07);background:#12121f;padding:0 28px;overflow-x:auto}
+.tab{padding:12px 20px;cursor:pointer;font-size:13px;color:rgba(255,255,255,0.5);border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
+.tab:hover{color:#e8e6f0}.tab.active{color:#ff6b2b;border-bottom-color:#ff6b2b;font-weight:600}
+.content{padding:24px 28px;display:none}.content.active{display:block}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:20px}
+.kpi-card{background:#12121f;border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:16px 18px}
+.kpi-label{font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.kpi-value{font-size:20px;font-weight:700;font-family:'DM Mono',monospace}
+.orange{color:#ff6b2b}.green{color:#2ecc71}.red{color:#e74c3c}.yellow{color:#f1c40f}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#12121f;color:rgba(255,255,255,.45);padding:8px 10px;text-align:right;font-weight:500;border-bottom:1px solid rgba(255,255,255,.07);white-space:nowrap}
+th:first-child{text-align:left}
+td{padding:7px 10px;text-align:right;border-bottom:1px solid rgba(255,255,255,.04);font-family:'DM Mono',monospace;font-size:11px;color:#e8e6f0}
+td:first-child{text-align:left;font-family:'DM Sans',sans-serif;font-size:12px}
+tr:hover td{background:rgba(255,255,255,.025)}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;font-family:'DM Sans',sans-serif}
+.badge.escalar{background:rgba(46,204,113,.15);color:#2ecc71;border:1px solid rgba(46,204,113,.3)}
+.badge.otimizar{background:rgba(241,196,15,.15);color:#f1c40f;border:1px solid rgba(241,196,15,.3)}
+.badge.corrigir{background:rgba(231,76,60,.15);color:#e74c3c;border:1px solid rgba(231,76,60,.3)}
+.badge.aguardar{background:rgba(255,255,255,.06);color:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.1)}
+.funil-section{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:16px 0}
+.funil-bar-wrap{margin-bottom:12px}
+.funil-label{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;color:rgba(255,255,255,.7)}
+.funil-bar-bg{background:rgba(255,255,255,.05);border-radius:4px;height:14px;overflow:hidden}
+.funil-bar-fill{background:linear-gradient(90deg,#ff6b2b,#ff9a3c);height:100%;border-radius:4px;transition:width .4s}
+.taxa-grid{display:grid;gap:8px}
+.taxa-item{background:rgba(255,255,255,.04);border-radius:8px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;font-size:12px;color:rgba(255,255,255,.7)}
+.taxa-val{font-family:'DM Mono',monospace;font-size:15px;font-weight:600;color:#ff6b2b}
+.chart-grid-2x2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0}
+.chart-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:16px}
+.chart-card h4{font-size:11px;color:rgba(255,255,255,.45);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
+.chart-card canvas{max-height:190px}
+.sec-title{font-size:13px;font-weight:600;color:rgba(255,255,255,.65);margin:20px 0 10px;border-left:3px solid #ff6b2b;padding-left:10px}
+.cri-filterbar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.cri-filter-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 12px;border-radius:5px;cursor:pointer;font-size:12px;transition:all .2s}
+.cri-filter-btn.active{background:rgba(255,107,43,.2);border-color:#ff6b2b;color:#ff6b2b}
+.cri-sort-label{font-size:11px;color:rgba(255,255,255,.4);white-space:nowrap}
+.cri-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
+@media(max-width:900px){.cri-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.cri-grid{grid-template-columns:1fr}.chart-grid-2x2{grid-template-columns:1fr}.funil-section{grid-template-columns:1fr}.period-bar{justify-content:flex-start}}
+.cri-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:14px}
+.cri-card.ativo{border-color:rgba(46,204,113,.25)}
+.cri-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.cri-name{font-size:11px;font-weight:600;word-break:break-all;flex:1;margin-right:6px;color:#e8e6f0}
+.cri-badge{font-size:10px;padding:2px 6px;border-radius:4px;white-space:nowrap}
+.cri-badge.ativo{background:rgba(46,204,113,.15);color:#2ecc71}
+.cri-badge.inativo{background:rgba(255,255,255,.08);color:rgba(255,255,255,.4)}
+.cri-metrics{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.cri-metric{display:flex;flex-direction:column}
+.cri-metric-label{color:rgba(255,255,255,.4);font-size:9px;margin-bottom:2px;text-transform:uppercase}
+.cri-metric-val{font-family:'DM Mono',monospace;font-size:12px;font-weight:600;color:#e8e6f0}
+.cri-metric-val.hl{color:#ff6b2b;font-size:14px}
+.cri-link{display:block;margin-top:8px;font-size:10px;color:rgba(255,107,43,.7);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cri-link:hover{color:#ff6b2b}
+.tbl-wrap{overflow-x:auto;border-radius:8px;border:1px solid rgba(255,255,255,.07)}
+.pub-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-bottom:24px}
+.pub-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:16px}
+.pub-card.ativo{border-color:rgba(46,204,113,.2)}
+.pub-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+.pub-name{font-size:12px;font-weight:600;flex:1;margin-right:8px;color:#e8e6f0;line-height:1.4}
+.pub-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.pub-metric{text-align:center;padding:8px 6px;background:rgba(255,255,255,.03);border-radius:6px}
+.pub-metric-val{font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:#ff6b2b}
+.pub-metric-val.neutral{color:#e8e6f0}
+.pub-metric-lbl{font-size:9px;color:rgba(255,255,255,.35);margin-top:2px;text-transform:uppercase;letter-spacing:.4px}
+.pub-bar-wrap{margin-top:8px}
+.pub-bar-label{display:flex;justify-content:space-between;font-size:10px;color:rgba(255,255,255,.35);margin-bottom:3px}
+.pub-bar-bg{height:5px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden}
+.pub-bar-fill{height:100%;background:linear-gradient(90deg,#ff6b2b,#ff9a3c);border-radius:3px;transition:width .5s}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div style="display:flex;align-items:center;gap:16px">
+    <div class="logo-jgt">
+      <svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+        <rect width="36" height="36" rx="8" fill="#ff6b2b" fill-opacity="0.15"/>
+        <rect width="36" height="36" rx="8" stroke="#ff6b2b" stroke-opacity="0.4" stroke-width="1" fill="none"/>
+        <text x="18" y="24" text-anchor="middle" font-family="DM Sans" font-weight="700" font-size="13" fill="#ff6b2b">JGT</text>
+      </svg>
+      <div class="logo-text"><strong>Jamelli GT</strong><span>Tráfego Pago</span></div>
+    </div>
+    <div>
+      <div class="brand">📦 PP258 · Conteúdos que Vendem · Ju Gomes</div>
+      <div class="subtitle">Dashboard de Performance — Perpétuo · Jamelli GT · 2026</div>
+    </div>
+  </div>
+  <div class="period-bar">
+    <label>De</label>
+    <input type="date" id="dateFrom" class="date-input" onchange="onDateChange()">
+    <span class="period-sep">→</span>
+    <label>Até</label>
+    <input type="date" id="dateTo" class="date-input" onchange="onDateChange()">
+    <button class="preset-btn" onclick="setPreset(7,this)">7d</button>
+    <button class="preset-btn" onclick="setPreset(14,this)">14d</button>
+    <button class="preset-btn" onclick="setPreset(30,this)">30d</button>
+    <button class="preset-btn active" id="btn-all" onclick="setPreset('all',this)">Tudo</button>
+    <span class="range-info" id="range-info"></span>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab active" onclick="showTab('visao',this)">Visão Geral</div>
+  <div class="tab" onclick="showTab('criativos',this)">Criativos</div>
+  <div class="tab" onclick="showTab('publicos',this)">Públicos</div>
+  <div class="tab" onclick="showTab('semanal',this)">Semana a Semana</div>
+  <div class="tab" onclick="showTab('mensal',this)">Mês a Mês</div>
+</div>
+
+<!-- ABA 1: VISÃO GERAL -->
+<div id="tab-visao" class="content active">
+  <div class="kpi-grid" id="kpi-visao"></div>
+  <div class="sec-title">Funil de Conversão</div>
+  <div class="funil-section">
+    <div id="funil-bars"></div>
+    <div class="taxa-grid" id="taxa-grid"></div>
+  </div>
+  <div class="sec-title">Dia a Dia</div>
+  <div class="chart-grid-2x2">
+    <div class="chart-card"><h4>Investimento x Faturamento (diário)</h4><canvas id="chartDiaInvFat"></canvas></div>
+    <div class="chart-card"><h4>ROAS Diário</h4><canvas id="chartDiaRoas"></canvas></div>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th>Data</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Cliques</th><th>PV</th><th>CK</th><th>Imp.</th><th>CPC</th><th>CPM</th><th>Status</th>
+      </tr></thead>
+      <tbody id="tbody-dias"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ABA 2: CRIATIVOS -->
+<div id="tab-criativos" class="content">
+  <div class="cri-filterbar">
+    <button class="cri-st-btn cri-filter-btn active" onclick="setCriFiltro('todos',this)">Todos</button>
+    <button class="cri-st-btn cri-filter-btn" onclick="setCriFiltro('ativos',this)">&#9679; Ativos</button>
+    <button class="cri-st-btn cri-filter-btn" onclick="setCriFiltro('inativos',this)">&#9679; Inativos</button>
+    <span style="flex:1"></span>
+    <span class="cri-sort-label">Ordenar:</span>
+    <button class="cri-so-btn cri-filter-btn active" onclick="setCriSort('inv',this)">Investimento</button>
+    <button class="cri-so-btn cri-filter-btn" onclick="setCriSort('ctr',this)">CTR</button>
+    <button class="cri-so-btn cri-filter-btn" onclick="setCriSort('cpc',this)">CPC</button>
+    <button class="cri-so-btn cri-filter-btn" onclick="setCriSort('roas',this)">ROAS</button>
+    <button class="cri-so-btn cri-filter-btn" onclick="setCriSort('vendas',this)">Vendas</button>
+  </div>
+  <div class="cri-grid" id="cri-cards"></div>
+  <div class="sec-title">Tabela de Criativos</div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th>Criativo</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Cliques</th><th>Imp.</th><th>CTR</th><th>CPC</th><th>CPM</th><th>CAC</th><th>Ticket</th><th>Status</th>
+      </tr></thead>
+      <tbody id="tbody-criativos"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ABA 3: PÚBLICOS -->
+<div id="tab-publicos" class="content">
+  <div class="cri-filterbar">
+    <button class="pub-filter-btn cri-filter-btn active" onclick="setPubFiltro('todos',this)">Todos</button>
+    <button class="pub-filter-btn cri-filter-btn" onclick="setPubFiltro('ativos',this)">&#9679; Ativos</button>
+    <button class="pub-filter-btn cri-filter-btn" onclick="setPubFiltro('inativos',this)">&#9679; Inativos</button>
+    <span style="flex:1"></span>
+    <span class="cri-sort-label">Ordenar:</span>
+    <button class="pub-sort-btn cri-filter-btn active" onclick="setPubSort('inv',this)">Investimento</button>
+    <button class="pub-sort-btn cri-filter-btn" onclick="setPubSort('ctr',this)">CTR</button>
+    <button class="pub-sort-btn cri-filter-btn" onclick="setPubSort('cpc',this)">CPC</button>
+    <button class="pub-sort-btn cri-filter-btn" onclick="setPubSort('cr',this)">Connect Rate</button>
+  </div>
+  <div class="pub-grid" id="pub-cards"></div>
+  <div class="sec-title">Tabela de Públicos</div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th>Público (Adset)</th><th>Invest.</th><th>Cliques</th><th>Imp.</th><th>PV</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Status</th>
+      </tr></thead>
+      <tbody id="tbody-publicos"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ABA 4: SEMANA A SEMANA -->
+<div id="tab-semanal" class="content">
+  <div class="kpi-grid" id="kpi-semanal"></div>
+  <div class="chart-grid-2x2">
+    <div class="chart-card"><h4>Investimento por Semana</h4><canvas id="chartSemInv"></canvas></div>
+    <div class="chart-card"><h4>ROAS por Semana</h4><canvas id="chartSemRoas"></canvas></div>
+  </div>
+  <div class="sec-title">Detalhamento Semanal</div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th>Semana</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Retorno</th><th>Compras</th><th>Ticket</th><th>Cliques</th><th>PV</th><th>CK</th><th>Imp.</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Taxa Compra</th>
+      </tr></thead>
+      <tbody id="tbody-semanal"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ABA 5: MÊS A MÊS -->
+<div id="tab-mensal" class="content">
+  <div class="kpi-grid" id="kpi-mensal"></div>
+  <div class="sec-title">Detalhamento Mensal</div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th>Mês</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Retorno</th><th>Compras</th><th>Ticket</th><th>Cliques</th><th>PV</th><th>CK</th><th>Imp.</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Taxa Compra</th>
+      </tr></thead>
+      <tbody id="tbody-mensal"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+// ==================== DATA ====================
+const DIAS = [
+  {"data":"25/02/2026","inv":17.39,"fat":0,"compras":0,"cliques":5,"pv":3,"ck":17,"imp":624},
+  {"data":"26/02/2026","inv":66.81,"fat":0,"compras":0,"cliques":25,"pv":22,"ck":55,"imp":1721},
+  {"data":"27/02/2026","inv":47.56,"fat":0,"compras":0,"cliques":18,"pv":17,"ck":29,"imp":1311},
+  {"data":"28/02/2026","inv":42.73,"fat":0,"compras":0,"cliques":12,"pv":11,"ck":23,"imp":1267},
+  {"data":"01/03/2026","inv":55.95,"fat":0,"compras":0,"cliques":17,"pv":14,"ck":34,"imp":1437},
+  {"data":"02/03/2026","inv":45.07,"fat":0,"compras":0,"cliques":16,"pv":15,"ck":30,"imp":1195},
+  {"data":"03/03/2026","inv":47.63,"fat":0,"compras":0,"cliques":16,"pv":12,"ck":23,"imp":1225},
+  {"data":"04/03/2026","inv":17.78,"fat":0,"compras":0,"cliques":3,"pv":3,"ck":5,"imp":322},
+  {"data":"10/03/2026","inv":37.41,"fat":0,"compras":0,"cliques":13,"pv":9,"ck":0,"imp":831},
+  {"data":"12/03/2026","inv":0,"fat":67,"compras":1,"cliques":0,"pv":0,"ck":0,"imp":0},
+  {"data":"17/03/2026","inv":18.19,"fat":0,"compras":0,"cliques":11,"pv":6,"ck":0,"imp":560},
+  {"data":"18/03/2026","inv":19.49,"fat":0,"compras":0,"cliques":17,"pv":12,"ck":2,"imp":534},
+  {"data":"19/03/2026","inv":21.52,"fat":0,"compras":0,"cliques":15,"pv":11,"ck":5,"imp":562},
+  {"data":"20/03/2026","inv":16.61,"fat":0,"compras":0,"cliques":10,"pv":5,"ck":0,"imp":484},
+  {"data":"21/03/2026","inv":15.87,"fat":0,"compras":0,"cliques":8,"pv":5,"ck":0,"imp":458},
+  {"data":"22/03/2026","inv":20.3,"fat":67,"compras":1,"cliques":16,"pv":15,"ck":8,"imp":465},
+  {"data":"23/03/2026","inv":10.45,"fat":0,"compras":0,"cliques":5,"pv":5,"ck":0,"imp":229},
+  {"data":"25/03/2026","inv":19.65,"fat":0,"compras":0,"cliques":16,"pv":11,"ck":3,"imp":465},
+  {"data":"26/03/2026","inv":20.4,"fat":0,"compras":0,"cliques":13,"pv":8,"ck":3,"imp":535},
+  {"data":"27/03/2026","inv":20.05,"fat":0,"compras":0,"cliques":17,"pv":12,"ck":8,"imp":473}
+];
+
+const SEMANAL = [
+  {"semana":"2608","inv":17.39,"fat":0,"compras":0,"cliques":5,"pv":3,"ck":17,"imp":624,"roas":0,"ticket":0,"taxaCompra":0,"cpc":3.48,"cpm":27.87,"retorno":-17.39,"connectRate":60},
+  {"semana":"2609","inv":323.53,"fat":0,"compras":0,"cliques":107,"pv":94,"ck":199,"imp":8478,"roas":0,"ticket":0,"taxaCompra":0,"cpc":3.02,"cpm":38.16,"retorno":-323.53,"connectRate":87.85},
+  {"semana":"2610","inv":37.41,"fat":0,"compras":0,"cliques":13,"pv":9,"ck":0,"imp":831,"roas":0,"ticket":0,"taxaCompra":0,"cpc":2.88,"cpm":45.02,"retorno":-37.41,"connectRate":69.23},
+  {"semana":"2611","inv":91.68,"fat":67,"compras":1,"cliques":61,"pv":39,"ck":7,"imp":2598,"roas":0.73,"ticket":67,"taxaCompra":2.56,"cpc":1.5,"cpm":35.28,"retorno":-24.68,"connectRate":63.93},
+  {"semana":"2612","inv":91.68,"fat":67,"compras":1,"cliques":66,"pv":49,"ck":15,"imp":2338,"roas":0.73,"ticket":67,"taxaCompra":2.04,"cpc":1.39,"cpm":39.22,"retorno":-24.68,"connectRate":74.24},
+  {"semana":"2613","inv":60.1,"fat":0,"compras":0,"cliques":46,"pv":31,"ck":14,"imp":1473,"roas":0,"ticket":0,"taxaCompra":0,"cpc":1.31,"cpm":40.8,"retorno":-60.1,"connectRate":67.39}
+];
+
+const MENSAL = [
+  {"mes":"Fevereiro","inv":174.49,"fat":0,"compras":0,"cliques":60,"pv":53,"ck":124,"imp":4923,"roas":0,"ticket":0,"taxaCompra":0,"cpc":2.91,"cpm":35.44,"retorno":-174.49,"connectRate":88.33},
+  {"mes":"Março","inv":447.3,"fat":134,"compras":2,"cliques":193,"pv":143,"ck":128,"imp":10819,"roas":0.3,"ticket":67,"taxaCompra":1.4,"cpc":2.32,"cpm":41.34,"retorno":-313.3,"connectRate":74.09}
+];
+
+const CRIATIVOS = [
+  {"nome":"ADVCV06","inv":138.41,"cliques":71,"imp":3524,"pv":52,"ck":33,"compras":1,"fat":67,"link":"https://www.instagram.com/p/DVMimfagbUJ/","cpc":1.95,"cpm":39.28,"ctr":2.02,"cac":138.41,"ticket":67,"roas":0.48,"ativo":true},
+  {"nome":"ADVCV04","inv":96.78,"cliques":37,"imp":2428,"pv":35,"ck":42,"compras":0,"fat":0,"link":"https://www.instagram.com/p/DVMimjhAPwD/","cpc":2.62,"cpm":39.87,"ctr":1.52,"cac":0,"ticket":0,"roas":0,"ativo":false},
+  {"nome":"ADVCV08","inv":91.46,"cliques":35,"imp":2291,"pv":32,"ck":42,"compras":0,"fat":0,"link":"https://www.instagram.com/p/DVMimsEgCX7/","cpc":2.61,"cpm":39.92,"ctr":1.53,"cac":0,"ticket":0,"roas":0,"ativo":false},
+  {"nome":"ADVCV02","inv":89.18,"cliques":36,"imp":2304,"pv":28,"ck":55,"compras":0,"fat":0,"link":"https://www.instagram.com/p/DVMimkkADfC/","cpc":2.48,"cpm":38.71,"ctr":1.56,"cac":0,"ticket":0,"roas":0,"ativo":false},
+  {"nome":"ADVCV07","inv":56.6,"cliques":21,"imp":1422,"pv":21,"ck":40,"compras":0,"fat":0,"link":"https://www.instagram.com/p/DVMimc4gDFH/","cpc":2.7,"cpm":39.8,"ctr":1.48,"cac":0,"ticket":0,"roas":0,"ativo":false},
+  {"nome":"ADVCV05","inv":55.11,"cliques":8,"imp":1645,"pv":7,"ck":17,"compras":0,"fat":0,"link":"https://www.instagram.com/p/DVMimvVAHYu/","cpc":6.89,"cpm":33.5,"ctr":0.49,"cac":0,"ticket":0,"roas":0,"ativo":false},
+  {"nome":"ADVCV01","inv":34,"cliques":13,"imp":729,"pv":9,"ck":14,"compras":0,"fat":0,"link":"https://www.instagram.com/p/DVMimlCgAQp/","cpc":2.62,"cpm":46.64,"ctr":1.78,"cac":0,"ticket":0,"roas":0,"ativo":false},
+  {"nome":"ADVCV03","inv":60.25,"cliques":32,"imp":1399,"pv":39,"ck":9,"compras":0,"fat":0,"link":"https://www.instagram.com/p/DVMimhnAO10/","cpc":1.88,"cpm":43.07,"ctr":2.29,"cac":0,"ticket":0,"roas":0,"ativo":true},
+  {"nome":"(sem criativo)","inv":0,"cliques":0,"imp":0,"pv":0,"ck":0,"compras":1,"fat":67,"link":"","cpc":0,"cpm":0,"ctr":0,"cac":0,"ticket":67,"roas":0,"ativo":true}
+];
+
+const PUBLICOS = [
+  {"nome":"00 - [CV] [PF] Cara de PIX 2026 - 04","inv":96.78,"cliques":37,"imp":2428,"pv":35,"ck":42,"cpc":2.62,"cpm":39.87,"ctr":1.52,"connectRate":94.59,"ativo":false},
+  {"nome":"00 - [CV] [PF] Cara de PIX 2026 - 08","inv":91.46,"cliques":35,"imp":2291,"pv":32,"ck":42,"cpc":2.61,"cpm":39.92,"ctr":1.53,"connectRate":91.43,"ativo":false},
+  {"nome":"00 - [CV] [PF] Cara de PIX 2026 - 02","inv":89.18,"cliques":36,"imp":2304,"pv":28,"ck":55,"cpc":2.48,"cpm":38.71,"ctr":1.56,"connectRate":77.78,"ativo":false},
+  {"nome":"00 - [CV] [PF] advantage+: Mentorship mulheres 25+ - 06","inv":59.81,"cliques":27,"imp":1336,"pv":18,"ck":6,"cpc":2.22,"cpm":44.77,"ctr":2.02,"connectRate":66.67,"ativo":true},
+  {"nome":"00 - [CV] [PF] Cara de PIX 2026 (outro*) - 06","inv":58.7,"cliques":45,"imp":1682,"pv":25,"ck":5,"cpc":1.3,"cpm":34.9,"ctr":2.68,"connectRate":55.56,"ativo":true},
+  {"nome":"00 - [CV] [PF] Cara de PIX 2026 - 07","inv":56.6,"cliques":21,"imp":1422,"pv":21,"ck":40,"cpc":2.7,"cpm":39.8,"ctr":1.48,"connectRate":100,"ativo":false},
+  {"nome":"00 - [CV] [PF] Cara de PIX 2026 - 05","inv":55.11,"cliques":8,"imp":1645,"pv":7,"ck":17,"cpc":6.89,"cpm":33.5,"ctr":0.49,"connectRate":87.5,"ativo":false},
+  {"nome":"00 - [CV] [PF] Cara de PIX 2026 - 01","inv":34,"cliques":13,"imp":729,"pv":9,"ck":14,"cpc":2.62,"cpm":46.64,"ctr":1.78,"connectRate":69.23,"ativo":false},
+  {"nome":"00 - [CV] [PF] Cara de PIX 2026 - 03","inv":12.47,"cliques":8,"imp":432,"pv":7,"ck":9,"cpc":1.56,"cpm":28.87,"ctr":1.85,"connectRate":87.5,"ativo":false},
+  {"nome":"00 - [CV] [PF] advantage+: Cara de PIX 2026 - 06","inv":40.58,"cliques":15,"imp":1020,"pv":9,"ck":18,"cpc":2.71,"cpm":39.78,"ctr":1.47,"connectRate":60,"ativo":true},
+  {"nome":"00 - [CV] [PF] Cara de PIX 2026 (outro*) - 06:2","inv":18.1,"cliques":5,"imp":411,"pv":2,"ck":4,"cpc":3.62,"cpm":44.04,"ctr":1.22,"connectRate":40,"ativo":true},
+  {"nome":"00 - [CV] [PF] advantage+: Cara de PIX 2026 (outro*) - 06","inv":9,"cliques":3,"imp":242,"pv":0,"ck":0,"cpc":3,"cpm":37.19,"ctr":1.24,"connectRate":0,"ativo":false}
+];
+
+// ==================== HELPERS ====================
+const ptMonFull=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+function toISO(d){const[dd,mm,yy]=d.split('/');return `${yy}-${mm}-${dd}`;}
+function dateToWeekKey(d){
+  const[dd,mm,yy]=d.split('/').map(Number);
+  const dt=new Date(yy,mm-1,dd),jan1=new Date(yy,0,1);
+  const w=Math.ceil((Math.floor((dt-jan1)/86400000)+1)/7);
+  return String(yy).slice(-2)+String(w).padStart(2,'0');
+}
+function dateToMonthKey(d){const[dd,mm,yy]=d.split('/').map(Number);return ptMonFull[mm-1];}
+function br(n,d=2){if(n===null||n===undefined||isNaN(n))return '—';return new Intl.NumberFormat('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}).format(n);}
+function brl(n){if(n===null||n===undefined)return '—';return 'R$ '+br(n,2);}
+function pct(n){if(n===null||n===undefined||isNaN(n))return '—';return br(n,2)+'%';}
+function statusBadge(inv,fat){
+  if(!inv||inv===0)return '<span class="badge aguardar">Aguardar</span>';
+  const r=inv>0?fat/inv:0;
+  if(r>=1.7)return '<span class="badge escalar">Escalar</span>';
+  if(r>=1)return '<span class="badge otimizar">Otimizar</span>';
+  return '<span class="badge corrigir">Corrigir</span>';
+}
+
+// ==================== CONSISTENCY FIX ====================
+function fixFatFromDias(){
+  const fatWk={},compWk={},cliqWk={},pvWk={},ckWk={},impWk={},invWk={};
+  DIAS.forEach(r=>{
+    const k=dateToWeekKey(r.data);
+    fatWk[k]=(fatWk[k]||0)+(r.fat||0);compWk[k]=(compWk[k]||0)+(r.compras||0);
+    cliqWk[k]=(cliqWk[k]||0)+(r.cliques||0);pvWk[k]=(pvWk[k]||0)+(r.pv||0);
+    ckWk[k]=(ckWk[k]||0)+(r.ck||0);impWk[k]=(impWk[k]||0)+(r.imp||0);invWk[k]=(invWk[k]||0)+(r.inv||0);
+  });
+  SEMANAL.forEach(r=>{
+    const k=String(r.semana);
+    r.fat=Math.round((fatWk[k]||0)*100)/100;r.compras=compWk[k]||0;
+    r.roas=r.inv>0?Math.round(r.fat/r.inv*100)/100:0;
+    r.ticket=r.compras>0?Math.round(r.fat/r.compras*100)/100:0;
+    r.retorno=Math.round((r.fat-r.inv)*100)/100;
+    r.taxaCompra=r.pv>0?Math.round(r.compras/r.pv*100*100)/100:0;
+    r.cpc=(cliqWk[k]||0)>0?Math.round(r.inv/(cliqWk[k]||1)*100)/100:0;
+    r.cpm=(impWk[k]||0)>0?Math.round(r.inv/(impWk[k]||1)*1000*100)/100:0;
+    r.connectRate=(cliqWk[k]||0)>0?Math.round((pvWk[k]||0)/(cliqWk[k]||1)*100*100)/100:0;
+  });
+  const fatMo={},compMo={},cliqMo={},pvMo={},ckMo={},impMo={},invMo={};
+  DIAS.forEach(r=>{
+    const k=dateToMonthKey(r.data);
+    fatMo[k]=(fatMo[k]||0)+(r.fat||0);compMo[k]=(compMo[k]||0)+(r.compras||0);
+    cliqMo[k]=(cliqMo[k]||0)+(r.cliques||0);pvMo[k]=(pvMo[k]||0)+(r.pv||0);
+    ckMo[k]=(ckMo[k]||0)+(r.ck||0);impMo[k]=(impMo[k]||0)+(r.imp||0);invMo[k]=(invMo[k]||0)+(r.inv||0);
+  });
+  MENSAL.forEach(r=>{
+    if(fatMo[r.mes]!==undefined){
+      r.fat=Math.round(fatMo[r.mes]*100)/100;r.compras=compMo[r.mes]||0;
+      r.roas=r.inv>0?Math.round(r.fat/r.inv*100)/100:0;
+      r.ticket=r.compras>0?Math.round(r.fat/r.compras*100)/100:0;
+      r.retorno=Math.round((r.fat-r.inv)*100)/100;
+      r.taxaCompra=r.pv>0?Math.round(r.compras/r.pv*100*100)/100:0;
+      r.cpc=(cliqMo[r.mes]||0)>0?Math.round(r.inv/(cliqMo[r.mes]||1)*100)/100:0;
+      r.cpm=(impMo[r.mes]||0)>0?Math.round(r.inv/(impMo[r.mes]||1)*1000*100)/100:0;
+      r.connectRate=(cliqMo[r.mes]||0)>0?Math.round((pvMo[r.mes]||0)/(cliqMo[r.mes]||1)*100*100)/100:0;
+    }
+  });
+}
+
+// ==================== GLOBAL FILTER ====================
+let dateFrom=null,dateTo=null;
+function initDatePickers(){
+  const dates=DIAS.map(d=>toISO(d.data)).sort();
+  document.getElementById('dateFrom').value=dates[0];
+  document.getElementById('dateTo').value=dates[dates.length-1];
+  dateFrom=dates[0];dateTo=dates[dates.length-1];updateRangeInfo();
+}
+function setPreset(days,btn){
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
+  const dates=DIAS.map(d=>toISO(d.data)).sort(),last=dates[dates.length-1];
+  if(days==='all'){document.getElementById('dateFrom').value=dates[0];document.getElementById('dateTo').value=last;}
+  else{const from=new Date(last);from.setDate(from.getDate()-(days-1));document.getElementById('dateFrom').value=from.toISOString().slice(0,10);document.getElementById('dateTo').value=last;}
+  dateFrom=document.getElementById('dateFrom').value;dateTo=document.getElementById('dateTo').value;
+  updateRangeInfo();renderAll();
+}
+function onDateChange(){
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+  dateFrom=document.getElementById('dateFrom').value;dateTo=document.getElementById('dateTo').value;
+  updateRangeInfo();renderAll();
+}
+function updateRangeInfo(){
+  if(!dateFrom||!dateTo){document.getElementById('range-info').textContent='';return;}
+  const diff=Math.round((new Date(dateTo+'T00:00:00')-new Date(dateFrom+'T00:00:00'))/86400000)+1;
+  document.getElementById('range-info').textContent=diff+(diff===1?' dia':' dias');
+}
+function filteredDias(){
+  return DIAS.filter(d=>{const iso=toISO(d.data);return(!dateFrom||iso>=dateFrom)&&(!dateTo||iso<=dateTo);});
+}
+function showTab(id,el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.content').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');document.getElementById('tab-'+id).classList.add('active');
+}
+
+// ==================== ABA 1: VISÃO GERAL ====================
+function renderKpiVisao(dias){
+  const inv=dias.reduce((s,d)=>s+d.inv,0);
+  const fat=dias.reduce((s,d)=>s+d.fat,0);
+  const compras=dias.reduce((s,d)=>s+d.compras,0);
+  const cliques=dias.reduce((s,d)=>s+d.cliques,0);
+  const imp=dias.reduce((s,d)=>s+d.imp,0);
+  const roas=inv>0?fat/inv:0;
+  const cpc=cliques>0?inv/cliques:0;
+  const cpm=imp>0?inv/imp*1000:0;
+  const html=`
+    <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${brl(inv)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Faturamento</div><div class="kpi-value green">${brl(fat)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">ROAS</div><div class="kpi-value ${roas>=1.7?'green':roas>=1?'yellow':'red'}">${br(roas)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Compras</div><div class="kpi-value">${br(compras,0)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Cliques</div><div class="kpi-value">${br(cliques,0)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Impressões</div><div class="kpi-value">${br(imp,0)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CPC</div><div class="kpi-value">${brl(cpc)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CPM</div><div class="kpi-value">${brl(cpm)}</div></div>`;
+  document.getElementById('kpi-visao').innerHTML=html;
+}
+function renderFunil(dias){
+  const cliques=dias.reduce((s,d)=>s+d.cliques,0);
+  const pv=dias.reduce((s,d)=>s+d.pv,0);
+  const ck=dias.reduce((s,d)=>s+d.ck,0);
+  const compras=dias.reduce((s,d)=>s+d.compras,0);
+  const max=Math.max(cliques,1);
+  const steps=[
+    {label:'Cliques',val:cliques},
+    {label:'Pageviews',val:pv},
+    {label:'Checkouts',val:ck},
+    {label:'Compras',val:compras}
+  ];
+  document.getElementById('funil-bars').innerHTML=steps.map(s=>`
+    <div class="funil-bar-wrap">
+      <div class="funil-label"><span>${s.label}</span><span>${br(s.val,0)}</span></div>
+      <div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${Math.min(100,s.val/max*100)}%"></div></div>
+    </div>`).join('');
+  const imp=dias.reduce((s,d)=>s+d.imp,0);
+  const ctr=imp>0?(cliques/imp*100):0;
+  const cr=cliques>0?(pv/cliques*100):0;
+  const tck=pv>0?(ck/pv*100):0;
+  const tc=pv>0?(compras/pv*100):0;
+  document.getElementById('taxa-grid').innerHTML=`
+    <div class="taxa-item"><span>CTR (Cliques/Imp.)</span><span class="taxa-val">${pct(ctr)}</span></div>
+    <div class="taxa-item"><span>Connect Rate (PV/Cliques)</span><span class="taxa-val">${pct(cr)}</span></div>
+    <div class="taxa-item"><span>Taxa Checkout (CK/PV)</span><span class="taxa-val">${pct(tck)}</span></div>
+    <div class="taxa-item"><span>Taxa Compra (Compras/PV)</span><span class="taxa-val">${pct(tc)}</span></div>`;
+}
+function renderTbodyDias(dias){
+  document.getElementById('tbody-dias').innerHTML=dias.map(d=>{
+    const roas=d.inv>0?d.fat/d.inv:0;
+    const cpc=d.cliques>0?d.inv/d.cliques:0;
+    const cpm=d.imp>0?d.inv/d.imp*1000:0;
+    return `<tr><td>${d.data}</td><td>${brl(d.inv)}</td><td>${brl(d.fat)}</td><td>${br(roas)}</td><td>${br(d.compras,0)}</td><td>${br(d.cliques,0)}</td><td>${br(d.pv,0)}</td><td>${br(d.ck,0)}</td><td>${br(d.imp,0)}</td><td>${brl(cpc)}</td><td>${brl(cpm)}</td><td>${statusBadge(d.inv,d.fat)}</td></tr>`;
+  }).join('');
+}
+
+// Charts
+let chartDiaInvFat=null, chartDiaRoas=null;
+function renderChartsDia(dias){
+  const labels=dias.map(d=>d.data.slice(0,5));
+  const invData=dias.map(d=>d.inv);
+  const fatData=dias.map(d=>d.fat);
+  const roasData=dias.map(d=>d.inv>0?Math.round(d.fat/d.inv*100)/100:0);
+  if(chartDiaInvFat)chartDiaInvFat.destroy();
+  if(chartDiaRoas)chartDiaRoas.destroy();
+  const ctx1=document.getElementById('chartDiaInvFat').getContext('2d');
+  chartDiaInvFat=new Chart(ctx1,{type:'bar',data:{labels,datasets:[
+    {label:'Investimento',data:invData,backgroundColor:'rgba(255,107,43,0.85)',borderRadius:3,order:2},
+    {label:'Faturamento',data:fatData,backgroundColor:'rgba(255,183,55,0.85)',borderRadius:3,order:1}
+  ]},options:{responsive:true,plugins:{legend:{labels:{color:'rgba(255,255,255,.5)',font:{size:10}}}},scales:{x:{ticks:{color:'rgba(255,255,255,.35)',font:{size:9}},grid:{display:false}},y:{ticks:{color:'rgba(255,255,255,.35)',font:{size:9}},grid:{color:'rgba(255,255,255,.05)'}}}}});
+  const ctx2=document.getElementById('chartDiaRoas').getContext('2d');
+  chartDiaRoas=new Chart(ctx2,{type:'line',data:{labels,datasets:[
+    {label:'ROAS',data:roasData,borderColor:'rgba(255,107,43,0.95)',backgroundColor:'rgba(255,107,43,0.13)',fill:true,tension:.3,pointRadius:2}
+  ]},options:{responsive:true,plugins:{legend:{labels:{color:'rgba(255,255,255,.5)',font:{size:10}}}},scales:{x:{ticks:{color:'rgba(255,255,255,.35)',font:{size:9}},grid:{display:false}},y:{ticks:{color:'rgba(255,255,255,.35)',font:{size:9}},grid:{color:'rgba(255,255,255,.05)'}}}}});
+}
+
+// ==================== ABA 2: CRIATIVOS ====================
+let criFilter='todos',criSort='inv';
+function setCriFiltro(f,btn){criFilter=f;document.querySelectorAll('.cri-st-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderCriativos();}
+function setCriSort(s,btn){criSort=s;document.querySelectorAll('.cri-so-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderCriativos();}
+function renderCriativos(){
+  let cris=[...CRIATIVOS];
+  if(criFilter==='ativos')cris=cris.filter(c=>c.ativo);
+  if(criFilter==='inativos')cris=cris.filter(c=>!c.ativo);
+  if(criSort==='inv')cris.sort((a,b)=>b.inv-a.inv);
+  else if(criSort==='ctr')cris.sort((a,b)=>b.ctr-a.ctr);
+  else if(criSort==='cpc')cris.sort((a,b)=>(a.cpc||999)-(b.cpc||999));
+  else if(criSort==='roas')cris.sort((a,b)=>b.roas-a.roas);
+  else if(criSort==='vendas')cris.sort((a,b)=>b.compras-a.compras);
+  document.getElementById('cri-cards').innerHTML=cris.map(c=>`
+    <div class="cri-card ${c.ativo?'ativo':''}">
+      <div class="cri-card-header"><div class="cri-name">${c.nome}</div><div class="cri-badge ${c.ativo?'ativo':'inativo'}">${c.ativo?'Ativo':'Inativo'}</div></div>
+      <div class="cri-metrics">
+        <div class="cri-metric"><div class="cri-metric-label">Invest.</div><div class="cri-metric-val hl">${brl(c.inv)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">Fat.</div><div class="cri-metric-val">${brl(c.fat)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">ROAS</div><div class="cri-metric-val">${br(c.roas)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">Compras</div><div class="cri-metric-val">${br(c.compras,0)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">CTR</div><div class="cri-metric-val">${pct(c.ctr)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">CPC</div><div class="cri-metric-val">${brl(c.cpc)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">CPM</div><div class="cri-metric-val">${brl(c.cpm)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">CAC</div><div class="cri-metric-val">${brl(c.cac)}</div></div>
+      </div>
+      ${c.link?`<a class="cri-link" href="${c.link}" target="_blank">${c.link}</a>`:''}
+    </div>`).join('');
+  document.getElementById('tbody-criativos').innerHTML=cris.map(c=>`
+    <tr><td>${c.nome}</td><td>${brl(c.inv)}</td><td>${brl(c.fat)}</td><td>${br(c.roas)}</td><td>${br(c.compras,0)}</td>
+    <td>${br(c.cliques,0)}</td><td>${br(c.imp,0)}</td><td>${pct(c.ctr)}</td><td>${brl(c.cpc)}</td><td>${brl(c.cpm)}</td>
+    <td>${brl(c.cac)}</td><td>${brl(c.ticket)}</td><td>${statusBadge(c.inv,c.fat)}</td></tr>`).join('');
+}
+
+// ==================== ABA 3: PÚBLICOS ====================
+let pubFilter='todos',pubSort='inv';
+function setPubFiltro(f,btn){pubFilter=f;document.querySelectorAll('.pub-filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderPublicos();}
+function setPubSort(s,btn){pubSort=s;document.querySelectorAll('.pub-sort-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderPublicos();}
+function renderPublicos(){
+  let pubs=[...PUBLICOS];
+  if(pubFilter==='ativos')pubs=pubs.filter(p=>p.ativo);
+  if(pubFilter==='inativos')pubs=pubs.filter(p=>!p.ativo);
+  if(pubSort==='inv')pubs.sort((a,b)=>b.inv-a.inv);
+  else if(pubSort==='ctr')pubs.sort((a,b)=>b.ctr-a.ctr);
+  else if(pubSort==='cpc')pubs.sort((a,b)=>(a.cpc||999)-(b.cpc||999));
+  else if(pubSort==='cr')pubs.sort((a,b)=>b.connectRate-a.connectRate);
+  if(!pubs.length){
+    document.getElementById('pub-cards').innerHTML='<div style="color:rgba(255,255,255,.3);font-size:13px;padding:20px 0">Nenhum público disponível.</div>';
+    document.getElementById('tbody-publicos').innerHTML='';return;
+  }
+  const totalInv=pubs.reduce((s,p)=>s+p.inv,0);
+  document.getElementById('pub-cards').innerHTML=pubs.map(p=>{
+    const pctInv=totalInv>0?p.inv/totalInv*100:0;
+    return `<div class="pub-card ${p.ativo?'ativo':''}">
+      <div class="pub-card-header"><div class="pub-name">${p.nome}</div><div class="cri-badge ${p.ativo?'ativo':'inativo'}">${p.ativo?'Ativo':'Inativo'}</div></div>
+      <div class="pub-metrics">
+        <div class="pub-metric"><div class="pub-metric-val">${brl(p.inv)}</div><div class="pub-metric-lbl">Invest.</div></div>
+        <div class="pub-metric"><div class="pub-metric-val neutral">${pct(p.ctr)}</div><div class="pub-metric-lbl">CTR</div></div>
+        <div class="pub-metric"><div class="pub-metric-val neutral">${pct(p.connectRate)}</div><div class="pub-metric-lbl">Connect Rate</div></div>
+      </div>
+      <div class="cri-metrics">
+        <div class="cri-metric"><div class="cri-metric-label">CPC</div><div class="cri-metric-val">${brl(p.cpc)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">CPM</div><div class="cri-metric-val">${brl(p.cpm)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">Cliques</div><div class="cri-metric-val">${br(p.cliques,0)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">Imp.</div><div class="cri-metric-val">${br(p.imp,0)}</div></div>
+      </div>
+      <div class="pub-bar-wrap">
+        <div class="pub-bar-label"><span>% do Investimento Total</span><span>${br(pctInv,1)}%</span></div>
+        <div class="pub-bar-bg"><div class="pub-bar-fill" style="width:${Math.min(100,pctInv)}%"></div></div>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('tbody-publicos').innerHTML=pubs.map(p=>`
+    <tr><td>${p.nome}</td><td>${brl(p.inv)}</td><td>${br(p.cliques,0)}</td><td>${br(p.imp,0)}</td>
+    <td>${br(p.pv||0,0)}</td><td>${pct(p.ctr)}</td><td>${brl(p.cpc)}</td><td>${brl(p.cpm)}</td>
+    <td>${pct(p.connectRate)}</td>
+    <td><span class="cri-badge ${p.ativo?'ativo':'inativo'}">${p.ativo?'Ativo':'Inativo'}</span></td></tr>`).join('');
+}
+
+// ==================== ABA 4: SEMANAL ====================
+let chartSemInv=null, chartSemRoas=null;
+function renderSemanal(){
+  const s=SEMANAL;
+  const inv=s.reduce((a,r)=>a+r.inv,0);
+  const fat=s.reduce((a,r)=>a+r.fat,0);
+  const compras=s.reduce((a,r)=>a+r.compras,0);
+  const roas=inv>0?fat/inv:0;
+  document.getElementById('kpi-semanal').innerHTML=`
+    <div class="kpi-card"><div class="kpi-label">Total Investido</div><div class="kpi-value orange">${brl(inv)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total Faturado</div><div class="kpi-value green">${brl(fat)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">ROAS Geral</div><div class="kpi-value ${roas>=1.7?'green':roas>=1?'yellow':'red'}">${br(roas)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total Compras</div><div class="kpi-value">${br(compras,0)}</div></div>`;
+  document.getElementById('tbody-semanal').innerHTML=s.map(r=>`
+    <tr><td>S${r.semana}</td><td>${brl(r.inv)}</td><td>${brl(r.fat)}</td><td>${br(r.roas)}</td><td>${brl(r.retorno)}</td>
+    <td>${br(r.compras,0)}</td><td>${brl(r.ticket)}</td><td>${br(r.cliques,0)}</td><td>${br(r.pv,0)}</td><td>${br(r.ck,0)}</td>
+    <td>${br(r.imp,0)}</td><td>${brl(r.cpc)}</td><td>${brl(r.cpm)}</td><td>${pct(r.connectRate)}</td><td>${pct(r.taxaCompra)}</td></tr>`).join('');
+  // Charts
+  const labels=s.map(r=>'S'+r.semana);
+  if(chartSemInv)chartSemInv.destroy();
+  if(chartSemRoas)chartSemRoas.destroy();
+  const ctx1=document.getElementById('chartSemInv').getContext('2d');
+  chartSemInv=new Chart(ctx1,{type:'bar',data:{labels,datasets:[
+    {label:'Investimento',data:s.map(r=>r.inv),backgroundColor:'rgba(255,107,43,0.85)',borderRadius:3},
+    {label:'Faturamento',data:s.map(r=>r.fat),backgroundColor:'rgba(255,183,55,0.85)',borderRadius:3}
+  ]},options:{responsive:true,plugins:{legend:{labels:{color:'rgba(255,255,255,.5)',font:{size:10}}}},scales:{x:{ticks:{color:'rgba(255,255,255,.35)',font:{size:9}},grid:{display:false}},y:{ticks:{color:'rgba(255,255,255,.35)',font:{size:9}},grid:{color:'rgba(255,255,255,.05)'}}}}});
+  const ctx2=document.getElementById('chartSemRoas').getContext('2d');
+  chartSemRoas=new Chart(ctx2,{type:'line',data:{labels,datasets:[
+    {label:'ROAS',data:s.map(r=>r.roas),borderColor:'rgba(255,107,43,0.95)',backgroundColor:'rgba(255,107,43,0.13)',fill:true,tension:.3,pointRadius:3}
+  ]},options:{responsive:true,plugins:{legend:{labels:{color:'rgba(255,255,255,.5)',font:{size:10}}}},scales:{x:{ticks:{color:'rgba(255,255,255,.35)',font:{size:9}},grid:{display:false}},y:{ticks:{color:'rgba(255,255,255,.35)',font:{size:9}},grid:{color:'rgba(255,255,255,.05)'}}}}});
+}
+
+// ==================== ABA 5: MENSAL ====================
+function renderMensal(){
+  const m=MENSAL;
+  const inv=m.reduce((a,r)=>a+r.inv,0);
+  const fat=m.reduce((a,r)=>a+r.fat,0);
+  const compras=m.reduce((a,r)=>a+r.compras,0);
+  const roas=inv>0?fat/inv:0;
+  document.getElementById('kpi-mensal').innerHTML=`
+    <div class="kpi-card"><div class="kpi-label">Total Investido</div><div class="kpi-value orange">${brl(inv)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total Faturado</div><div class="kpi-value green">${brl(fat)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">ROAS Geral</div><div class="kpi-value ${roas>=1.7?'green':roas>=1?'yellow':'red'}">${br(roas)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total Compras</div><div class="kpi-value">${br(compras,0)}</div></div>`;
+  document.getElementById('tbody-mensal').innerHTML=m.map(r=>`
+    <tr><td>${r.mes}</td><td>${brl(r.inv)}</td><td>${brl(r.fat)}</td><td>${br(r.roas)}</td><td>${brl(r.retorno)}</td>
+    <td>${br(r.compras,0)}</td><td>${brl(r.ticket)}</td><td>${br(r.cliques,0)}</td><td>${br(r.pv,0)}</td><td>${br(r.ck,0)}</td>
+    <td>${br(r.imp,0)}</td><td>${brl(r.cpc)}</td><td>${brl(r.cpm)}</td><td>${pct(r.connectRate)}</td><td>${pct(r.taxaCompra)}</td></tr>`).join('');
+}
+
+// ==================== INIT ====================
+function renderAll(){
+  const dias=filteredDias();
+  renderKpiVisao(dias);renderFunil(dias);renderTbodyDias(dias);renderChartsDia(dias);
+  renderCriativos();renderPublicos();renderSemanal();renderMensal();
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  fixFatFromDias();
+  initDatePickers();
+  renderAll();
+});
+</script>
+</body>
+</html>
