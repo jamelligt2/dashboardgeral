@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Jamelli GT · Painel de Dashboards</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#1a1a2e;color:#e8e6f0;font-family:'DM Sans',sans-serif;min-height:100vh}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:#12121f}::-webkit-scrollbar-thumb{background:#ff6b2b55;border-radius:3px}
+
+.header{background:#12121f;border-bottom:1px solid rgba(255,255,255,.07);padding:24px 32px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;position:sticky;top:0;z-index:100}
+.header-left{display:flex;align-items:center;gap:16px}
+.logo-jgt svg{width:44px;height:44px}
+.logo-info strong{font-size:18px;font-weight:700;color:#ff6b2b;display:block}
+.logo-info span{font-size:11px;color:rgba(255,255,255,.35);margin-top:2px;display:block}
+
+.search-wrap{position:relative;width:340px}
+.search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:rgba(255,255,255,.3);font-size:14px;pointer-events:none}
+.search-input{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#e8e6f0;padding:10px 14px 10px 36px;border-radius:8px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;transition:all .2s}
+.search-input::placeholder{color:rgba(255,255,255,.25)}
+.search-input:focus{border-color:#ff6b2b;background:rgba(255,255,255,.08)}
+
+.container{max-width:1200px;margin:0 auto;padding:24px 32px 60px}
+
+/* ===== FILTROS ===== */
+.filters{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:24px;align-items:center}
+.filter-group{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.filter-label{font-size:11px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.8px;margin-right:4px;white-space:nowrap}
+.filter-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.5);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;transition:all .2s;white-space:nowrap}
+.filter-btn:hover{color:#e8e6f0;border-color:rgba(255,255,255,.2)}
+.filter-btn.active{background:rgba(255,107,43,.15);border-color:rgba(255,107,43,.4);color:#ff6b2b;font-weight:600}
+.filter-sep{width:1px;height:24px;background:rgba(255,255,255,.08);margin:0 8px}
+
+.section-title{font-size:12px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.section-title .count{background:rgba(255,107,43,.15);color:#ff6b2b;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-bottom:40px}
+
+.card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:20px 22px;transition:all .25s;cursor:pointer;text-decoration:none;display:flex;flex-direction:column;gap:10px}
+.card:hover{border-color:rgba(255,107,43,.4);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.3)}
+.card.hidden{display:none}
+
+.card-top{display:flex;align-items:center;justify-content:space-between}
+.card-icon{font-size:24px}
+.card-tags{display:flex;gap:6px}
+.tag{padding:3px 10px;border-radius:5px;font-size:10px;font-weight:600}
+.tag.perpetuo{background:rgba(255,107,43,.12);color:#ff6b2b;border:1px solid rgba(255,107,43,.2)}
+.tag.formulario{background:rgba(52,152,219,.12);color:#3498db;border:1px solid rgba(52,152,219,.2)}
+.tag.google{background:rgba(241,196,15,.12);color:#f1c40f;border:1px solid rgba(241,196,15,.2)}
+
+.card-title{font-size:15px;font-weight:700;color:#e8e6f0;line-height:1.3}
+.card-client{font-size:12px;color:rgba(255,255,255,.4)}
+.card-path{font-size:10px;color:rgba(255,107,43,.5);font-family:'DM Mono',monospace;margin-top:auto}
+
+.no-results{display:none;text-align:center;padding:60px 20px;color:rgba(255,255,255,.25);font-size:14px}
+.no-results.visible{display:block}
+
+.footer{text-align:center;padding:32px;color:rgba(255,255,255,.15);font-size:11px;border-top:1px solid rgba(255,255,255,.04)}
+
+@media(max-width:700px){
+  .header{padding:18px 16px}
+  .search-wrap{width:100%;order:3}
+  .container{padding:16px 16px 40px}
+  .grid{grid-template-columns:1fr}
+  .filter-sep{display:none}
+  .filters{gap:6px}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo-jgt">
+      <svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+        <rect width="44" height="44" rx="10" fill="#ff6b2b" fill-opacity="0.15"/>
+        <rect width="44" height="44" rx="10" stroke="#ff6b2b" stroke-opacity="0.4" stroke-width="1.5" fill="none"/>
+        <text x="22" y="29" text-anchor="middle" font-family="DM Sans" font-weight="700" font-size="15" fill="#ff6b2b">JGT</text>
+      </svg>
+    </div>
+    <div class="logo-info">
+      <strong>Jamelli GT</strong>
+      <span>Painel de Dashboards · Tráfego Pago</span>
+    </div>
+  </div>
+  <div class="search-wrap">
+    <span class="search-icon">&#128269;</span>
+    <input type="text" class="search-input" id="search" placeholder="Buscar cliente ou produto..." oninput="applyFilters()">
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- ===== FILTROS ===== -->
+  <div class="filters">
+    <div class="filter-group">
+      <span class="filter-label">Tipo:</span>
+      <button class="filter-btn active" data-filter-type="todos" onclick="setTypeFilter('todos',this)">Todos</button>
+      <button class="filter-btn" data-filter-type="perpetuo" onclick="setTypeFilter('perpetuo',this)">Perpétuo</button>
+      <button class="filter-btn" data-filter-type="formulario" onclick="setTypeFilter('formulario',this)">Formulário</button>
+      <button class="filter-btn" data-filter-type="google" onclick="setTypeFilter('google',this)">Google Ads</button>
+    </div>
+    <div class="filter-sep"></div>
+    <div class="filter-group" id="client-filters">
+      <span class="filter-label">Cliente:</span>
+      <button class="filter-btn active" data-filter-client="todos" onclick="setClientFilter('todos',this)">Todos</button>
+      <!-- Gerados automaticamente pelo JS -->
+    </div>
+  </div>
+
+  <div class="section-title">Dashboards <span class="count" id="dash-count">18</span></div>
+
+  <div class="grid" id="card-grid">
+
+    <!--
+    ╔══════════════════════════════════════════════════════════════╗
+    ║  COMO ADICIONAR UM NOVO DASHBOARD:                          ║
+    ║                                                              ║
+    ║  1. Copie um bloco <a class="card"> abaixo                  ║
+    ║  2. Cole antes do comentário "FIM DOS CARDS"                ║
+    ║  3. Altere:                                                  ║
+    ║     - href="./nome-da-pasta/"                                ║
+    ║     - data-type="perpetuo" (ou "formulario" ou "google")    ║
+    ║     - data-client="Nome do Cliente"                          ║
+    ║     - O emoji, título, nome do cliente e path               ║
+    ║  4. Salve, commit e push no GitHub Desktop                  ║
+    ╚══════════════════════════════════════════════════════════════╝
+    -->
+
+    <a class="card" href="./bruna/" data-type="perpetuo" data-client="Bruna Stacke">
+      <div class="card-top">
+        <span class="card-icon">📊</span>
+        <div class="card-tags"><span class="tag perpetuo">Perpétuo</span></div>
+      </div>
+      <div class="card-title">MPMB</div>
+      <div class="card-client">Bruna Stacke</div>
+      <div class="card-path">/bruna</div>
+    </a>
+
+    <a class="card" href="./elaine/" data-type="perpetuo" data-client="Elaine">
+      <div class="card-top">
+        <span class="card-icon">🔥</span>
+        <div class="card-tags"><span class="tag perpetuo">Perpétuo</span></div>
+      </div>
+      <div class="card-title">Desafio Corrimento Zero</div>
+      <div class="card-client">Elaine</div>
+      <div class="card-path">/elaine</div>
+    </a>
+
+    <a class="card" href="./cl38-flavia-google/" data-type="google" data-client="Flávia">
+      <div class="card-top">
+        <span class="card-icon">🔍</span>
+        <div class="card-tags"><span class="tag google">Google Ads</span></div>
+      </div>
+      <div class="card-title">Dashboard Google Ads</div>
+      <div class="card-client">Flávia</div>
+      <div class="card-path">/cl38-flavia-google</div>
+    </a>
+
+    <a class="card" href="./gabi-bergo-raiox/" data-type="perpetuo" data-client="Gabi Bergo">
+      <div class="card-top">
+        <span class="card-icon">🔮</span>
+        <div class="card-tags"><span class="tag perpetuo">Perpétuo</span></div>
+      </div>
+      <div class="card-title">Raio X Missão de Alma</div>
+      <div class="card-client">Gabi Bergo</div>
+      <div class="card-path">/gabi-bergo-raiox</div>
+    </a>
+
+    <a class="card" href="./Geize-tracos-revelados/" data-type="perpetuo" data-client="Geize">
+      <div class="card-top">
+        <span class="card-icon">✨</span>
+        <div class="card-tags"><span class="tag perpetuo">Perpétuo</span></div>
+      </div>
+      <div class="card-title">Traços Revelados</div>
+      <div class="card-client">Geize</div>
+      <div class="card-path">/Geize-tracos-revelados</div>
+    </a>
+
+    <a class="card" href="./geize-protocolo/" data-type="perpetuo" data-client="Geize">
+      <div class="card-top">
+        <span class="card-icon">💪</span>
+        <div class="card-tags"><span class="tag perpetuo">Perpétuo</span></div>
+      </div>
+      <div class="card-title">Protocolo de 12 Semanas</div>
+      <div class="card-client">Geize</div>
+      <div class="card-path">/geize-protocolo</div>
+    </a>
+
+    <a class="card" href="./geize-pack/" data-type="perpetuo" data-client="Geize">
+      <div class="card-top">
+        <span class="card-icon">📦</span>
+        <div class="card-tags"><span class="tag perpetuo">Perpétuo</span></div>
+      </div>
+      <div class="card-title">Pack</div>
+      <div class="card-client">Geize</div>
+      <div class="card-path">/geize-pack</div>
+    </a>
+
+    <a class="card" href="./geize-RTG/" data-type="perpetuo" data-client="Geize">
+      <div class="card-top">
+        <span class="card-icon">🎯</span>
+        <div class="card-tags"><span class="tag perpetuo">Perpétuo</span></div>
+      </div>
+      <div class="card-title">RTG</div>
+      <div class="card-client">Geize</div>
+      <div class="card-path">/geize-RTG</div>
+    </a>
+
+    <a class="card" href="./ju-gomes/" data-type="perpetuo" data-client="Ju Gomes">
+      <div class="card-top">
+        <span class="card-icon">📱</span>
+        <div class="card-tags"><span class="tag perpetuo">Perpétuo</span></div>
+      </div>
+      <div class="card-title">Conteúdos que Vendem</div>
+      <div class="card-client">Ju Gomes</div>
+      <div class="card-path">/ju-gomes</div>
+    </a>
+
+    <a class="card" href="./Ju-gomes-forms/" data-type="formulario" data-client="Ju Gomes">
+      <div class="card-top">
+        <span class="card-icon">📋</span>
+        <div class="card-tags"><span class="tag formulario">Formulário</span></div>
+      </div>
+      <div class="card-title">Captação Formulário</div>
+      <div class="card-client">Ju Gomes</div>
+      <div class="card-path">/Ju-gomes-forms</div>
+    </a>
+
+    <a class="card" href="./nathy/" data-type="perpetuo" data-client="Nathy">
+      <div class="card-top">
+        <span class="card-icon">👩‍👧</span>
+        <div class="card-tags"><span class="tag perpetuo">Perpétuo</span></div>
+      </div>
+      <div class="card-title">Mentoras Maternas</div>
+      <div class="card-client">Nathy</div>
+      <div class="card-path">/nathy</div>
+    </a>
+
+    <a class="card" href="./nathy-fotos-ia/" data-type="perpetuo" data-client="Nathy">
+      <div class="card-top">
+        <span class="card-icon">📸</span>
+        <div class="card-tags"><span class="tag perpetuo">Perpétuo</span></div>
+      </div>
+      <div class="card-title">Fotos IA</div>
+      <div class="card-client">Nathy</div>
+      <div class="card-path">/nathy-fotos-ia</div>
+    </a>
+
+    <a class="card" href="./nathy-imm/" data-type="perpetuo" data-client="Nathy">
+      <div class="card-top">
+        <span class="card-icon">🧠</span>
+        <div class="card-tags"><span class="tag perpetuo">Perpétuo</span></div>
+      </div>
+      <div class="card-title">IMM</div>
+      <div class="card-client">Nathy</div>
+      <div class="card-path">/nathy-imm</div>
+    </a>
+
+    <a class="card" href="./nathy-sm/" data-type="perpetuo" data-client="Nathy">
+      <div class="card-top">
+        <span class="card-icon">📖</span>
+        <div class="card-tags"><span class="tag perpetuo">Perpétuo</span></div>
+      </div>
+      <div class="card-title">Stories Maternos</div>
+      <div class="card-client">Nathy</div>
+      <div class="card-path">/nathy-sm</div>
+    </a>
+
+    <a class="card" href="./cl33-talita-100k/" data-type="perpetuo" data-client="Talita">
+      <div class="card-top">
+        <span class="card-icon">✅</span>
+        <div class="card-tags"><span class="tag perpetuo">Perpétuo</span></div>
+      </div>
+      <div class="card-title">Checklist 10k</div>
+      <div class="card-client">Talita Marques</div>
+      <div class="card-path">/cl33-talita-100k</div>
+    </a>
+
+    <a class="card" href="./talita-forms/" data-type="formulario" data-client="Talita">
+      <div class="card-top">
+        <span class="card-icon">📋</span>
+        <div class="card-tags"><span class="tag formulario">Formulário</span></div>
+      </div>
+      <div class="card-title">Captação Formulário</div>
+      <div class="card-client">Talita</div>
+      <div class="card-path">/talita-forms</div>
+    </a>
+
+    <a class="card" href="./tony-speed/" data-type="perpetuo" data-client="Tony Belleza">
+      <div class="card-top">
+        <span class="card-icon">⚡</span>
+        <div class="card-tags"><span class="tag perpetuo">Perpétuo</span></div>
+      </div>
+      <div class="card-title">Speed to Lead</div>
+      <div class="card-client">Tony Belleza</div>
+      <div class="card-path">/tony-speed</div>
+    </a>
+
+    <a class="card" href="./gabi-forms/" data-type="formulario" data-client="Gabi">
+      <div class="card-top">
+        <span class="card-icon">📋</span>
+        <div class="card-tags"><span class="tag formulario">Formulário</span></div>
+      </div>
+      <div class="card-title">Captação Formulário</div>
+      <div class="card-client">Gabi</div>
+      <div class="card-path">/gabi-forms</div>
+    </a>
+
+    <!-- ===== FIM DOS CARDS — cole novos cards ACIMA desta linha ===== -->
+
+  </div>
+
+  <div class="no-results" id="no-results">Nenhum dashboard encontrado.</div>
+
+</div>
+
+<div class="footer">Jamelli GT · Tráfego Pago · 2026</div>
+
+<script>
+// ===== ESTADO DOS FILTROS =====
+let activeType = 'todos';
+let activeClient = 'todos';
+
+// ===== GERAR BOTÕES DE CLIENTES AUTOMATICAMENTE =====
+function buildClientFilters() {
+  const cards = document.querySelectorAll('#card-grid .card');
+  const clients = new Set();
+  cards.forEach(c => {
+    const cl = c.getAttribute('data-client');
+    if (cl) clients.add(cl);
+  });
+  const sorted = [...clients].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const container = document.getElementById('client-filters');
+  // Manter o botão "Todos" que já existe
+  sorted.forEach(name => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn';
+    btn.setAttribute('data-filter-client', name);
+    btn.textContent = name;
+    btn.onclick = function() { setClientFilter(name, this); };
+    container.appendChild(btn);
+  });
+}
+
+// ===== FILTRO POR TIPO =====
+function setTypeFilter(type, btn) {
+  activeType = type;
+  document.querySelectorAll('[data-filter-type]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  applyFilters();
+}
+
+// ===== FILTRO POR CLIENTE =====
+function setClientFilter(client, btn) {
+  activeClient = client;
+  document.querySelectorAll('[data-filter-client]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  applyFilters();
+}
+
+// ===== APLICAR TODOS OS FILTROS =====
+function applyFilters() {
+  const q = document.getElementById('search').value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const cards = document.querySelectorAll('#card-grid .card');
+  let visible = 0;
+
+  cards.forEach(card => {
+    const type = card.getAttribute('data-type') || '';
+    const client = card.getAttribute('data-client') || '';
+    const text = (client + ' ' + card.textContent).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    const matchType = activeType === 'todos' || type === activeType;
+    const matchClient = activeClient === 'todos' || client === activeClient;
+    const matchSearch = !q || text.includes(q);
+
+    const show = matchType && matchClient && matchSearch;
+    card.classList.toggle('hidden', !show);
+    if (show) visible++;
+  });
+
+  document.getElementById('dash-count').textContent = visible;
+  document.getElementById('no-results').classList.toggle('visible', visible === 0);
+}
+
+// ===== INIT =====
+document.addEventListener('DOMContentLoaded', () => {
+  buildClientFilters();
+  applyFilters();
+});
+</script>
+</body>
+</html>

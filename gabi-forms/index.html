@@ -1,0 +1,2507 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CL08 - Dashboard Captação | Meta Ads Forms</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0d0d0d;
+            --bg-secondary: #1a1a1a;
+            --bg-card: #1e1e1e;
+            --bg-card-hover: #252525;
+            --orange: #ff6b00;
+            --orange-light: #ff8533;
+            --orange-dark: #d55a00;
+            --green: #00d68f;
+            --green-dark: #009e5d;
+            --red: #ff3d71;
+            --red-dark: #c4254a;
+            --yellow: #ffaa00;
+            --blue: #3366ff;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --text-muted: #666666;
+            --border: #2a2a2a;
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow-x: hidden;
+        }
+
+        html, body, #app {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Loading Screen */
+        #loadingScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-primary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            gap: 24px;
+        }
+
+        #loadingScreen.hidden {
+            display: none;
+        }
+
+        .logo-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo-text {
+            font-weight: 900;
+            font-size: 32px;
+            letter-spacing: 2px;
+            background: linear-gradient(135deg, var(--orange) 0%, var(--orange-light) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .logo-bar {
+            width: 200px;
+            height: 3px;
+            background: linear-gradient(90deg, var(--orange) 0%, var(--orange-light) 100%);
+            border-radius: 2px;
+        }
+
+        .logo-subtitle {
+            font-size: 11px;
+            font-weight: 400;
+            color: var(--text-secondary);
+            letter-spacing: 1px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255, 107, 0, 0.2);
+            border-top-color: var(--orange);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-status {
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        /* Error Screen */
+        #errorScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-primary);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            gap: 24px;
+            padding: 20px;
+        }
+
+        #errorScreen.show {
+            display: flex;
+        }
+
+        .error-box {
+            text-align: center;
+            max-width: 500px;
+        }
+
+        .error-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .error-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--red);
+            margin-bottom: 12px;
+        }
+
+        .error-message {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .error-instructions {
+            background: rgba(255, 107, 0, 0.1);
+            border: 1px solid var(--orange);
+            border-radius: 8px;
+            padding: 16px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-align: left;
+            line-height: 1.6;
+        }
+
+        /* Main Layout */
+        #app {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 32px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            flex: 1;
+        }
+
+        .header-logo {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 120px;
+        }
+
+        .header-logo-text {
+            font-weight: 900;
+            font-size: 18px;
+            letter-spacing: 1px;
+            color: var(--text-primary);
+        }
+
+        .header-logo-bar {
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, var(--orange) 0%, var(--orange-light) 100%);
+        }
+
+        .header-logo-subtitle {
+            font-size: 9px;
+            font-weight: 400;
+            color: var(--text-secondary);
+            letter-spacing: 0.5px;
+        }
+
+        .header-divider {
+            width: 1px;
+            height: 35px;
+            background: var(--border);
+        }
+
+        .header-client {
+            flex: 1;
+        }
+
+        .header-client-title {
+            font-size: 16px;
+            font-weight: 800;
+            color: var(--orange);
+            margin-bottom: 4px;
+        }
+
+        .header-client-subtitle {
+            font-size: 12px;
+            font-weight: 400;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .live-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            background: rgba(0, 214, 143, 0.1);
+            border: 1px solid rgba(0, 214, 143, 0.3);
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--green);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .live-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--green);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            min-width: 300px;
+            justify-content: flex-end;
+        }
+
+        .header-timestamp {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-align: right;
+            line-height: 1.4;
+        }
+
+        .btn-refresh {
+            padding: 8px 16px;
+            background: rgba(255, 107, 0, 0.15);
+            border: 1px solid var(--orange);
+            color: var(--orange);
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-refresh:hover {
+            background: rgba(255, 107, 0, 0.25);
+        }
+
+        .btn-refresh.loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        /* Filter Bar */
+        .filter-bar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .filter-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .filter-input {
+            padding: 8px 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            border-radius: 6px;
+            font-size: 12px;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .filter-input:focus {
+            outline: none;
+            border-color: var(--orange);
+            box-shadow: 0 0 0 2px rgba(255, 107, 0, 0.1);
+        }
+
+        .filter-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-filter {
+            padding: 8px 16px;
+            background: rgba(255, 107, 0, 0.15);
+            border: 1px solid var(--orange);
+            color: var(--orange);
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-filter:hover, .btn-filter.active {
+            background: var(--orange);
+            color: var(--text-primary);
+        }
+
+        .btn-clear {
+            padding: 8px 16px;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-clear:hover {
+            border-color: var(--orange);
+            color: var(--orange);
+        }
+
+        .filter-info {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-left: auto;
+        }
+
+        /* Tabs */
+        .tabs-nav {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 0 24px;
+            display: flex;
+            gap: 32px;
+            overflow-x: auto;
+        }
+
+        .tabs-nav::-webkit-scrollbar {
+            height: 3px;
+        }
+
+        .tabs-nav::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .tabs-nav::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 2px;
+        }
+
+        .tab-btn {
+            padding: 16px 0;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-bottom: 2px solid transparent;
+            white-space: nowrap;
+        }
+
+        .tab-btn:hover {
+            color: var(--orange);
+        }
+
+        .tab-btn.active {
+            color: var(--orange);
+            border-bottom-color: var(--orange);
+        }
+
+        /* Tab Content */
+        .tabs-content {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .tab-pane {
+            display: none;
+            padding: 24px;
+        }
+
+        .tab-pane.active {
+            display: block;
+        }
+
+        /* KPI Grid */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .kpi-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 18px;
+            transition: all 0.3s ease;
+        }
+
+        .kpi-card:hover {
+            border-color: var(--orange);
+            box-shadow: 0 0 0 2px rgba(255, 107, 0, 0.1);
+        }
+
+        .kpi-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+            display: block;
+        }
+
+        .kpi-value {
+            font-size: 26px;
+            font-weight: 800;
+            color: var(--text-primary);
+            line-height: 1.2;
+            word-break: break-word;
+        }
+
+        .kpi-subtitle {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-top: 8px;
+        }
+
+        /* Section Title */
+        .section-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 20px;
+            padding-left: 12px;
+            border-left: 4px solid var(--orange);
+        }
+
+        /* Funnel Container */
+        .funnel-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .funnel-visual {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .funnel-bar-item {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .funnel-bar-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .funnel-bar {
+            height: 32px;
+            background: linear-gradient(90deg, rgba(255,107,0,0.3) 0%, rgba(255,107,0,0.1) 100%);
+            border-radius: 6px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .funnel-bar.impressoes {
+            background: linear-gradient(90deg, var(--orange) 0%, var(--orange-light) 100%);
+        }
+
+        .funnel-bar.cliques {
+            background: linear-gradient(90deg, var(--orange-dark) 0%, var(--orange) 100%);
+        }
+
+        .funnel-bar.leads {
+            background: linear-gradient(90deg, var(--orange-dark) 0%, var(--orange-dark) 100%);
+        }
+
+        .funnel-bar.qualificados {
+            background: linear-gradient(90deg, var(--green-dark) 0%, var(--green) 100%);
+        }
+
+        .funnel-rate-arrow {
+            font-size: 12px;
+            color: var(--yellow);
+            margin-top: 4px;
+            text-align: right;
+        }
+
+        .funnel-analysis {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .funnel-step {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .funnel-step-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .step-number {
+            width: 32px;
+            height: 32px;
+            background: var(--orange);
+            color: var(--text-primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .funnel-step-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .funnel-step-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            font-size: 12px;
+        }
+
+        .funnel-metric {
+            background: rgba(255, 107, 0, 0.05);
+            padding: 8px;
+            border-radius: 6px;
+        }
+
+        .funnel-metric-label {
+            color: var(--text-muted);
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .funnel-metric-value {
+            color: var(--text-primary);
+            font-weight: 600;
+            font-size: 13px;
+            margin-top: 4px;
+        }
+
+        .biggest-loss {
+            background: rgba(255, 61, 113, 0.1);
+            border: 1px solid rgba(255, 61, 113, 0.3);
+        }
+
+        .loss-badge {
+            display: inline-block;
+            background: var(--red);
+            color: var(--text-primary);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Charts Grid */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .chart-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            position: relative;
+            min-height: 300px;
+        }
+
+        .chart-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 16px;
+        }
+
+        .chart-canvas {
+            width: 100% !important;
+            height: auto !important;
+            max-height: 250px;
+        }
+
+        /* Tables */
+        .table-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+
+        .table-scroll {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        thead {
+            background: rgba(255, 107, 0, 0.1);
+        }
+
+        th {
+            padding: 12px;
+            text-align: left;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+            transition: all 0.3s ease;
+        }
+
+        th:hover {
+            color: var(--orange);
+            background: rgba(255, 107, 0, 0.15);
+        }
+
+        th.sortable::after {
+            content: ' ⇅';
+            font-size: 10px;
+            opacity: 0.5;
+        }
+
+        th.asc::after {
+            content: ' ▲';
+            opacity: 1;
+            color: var(--green);
+        }
+
+        th.desc::after {
+            content: ' ▼';
+            opacity: 1;
+            color: var(--red);
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            color: var(--text-secondary);
+        }
+
+        tbody tr {
+            transition: all 0.2s ease;
+        }
+
+        tbody tr:hover {
+            background: rgba(255, 107, 0, 0.05);
+        }
+
+        tbody tr.opacity-5 {
+            opacity: 0.5;
+        }
+
+        tbody tr.opacity-35 {
+            opacity: 0.35;
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .badge-active {
+            background: rgba(0, 214, 143, 0.2);
+            color: var(--green);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            width: fit-content;
+        }
+
+        .badge-active::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            background: var(--green);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .badge-inactive {
+            background: rgba(102, 102, 102, 0.2);
+            color: var(--text-muted);
+        }
+
+        .badge-green {
+            background: rgba(0, 214, 143, 0.15);
+            color: var(--green);
+        }
+
+        .badge-yellow {
+            background: rgba(255, 170, 0, 0.15);
+            color: var(--yellow);
+        }
+
+        .badge-orange {
+            background: rgba(255, 107, 0, 0.15);
+            color: var(--orange);
+        }
+
+        .badge-red {
+            background: rgba(255, 61, 113, 0.15);
+            color: var(--red);
+        }
+
+        /* Rate Bars */
+        .rate-bar {
+            display: inline-flex;
+            height: 8px;
+            background: var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+            gap: 1px;
+            width: 60px;
+        }
+
+        .rate-segment {
+            flex: 1;
+            background: var(--orange);
+            border-radius: 2px;
+        }
+
+        .rate-segment.blue {
+            background: var(--blue);
+        }
+
+        /* Insights */
+        .insights-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .insights-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 16px;
+        }
+
+        .insight-item {
+            padding: 12px;
+            background: rgba(255, 107, 0, 0.05);
+            border: 1px solid rgba(255, 107, 0, 0.2);
+            border-radius: 8px;
+            margin-bottom: 12px;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .insight-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .insight-label {
+            color: var(--text-muted);
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .insight-value {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        /* Links */
+        a.table-link {
+            color: var(--blue);
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+
+        a.table-link:hover {
+            color: var(--orange);
+            text-decoration: underline;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .funnel-container {
+                grid-template-columns: 1fr;
+            }
+
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .kpi-grid {
+                grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            }
+
+            .header {
+                flex-wrap: wrap;
+                gap: 16px;
+            }
+
+            .header-left {
+                width: 100%;
+            }
+
+            .header-right {
+                width: 100%;
+                min-width: unset;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .kpi-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .kpi-value {
+                font-size: 18px;
+            }
+
+            .filter-bar {
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .filter-info {
+                margin-left: 0;
+                width: 100%;
+            }
+
+            .table-scroll {
+                font-size: 11px;
+            }
+
+            th, td {
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="loadingScreen">
+        <div class="logo-section">
+            <div class="logo-text">JAMELLI</div>
+            <div class="logo-bar"></div>
+            <div class="logo-subtitle">Gestão de Tráfego</div>
+        </div>
+        <div class="spinner"></div>
+        <div class="loading-status">Carregando dados...</div>
+    </div>
+
+    <div id="errorScreen">
+        <div class="error-box">
+            <div class="error-icon">⚠️</div>
+            <div class="error-title">Erro ao carregar dados</div>
+            <div class="error-message">Não conseguimos acessar os dados da planilha. Verifique se a planilha está compartilhada publicamente.</div>
+            <div class="error-instructions">
+                <strong>Para resolver:</strong><br>
+                1. Abra a planilha Google Sheets<br>
+                2. Clique em "Compartilhar" (canto superior direito)<br>
+                3. Altere para "Qualquer pessoa com o link pode visualizar"<br>
+                4. Recarregue esta página
+            </div>
+        </div>
+    </div>
+
+    <div id="app">
+        <div class="header">
+            <div class="header-left">
+                <div class="header-logo">
+                    <div class="header-logo-text">JAMELLI</div>
+                    <div class="header-logo-bar"></div>
+                    <div class="header-logo-subtitle">Gestão de Tráfego</div>
+                </div>
+                <div class="header-divider"></div>
+                <div class="header-client">
+                    <div class="header-client-title">CL08 - DASHBOARD CAPTAÇÃO</div>
+                    <div class="header-client-subtitle">
+                        Meta Ads | Campanhas de Formulário |
+                        <span class="live-badge">
+                            <span class="live-dot"></span>
+                            Dados ao Vivo
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="header-timestamp">
+                    <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Última atualização</div>
+                    <div id="lastUpdateTime">--:--:--</div>
+                </div>
+                <button class="btn-refresh" id="refreshBtn">Atualizar Dados</button>
+            </div>
+        </div>
+
+        <div class="filter-bar">
+            <div class="filter-group">
+                <label class="filter-label">Data inicial:</label>
+                <input type="date" id="filterStartDate" class="filter-input">
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">Data final:</label>
+                <input type="date" id="filterEndDate" class="filter-input">
+            </div>
+            <div class="filter-buttons">
+                <button class="btn-filter" data-days="7">7D</button>
+                <button class="btn-filter" data-days="14">14D</button>
+                <button class="btn-filter" data-days="30">30D</button>
+                <button class="btn-filter" id="filterBtn">Filtrar</button>
+                <button class="btn-clear" id="clearFilterBtn">Limpar</button>
+            </div>
+            <div class="filter-info" id="filterInfo">Carregando...</div>
+        </div>
+
+        <div class="tabs-nav">
+            <button class="tab-btn active" data-tab="0">Visão Geral</button>
+            <button class="tab-btn" data-tab="1">Criativos</button>
+            <button class="tab-btn" data-tab="2">Públicos</button>
+            <button class="tab-btn" data-tab="3">Análise Semanal</button>
+            <button class="tab-btn" data-tab="4">Comparativo Mensal</button>
+        </div>
+
+        <div class="tabs-content">
+            <!-- TAB 0: VISÃO GERAL -->
+            <div class="tab-pane active" data-tab="0">
+                <div id="tab0Content"></div>
+            </div>
+
+            <!-- TAB 1: CRIATIVOS -->
+            <div class="tab-pane" data-tab="1">
+                <div id="tab1Content"></div>
+            </div>
+
+            <!-- TAB 2: PÚBLICOS -->
+            <div class="tab-pane" data-tab="2">
+                <div id="tab2Content"></div>
+            </div>
+
+            <!-- TAB 3: ANÁLISE SEMANAL -->
+            <div class="tab-pane" data-tab="3">
+                <div id="tab3Content"></div>
+            </div>
+
+            <!-- TAB 4: COMPARATIVO MENSAL -->
+            <div class="tab-pane" data-tab="4">
+                <div id="tab4Content"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // CONFIG
+        const CONFIG = {
+            sheetId: '1_LLqeiheO4cYty7BQ_Jx7Ia0hzaTmSBqahq2edjrYSI',
+            capSheet: 'Gerenciador',
+            formsSheet: 'Forms',
+            qualThreshold: 7000,
+            forceInactive: [],
+        };
+
+        // STATE
+        let GLOBAL_DATA = {
+            capRaw: [],
+            formsRaw: [],
+            capProcessed: [],
+            formsProcessed: [],
+            filtered: [],
+            lastDataDay: null,
+            filterStart: null,
+            filterEnd: null,
+        };
+
+        let FORMS_QUAL = {}; // ad_name -> qualified count
+
+        let CHARTS = {}; // Store chart instances for cleanup
+
+        // Utility Functions
+        function findCol(row, keywords) {
+            const keys = Object.keys(row);
+            for (const kw of keywords) {
+                const found = keys.find(k => k.toLowerCase().includes(kw.toLowerCase()));
+                if (found) return found;
+            }
+            return null;
+        }
+
+        function parseMoney(str) {
+            if (!str || typeof str !== 'string') return 0;
+            const num = parseFloat(str.replace(/\./g, '').replace(',', '.'));
+            return isNaN(num) ? 0 : num;
+        }
+
+        function formatMoney(num) {
+            return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(num);
+        }
+
+        function formatPercent(num) {
+            return (num * 100).toFixed(1) + '%';
+        }
+
+        function parseDate(str) {
+            if (!str) return null;
+            const date = new Date(str);
+            return isNaN(date) ? null : date;
+        }
+
+        function formatDate(date) {
+            if (!date) return '--';
+            return date.toLocaleDateString('pt-BR');
+        }
+
+        function parseFaturamento(str) {
+            if (!str) return 0;
+            str = String(str).toLowerCase().replace(/_/g, ' ');
+            const nums = str.match(/[\d.,]+/g);
+            if (!nums) return 0;
+            let num = parseFloat(nums[0].replace(/\./g, '').replace(',', '.'));
+            return isNaN(num) ? 0 : num;
+        }
+
+        // Fetch CSV from Google Sheets
+        async function fetchCSV(sheetName) {
+            const url = `https://docs.google.com/spreadsheets/d/${CONFIG.sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+            try {
+                const resp = await fetch(url);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const text = await resp.text();
+                const result = Papa.parse(text, { header: true, skipEmptyLines: true });
+                if (result.errors && result.errors.length > 0) {
+                    throw new Error('CSV parse error');
+                }
+                return result.data;
+            } catch (e) {
+                console.error(`Error fetching ${sheetName}:`, e);
+                throw e;
+            }
+        }
+
+        // Load data
+        async function loadData() {
+            try {
+                document.getElementById('loadingScreen').classList.remove('hidden');
+                document.getElementById('errorScreen').classList.remove('show');
+
+                GLOBAL_DATA.capRaw = await fetchCSV(CONFIG.capSheet);
+                GLOBAL_DATA.formsRaw = await fetchCSV(CONFIG.formsSheet);
+
+                processCapData();
+                processFormsData();
+                calculateQualifications();
+
+                // Set filter defaults
+                const dates = GLOBAL_DATA.capProcessed.map(r => r.date).filter(d => d).sort();
+                if (dates.length > 0) {
+                    GLOBAL_DATA.lastDataDay = dates[dates.length - 1];
+                    GLOBAL_DATA.filterStart = dates[0];
+                    GLOBAL_DATA.filterEnd = GLOBAL_DATA.lastDataDay;
+                    document.getElementById('filterStartDate').value = formatDateISO(dates[0]);
+                    document.getElementById('filterEndDate').value = formatDateISO(GLOBAL_DATA.lastDataDay);
+                } else {
+                    GLOBAL_DATA.filterStart = new Date();
+                    GLOBAL_DATA.filterEnd = new Date();
+                }
+
+                applyFilter();
+                updateUI();
+
+                document.getElementById('loadingScreen').classList.add('hidden');
+            } catch (e) {
+                console.error('Load error:', e);
+                document.getElementById('loadingScreen').classList.add('hidden');
+                document.getElementById('errorScreen').classList.add('show');
+            }
+        }
+
+        function formatDateISO(date) {
+            if (typeof date === 'string') date = new Date(date);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function processCapData() {
+            GLOBAL_DATA.capProcessed = GLOBAL_DATA.capRaw.map(row => {
+                const dateCol = findCol(row, ['date', 'data']);
+                const campaignCol = findCol(row, ['campaign name', 'campanha']);
+                const adsetCol = findCol(row, ['adset name', 'conjunto']);
+                const adCol = findCol(row, ['ad name', 'criativo']);
+                const urlCol = findCol(row, ['instagram permalink', 'url', 'link']);
+                const spendCol = findCol(row, ['spend', 'cost', 'investimento']);
+                const reachCol = findCol(row, ['reach', 'alcance']);
+                const impCol = findCol(row, ['impressions', 'impressões']);
+                const clickCol = findCol(row, ['action link clicks', 'cliques']);
+                const lpvCol = findCol(row, ['action landing page view', 'visualizações']);
+                const leadsCol = findCol(row, ['action leads', 'leads']);
+                const video3sCol = findCol(row, ['action 3s video views', '3s']);
+                const video95Col = findCol(row, ['video 95 percent watched', '95%']);
+
+                return {
+                    date: parseDate(row[dateCol]),
+                    campaign: row[campaignCol] || '',
+                    adset: row[adsetCol] || '',
+                    ad: row[adCol] || '',
+                    url: row[urlCol] || '',
+                    spend: parseMoney(row[spendCol]),
+                    reach: parseInt(row[reachCol]) || 0,
+                    impressions: parseInt(row[impCol]) || 0,
+                    clicks: parseInt(row[clickCol]) || 0,
+                    lpv: parseInt(row[lpvCol]) || 0,
+                    leads: parseInt(row[leadsCol]) || 0,
+                    video3s: parseInt(row[video3sCol]) || 0,
+                    video95: parseInt(row[video95Col]) || 0,
+                };
+            }).filter(r => r.campaign);
+        }
+
+        function processFormsData() {
+            GLOBAL_DATA.formsProcessed = GLOBAL_DATA.formsRaw.map(row => {
+                const faturamentoCol = findCol(row, ['média', 'faturamento', 'media']);
+                return {
+                    ad_name: row.ad_name || '',
+                    faturamento: parseFaturamento(row[faturamentoCol]),
+                };
+            });
+        }
+
+        function calculateQualifications() {
+            FORMS_QUAL = {};
+            GLOBAL_DATA.formsProcessed.forEach(form => {
+                if (form.faturamento >= CONFIG.qualThreshold) {
+                    FORMS_QUAL[form.ad_name] = (FORMS_QUAL[form.ad_name] || 0) + 1;
+                }
+            });
+        }
+
+        function applyFilter() {
+            const start = document.getElementById('filterStartDate').valueAsDate;
+            const end = document.getElementById('filterEndDate').valueAsDate;
+
+            GLOBAL_DATA.filtered = GLOBAL_DATA.capProcessed.filter(row => {
+                if (!row.date) return false;
+                return row.date >= start && row.date <= end;
+            });
+
+            const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+            document.getElementById('filterInfo').innerText = `${days} dias selecionados`;
+        }
+
+        function updateUI() {
+            updateTimestamp();
+            renderTab(0);
+        }
+
+        function updateTimestamp() {
+            const now = new Date();
+            const h = String(now.getHours()).padStart(2, '0');
+            const m = String(now.getMinutes()).padStart(2, '0');
+            const s = String(now.getSeconds()).padStart(2, '0');
+            document.getElementById('lastUpdateTime').innerText = `${h}:${m}:${s}`;
+        }
+
+        // Tab Navigation
+        function switchTab(idx) {
+            document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+                btn.classList.toggle('active', i === idx);
+            });
+            document.querySelectorAll('.tab-pane').forEach((pane, i) => {
+                pane.classList.toggle('active', i === idx);
+            });
+            renderTab(idx);
+        }
+
+        function renderTab(idx) {
+            if (idx === 0) renderTab0();
+            else if (idx === 1) renderTab1();
+            else if (idx === 2) renderTab2();
+            else if (idx === 3) renderTab3();
+            else if (idx === 4) renderTab4();
+        }
+
+        // TAB 0: VISÃO GERAL
+        function renderTab0() {
+            const data = GLOBAL_DATA.filtered;
+            const container = document.getElementById('tab0Content');
+
+            // Aggregates
+            const totalSpend = data.reduce((s, r) => s + r.spend, 0);
+            const totalLeads = data.reduce((s, r) => s + r.leads, 0);
+            const totalImpressions = data.reduce((s, r) => s + r.impressions, 0);
+            const totalClicks = data.reduce((s, r) => s + r.clicks, 0);
+            const totalVideo3s = data.reduce((s, r) => s + r.video3s, 0);
+            const totalVideo95 = data.reduce((s, r) => s + r.video95, 0);
+
+            // Calculate qualified leads
+            let totalQual = 0;
+            data.forEach(row => {
+                totalQual += FORMS_QUAL[row.ad] || 0;
+            });
+
+            const qualRate = totalLeads > 0 ? totalQual / totalLeads : 0;
+            const cpl = totalLeads > 0 ? totalSpend / totalLeads : 0;
+            const cplQual = totalQual > 0 ? totalSpend / totalQual : 0;
+            const ctr = totalImpressions > 0 ? totalClicks / totalImpressions : 0;
+            const cpc = totalClicks > 0 ? totalSpend / totalClicks : 0;
+            const cpm = totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : 0;
+
+            let html = `
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <span class="kpi-label">Investimento Total</span>
+                        <div class="kpi-value">${formatMoney(totalSpend)}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <span class="kpi-label">Total de Leads</span>
+                        <div class="kpi-value">${totalLeads.toLocaleString('pt-BR')}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <span class="kpi-label">Leads Qualificados</span>
+                        <div class="kpi-value">${totalQual}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <span class="kpi-label">Taxa de Qualificação</span>
+                        <div class="kpi-value">${formatPercent(qualRate)}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <span class="kpi-label">CPL Médio</span>
+                        <div class="kpi-value">${formatMoney(cpl)}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <span class="kpi-label">CPL Qualificado</span>
+                        <div class="kpi-value">${formatMoney(cplQual)}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <span class="kpi-label">Total de Cliques</span>
+                        <div class="kpi-value">${totalClicks.toLocaleString('pt-BR')}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <span class="kpi-label">CTR Médio</span>
+                        <div class="kpi-value">${formatPercent(ctr)}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <span class="kpi-label">CPC Médio</span>
+                        <div class="kpi-value">${formatMoney(cpc)}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <span class="kpi-label">CPM Médio</span>
+                        <div class="kpi-value">${formatMoney(cpm)}</div>
+                    </div>
+                </div>
+            `;
+
+            // Funnel
+            const ctrimpr = totalImpressions > 0 ? totalClicks / totalImpressions : 0;
+            const convrate = totalClicks > 0 ? totalLeads / totalClicks : 0;
+            const qualrate = totalLeads > 0 ? totalQual / totalLeads : 0;
+
+            let funnelLoss = 'Cliques';
+            let funnelLossVal = 1 - ctrimpr;
+            if (convrate < ctrimpr) { funnelLoss = 'Leads'; funnelLossVal = 1 - convrate; }
+            if (qualrate < convrate) { funnelLoss = 'Qualificados'; funnelLossVal = 1 - qualrate; }
+
+            html += `
+                <div class="funnel-container">
+                    <div class="funnel-visual">
+                        <div class="funnel-bar-item">
+                            <div class="funnel-bar-label">
+                                <span>Impressões</span>
+                                <span>${totalImpressions.toLocaleString('pt-BR')}</span>
+                            </div>
+                            <div class="funnel-bar impressoes" style="width: 100%"></div>
+                        </div>
+                        <div class="funnel-rate-arrow">↓ ${formatPercent(ctrimpr)} CTR</div>
+
+                        <div class="funnel-bar-item">
+                            <div class="funnel-bar-label">
+                                <span>Cliques</span>
+                                <span>${totalClicks.toLocaleString('pt-BR')}</span>
+                            </div>
+                            <div class="funnel-bar cliques" style="width: ${ctrimpr * 100}%"></div>
+                        </div>
+                        <div class="funnel-rate-arrow">↓ ${formatPercent(convrate)} Conv. Rate</div>
+
+                        <div class="funnel-bar-item">
+                            <div class="funnel-bar-label">
+                                <span>Leads</span>
+                                <span>${totalLeads.toLocaleString('pt-BR')}</span>
+                            </div>
+                            <div class="funnel-bar leads" style="width: ${ctrimpr * convrate * 100}%"></div>
+                        </div>
+                        <div class="funnel-rate-arrow">↓ ${formatPercent(qualrate)} Taxa Qualif.</div>
+
+                        <div class="funnel-bar-item">
+                            <div class="funnel-bar-label">
+                                <span>Qualificados</span>
+                                <span>${totalQual}</span>
+                            </div>
+                            <div class="funnel-bar qualificados" style="width: ${ctrimpr * convrate * qualrate * 100}%"></div>
+                        </div>
+                    </div>
+
+                    <div class="funnel-analysis">
+                        <div class="funnel-step">
+                            <div class="funnel-step-header">
+                                <div class="step-number">1</div>
+                                <div class="funnel-step-title">Impressões → Cliques</div>
+                            </div>
+                            <div class="funnel-step-content">
+                                <div class="funnel-metric">
+                                    <div class="funnel-metric-label">CTR</div>
+                                    <div class="funnel-metric-value">${formatPercent(ctrimpr)}</div>
+                                </div>
+                                <div class="funnel-metric">
+                                    <div class="funnel-metric-label">CPC</div>
+                                    <div class="funnel-metric-value">${formatMoney(cpc)}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="funnel-step">
+                            <div class="funnel-step-header">
+                                <div class="step-number">2</div>
+                                <div class="funnel-step-title">Cliques → Leads</div>
+                            </div>
+                            <div class="funnel-step-content">
+                                <div class="funnel-metric">
+                                    <div class="funnel-metric-label">Conv. Rate</div>
+                                    <div class="funnel-metric-value">${formatPercent(convrate)}</div>
+                                </div>
+                                <div class="funnel-metric">
+                                    <div class="funnel-metric-label">CPL</div>
+                                    <div class="funnel-metric-value">${formatMoney(cpl)}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="funnel-step ${funnelLoss === 'Qualificados' ? 'biggest-loss' : ''}">
+                            <div class="funnel-step-header">
+                                <div class="step-number">3</div>
+                                <div class="funnel-step-title">Leads → Qualificados</div>
+                            </div>
+                            <div class="funnel-step-content">
+                                <div class="funnel-metric">
+                                    <div class="funnel-metric-label">Taxa Qualif.</div>
+                                    <div class="funnel-metric-value">${formatPercent(qualrate)}</div>
+                                </div>
+                                <div class="funnel-metric">
+                                    <div class="funnel-metric-label">CPL Qual.</div>
+                                    <div class="funnel-metric-value">${formatMoney(cplQual)}</div>
+                                </div>
+                            </div>
+                            ${funnelLoss === 'Qualificados' ? '<div class="loss-badge" style="display: block; width: 100%; text-align: center; margin-top: 8px;">Maior Perda</div>' : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Charts
+            html += `<div class="charts-grid"><div class="chart-container"><div class="chart-title">Evolução Diária do CPL</div><canvas id="chart-cpl-daily" class="chart-canvas"></canvas></div><div class="chart-container"><div class="chart-title">Investimento e Leads por Dia</div><canvas id="chart-invest-leads" class="chart-canvas"></canvas></div></div>`;
+
+            container.innerHTML = html;
+
+            renderChartDailyCPL();
+            renderChartInvestLeads();
+        }
+
+        function renderChartDailyCPL() {
+            const data = GLOBAL_DATA.filtered;
+            const byDate = {};
+            data.forEach(row => {
+                const dateKey = formatDateISO(row.date);
+                if (!byDate[dateKey]) byDate[dateKey] = { spend: 0, leads: 0 };
+                byDate[dateKey].spend += row.spend;
+                byDate[dateKey].leads += row.leads;
+            });
+
+            const dates = Object.keys(byDate).sort();
+            const cpls = dates.map(d => byDate[d].leads > 0 ? byDate[d].spend / byDate[d].leads : 0);
+            const avgCPL = cpls.length > 0 ? cpls.reduce((a, b) => a + b, 0) / cpls.length : 0;
+
+            const colors = cpls.map(cpl => {
+                if (cpl <= 20) return 'rgba(0, 214, 143, 0.8)';
+                if (cpl <= 30) return 'rgba(255, 170, 0, 0.8)';
+                return 'rgba(255, 61, 113, 0.8)';
+            });
+
+            if (CHARTS['cpl-daily']) CHARTS['cpl-daily'].destroy();
+
+            const ctx = document.getElementById('chart-cpl-daily').getContext('2d');
+            CHARTS['cpl-daily'] = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates.map(d => new Date(d).toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit' })),
+                    datasets: [
+                        {
+                            label: 'CPL',
+                            data: cpls,
+                            borderColor: 'rgba(255, 107, 0, 0.8)',
+                            backgroundColor: 'rgba(255, 107, 0, 0.1)',
+                            pointBackgroundColor: colors,
+                            pointRadius: 5,
+                            pointHoverRadius: 7,
+                            tension: 0.3,
+                            fill: false,
+                            borderWidth: 2,
+                        },
+                        {
+                            label: 'CPL Médio',
+                            data: Array(dates.length).fill(avgCPL),
+                            borderColor: 'rgba(255, 107, 0, 0.3)',
+                            borderDash: [5, 5],
+                            pointRadius: 0,
+                            fill: false,
+                            borderWidth: 1,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: true, labels: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 11 } } }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 10 } }
+                        },
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 10 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderChartInvestLeads() {
+            const data = GLOBAL_DATA.filtered;
+            const byDate = {};
+            data.forEach(row => {
+                const dateKey = formatDateISO(row.date);
+                if (!byDate[dateKey]) byDate[dateKey] = { spend: 0, leads: 0 };
+                byDate[dateKey].spend += row.spend;
+                byDate[dateKey].leads += row.leads;
+            });
+
+            const dates = Object.keys(byDate).sort();
+            const spends = dates.map(d => byDate[d].spend);
+            const leads = dates.map(d => byDate[d].leads);
+
+            if (CHARTS['invest-leads']) CHARTS['invest-leads'].destroy();
+
+            const ctx = document.getElementById('chart-invest-leads').getContext('2d');
+            CHARTS['invest-leads'] = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: dates.map(d => new Date(d).toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit' })),
+                    datasets: [
+                        {
+                            label: 'Investimento (R$)',
+                            data: spends,
+                            backgroundColor: 'rgba(255, 107, 0, 0.6)',
+                            borderColor: 'rgba(255, 107, 0, 1)',
+                            borderWidth: 1,
+                            yAxisID: 'y',
+                        },
+                        {
+                            label: 'Leads',
+                            data: leads,
+                            borderColor: 'rgba(0, 214, 143, 0.8)',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            type: 'line',
+                            yAxisID: 'y1',
+                            pointBackgroundColor: 'rgba(0, 214, 143, 0.8)',
+                            pointRadius: 4,
+                            tension: 0.3,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: true, labels: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 11 } } }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            position: 'left',
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 10 } }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            beginAtZero: true,
+                            grid: { drawOnChartArea: false },
+                            ticks: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 10 } }
+                        },
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 10 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // TAB 1: CRIATIVOS
+        function renderTab1() {
+            const data = GLOBAL_DATA.filtered;
+            const byAd = {};
+            data.forEach(row => {
+                if (!byAd[row.ad]) {
+                    byAd[row.ad] = {
+                        ad: row.ad,
+                        spend: 0,
+                        leads: 0,
+                        clicks: 0,
+                        impressions: 0,
+                        video3s: 0,
+                        video95: 0,
+                        lastDate: row.date,
+                    };
+                }
+                byAd[row.ad].spend += row.spend;
+                byAd[row.ad].leads += row.leads;
+                byAd[row.ad].clicks += row.clicks;
+                byAd[row.ad].impressions += row.impressions;
+                byAd[row.ad].video3s += row.video3s;
+                byAd[row.ad].video95 += row.video95;
+                if (row.date > byAd[row.ad].lastDate) byAd[row.ad].lastDate = row.date;
+            });
+
+            const ads = Object.values(byAd)
+                .map(ad => ({
+                    ...ad,
+                    qual: FORMS_QUAL[ad.ad] || 0,
+                    cpl: ad.leads > 0 ? ad.spend / ad.leads : 0,
+                    cplQual: (FORMS_QUAL[ad.ad] || 0) > 0 ? ad.spend / (FORMS_QUAL[ad.ad] || 1) : 0,
+                    cpc: ad.clicks > 0 ? ad.spend / ad.clicks : 0,
+                    ctr: ad.impressions > 0 ? ad.clicks / ad.impressions : 0,
+                    hookRate: ad.impressions > 0 ? ad.video3s / ad.impressions : 0,
+                    holdRate: ad.video3s > 0 ? ad.video95 / ad.video3s : 0,
+                }))
+                .sort((a, b) => a.cplQual - b.cplQual);
+
+            const container = document.getElementById('tab1Content');
+            let html = `
+                <div style="margin-bottom: 16px;">
+                    <span class="section-title">Ordenar por:</span>
+                </div>
+                <div class="table-container">
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th class="sortable" data-field="index">#</th>
+                                    <th class="sortable" data-field="active">Ativo</th>
+                                    <th class="sortable" data-field="ad">Criativo</th>
+                                    <th class="sortable" data-field="spend">Invest.</th>
+                                    <th class="sortable" data-field="leads">Leads</th>
+                                    <th class="sortable" data-field="qual">Qual.</th>
+                                    <th class="sortable" data-field="qualPct">% Qual.</th>
+                                    <th class="sortable" data-field="cpc">CPC</th>
+                                    <th class="sortable" data-field="cpl">CPL</th>
+                                    <th class="sortable" data-field="cplQual">CPL Qual.</th>
+                                    <th class="sortable" data-field="ctr">CTR</th>
+                                    <th class="sortable" data-field="hookRate">Hook Rate</th>
+                                    <th class="sortable" data-field="holdRate">Hold Rate</th>
+                                    <th class="sortable" data-field="status">Status</th>
+                                    <th>Link</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+            `;
+
+            ads.forEach((ad, idx) => {
+                const isActive = ad.lastDate === GLOBAL_DATA.lastDataDay;
+                const qualPct = ad.leads > 0 ? ad.qual / ad.leads : 0;
+                let status = 'PAUSAR';
+                let statusBadge = 'badge-red';
+                if (ad.qual > 0 && ad.cplQual <= 80) { status = 'ESCALAR'; statusBadge = 'badge-green'; }
+                else if (ad.qual > 0 && ad.cplQual <= 110) { status = 'TESTAR'; statusBadge = 'badge-yellow'; }
+                else if ((ad.qual > 0 && ad.cplQual > 110) || (ad.leads >= 3 && ad.cpl <= 25)) { status = 'MONITORAR'; statusBadge = 'badge-orange'; }
+
+                const rowOpacity = ad.qual === 0 ? 'opacity-35' : (ad.leads === 0 ? 'opacity-5' : '');
+
+                html += `
+                    <tr class="${rowOpacity}">
+                        <td>${idx + 1}</td>
+                        <td><span class="badge ${isActive ? 'badge-active' : 'badge-inactive'}">${isActive ? 'Ativo' : 'Inativo'}</span></td>
+                        <td>${ad.ad}</td>
+                        <td>${formatMoney(ad.spend)}</td>
+                        <td>${ad.leads}</td>
+                        <td>${ad.qual}</td>
+                        <td>${formatPercent(qualPct)}</td>
+                        <td>${formatMoney(ad.cpc)}</td>
+                        <td>${formatMoney(ad.cpl)}</td>
+                        <td>${formatMoney(ad.cplQual)}</td>
+                        <td>${formatPercent(ad.ctr)}</td>
+                        <td>
+                            <span class="rate-bar">
+                                <span class="rate-segment" style="flex: ${ad.hookRate * 100}; background: var(--orange);" title="${formatPercent(ad.hookRate)}"></span>
+                            </span>
+                            ${formatPercent(ad.hookRate)}
+                        </td>
+                        <td>
+                            <span class="rate-bar">
+                                <span class="rate-segment blue" style="flex: ${ad.holdRate * 100}; background: var(--blue);" title="${formatPercent(ad.holdRate)}"></span>
+                            </span>
+                            ${formatPercent(ad.holdRate)}
+                        </td>
+                        <td><span class="badge ${statusBadge}">${status}</span></td>
+                        <td><a href="${ad.ad}" target="_blank" class="table-link">Ver</a></td>
+                    </tr>
+                `;
+            });
+
+            html += `</tbody></table></div></div>`;
+
+            // Hook vs Hold Chart
+            const topVideos = ads.filter(a => a.video3s > 0).sort((a, b) => b.video3s - a.video3s).slice(0, 10);
+            html += `<div style="margin-top: 24px;"><h3 class="section-title">Hook Rate vs Hold Rate (Top 10 Vídeos)</h3><div class="chart-container"><canvas id="chart-hook-hold" class="chart-canvas"></canvas></div></div>`;
+
+            // Insights
+            const top3 = ads.slice(0, 3);
+            html += `<div class="insights-container"><div class="insights-title">Insights</div>`;
+            top3.forEach((ad, i) => {
+                html += `<div class="insight-item"><div class="insight-label">Top ${i + 1} - ${ad.ad}</div><div class="insight-value">CPL Qual: ${formatMoney(ad.cplQual)} | Leads: ${ad.leads} | Qualificados: ${ad.qual}</div></div>`;
+            });
+            html += `</div>`;
+
+            container.innerHTML = html;
+
+            // Event listeners
+            document.querySelectorAll('th.sortable').forEach(th => {
+                th.addEventListener('click', () => {
+                    const field = th.dataset.field;
+                    const isAsc = th.classList.contains('asc');
+                    document.querySelectorAll('th.sortable').forEach(t => t.classList.remove('asc', 'desc'));
+                    if (isAsc) {
+                        th.classList.add('desc');
+                        ads.sort((a, b) => b[field] - a[field]);
+                    } else {
+                        th.classList.add('asc');
+                        ads.sort((a, b) => a[field] - b[field]);
+                    }
+                    renderTab1();
+                });
+            });
+
+            renderChartHookHold(topVideos);
+        }
+
+        function renderChartHookHold(videos) {
+            if (CHARTS['hook-hold']) CHARTS['hook-hold'].destroy();
+
+            const ctx = document.getElementById('chart-hook-hold').getContext('2d');
+            CHARTS['hook-hold'] = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: videos.map(v => v.ad),
+                    datasets: [
+                        {
+                            label: 'Hook Rate',
+                            data: videos.map(v => v.hookRate * 100),
+                            backgroundColor: 'rgba(255, 107, 0, 0.6)',
+                            borderColor: 'rgba(255, 107, 0, 1)',
+                            borderWidth: 1,
+                        },
+                        {
+                            label: 'Hold Rate',
+                            data: videos.map(v => v.holdRate * 100),
+                            backgroundColor: 'rgba(51, 102, 255, 0.6)',
+                            borderColor: 'rgba(51, 102, 255, 1)',
+                            borderWidth: 1,
+                        }
+                    ]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: true, labels: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 11 } } }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 10 } }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 10 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // TAB 2: PÚBLICOS
+        function renderTab2() {
+            const data = GLOBAL_DATA.filtered;
+            const byAdset = {};
+            data.forEach(row => {
+                if (!byAdset[row.adset]) {
+                    byAdset[row.adset] = { adset: row.adset, spend: 0, leads: 0, clicks: 0, impressions: 0 };
+                }
+                byAdset[row.adset].spend += row.spend;
+                byAdset[row.adset].leads += row.leads;
+                byAdset[row.adset].clicks += row.clicks;
+                byAdset[row.adset].impressions += row.impressions;
+            });
+
+            const adsets = Object.values(byAdset)
+                .map(a => ({
+                    ...a,
+                    cpc: a.clicks > 0 ? a.spend / a.clicks : 0,
+                    cpl: a.leads > 0 ? a.spend / a.leads : 0,
+                    ctr: a.impressions > 0 ? a.clicks / a.impressions : 0,
+                }))
+                .sort((a, b) => a.cpl - b.cpl);
+
+            const container = document.getElementById('tab2Content');
+            let html = `
+                <div class="table-container">
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th class="sortable" data-field="index">#</th>
+                                    <th class="sortable" data-field="adset">Conjunto/Público</th>
+                                    <th class="sortable" data-field="spend">Investimento</th>
+                                    <th class="sortable" data-field="clicks">Cliques</th>
+                                    <th class="sortable" data-field="leads">Leads</th>
+                                    <th class="sortable" data-field="cpc">CPC</th>
+                                    <th class="sortable" data-field="cpl">CPL</th>
+                                    <th class="sortable" data-field="ctr">CTR</th>
+                                    <th class="sortable" data-field="status">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+            `;
+
+            adsets.forEach((a, idx) => {
+                let status = 'PAUSAR';
+                let statusBadge = 'badge-red';
+                if (a.cpl <= 20) { status = 'ESCALAR'; statusBadge = 'badge-green'; }
+                else if (a.cpl <= 30) { status = 'TESTAR'; statusBadge = 'badge-yellow'; }
+                else if (a.cpl <= 40) { status = 'MONITORAR'; statusBadge = 'badge-orange'; }
+
+                html += `
+                    <tr>
+                        <td>${idx + 1}</td>
+                        <td>${a.adset}</td>
+                        <td>${formatMoney(a.spend)}</td>
+                        <td>${a.clicks}</td>
+                        <td>${a.leads}</td>
+                        <td>${formatMoney(a.cpc)}</td>
+                        <td>${formatMoney(a.cpl)}</td>
+                        <td>${formatPercent(a.ctr)}</td>
+                        <td><span class="badge ${statusBadge}">${status}</span></td>
+                    </tr>
+                `;
+            });
+
+            html += `</tbody></table></div></div>`;
+
+            // Insights
+            html += `<div class="insights-container"><div class="insights-title">Insights</div>`;
+            if (adsets.length > 0) {
+                const best = adsets[0];
+                const worst = adsets[adsets.length - 1];
+                html += `<div class="insight-item"><div class="insight-label">Melhor Público</div><div class="insight-value">${best.adset} - CPL: ${formatMoney(best.cpl)}</div></div>`;
+                html += `<div class="insight-item"><div class="insight-label">Pior Público</div><div class="insight-value">${worst.adset} - CPL: ${formatMoney(worst.cpl)}</div></div>`;
+            }
+            html += `</div>`;
+
+            container.innerHTML = html;
+
+            document.querySelectorAll('th.sortable').forEach(th => {
+                th.addEventListener('click', () => {
+                    const field = th.dataset.field;
+                    const isAsc = th.classList.contains('asc');
+                    document.querySelectorAll('th.sortable').forEach(t => t.classList.remove('asc', 'desc'));
+                    if (isAsc) {
+                        th.classList.add('desc');
+                        adsets.sort((a, b) => b[field] - a[field]);
+                    } else {
+                        th.classList.add('asc');
+                        adsets.sort((a, b) => a[field] - b[field]);
+                    }
+                    renderTab2();
+                });
+            });
+        }
+
+        // TAB 3: ANÁLISE SEMANAL
+        function renderTab3() {
+            const data = GLOBAL_DATA.filtered;
+            const weeks = {};
+
+            data.forEach(row => {
+                const date = new Date(row.date);
+                const dayOfWeek = date.getDay();
+                const diffToMonday = (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
+                const monday = new Date(date);
+                monday.setDate(monday.getDate() - diffToMonday);
+                const weekKey = formatDateISO(monday);
+
+                if (!weeks[weekKey]) {
+                    weeks[weekKey] = { week: weekKey, spend: 0, leads: 0, clicks: 0, impressions: 0, cpm: 0, cpl: 0 };
+                }
+                weeks[weekKey].spend += row.spend;
+                weeks[weekKey].leads += row.leads;
+                weeks[weekKey].clicks += row.clicks;
+                weeks[weekKey].impressions += row.impressions;
+            });
+
+            const weekList = Object.values(weeks)
+                .map(w => {
+                    const cpl = w.leads > 0 ? w.spend / w.leads : 0;
+                    const cpc = w.clicks > 0 ? w.spend / w.clicks : 0;
+                    const ctr = w.impressions > 0 ? w.clicks / w.impressions : 0;
+                    const cpm = w.impressions > 0 ? (w.spend / w.impressions) * 1000 : 0;
+                    const convRate = w.clicks > 0 ? w.leads / w.clicks : 0;
+                    return { ...w, cpl, cpc, ctr, cpm, convRate };
+                })
+                .sort((a, b) => new Date(a.week) - new Date(b.week));
+
+            // Calculate trends
+            const trends = [];
+            for (let i = 1; i < weekList.length; i++) {
+                const prev = weekList[i - 1].cpl;
+                const curr = weekList[i].cpl;
+                const change = prev > 0 ? ((curr - prev) / prev) : 0;
+                let trend = '►';
+                if (change <= -0.1) trend = '▲';
+                if (change >= 0.1) trend = '▼';
+                trends[i] = { trend, change };
+            }
+
+            const container = document.getElementById('tab3Content');
+            let html = `
+                <div class="table-container">
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th class="sortable" data-field="week">Semana</th>
+                                    <th class="sortable" data-field="spend">Invest.</th>
+                                    <th class="sortable" data-field="clicks">Cliques</th>
+                                    <th class="sortable" data-field="leads">Leads</th>
+                                    <th class="sortable" data-field="cpc">CPC</th>
+                                    <th class="sortable" data-field="cpm">CPM</th>
+                                    <th class="sortable" data-field="cpl">CPL</th>
+                                    <th class="sortable" data-field="convRate">Conv. Rate</th>
+                                    <th>Tendência</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+            `;
+
+            weekList.forEach((w, idx) => {
+                const trendData = trends[idx] || { trend: '-', change: 0 };
+                html += `
+                    <tr>
+                        <td>${new Date(w.week).toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit' })}</td>
+                        <td>${formatMoney(w.spend)}</td>
+                        <td>${w.clicks}</td>
+                        <td>${w.leads}</td>
+                        <td>${formatMoney(w.cpc)}</td>
+                        <td>${formatMoney(w.cpm)}</td>
+                        <td>${formatMoney(w.cpl)}</td>
+                        <td>${formatPercent(w.convRate)}</td>
+                        <td><span style="font-size: 16px; color: ${trendData.trend === '▲' ? 'var(--green)' : trendData.trend === '▼' ? 'var(--red)' : 'var(--text-muted)'}">${trendData.trend}</span></td>
+                    </tr>
+                `;
+            });
+
+            html += `</tbody></table></div></div>`;
+
+            // Charts
+            html += `
+                <div class="charts-grid">
+                    <div class="chart-container"><div class="chart-title">CPL Semanal</div><canvas id="chart-weekly-cpl" class="chart-canvas"></canvas></div>
+                    <div class="chart-container"><div class="chart-title">CPC vs CPL por Semana</div><canvas id="chart-weekly-cpc-cpl" class="chart-canvas"></canvas></div>
+                </div>
+                <div style="margin-top: 24px;">
+                    <div class="chart-container"><div class="chart-title">CPL Qualificado por Período</div><canvas id="chart-weekly-cpl-qual" class="chart-canvas"></canvas></div>
+                </div>
+            `;
+
+            // Insights
+            const best = weekList.reduce((a, b) => a.cpl < b.cpl ? a : b);
+            const worst = weekList.reduce((a, b) => a.cpl > b.cpl ? a : b);
+            html += `<div class="insights-container"><div class="insights-title">Insights</div>`;
+            html += `<div class="insight-item"><div class="insight-label">Melhor Semana</div><div class="insight-value">${new Date(best.week).toLocaleDateString('pt-BR')} - CPL: ${formatMoney(best.cpl)}</div></div>`;
+            html += `<div class="insight-item"><div class="insight-label">Pior Semana</div><div class="insight-value">${new Date(worst.week).toLocaleDateString('pt-BR')} - CPL: ${formatMoney(worst.cpl)}</div></div>`;
+            html += `</div>`;
+
+            container.innerHTML = html;
+
+            renderChartWeeklyCPL(weekList);
+            renderChartWeeklyCPCCPL(weekList);
+            renderChartWeeklyCPLQual(weekList);
+        }
+
+        function renderChartWeeklyCPL(weeks) {
+            if (CHARTS['weekly-cpl']) CHARTS['weekly-cpl'].destroy();
+
+            const ctx = document.getElementById('chart-weekly-cpl').getContext('2d');
+            const colors = weeks.map(w => {
+                if (w.cpl <= 20) return 'rgba(0, 214, 143, 0.6)';
+                if (w.cpl <= 30) return 'rgba(255, 170, 0, 0.6)';
+                return 'rgba(255, 61, 113, 0.6)';
+            });
+
+            CHARTS['weekly-cpl'] = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: weeks.map(w => new Date(w.week).toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit' })),
+                    datasets: [
+                        {
+                            label: 'CPL',
+                            data: weeks.map(w => w.cpl),
+                            backgroundColor: colors,
+                            borderColor: 'rgba(255, 107, 0, 1)',
+                            borderWidth: 1,
+                            yAxisID: 'y',
+                        },
+                        {
+                            label: 'Taxa de Conversão',
+                            data: weeks.map(w => w.convRate * 100),
+                            borderColor: 'rgba(51, 102, 255, 0.8)',
+                            borderWidth: 2,
+                            type: 'line',
+                            yAxisID: 'y1',
+                            pointBackgroundColor: 'rgba(51, 102, 255, 0.8)',
+                            pointRadius: 4,
+                            tension: 0.3,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: true, labels: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 11 } } }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            position: 'left',
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 10 } }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            beginAtZero: true,
+                            grid: { drawOnChartArea: false },
+                            ticks: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 10 } }
+                        },
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 10 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderChartWeeklyCPCCPL(weeks) {
+            if (CHARTS['weekly-cpc-cpl']) CHARTS['weekly-cpc-cpl'].destroy();
+
+            const ctx = document.getElementById('chart-weekly-cpc-cpl').getContext('2d');
+            CHARTS['weekly-cpc-cpl'] = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: weeks.map(w => new Date(w.week).toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit' })),
+                    datasets: [
+                        {
+                            label: 'CPC',
+                            data: weeks.map(w => w.cpc),
+                            backgroundColor: 'rgba(51, 102, 255, 0.6)',
+                            borderColor: 'rgba(51, 102, 255, 1)',
+                            borderWidth: 1,
+                        },
+                        {
+                            label: 'CPL',
+                            data: weeks.map(w => w.cpl),
+                            backgroundColor: 'rgba(255, 107, 0, 0.6)',
+                            borderColor: 'rgba(255, 107, 0, 1)',
+                            borderWidth: 1,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: true, labels: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 11 } } }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 10 } }
+                        },
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 10 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderChartWeeklyCPLQual(weeks) {
+            if (CHARTS['weekly-cpl-qual']) CHARTS['weekly-cpl-qual'].destroy();
+
+            const ctx = document.getElementById('chart-weekly-cpl-qual').getContext('2d');
+            const refCPL = weeks.reduce((s, w) => s + w.cpl, 0) / weeks.length;
+
+            CHARTS['weekly-cpl-qual'] = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: weeks.map(w => new Date(w.week).toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit' })),
+                    datasets: [
+                        {
+                            label: 'CPL',
+                            data: weeks.map(w => w.cpl),
+                            borderColor: 'rgba(0, 214, 143, 0.8)',
+                            backgroundColor: 'rgba(0, 214, 143, 0.1)',
+                            pointBackgroundColor: weeks.map(w => w.cpl <= 20 ? 'rgba(0, 214, 143, 1)' : w.cpl <= 30 ? 'rgba(255, 170, 0, 1)' : 'rgba(255, 61, 113, 1)'),
+                            pointRadius: 5,
+                            pointHoverRadius: 7,
+                            tension: 0.3,
+                            fill: false,
+                            borderWidth: 2,
+                        },
+                        {
+                            label: 'CPL Ref.',
+                            data: Array(weeks.length).fill(refCPL),
+                            borderColor: 'rgba(255, 107, 0, 0.3)',
+                            borderDash: [5, 5],
+                            pointRadius: 0,
+                            fill: false,
+                            borderWidth: 1,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: true, labels: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 11 } } }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 10 } }
+                        },
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 10 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // TAB 4: COMPARATIVO MENSAL
+        function renderTab4() {
+            const data = GLOBAL_DATA.filtered;
+            const months = {};
+
+            data.forEach(row => {
+                const date = new Date(row.date);
+                const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+                if (!months[monthKey]) {
+                    months[monthKey] = { month: monthKey, spend: 0, leads: 0, qual: 0, clicks: 0, impressions: 0, days: new Set() };
+                }
+                months[monthKey].spend += row.spend;
+                months[monthKey].leads += row.leads;
+                months[monthKey].qual += FORMS_QUAL[row.ad] || 0;
+                months[monthKey].clicks += row.clicks;
+                months[monthKey].impressions += row.impressions;
+                months[monthKey].days.add(formatDateISO(row.date));
+            });
+
+            const monthList = Object.values(months)
+                .map(m => {
+                    const cpl = m.leads > 0 ? m.spend / m.leads : 0;
+                    const cplQual = m.qual > 0 ? m.spend / m.qual : 0;
+                    const cpc = m.clicks > 0 ? m.spend / m.clicks : 0;
+                    const ctr = m.impressions > 0 ? m.clicks / m.impressions : 0;
+                    const cpm = m.impressions > 0 ? (m.spend / m.impressions) * 1000 : 0;
+                    const convRate = m.clicks > 0 ? m.leads / m.clicks : 0;
+                    return { ...m, cpl, cplQual, cpc, ctr, cpm, convRate, daysCount: m.days.size };
+                })
+                .sort((a, b) => a.month.localeCompare(b.month));
+
+            const container = document.getElementById('tab4Content');
+            let html = '';
+
+            // Month KPI cards
+            html += `<div class="kpi-grid">`;
+            const colors = ['var(--orange)', 'var(--blue)', 'var(--green)'];
+            monthList.forEach((m, idx) => {
+                const monthName = new Date(m.month + '-01').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+                html += `
+                    <div class="kpi-card" style="border-color: ${colors[idx % 3]};">
+                        <span class="kpi-label">${monthName}</span>
+                        <div style="margin-bottom: 8px;">
+                            <div class="kpi-value" style="font-size: 16px;">${m.daysCount} dias</div>
+                            <div style="font-size: 12px; color: var(--text-secondary);">${formatMoney(m.spend)}</div>
+                        </div>
+                        <div style="font-size: 11px; color: var(--text-muted); line-height: 1.6;">
+                            Leads: ${m.leads} | Qual: ${m.qual} | CPL: ${formatMoney(m.cpl)}
+                        </div>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+
+            // Comparison table
+            html += `
+                <div class="table-container">
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Métrica</th>
+                                    ${monthList.map(m => `<th>${new Date(m.month + '-01').toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })}</th>`).join('')}
+                                    <th>Variação (%)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+            `;
+
+            const metrics = [
+                { label: 'Investimento', field: 'spend', format: 'money' },
+                { label: 'Leads', field: 'leads', format: 'number' },
+                { label: 'Leads Qualificados', field: 'qual', format: 'number' },
+                { label: 'CPL', field: 'cpl', format: 'money' },
+                { label: 'CPL Qualificado', field: 'cplQual', format: 'money' },
+                { label: 'CPC', field: 'cpc', format: 'money' },
+                { label: 'CPM', field: 'cpm', format: 'money' },
+                { label: 'Cliques', field: 'clicks', format: 'number' },
+                { label: 'CTR', field: 'ctr', format: 'percent' },
+                { label: 'Conv. Rate', field: 'convRate', format: 'percent' },
+            ];
+
+            metrics.forEach(metric => {
+                html += `<tr><td><strong>${metric.label}</strong></td>`;
+                monthList.forEach(m => {
+                    const val = m[metric.field];
+                    let formatted = '';
+                    if (metric.format === 'money') formatted = formatMoney(val);
+                    else if (metric.format === 'number') formatted = val.toLocaleString('pt-BR');
+                    else if (metric.format === 'percent') formatted = formatPercent(val);
+                    html += `<td>${formatted}</td>`;
+                });
+
+                if (monthList.length >= 2) {
+                    const prev = monthList[monthList.length - 2][metric.field];
+                    const curr = monthList[monthList.length - 1][metric.field];
+                    const change = prev > 0 ? ((curr - prev) / prev) * 100 : 0;
+                    let badge = 'badge-green';
+                    if (metric.field.includes('cpl') || metric.field.includes('cpc') || metric.field.includes('cpm')) {
+                        badge = change < -5 ? 'badge-green' : change > 5 ? 'badge-red' : 'badge-yellow';
+                    } else {
+                        badge = change > 5 ? 'badge-green' : change < -5 ? 'badge-red' : 'badge-yellow';
+                    }
+                    html += `<td><span class="badge ${badge}">${change > 0 ? '+' : ''}${change.toFixed(1)}%</span></td>`;
+                } else {
+                    html += `<td>-</td>`;
+                }
+
+                html += `</tr>`;
+            });
+
+            html += `</tbody></table></div></div>`;
+
+            // Charts
+            html += `
+                <div class="charts-grid">
+                    <div class="chart-container"><div class="chart-title">Investimento Mensal</div><canvas id="chart-monthly-invest" class="chart-canvas"></canvas></div>
+                    <div class="chart-container"><div class="chart-title">CPL e Leads por Mês</div><canvas id="chart-monthly-cpl-leads" class="chart-canvas"></canvas></div>
+                </div>
+            `;
+
+            // Insights
+            if (monthList.length >= 2) {
+                const prev = monthList[monthList.length - 2];
+                const curr = monthList[monthList.length - 1];
+                const spendChange = prev.spend > 0 ? ((curr.spend - prev.spend) / prev.spend) * 100 : 0;
+                const leadsChange = prev.leads > 0 ? ((curr.leads - prev.leads) / prev.leads) * 100 : 0;
+                const cplChange = prev.cpl > 0 ? ((curr.cpl - prev.cpl) / prev.cpl) * 100 : 0;
+                const cpcChange = prev.cpc > 0 ? ((curr.cpc - prev.cpc) / prev.cpc) * 100 : 0;
+
+                html += `<div class="insights-container"><div class="insights-title">Insights</div>`;
+                html += `<div class="insight-item"><div class="insight-label">Variação Investimento</div><div class="insight-value">${spendChange > 0 ? '+' : ''}${spendChange.toFixed(1)}%</div></div>`;
+                html += `<div class="insight-item"><div class="insight-label">Variação Leads</div><div class="insight-value">${leadsChange > 0 ? '+' : ''}${leadsChange.toFixed(1)}%</div></div>`;
+                html += `<div class="insight-item"><div class="insight-label">Variação CPL</div><div class="insight-value">${cplChange > 0 ? '+' : ''}${cplChange.toFixed(1)}%</div></div>`;
+                html += `<div class="insight-item"><div class="insight-label">Variação CPC</div><div class="insight-value">${cpcChange > 0 ? '+' : ''}${cpcChange.toFixed(1)}%</div></div>`;
+                html += `</div>`;
+            }
+
+            container.innerHTML = html;
+
+            renderChartMonthlyInvest(monthList);
+            renderChartMonthlyCPLLeads(monthList);
+        }
+
+        function renderChartMonthlyInvest(months) {
+            if (CHARTS['monthly-invest']) CHARTS['monthly-invest'].destroy();
+
+            const ctx = document.getElementById('chart-monthly-invest').getContext('2d');
+            const colors = ['rgba(255, 107, 0, 0.6)', 'rgba(51, 102, 255, 0.6)', 'rgba(0, 214, 143, 0.6)'];
+
+            CHARTS['monthly-invest'] = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: months.map(m => new Date(m.month + '-01').toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })),
+                    datasets: [{
+                        label: 'Investimento',
+                        data: months.map(m => m.spend),
+                        backgroundColor: months.map((_, i) => colors[i % 3]),
+                        borderColor: 'rgba(255, 255, 255, 0.2)',
+                        borderWidth: 1,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 10 } }
+                        },
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 10 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderChartMonthlyCPLLeads(months) {
+            if (CHARTS['monthly-cpl-leads']) CHARTS['monthly-cpl-leads'].destroy();
+
+            const ctx = document.getElementById('chart-monthly-cpl-leads').getContext('2d');
+            CHARTS['monthly-cpl-leads'] = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: months.map(m => new Date(m.month + '-01').toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })),
+                    datasets: [
+                        {
+                            label: 'CPL',
+                            data: months.map(m => m.cpl),
+                            backgroundColor: 'rgba(255, 107, 0, 0.6)',
+                            borderColor: 'rgba(255, 107, 0, 1)',
+                            borderWidth: 1,
+                            yAxisID: 'y',
+                        },
+                        {
+                            label: 'Leads',
+                            data: months.map(m => m.leads),
+                            borderColor: 'rgba(0, 214, 143, 0.8)',
+                            borderWidth: 2,
+                            type: 'line',
+                            yAxisID: 'y1',
+                            pointBackgroundColor: 'rgba(0, 214, 143, 0.8)',
+                            pointRadius: 4,
+                            tension: 0.3,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: true, labels: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 11 } } }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            position: 'left',
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 10 } }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            beginAtZero: true,
+                            grid: { drawOnChartArea: false },
+                            ticks: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 10 } }
+                        },
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 10 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Event Listeners
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tab = parseInt(btn.dataset.tab);
+                switchTab(tab);
+            });
+        });
+
+        document.getElementById('refreshBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('refreshBtn');
+            btn.classList.add('loading');
+            await loadData();
+            btn.classList.remove('loading');
+        });
+
+        document.getElementById('filterBtn').addEventListener('click', () => {
+            applyFilter();
+            updateUI();
+        });
+
+        document.getElementById('clearFilterBtn').addEventListener('click', () => {
+            const dates = GLOBAL_DATA.capProcessed.map(r => r.date).filter(d => d).sort();
+            if (dates.length > 0) {
+                document.getElementById('filterStartDate').value = formatDateISO(dates[0]);
+                document.getElementById('filterEndDate').value = formatDateISO(dates[dates.length - 1]);
+            }
+            applyFilter();
+            updateUI();
+        });
+
+        document.querySelectorAll('.btn-filter[data-days]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const days = parseInt(btn.dataset.days);
+                const end = new Date();
+                const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
+                document.getElementById('filterStartDate').value = formatDateISO(start);
+                document.getElementById('filterEndDate').value = formatDateISO(end);
+                applyFilter();
+                updateUI();
+            });
+        });
+
+        // Initialize
+        loadData();
+        setInterval(updateTimestamp, 1000);
+    </script>
+</body>
+</html>
