@@ -1731,9 +1731,20 @@ function fetchLiveData(){
         if(ymd<CUTOFF)continue;
 
         var price=parseFloat((vals[wColPrice]||'0').replace(',','.'))||0; // col 25
-        if(price<=0){
-          // Fallback: search nearby for a plausible product price (>=30)
-          for(var pi=20;pi<=35&&price<=0;pi++){var pc=parseFloat((vals[pi]||'').replace(',','.'));if(!isNaN(pc)&&pc>=30&&pc<10000)price=pc;}
+        if(price>0&&price<=50){
+          // Normal BRL price in expected range, keep it
+        } else {
+          // Price missing or suspicious (foreign currency?). Search all cols for best candidate.
+          // Prefer values in normal product range (30-50), which are BRL converted prices.
+          var bestNormal=0, bestAny=0;
+          for(var pi=10;pi<=45;pi++){
+            var pc=parseFloat((vals[pi]||'').replace(',','.'));
+            if(!isNaN(pc)&&pc>=30&&pc<10000){
+              if(pc>=30&&pc<=50&&!bestNormal) bestNormal=pc;
+              if(!bestAny) bestAny=pc;
+            }
+          }
+          price=bestNormal||bestAny||0;
         }
         if(price<=0)continue;
 
