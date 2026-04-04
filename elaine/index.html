@@ -164,6 +164,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
   <div class="tab" onclick="showTab('publicos',this)">Públicos</div>
   <div class="tab" onclick="showTab('paginas',this)">Páginas</div>
   <div class="tab" onclick="showTab('desafios',this)">Desafios</div>
+  <div class="tab" onclick="showTab('debriefing',this)">Debriefing</div>
   <div class="tab" onclick="showTab('semanal',this)">Semana a Semana</div>
   <div class="tab" onclick="showTab('mensal',this)">Mês a Mês</div>
 </div>
@@ -258,6 +259,12 @@ tr:hover td{background:rgba(255,255,255,.025)}
   </div>
   <div class="sec-title" style="margin-top:24px">Tabela Comparativa</div>
   <div class="tbl-wrap"><table id="tbl-desafios"></table></div>
+</div>
+
+<!-- DEBRIEFING -->
+<div id="tab-debriefing" class="content">
+  <div class="sec-title">Debriefing — Resultado Completo por Desafio</div>
+  <div class="tbl-wrap" id="debriefing-wrap"></div>
 </div>
 
 <!-- SEMANAL -->
@@ -1349,10 +1356,10 @@ function renderPaginas(){
 // B: 65 vendas R$2275 + 15 OB R$266.58 = R$2541.58
 // C: 30 vendas R$1131 + 12 OB R$260 = R$1391
 var DESAFIOS_RANGES = [
-  {nome:"Desafio A", de:"2026-02-17", ate:"2026-03-01", cor:"#ff6b2b", comprasAds:66, fatAds:2310, obCompras:27, obFat:890.61},
-  {nome:"Desafio B", de:"2026-03-02", ate:"2026-03-15", cor:"#3b82f6", comprasAds:65, fatAds:2275, obCompras:15, obFat:266.58},
-  {nome:"Desafio C", de:"2026-03-16", ate:"2026-04-05", cor:"#2ecc71", comprasAds:0, fatAds:0, obCompras:12, obFat:260, useLive:true},
-  {nome:"Desafio D", de:"2026-04-06", ate:"2026-04-20", cor:"#e74c3c", comprasAds:0, fatAds:0, obCompras:0, obFat:0, useLive:true}
+  {nome:"Desafio A", de:"2026-02-17", ate:"2026-03-01", cor:"#ff6b2b", comprasAds:66, fatAds:2310, obCompras:27, obFat:890.61, upsellQtd:14, upsellTicket:997},
+  {nome:"Desafio B", de:"2026-03-02", ate:"2026-03-15", cor:"#3b82f6", comprasAds:65, fatAds:2275, obCompras:15, obFat:266.58, upsellQtd:3, upsellTicket:997},
+  {nome:"Desafio C", de:"2026-03-16", ate:"2026-04-05", cor:"#2ecc71", comprasAds:0, fatAds:0, obCompras:18, obFat:480.60, useLive:true, upsellQtd:0, upsellTicket:997},
+  {nome:"Desafio D", de:"2026-04-06", ate:"2026-04-20", cor:"#e74c3c", comprasAds:0, fatAds:0, obCompras:0, obFat:0, useLive:true, upsellQtd:0, upsellTicket:997}
 ];
 
 function calcDesafioData(){
@@ -1386,11 +1393,18 @@ function calcDesafioData(){
     var cac=comp>0?(inv/comp):0;
     var ticket=comp>0?(fatTotal/comp):0;
     var roas=inv>0?(fatTotal/inv):0;
+    var upsellQtd=range.upsellQtd||0;
+    var upsellFat=upsellQtd*(range.upsellTicket||0);
+    var taxaUpsell=comp>0?(upsellQtd/comp*100):0;
+    var fatGeral=fatTotal+upsellFat;
+    var roasGeral=inv>0?(fatGeral/inv):0;
     return {nome:range.nome, cor:range.cor, de:range.de, ate:range.ate, dias:dias,
       inv:inv, fatAds:fatAds, obCompras:obComp, obFat:obFat, fatTotal:fatTotal,
       compras:comp, cliques:cliq, imp:imps, pv:pvs, ck:cks,
       ctr:ctr, cpc:cpc, cpm:cpm, taxaEntrada:taxaEntrada, taxaCompra:taxaCompra,
-      cac:cac, ticket:ticket, roas:roas};
+      cac:cac, ticket:ticket, roas:roas,
+      upsellQtd:upsellQtd, upsellTicket:range.upsellTicket||0, upsellFat:upsellFat,
+      taxaUpsell:taxaUpsell, fatGeral:fatGeral, roasGeral:roasGeral};
   });
 }
 
@@ -1507,8 +1521,79 @@ function renderDesafios(){
   document.getElementById('tbl-desafios').innerHTML=h;
 }
 
+function renderDebriefing(){
+  var data=calcDesafioData();
+  var activeData=data.filter(function(d){return d.dias>0||d.compras>0});
+  if(activeData.length===0) activeData=data;
+
+  // Spreadsheet-style table
+  var h='<table style="width:100%;border-collapse:collapse;font-size:13px;line-height:1.8">';
+
+  // Header row with desafio names
+  h+='<thead><tr><th style="text-align:left;padding:12px 16px;font-size:14px;color:rgba(255,255,255,.5);border-bottom:2px solid rgba(255,255,255,.1);min-width:200px">Indicador</th>';
+  activeData.forEach(function(d){
+    h+='<th style="text-align:center;padding:12px 16px;font-size:14px;font-weight:700;color:'+d.cor+';border-bottom:2px solid '+d.cor+'44;min-width:140px">'+d.nome+'</th>';
+  });
+  h+='</tr></thead><tbody>';
+
+  function row(label, valsFn, opts){
+    opts=opts||{};
+    var bg=opts.bg||'transparent';
+    var bold=opts.bold?'font-weight:700;':'';
+    var size=opts.size||'13px';
+    h+='<tr style="background:'+bg+'">';
+    h+='<td style="padding:10px 16px;font-size:'+size+';'+bold+'color:rgba(255,255,255,.85);border-bottom:1px solid rgba(255,255,255,.06)">'+label+'</td>';
+    activeData.forEach(function(d){
+      var val=valsFn(d);
+      var cls=opts.cls?opts.cls(d):'';
+      h+='<td style="text-align:center;padding:10px 16px;font-size:'+size+';'+bold+'border-bottom:1px solid rgba(255,255,255,.06)"><span class="'+cls+'">'+val+'</span></td>';
+    });
+    h+='</tr>';
+  }
+
+  function sep(label){
+    h+='<tr><td colspan="'+(activeData.length+1)+'" style="padding:14px 16px 8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#ff6b2b;background:rgba(255,107,43,.06);border-bottom:1px solid rgba(255,107,43,.15)">'+label+'</td></tr>';
+  }
+
+  // SEÇÃO: Tráfego
+  sep('Tráfego');
+  row('CTR', function(d){return pct(d.ctr)});
+  row('CPC', function(d){return brl(d.cpc)});
+  row('Taxa de Entrada', function(d){return pct(d.taxaEntrada)});
+  row('Taxa de Conversão', function(d){return pct(d.taxaCompra)});
+  row('CPM', function(d){return brl(d.cpm)});
+  row('Ticket Médio', function(d){return d.compras>0?brl(d.ticket):'—'});
+  row('ROAS (Ingressos + OB)', function(d){return br(d.roas)+'x'}, {bold:true, cls:function(d){return d.roas>=1.7?'green':d.roas>=1?'yellow':'red'}});
+  row('CAC', function(d){return d.compras>0?brl(d.cac):'—'}, {cls:function(d){return d.cac>0&&d.cac<=35?'green':d.cac<=50?'yellow':'red'}});
+
+  // SEÇÃO: Financeiro Ingressos
+  sep('Financeiro — Ingressos');
+  row('Investimento', function(d){return brl(d.inv)}, {bold:true});
+  row('Vendas Ingressos', function(d){return num(d.compras)});
+  row('Faturamento Ingressos', function(d){return brl(d.fatAds)}, {bold:true});
+
+  // SEÇÃO: Order Bumps
+  sep('Order Bumps');
+  row('Qtd. Order Bumps', function(d){return num(d.obCompras)});
+  row('Faturamento OB', function(d){return brl(d.obFat)});
+
+  // SEÇÃO: Upsell (Jornada)
+  sep('Upsell — Jornada R$ 997');
+  row('Vendas Upsell', function(d){return d.upsellQtd>0?num(d.upsellQtd):'—'}, {bold:true, size:'14px'});
+  row('Faturamento Upsell', function(d){return d.upsellFat>0?brl(d.upsellFat):'—'}, {bold:true});
+  row('Taxa de Upsell (Jornada / Ingressos)', function(d){return d.taxaUpsell>0?pct(d.taxaUpsell):'—'}, {cls:function(d){return d.taxaUpsell>=15?'green':d.taxaUpsell>=8?'yellow':''}});
+
+  // SEÇÃO: Resultado Total
+  sep('Resultado Total');
+  row('Faturamento Total', function(d){return brl(d.fatGeral)}, {bold:true, size:'15px', bg:'rgba(46,204,113,.06)', cls:function(){return 'green'}});
+  row('ROAS Total', function(d){return d.inv>0?br(d.roasGeral)+'x':'—'}, {bold:true, size:'15px', bg:'rgba(46,204,113,.06)', cls:function(d){return d.roasGeral>=1.7?'green':d.roasGeral>=1?'yellow':'red'}});
+
+  h+='</tbody></table>';
+  document.getElementById('debriefing-wrap').innerHTML=h;
+}
+
 function renderAll(){
-  renderKPIs();renderCharts();renderTblDias();renderCriativos();renderPublicos();renderPaginas();renderDesafios();renderSemanal();renderMensal();
+  renderKPIs();renderCharts();renderTblDias();renderCriativos();renderPublicos();renderPaginas();renderDesafios();renderDebriefing();renderSemanal();renderMensal();
 }
 
 // ========== LIVE FETCH (dados novos a partir de 29/03/2026) ==========
