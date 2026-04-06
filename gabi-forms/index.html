@@ -1259,17 +1259,21 @@
                 processFormsData();
                 calculateQualifications();
 
-                // Set filter defaults
-                const dates = GLOBAL_DATA.capProcessed.map(r => r.date).filter(d => d).sort();
+                // Set filter defaults — always end on today
+                const dates = GLOBAL_DATA.capProcessed.map(r => r.date).filter(d => d).sort((a, b) => a - b);
+                const today = new Date();
+                today.setHours(23, 59, 59, 999);
                 if (dates.length > 0) {
-                    GLOBAL_DATA.lastDataDay = dates[dates.length - 1];
+                    GLOBAL_DATA.lastDataDay = today;
                     GLOBAL_DATA.filterStart = dates[0];
-                    GLOBAL_DATA.filterEnd = GLOBAL_DATA.lastDataDay;
+                    GLOBAL_DATA.filterEnd = today;
                     document.getElementById('filterStartDate').value = formatDateISO(dates[0]);
-                    document.getElementById('filterEndDate').value = formatDateISO(GLOBAL_DATA.lastDataDay);
+                    document.getElementById('filterEndDate').value = formatDateISO(today);
                 } else {
-                    GLOBAL_DATA.filterStart = new Date();
-                    GLOBAL_DATA.filterEnd = new Date();
+                    GLOBAL_DATA.filterStart = today;
+                    GLOBAL_DATA.filterEnd = today;
+                    document.getElementById('filterStartDate').value = formatDateISO(today);
+                    document.getElementById('filterEndDate').value = formatDateISO(today);
                 }
 
                 applyFilter();
@@ -1353,15 +1357,20 @@
         }
 
         function applyFilter() {
-            const start = document.getElementById('filterStartDate').valueAsDate;
-            const end = document.getElementById('filterEndDate').valueAsDate;
+            const startStr = document.getElementById('filterStartDate').value; // 'YYYY-MM-DD'
+            const endStr = document.getElementById('filterEndDate').value;
 
             GLOBAL_DATA.filtered = GLOBAL_DATA.capProcessed.filter(row => {
                 if (!row.date) return false;
-                return row.date >= start && row.date <= end;
+                const rowStr = formatDateISO(row.date);
+                return rowStr >= startStr && rowStr <= endStr;
             });
 
-            const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+            const startParts = startStr.split('-').map(Number);
+            const endParts = endStr.split('-').map(Number);
+            const s = new Date(startParts[0], startParts[1] - 1, startParts[2]);
+            const e = new Date(endParts[0], endParts[1] - 1, endParts[2]);
+            const days = Math.ceil((e - s) / (1000 * 60 * 60 * 24)) + 1;
             document.getElementById('filterInfo').innerText = `${days} dias selecionados`;
         }
 
@@ -2569,10 +2578,10 @@
         });
 
         document.getElementById('clearFilterBtn').addEventListener('click', () => {
-            const dates = GLOBAL_DATA.capProcessed.map(r => r.date).filter(d => d).sort();
+            const dates = GLOBAL_DATA.capProcessed.map(r => r.date).filter(d => d).sort((a, b) => a - b);
             if (dates.length > 0) {
                 document.getElementById('filterStartDate').value = formatDateISO(dates[0]);
-                document.getElementById('filterEndDate').value = formatDateISO(dates[dates.length - 1]);
+                document.getElementById('filterEndDate').value = formatDateISO(new Date());
             }
             applyFilter();
             updateUI();
