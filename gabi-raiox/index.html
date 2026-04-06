@@ -417,8 +417,8 @@ async function loadData() {
       const isAntiga = campaign === CAMPANHA_ANTIGA;
       const targetMap = isNova ? compNovaMap : isAntiga ? compAntigaMap : null;
       if (targetMap) {
-        if (!targetMap[date]) targetMap[date] = { data: date, inv: 0, cliques: 0, pv: 0, ck: 0, imp: 0 };
-        targetMap[date].inv += spend; targetMap[date].cliques += clicks; targetMap[date].pv += pv; targetMap[date].ck += ck; targetMap[date].imp += imp;
+        if (!targetMap[date]) targetMap[date] = { data: date, inv: 0, cliques: 0, pv: 0, ck: 0, imp: 0, compras: 0 };
+        targetMap[date].inv += spend; targetMap[date].cliques += clicks; targetMap[date].pv += pv; targetMap[date].ck += ck; targetMap[date].imp += imp; targetMap[date].compras += (parseInt(r[iPurchase]) || 0);
       }
 
       // Criativos
@@ -730,10 +730,11 @@ function renderComparativo() {
     const cliques = arr.reduce((s, d) => s + d.cliques, 0);
     const pv = arr.reduce((s, d) => s + d.pv, 0);
     const ck = arr.reduce((s, d) => s + d.ck, 0);
+    const compras = arr.reduce((s, d) => s + (d.compras || 0), 0);
     const dias = arr.length;
     const connectRate = cliques > 0 ? pv / cliques * 100 : 0;
     const taxaConversao = pv > 0 ? ck / pv * 100 : 0;
-    return { cliques, pv, ck, dias, connectRate, taxaConversao };
+    return { cliques, pv, ck, compras, dias, connectRate, taxaConversao };
   }
   const a = sumArr(COMP_ANTIGA), n = sumArr(COMP_NOVA);
 
@@ -742,7 +743,7 @@ function renderComparativo() {
     return arr[0].data + ' a ' + arr[arr.length - 1].data + ' (' + arr.length + ' dias)';
   }
 
-  function buildMetricBoxes(containerId, label, valAntiga, valNova, fmtFn) {
+  function buildMetricBoxes(containerId, label, valAntiga, valNova, fmtFn, metricsA, metricsN) {
     const diff = valNova - valAntiga;
     const pctDiff = valAntiga > 0 ? (diff / valAntiga * 100) : (valNova > 0 ? 100 : 0);
     const antigaWins = valAntiga > valNova;
@@ -751,6 +752,14 @@ function renderComparativo() {
     const deltaClass = novaWins ? 'up' : antigaWins ? 'down' : 'neutral';
     const deltaText = diff === 0 ? 'Igual' : `${arrow} ${br(Math.abs(pctDiff), 1)}%`;
 
+    function subMetrics(m) {
+      return `<div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div style="text-align:center"><div style="font-size:9px;color:rgba(255,255,255,.35);text-transform:uppercase">Cliques</div><div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:600">${br(m.cliques, 0)}</div></div>
+        <div style="text-align:center"><div style="font-size:9px;color:rgba(255,255,255,.35);text-transform:uppercase">Pageviews</div><div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:600">${br(m.pv, 0)}</div></div>
+        <div style="text-align:center"><div style="font-size:9px;color:rgba(255,255,255,.35);text-transform:uppercase">Vendas</div><div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:600">${br(m.compras, 0)}</div></div>
+      </div>`;
+    }
+
     document.getElementById(containerId).innerHTML = `
       <div class="comp-box ${antigaWins ? 'winner' : ''}">
         <div class="comp-box-tag ${antigaWins ? 'vencedor' : 'antiga'}">${antigaWins ? 'Vencedor' : 'Antiga'}</div>
@@ -758,11 +767,7 @@ function renderComparativo() {
         <div class="comp-box-sub">${dateRange(COMP_ANTIGA)}</div>
         <div class="comp-big-num ${antigaWins ? 'green' : 'orange'}">${fmtFn(valAntiga)}</div>
         <div class="comp-big-label">${label}</div>
-        <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-          <div style="text-align:center"><div style="font-size:9px;color:rgba(255,255,255,.35);text-transform:uppercase">Cliques</div><div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:600">${br(a.cliques, 0)}</div></div>
-          <div style="text-align:center"><div style="font-size:9px;color:rgba(255,255,255,.35);text-transform:uppercase">PV</div><div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:600">${br(a.pv, 0)}</div></div>
-          <div style="text-align:center"><div style="font-size:9px;color:rgba(255,255,255,.35);text-transform:uppercase">CK</div><div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:600">${br(a.ck, 0)}</div></div>
-        </div>
+        ${subMetrics(metricsA)}
       </div>
       <div class="comp-box ${novaWins ? 'winner' : ''}">
         <div class="comp-box-tag ${novaWins ? 'vencedor' : 'nova'}">${novaWins ? 'Vencedor' : 'Nova'}</div>
@@ -771,16 +776,12 @@ function renderComparativo() {
         <div class="comp-big-num ${novaWins ? 'green' : 'orange'}">${fmtFn(valNova)}</div>
         <div class="comp-big-label">${label}</div>
         <div class="comp-delta ${deltaClass}">${deltaText} vs antiga</div>
-        <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-          <div style="text-align:center"><div style="font-size:9px;color:rgba(255,255,255,.35);text-transform:uppercase">Cliques</div><div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:600">${br(n.cliques, 0)}</div></div>
-          <div style="text-align:center"><div style="font-size:9px;color:rgba(255,255,255,.35);text-transform:uppercase">PV</div><div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:600">${br(n.pv, 0)}</div></div>
-          <div style="text-align:center"><div style="font-size:9px;color:rgba(255,255,255,.35);text-transform:uppercase">CK</div><div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:600">${br(n.ck, 0)}</div></div>
-        </div>
+        ${subMetrics(metricsN)}
       </div>`;
   }
 
-  buildMetricBoxes('comp-cr', 'Connect Rate', a.connectRate, n.connectRate, pct);
-  buildMetricBoxes('comp-tc', 'Taxa de Conversão', a.taxaConversao, n.taxaConversao, pct);
+  buildMetricBoxes('comp-cr', 'Connect Rate', a.connectRate, n.connectRate, pct, a, n);
+  buildMetricBoxes('comp-tc', 'Taxa de Conversão', a.taxaConversao, n.taxaConversao, pct, a, n);
 }
 
 // ===== INIT =====
