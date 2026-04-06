@@ -525,69 +525,89 @@
             border-left: 4px solid var(--orange);
         }
 
-        /* Funnel Container */
+        /* Funnel Container - Ju Gomes Style */
         .funnel-container {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             margin-bottom: 32px;
-        }
-
-        .funnel-visual {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-
-        .funnel-bar-item {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .funnel-bar-label {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--text-secondary);
-            display: flex;
-            justify-content: space-between;
+            padding: 24px 0;
         }
 
         .funnel-bar {
-            height: 32px;
-            background: linear-gradient(90deg, rgba(255,107,0,0.3) 0%, rgba(255,107,0,0.1) 100%);
-            border-radius: 6px;
-            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 52px;
+            border-radius: 10px;
             position: relative;
+            transition: all 0.3s ease;
         }
 
         .funnel-bar.impressoes {
+            width: 100%;
             background: linear-gradient(90deg, var(--orange) 0%, var(--orange-light) 100%);
         }
 
         .funnel-bar.cliques {
-            background: linear-gradient(90deg, var(--orange-dark) 0%, var(--orange) 100%);
+            width: 75%;
+            background: linear-gradient(90deg, #c45a00 0%, var(--orange) 100%);
         }
 
         .funnel-bar.leads {
-            background: linear-gradient(90deg, var(--orange-dark) 0%, var(--orange-dark) 100%);
+            width: 55%;
+            background: linear-gradient(90deg, var(--orange-dark) 0%, var(--orange) 100%);
         }
 
         .funnel-bar.qualificados {
+            width: 40%;
             background: linear-gradient(90deg, var(--green-dark) 0%, var(--green) 100%);
+        }
+
+        .funnel-bar-text {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            z-index: 1;
+        }
+
+        .funnel-bar-number {
+            font-size: 24px;
+            font-weight: 800;
+            color: #fff;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+
+        .funnel-bar-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: rgba(255,255,255,0.9);
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
         }
 
         .funnel-rate-arrow {
             font-size: 12px;
+            font-weight: 700;
             color: var(--yellow);
-            margin-top: 4px;
-            text-align: right;
+            margin: 6px 0;
+            text-align: center;
+        }
+
+        .funnel-footnote {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-align: center;
+            margin-top: 12px;
+            font-style: italic;
         }
 
         .funnel-analysis {
             display: flex;
             flex-direction: column;
             gap: 12px;
+            width: 100%;
+            margin-top: 24px;
         }
 
         .funnel-step {
@@ -916,8 +936,16 @@
 
         /* Responsive */
         @media (max-width: 1024px) {
-            .funnel-container {
-                grid-template-columns: 1fr;
+            .funnel-bar-number {
+                font-size: 18px;
+            }
+
+            .funnel-bar-label {
+                font-size: 9px;
+            }
+
+            .funnel-bar {
+                height: 44px;
             }
 
             .charts-grid {
@@ -1105,6 +1133,7 @@
         };
 
         let FORMS_QUAL = {}; // ad_name -> qualified count
+        let FORMS_QUAL_MONTHLY = {}; // 'YYYY-MM' -> qualified count
 
         let CHARTS = {}; // Store chart instances for cleanup
 
@@ -1252,18 +1281,26 @@
         function processFormsData() {
             GLOBAL_DATA.formsProcessed = GLOBAL_DATA.formsRaw.map(row => {
                 const faturamentoCol = findCol(row, ['média', 'faturamento', 'media']);
+                const dateCol = findCol(row, ['created_time', 'data', 'date']);
                 return {
                     ad_name: row.ad_name || '',
                     faturamento: parseFaturamento(row[faturamentoCol]),
+                    date: parseDate(row[dateCol]),
                 };
             });
         }
 
         function calculateQualifications() {
             FORMS_QUAL = {};
+            FORMS_QUAL_MONTHLY = {};
             GLOBAL_DATA.formsProcessed.forEach(form => {
                 if (form.faturamento >= CONFIG.qualThreshold) {
                     FORMS_QUAL[form.ad_name] = (FORMS_QUAL[form.ad_name] || 0) + 1;
+                    if (form.date) {
+                        const d = new Date(form.date);
+                        const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                        FORMS_QUAL_MONTHLY[mk] = (FORMS_QUAL_MONTHLY[mk] || 0) + 1;
+                    }
                 }
             });
         }
@@ -1326,11 +1363,8 @@
             const totalVideo3s = data.reduce((s, r) => s + r.video3s, 0);
             const totalVideo95 = data.reduce((s, r) => s + r.video95, 0);
 
-            // Calculate qualified leads
-            let totalQual = 0;
-            data.forEach(row => {
-                totalQual += FORMS_QUAL[row.ad] || 0;
-            });
+            // Calculate qualified leads (sum from FORMS_QUAL directly, not per Gerenciador row)
+            let totalQual = Object.values(FORMS_QUAL).reduce((s, v) => s + v, 0);
 
             const qualRate = totalLeads > 0 ? totalQual / totalLeads : 0;
             const cpl = totalLeads > 0 ? totalSpend / totalLeads : 0;
@@ -1396,42 +1430,38 @@
 
             html += `
                 <div class="funnel-container">
-                    <div class="funnel-visual">
-                        <div class="funnel-bar-item">
-                            <div class="funnel-bar-label">
-                                <span>Impressões</span>
-                                <span>${totalImpressions.toLocaleString('pt-BR')}</span>
-                            </div>
-                            <div class="funnel-bar impressoes" style="width: 100%"></div>
-                        </div>
-                        <div class="funnel-rate-arrow">↓ ${formatPercent(ctrimpr)} CTR</div>
-
-                        <div class="funnel-bar-item">
-                            <div class="funnel-bar-label">
-                                <span>Cliques</span>
-                                <span>${totalClicks.toLocaleString('pt-BR')}</span>
-                            </div>
-                            <div class="funnel-bar cliques" style="width: ${ctrimpr * 100}%"></div>
-                        </div>
-                        <div class="funnel-rate-arrow">↓ ${formatPercent(convrate)} Conv. Rate</div>
-
-                        <div class="funnel-bar-item">
-                            <div class="funnel-bar-label">
-                                <span>Leads</span>
-                                <span>${totalLeads.toLocaleString('pt-BR')}</span>
-                            </div>
-                            <div class="funnel-bar leads" style="width: ${ctrimpr * convrate * 100}%"></div>
-                        </div>
-                        <div class="funnel-rate-arrow">↓ ${formatPercent(qualrate)} Taxa Qualif.</div>
-
-                        <div class="funnel-bar-item">
-                            <div class="funnel-bar-label">
-                                <span>Qualificados</span>
-                                <span>${totalQual}</span>
-                            </div>
-                            <div class="funnel-bar qualificados" style="width: ${ctrimpr * convrate * qualrate * 100}%"></div>
+                    <div class="funnel-bar impressoes">
+                        <div class="funnel-bar-text">
+                            <span class="funnel-bar-number">${totalImpressions.toLocaleString('pt-BR')}</span>
+                            <span class="funnel-bar-label">IMPRESSÕES</span>
                         </div>
                     </div>
+                    <div class="funnel-rate-arrow">▾ CTR ${formatPercent(ctrimpr)}</div>
+
+                    <div class="funnel-bar cliques">
+                        <div class="funnel-bar-text">
+                            <span class="funnel-bar-number">${totalClicks.toLocaleString('pt-BR')}</span>
+                            <span class="funnel-bar-label">CLIQUES</span>
+                        </div>
+                    </div>
+                    <div class="funnel-rate-arrow">▾ Conv. ${formatPercent(convrate)}</div>
+
+                    <div class="funnel-bar leads">
+                        <div class="funnel-bar-text">
+                            <span class="funnel-bar-number">${totalLeads.toLocaleString('pt-BR')}</span>
+                            <span class="funnel-bar-label">LEADS TOTAIS</span>
+                        </div>
+                    </div>
+                    <div class="funnel-rate-arrow">▾ Qualif. ${formatPercent(qualrate)}</div>
+
+                    <div class="funnel-bar qualificados">
+                        <div class="funnel-bar-text">
+                            <span class="funnel-bar-number">${totalQual}</span>
+                            <span class="funnel-bar-label">QUALIFICADOS</span>
+                        </div>
+                    </div>
+
+                    <div class="funnel-footnote">* Leads qualificados = faturamento ≥ R$ ${CONFIG.qualThreshold.toLocaleString('pt-BR')}/mês</div>
 
                     <div class="funnel-analysis">
                         <div class="funnel-step">
@@ -2227,7 +2257,7 @@
                 }
                 months[monthKey].spend += row.spend;
                 months[monthKey].leads += row.leads;
-                months[monthKey].qual += FORMS_QUAL[row.ad] || 0;
+                months[monthKey].qual = FORMS_QUAL_MONTHLY[monthKey] || 0;
                 months[monthKey].clicks += row.clicks;
                 months[monthKey].impressions += row.impressions;
                 months[monthKey].days.add(formatDateISO(row.date));
