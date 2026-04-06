@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Dashboard · Raio X Missão de Alma · Gabi Bergo</title>
-<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
@@ -181,7 +180,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
     <div class="chart-card"><h4>Cliques vs Pageviews</h4><canvas id="chart-cliq-pv"></canvas></div>
   </div>
   <div class="tbl-wrap"><table><thead><tr>
-    <th>Data</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Ticket</th><th>CAC</th><th>Cliques</th><th>PV</th><th>CK</th><th>Imp.</th><th>CPC</th><th>CPM</th><th>Status</th>
+    <th>Data</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Cliques</th><th>PV</th><th>CK</th><th>Imp.</th><th>CPC</th><th>CPM</th><th>Status</th>
   </tr></thead><tbody id="tbody-dias"></tbody></table></div>
 </div>
 
@@ -235,7 +234,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
   </div>
   <div class="sec-title">Detalhamento Semanal</div>
   <div class="tbl-wrap"><table><thead><tr>
-    <th>Semana</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Retorno</th><th>Compras</th><th>Ticket</th><th>CAC</th><th>Cliques</th><th>PV</th><th>CK</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Status</th>
+    <th>Semana</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Retorno</th><th>Compras</th><th>Ticket</th><th>Cliques</th><th>PV</th><th>CK</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Status</th>
   </tr></thead><tbody id="tbody-semanal"></tbody></table></div>
 </div>
 
@@ -244,7 +243,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
   <div class="kpi-grid" id="kpi-mensal"></div>
   <div class="sec-title">Detalhamento Mensal</div>
   <div class="tbl-wrap"><table><thead><tr>
-    <th>Mês</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Retorno</th><th>Compras</th><th>Ticket</th><th>CAC</th><th>Cliques</th><th>PV</th><th>CK</th><th>Imp.</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Status</th>
+    <th>Mês</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Retorno</th><th>Compras</th><th>Ticket</th><th>Cliques</th><th>PV</th><th>CK</th><th>Imp.</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Status</th>
   </tr></thead><tbody id="tbody-mensal"></tbody></table></div>
 </div>
 
@@ -404,8 +403,8 @@ async function loadData() {
       const r = gRows[i];
       const date = r[iDate] || ''; if (!date || date.trim() === '') continue;
       const spend = pn(r[iSpend]);
-      const clicks = Math.round(pn(r[iClicks])), pv = Math.round(pn(r[iPV]));
-      const ck = Math.round(pn(r[iCK])), imp = Math.round(pn(r[iImp]));
+      const clicks = parseInt(r[iClicks]) || 0, pv = parseInt(r[iPV]) || 0;
+      const ck = parseInt(r[iCK]) || 0, imp = parseInt(r[iImp]) || 0;
       const adset = (r[iAdset] || '').trim(), adname = (r[iAdName] || '').trim();
       const link = (r[iLink] || '').trim(), campaign = (r[iCampaign] || '').trim();
 
@@ -418,8 +417,8 @@ async function loadData() {
       const isAntiga = campaign === CAMPANHA_ANTIGA;
       const targetMap = isNova ? compNovaMap : isAntiga ? compAntigaMap : null;
       if (targetMap) {
-        if (!targetMap[date]) targetMap[date] = { data: date, inv: 0, fat: 0, cliques: 0, pv: 0, ck: 0, imp: 0, compras: 0 };
-        targetMap[date].inv += spend; targetMap[date].cliques += clicks; targetMap[date].pv += pv; targetMap[date].ck += ck; targetMap[date].imp += imp;
+        if (!targetMap[date]) targetMap[date] = { data: date, inv: 0, cliques: 0, pv: 0, ck: 0, imp: 0, compras: 0 };
+        targetMap[date].inv += spend; targetMap[date].cliques += clicks; targetMap[date].pv += pv; targetMap[date].ck += ck; targetMap[date].imp += imp; targetMap[date].compras += (parseInt(r[iPurchase]) || 0);
       }
 
       // Criativos
@@ -452,19 +451,19 @@ async function loadData() {
       // If sale date falls within antiga's date range
       if (antigaStart && dt >= antigaStart && dt <= antigaEnd) {
         const entry = compAntigaMap[dt];
-        if (entry) { entry.compras += v.compras; entry.fat += v.fat; }
+        if (entry) { entry.compras += v.compras; }
         else {
           const match = COMP_ANTIGA.find(d => d.data === dt);
-          if (match) { match.compras += v.compras; match.fat += v.fat; }
+          if (match) match.compras += v.compras;
         }
       }
       // If sale date falls within nova's date range
       if (novaStart && dt >= novaStart && dt <= novaEnd) {
         const entry = compNovaMap[dt];
-        if (entry) { entry.compras += v.compras; entry.fat += v.fat; }
+        if (entry) { entry.compras += v.compras; }
         else {
           const match = COMP_NOVA.find(d => d.data === dt);
-          if (match) { match.compras += v.compras; match.fat += v.fat; }
+          if (match) match.compras += v.compras;
         }
       }
     }
@@ -606,15 +605,12 @@ function renderKpiVisao(dias) {
   const compras = dias.reduce((s, d) => s + d.compras, 0), cliques = dias.reduce((s, d) => s + d.cliques, 0);
   const imp = dias.reduce((s, d) => s + d.imp, 0);
   const roas = inv > 0 ? fat / inv : 0, cpc = cliques > 0 ? inv / cliques : 0, cpm = imp > 0 ? inv / imp * 1000 : 0;
-  const ticket = compras > 0 ? fat / compras : 0, cac = compras > 0 ? inv / compras : 0;
   const roasColor = roas >= 1.7 ? 'green' : roas >= 1 ? 'yellow' : 'red';
   document.getElementById('kpi-visao').innerHTML = `
     <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${brl(inv)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Faturamento</div><div class="kpi-value green">${brl(fat)}</div></div>
     <div class="kpi-card"><div class="kpi-label">ROAS</div><div class="kpi-value ${roasColor}">${br(roas, 2)}x</div></div>
     <div class="kpi-card"><div class="kpi-label">Compras</div><div class="kpi-value orange">${br(compras, 0)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value green">${brl(ticket)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">CAC</div><div class="kpi-value orange">${brl(cac)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Cliques</div><div class="kpi-value orange">${br(cliques, 0)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Impressões</div><div class="kpi-value orange">${br(imp, 0)}</div></div>
     <div class="kpi-card"><div class="kpi-label">CPC</div><div class="kpi-value orange">${brl(cpc)}</div></div>
@@ -643,8 +639,7 @@ function renderTaxaGrid(dias) {
 function renderTbodyDias(dias) {
   document.getElementById('tbody-dias').innerHTML = dias.map(d => {
     const roas = d.inv > 0 ? d.fat / d.inv : 0, cpc = d.cliques > 0 ? d.inv / d.cliques : 0, cpm = d.imp > 0 ? d.inv / d.imp * 1000 : 0;
-    const ticket = d.compras > 0 ? d.fat / d.compras : 0, cac = d.compras > 0 ? d.inv / d.compras : 0;
-    return `<tr><td>${d.data}</td><td>${brl(d.inv)}</td><td>${brl(d.fat)}</td><td>${br(roas, 2)}x</td><td>${br(d.compras, 0)}</td><td>${brl(ticket)}</td><td>${brl(cac)}</td><td>${br(d.cliques, 0)}</td><td>${br(d.pv, 0)}</td><td>${br(d.ck, 0)}</td><td>${br(d.imp, 0)}</td><td>${brl(cpc)}</td><td>${brl(cpm)}</td><td>${statusBadge(d.inv, d.fat)}</td></tr>`;
+    return `<tr><td>${d.data}</td><td>${brl(d.inv)}</td><td>${brl(d.fat)}</td><td>${br(roas, 2)}x</td><td>${br(d.compras, 0)}</td><td>${br(d.cliques, 0)}</td><td>${br(d.pv, 0)}</td><td>${br(d.ck, 0)}</td><td>${br(d.imp, 0)}</td><td>${brl(cpc)}</td><td>${brl(cpm)}</td><td>${statusBadge(d.inv, d.fat)}</td></tr>`;
   }).join('');
 }
 
@@ -729,42 +724,37 @@ let chartInvSem, chartRoasSem;
 function renderSemanal() {
   const s = SEMANAL;
   const inv = s.reduce((a, r) => a + r.inv, 0), fat = s.reduce((a, r) => a + r.fat, 0), compras = s.reduce((a, r) => a + r.compras, 0);
-  const roas = inv > 0 ? fat / inv : 0, ticket = compras > 0 ? fat / compras : 0, cac = compras > 0 ? inv / compras : 0;
+  const roas = inv > 0 ? fat / inv : 0;
   document.getElementById('kpi-semanal').innerHTML = `
     <div class="kpi-card"><div class="kpi-label">Total Investido</div><div class="kpi-value orange">${brl(inv)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Total Faturado</div><div class="kpi-value green">${brl(fat)}</div></div>
     <div class="kpi-card"><div class="kpi-label">ROAS Geral</div><div class="kpi-value ${roas >= 1.7 ? 'green' : roas >= 1 ? 'yellow' : 'red'}">${br(roas, 2)}x</div></div>
-    <div class="kpi-card"><div class="kpi-label">Total Compras</div><div class="kpi-value orange">${br(compras, 0)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value green">${brl(ticket)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">CAC</div><div class="kpi-value orange">${brl(cac)}</div></div>`;
+    <div class="kpi-card"><div class="kpi-label">Total Compras</div><div class="kpi-value orange">${br(compras, 0)}</div></div>`;
   const labels = s.map(r => 'S' + r.semana);
   const opts = { responsive: true, plugins: { legend: { labels: { color: 'rgba(255,255,255,.5)', font: { size: 10 } } } }, scales: { x: { ticks: { color: 'rgba(255,255,255,.35)', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,.05)' } }, y: { ticks: { color: 'rgba(255,255,255,.35)', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,.05)' } } } };
   if (chartInvSem) chartInvSem.destroy(); if (chartRoasSem) chartRoasSem.destroy();
   chartInvSem = new Chart(document.getElementById('chart-inv-sem'), { type: 'bar', data: { labels, datasets: [{ label: 'Investimento', data: s.map(r => r.inv), backgroundColor: 'rgba(255,107,43,0.85)', borderRadius: 4 }] }, options: opts });
   chartRoasSem = new Chart(document.getElementById('chart-roas-sem'), { type: 'line', data: { labels, datasets: [{ label: 'ROAS', data: s.map(r => r.roas), borderColor: 'rgba(255,183,55,0.95)', backgroundColor: 'rgba(255,183,55,0.13)', fill: true, tension: 0.3 }] }, options: opts });
-  document.getElementById('tbody-semanal').innerHTML = s.map(r => { const cacS = r.compras > 0 ? r.inv / r.compras : 0; return `<tr><td>S${r.semana}</td><td>${brl(r.inv)}</td><td>${brl(r.fat)}</td><td>${br(r.roas, 2)}x</td><td>${brl(r.retorno)}</td><td>${br(r.compras, 0)}</td><td>${brl(r.ticket)}</td><td>${brl(cacS)}</td><td>${br(r.cliques, 0)}</td><td>${br(r.pv, 0)}</td><td>${br(r.ck, 0)}</td><td>${brl(r.cpc)}</td><td>${brl(r.cpm)}</td><td>${pct(r.connectRate)}</td><td>${statusBadge(r.inv, r.fat)}</td></tr>`; }).join('');
+  document.getElementById('tbody-semanal').innerHTML = s.map(r => `<tr><td>S${r.semana}</td><td>${brl(r.inv)}</td><td>${brl(r.fat)}</td><td>${br(r.roas, 2)}x</td><td>${brl(r.retorno)}</td><td>${br(r.compras, 0)}</td><td>${brl(r.ticket)}</td><td>${br(r.cliques, 0)}</td><td>${br(r.pv, 0)}</td><td>${br(r.ck, 0)}</td><td>${brl(r.cpc)}</td><td>${brl(r.cpm)}</td><td>${pct(r.connectRate)}</td><td>${statusBadge(r.inv, r.fat)}</td></tr>`).join('');
 }
 
 // ===== MENSAL =====
 function renderMensal() {
   const m = MENSAL;
   const inv = m.reduce((a, r) => a + r.inv, 0), fat = m.reduce((a, r) => a + r.fat, 0), compras = m.reduce((a, r) => a + r.compras, 0);
-  const roas = inv > 0 ? fat / inv : 0, ticket = compras > 0 ? fat / compras : 0, cac = compras > 0 ? inv / compras : 0;
+  const roas = inv > 0 ? fat / inv : 0;
   document.getElementById('kpi-mensal').innerHTML = `
     <div class="kpi-card"><div class="kpi-label">Total Investido</div><div class="kpi-value orange">${brl(inv)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Total Faturado</div><div class="kpi-value green">${brl(fat)}</div></div>
     <div class="kpi-card"><div class="kpi-label">ROAS Geral</div><div class="kpi-value ${roas >= 1.7 ? 'green' : roas >= 1 ? 'yellow' : 'red'}">${br(roas, 2)}x</div></div>
-    <div class="kpi-card"><div class="kpi-label">Total Compras</div><div class="kpi-value orange">${br(compras, 0)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value green">${brl(ticket)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">CAC</div><div class="kpi-value orange">${brl(cac)}</div></div>`;
-  document.getElementById('tbody-mensal').innerHTML = m.map(r => { const cacM = r.compras > 0 ? r.inv / r.compras : 0; return `<tr><td>${r.mes}</td><td>${brl(r.inv)}</td><td>${brl(r.fat)}</td><td>${br(r.roas, 2)}x</td><td>${brl(r.retorno)}</td><td>${br(r.compras, 0)}</td><td>${brl(r.ticket)}</td><td>${brl(cacM)}</td><td>${br(r.cliques, 0)}</td><td>${br(r.pv, 0)}</td><td>${br(r.ck, 0)}</td><td>${br(r.imp, 0)}</td><td>${brl(r.cpc)}</td><td>${brl(r.cpm)}</td><td>${pct(r.connectRate)}</td><td>${statusBadge(r.inv, r.fat)}</td></tr>`; }).join('');
+    <div class="kpi-card"><div class="kpi-label">Total Compras</div><div class="kpi-value orange">${br(compras, 0)}</div></div>`;
+  document.getElementById('tbody-mensal').innerHTML = m.map(r => `<tr><td>${r.mes}</td><td>${brl(r.inv)}</td><td>${brl(r.fat)}</td><td>${br(r.roas, 2)}x</td><td>${brl(r.retorno)}</td><td>${br(r.compras, 0)}</td><td>${brl(r.ticket)}</td><td>${br(r.cliques, 0)}</td><td>${br(r.pv, 0)}</td><td>${br(r.ck, 0)}</td><td>${br(r.imp, 0)}</td><td>${brl(r.cpc)}</td><td>${brl(r.cpm)}</td><td>${pct(r.connectRate)}</td><td>${statusBadge(r.inv, r.fat)}</td></tr>`).join('');
 }
 
 // ===== COMPARATIVO DE PÁGINAS =====
 function renderComparativo() {
   function sumArr(arr) {
     const inv = arr.reduce((s, d) => s + d.inv, 0);
-    const fat = arr.reduce((s, d) => s + (d.fat || 0), 0);
     const cliques = arr.reduce((s, d) => s + d.cliques, 0);
     const pv = arr.reduce((s, d) => s + d.pv, 0);
     const ck = arr.reduce((s, d) => s + d.ck, 0);
@@ -772,11 +762,9 @@ function renderComparativo() {
     const compras = arr.reduce((s, d) => s + (d.compras || 0), 0);
     const dias = arr.length;
     const connectRate = cliques > 0 ? pv / cliques * 100 : 0;
-    const taxaConversao = pv > 0 ? compras / pv * 100 : 0;
+    const taxaConversao = pv > 0 ? ck / pv * 100 : 0;
     const cpm = imp > 0 ? inv / imp * 1000 : 0;
-    const ticket = compras > 0 ? fat / compras : 0;
-    const cac = compras > 0 ? inv / compras : 0;
-    return { inv, fat, cliques, pv, ck, imp, compras, dias, connectRate, taxaConversao, cpm, ticket, cac };
+    return { inv, cliques, pv, ck, imp, compras, dias, connectRate, taxaConversao, cpm };
   }
   const a = sumArr(COMP_ANTIGA), n = sumArr(COMP_NOVA);
 
@@ -795,12 +783,10 @@ function renderComparativo() {
     const deltaText = diff === 0 ? 'Igual' : `${arrow} ${br(Math.abs(pctDiff), 1)}%`;
 
     function subMetrics(m) {
-      return `<div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+      return `<div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div style="text-align:center"><div style="font-size:9px;color:rgba(255,255,255,.35);text-transform:uppercase">Cliques</div><div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:600">${br(m.cliques, 0)}</div></div>
         <div style="text-align:center"><div style="font-size:9px;color:rgba(255,255,255,.35);text-transform:uppercase">Pageviews</div><div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:600">${br(m.pv, 0)}</div></div>
         <div style="text-align:center"><div style="font-size:9px;color:rgba(255,255,255,.35);text-transform:uppercase">Vendas</div><div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:600">${br(m.compras, 0)}</div></div>
-        <div style="text-align:center"><div style="font-size:9px;color:rgba(255,255,255,.35);text-transform:uppercase">Ticket Médio</div><div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:600">${brl(m.ticket)}</div></div>
-        <div style="text-align:center"><div style="font-size:9px;color:rgba(255,255,255,.35);text-transform:uppercase">CAC</div><div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:600">${brl(m.cac)}</div></div>
         <div style="text-align:center"><div style="font-size:9px;color:rgba(255,255,255,.35);text-transform:uppercase">CPM</div><div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:600">${brl(m.cpm)}</div></div>
       </div>`;
     }
