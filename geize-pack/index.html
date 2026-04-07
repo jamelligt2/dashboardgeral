@@ -252,28 +252,42 @@
   <div id="tab-semanal" class="content">
     <div class="kpi-grid" id="kpi-semanal"></div>
     <div class="chart-grid-2x2">
-      <div class="chart-card">
-        <h4>Investimento por Semana</h4>
-        <canvas id="chart-inv-week"></canvas>
-      </div>
-      <div class="chart-card">
-        <h4>ROAS por Semana</h4>
-        <canvas id="chart-roas-week"></canvas>
-      </div>
+      <div class="chart-card"><h4>Investimento × Faturamento</h4><canvas id="chartSemInv"></canvas></div>
+      <div class="chart-card"><h4>ROAS</h4><canvas id="chartSemRoas"></canvas></div>
+      <div class="chart-card"><h4>Compras</h4><canvas id="chartSemCompras"></canvas></div>
+      <div class="chart-card"><h4>Ticket Médio</h4><canvas id="chartSemTicket"></canvas></div>
+      <div class="chart-card"><h4>CAC</h4><canvas id="chartSemCAC"></canvas></div>
+      <div class="chart-card"><h4>Taxa de Conversão</h4><canvas id="chartSemTxConv"></canvas></div>
+      <div class="chart-card"><h4>CPC</h4><canvas id="chartSemCPC"></canvas></div>
+      <div class="chart-card"><h4>CPM</h4><canvas id="chartSemCPM"></canvas></div>
+      <div class="chart-card"><h4>Retorno (Fat − Inv)</h4><canvas id="chartSemRetorno"></canvas></div>
+      <div class="chart-card"><h4>Connect Rate</h4><canvas id="chartSemCR"></canvas></div>
     </div>
-    <div class="sec-title">Desempenho Semanal</div>
-    <div class="tbl-wrap">
-      <table id="table-semanal"></table>
-    </div>
+    <div class="sec-title">Detalhamento Semanal</div>
+    <div class="tbl-wrap"><table><thead><tr>
+      <th>Semana</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Retorno</th><th>Compras</th><th>Ticket</th><th>CAC</th><th>Taxa Conv.</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Taxa Compra</th><th>Status</th>
+    </tr></thead><tbody id="tbody-semanal"></tbody></table></div>
   </div>
 
   <!-- TAB 5: MENSAL -->
   <div id="tab-mensal" class="content">
     <div class="kpi-grid" id="kpi-mensal"></div>
-    <div class="sec-title">Desempenho Mensal</div>
-    <div class="tbl-wrap">
-      <table id="table-mensal"></table>
+    <div class="chart-grid-2x2">
+      <div class="chart-card"><h4>Investimento × Faturamento</h4><canvas id="chartMesInv"></canvas></div>
+      <div class="chart-card"><h4>ROAS</h4><canvas id="chartMesRoas"></canvas></div>
+      <div class="chart-card"><h4>Compras</h4><canvas id="chartMesCompras"></canvas></div>
+      <div class="chart-card"><h4>Ticket Médio</h4><canvas id="chartMesTicket"></canvas></div>
+      <div class="chart-card"><h4>CAC</h4><canvas id="chartMesCAC"></canvas></div>
+      <div class="chart-card"><h4>Taxa de Conversão</h4><canvas id="chartMesTxConv"></canvas></div>
+      <div class="chart-card"><h4>CPC</h4><canvas id="chartMesCPC"></canvas></div>
+      <div class="chart-card"><h4>CPM</h4><canvas id="chartMesCPM"></canvas></div>
+      <div class="chart-card"><h4>Retorno (Fat − Inv)</h4><canvas id="chartMesRetorno"></canvas></div>
+      <div class="chart-card"><h4>Connect Rate</h4><canvas id="chartMesCR"></canvas></div>
     </div>
+    <div class="sec-title">Detalhamento Mensal</div>
+    <div class="tbl-wrap"><table><thead><tr>
+      <th>Mês</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Retorno</th><th>Compras</th><th>Ticket</th><th>CAC</th><th>Taxa Conv.</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Taxa Compra</th><th>Status</th>
+    </tr></thead><tbody id="tbody-mensal"></tbody></table></div>
   </div>
 
   <script>
@@ -350,6 +364,17 @@
       if (r >= 1) return '<span class="badge otimizar">Otimizar</span>';
       return '<span class="badge corrigir">Corrigir</span>';
     }
+
+    function roasColor(r){if(r>=1.7)return 'green';if(r>=1)return 'yellow';return 'red';}
+
+    function makeChart(canvasId,cfg){
+      if(charts[canvasId]){charts[canvasId].destroy();}
+      const ctx=document.getElementById(canvasId);
+      if(!ctx)return;
+      charts[canvasId]=new Chart(ctx,cfg);
+    }
+    const chartDefaults={responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'rgba(255,255,255,0.5)',font:{size:10,family:'DM Sans'}}},tooltip:{backgroundColor:'#12121f',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleColor:'#ff6b2b',bodyColor:'#e8e6f0',titleFont:{family:'DM Sans'},bodyFont:{family:'DM Mono'}}},scales:{x:{ticks:{color:'rgba(255,255,255,0.4)',font:{size:9,family:'DM Mono'},maxRotation:45},grid:{color:'rgba(255,255,255,0.05)'}},y:{ticks:{color:'rgba(255,255,255,0.4)',font:{size:9,family:'DM Mono'}},grid:{color:'rgba(255,255,255,0.05)'}}}};
+
 
     function fixFatFromDias() {
       const fatWk = {}, compWk = {}, cliqWk = {}, pvWk = {}, ckWk = {}, impWk = {}, invWk = {};
@@ -821,68 +846,10 @@
       const cpcData = dias.map(d => d.cpc);
       const comprasData = dias.map(d => d.compras);
 
-      if (charts['inv-fat']) charts['inv-fat'].destroy();
-      charts['inv-fat'] = new Chart(document.getElementById('chart-inv-fat'), {
-        type: 'bar',
-        data: {
-          labels,
-          datasets: [
-            { label: 'Investimento', data: invData, backgroundColor: '#ff6b2b', borderRadius: 4 },
-            { label: 'Faturamento', data: fatData, backgroundColor: '#2ecc71', borderRadius: 4 }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { labels: { color: 'rgba(255,255,255,.5)', font: { family: "'DM Sans'" } } } },
-          scales: { y: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: 'rgba(255,255,255,.5)' } }, x: { ticks: { color: 'rgba(255,255,255,.5)' } } }
-        }
-      });
-
-      if (charts['roas']) charts['roas'].destroy();
-      charts['roas'] = new Chart(document.getElementById('chart-roas'), {
-        type: 'line',
-        data: {
-          labels,
-          datasets: [{ label: 'ROAS', data: roasData, borderColor: '#ff6b2b', backgroundColor: 'rgba(255,107,43,.1)', tension: 0.3, borderWidth: 2 }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { labels: { color: 'rgba(255,255,255,.5)' } } },
-          scales: { y: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: 'rgba(255,255,255,.5)' } }, x: { ticks: { color: 'rgba(255,255,255,.5)' } } }
-        }
-      });
-
-      if (charts['cpc']) charts['cpc'].destroy();
-      charts['cpc'] = new Chart(document.getElementById('chart-cpc'), {
-        type: 'line',
-        data: {
-          labels,
-          datasets: [{ label: 'CPC', data: cpcData, borderColor: '#ff6b2b', backgroundColor: 'rgba(255,107,43,.1)', tension: 0.3, borderWidth: 2 }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { labels: { color: 'rgba(255,255,255,.5)' } } },
-          scales: { y: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: 'rgba(255,255,255,.5)' } }, x: { ticks: { color: 'rgba(255,255,255,.5)' } } }
-        }
-      });
-
-      if (charts['compras']) charts['compras'].destroy();
-      charts['compras'] = new Chart(document.getElementById('chart-compras'), {
-        type: 'bar',
-        data: {
-          labels,
-          datasets: [{ label: 'Compras', data: comprasData, backgroundColor: '#2ecc71', borderRadius: 4 }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { labels: { color: 'rgba(255,255,255,.5)' } } },
-          scales: { y: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: 'rgba(255,255,255,.5)' } }, x: { ticks: { color: 'rgba(255,255,255,.5)' } } }
-        }
-      });
+      makeChart('inv-fat',{type:'bar',data:{labels,datasets:[{label:'Investimento',data:invData,backgroundColor:'rgba(255,107,43,0.5)',borderRadius:4},{label:'Faturamento',data:fatData,backgroundColor:'rgba(46,204,113,0.5)',borderRadius:4}]},options:{...chartDefaults}});
+      makeChart('roas',{type:'line',data:{labels,datasets:[{label:'ROAS',data:roasData,borderColor:'#ff6b2b',backgroundColor:'rgba(255,107,43,.1)',tension:0.3,borderWidth:2}]},options:{...chartDefaults}});
+      makeChart('cpc',{type:'line',data:{labels,datasets:[{label:'CPC',data:cpcData,borderColor:'#ff6b2b',backgroundColor:'rgba(255,107,43,.1)',tension:0.3,borderWidth:2}]},options:{...chartDefaults}});
+      makeChart('compras',{type:'bar',data:{labels,datasets:[{label:'Compras',data:comprasData,backgroundColor:'rgba(46,204,113,0.5)',borderRadius:4}]},options:{...chartDefaults}});
     }
 
     function filterCriativos(type, btn) {
@@ -1080,112 +1047,85 @@
       document.getElementById('table-publicos').innerHTML = tblHtml;
     }
 
-    function renderSemanal() {
-      const semanas = filteredSemanal();
-      const totInv = semanas.reduce((a, s) => a + s.inv, 0);
-      const totFat = semanas.reduce((a, s) => a + s.fat, 0);
-      const totCompras = semanas.reduce((a, s) => a + s.compras, 0);
-      const roas = totInv > 0 ? Math.round(totFat / totInv * 100) / 100 : 0;
+    function renderSemanal(){
+      const inv=SEMANAL.reduce((s,w)=>s+w.inv,0);
+      const fat=SEMANAL.reduce((s,w)=>s+w.fat,0);
+      const compras=SEMANAL.reduce((s,w)=>s+w.compras,0);
+      const pv=SEMANAL.reduce((s,w)=>s+w.pv,0);
+      const roas=inv>0?fat/inv:0;
+      const ticket=compras>0?fat/compras:0;
+      const cac=compras>0?inv/compras:0;
+      const taxaConv=pv>0?compras/pv*100:0;
+      document.getElementById('kpi-semanal').innerHTML=`
+        <div class="kpi-card"><div class="kpi-label">Investimento Total</div><div class="kpi-value orange">${brl(inv)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Faturamento Total</div><div class="kpi-value green">${brl(fat)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">ROAS Geral</div><div class="kpi-value ${roasColor(roas)}">${br(roas,2)}x</div></div>
+        <div class="kpi-card"><div class="kpi-label">Total Compras</div><div class="kpi-value orange">${br(compras,0)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value orange">${brl(ticket)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">CAC</div><div class="kpi-value orange">${brl(cac)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Taxa de Conversão</div><div class="kpi-value orange">${pct(taxaConv)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Retorno</div><div class="kpi-value ${fat-inv>=0?'green':'red'}">${brl(fat-inv)}</div></div>`;
 
-      document.getElementById('kpi-semanal').innerHTML = `
-        <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${brl(totInv)}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Faturamento</div><div class="kpi-value green">${brl(totFat)}</div></div>
-        <div class="kpi-card"><div class="kpi-label">ROAS</div><div class="kpi-value">${br(roas)}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Compras</div><div class="kpi-value green">${totCompras}</div></div>
-      `;
+      const labels=SEMANAL.map(w=>'S'+w.semana);
+      const noLeg={...chartDefaults,plugins:{...chartDefaults.plugins,legend:{display:false}}};
 
-      const labels = semanas.map(s => 'Sem ' + s.semana);
-      const invData = semanas.map(s => s.inv);
-      const roasData = semanas.map(s => s.roas);
+      makeChart('chartSemInv',{type:'bar',data:{labels,datasets:[{label:'Investimento',data:SEMANAL.map(w=>w.inv),backgroundColor:'rgba(255,107,43,0.5)',borderRadius:4},{label:'Faturamento',data:SEMANAL.map(w=>w.fat),backgroundColor:'rgba(46,204,113,0.5)',borderRadius:4}]},options:{...chartDefaults}});
+      makeChart('chartSemRoas',{type:'bar',data:{labels,datasets:[{label:'ROAS',data:SEMANAL.map(w=>w.roas),backgroundColor:SEMANAL.map(w=>w.roas>=1.7?'rgba(46,204,113,0.6)':w.roas>=1?'rgba(241,196,15,0.6)':'rgba(231,76,60,0.6)'),borderRadius:4}]},options:noLeg});
+      makeChart('chartSemCompras',{type:'bar',data:{labels,datasets:[{label:'Compras',data:SEMANAL.map(w=>w.compras),backgroundColor:'rgba(255,107,43,0.5)',borderRadius:4}]},options:noLeg});
+      makeChart('chartSemTicket',{type:'bar',data:{labels,datasets:[{label:'Ticket Médio',data:SEMANAL.map(w=>w.ticket),backgroundColor:'rgba(52,152,219,0.5)',borderRadius:4}]},options:noLeg});
+      makeChart('chartSemCAC',{type:'bar',data:{labels,datasets:[{label:'CAC',data:SEMANAL.map(w=>w.compras>0?Math.round(w.inv/w.compras*100)/100:0),backgroundColor:'rgba(231,76,60,0.5)',borderRadius:4}]},options:noLeg});
+      makeChart('chartSemTxConv',{type:'bar',data:{labels,datasets:[{label:'Taxa Conv. %',data:SEMANAL.map(w=>w.pv>0?Math.round(w.compras/w.pv*100*100)/100:0),backgroundColor:'rgba(46,204,113,0.5)',borderRadius:4}]},options:noLeg});
+      makeChart('chartSemCPC',{type:'bar',data:{labels,datasets:[{label:'CPC',data:SEMANAL.map(w=>w.cpc),backgroundColor:'rgba(155,89,182,0.5)',borderRadius:4}]},options:noLeg});
+      makeChart('chartSemCPM',{type:'bar',data:{labels,datasets:[{label:'CPM',data:SEMANAL.map(w=>w.cpm),backgroundColor:'rgba(241,196,15,0.5)',borderRadius:4}]},options:noLeg});
+      makeChart('chartSemRetorno',{type:'bar',data:{labels,datasets:[{label:'Retorno',data:SEMANAL.map(w=>w.retorno),backgroundColor:SEMANAL.map(w=>w.retorno>=0?'rgba(46,204,113,0.6)':'rgba(231,76,60,0.6)'),borderRadius:4}]},options:noLeg});
+      makeChart('chartSemCR',{type:'bar',data:{labels,datasets:[{label:'Connect Rate %',data:SEMANAL.map(w=>w.connectRate),backgroundColor:'rgba(52,152,219,0.5)',borderRadius:4}]},options:noLeg});
 
-      if (charts['inv-week']) charts['inv-week'].destroy();
-      charts['inv-week'] = new Chart(document.getElementById('chart-inv-week'), {
-        type: 'bar',
-        data: {
-          labels,
-          datasets: [{ label: 'Investimento', data: invData, backgroundColor: '#ff6b2b', borderRadius: 4 }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { labels: { color: 'rgba(255,255,255,.5)' } } },
-          scales: { y: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: 'rgba(255,255,255,.5)' } }, x: { ticks: { color: 'rgba(255,255,255,.5)' } } }
-        }
-      });
-
-      if (charts['roas-week']) charts['roas-week'].destroy();
-      charts['roas-week'] = new Chart(document.getElementById('chart-roas-week'), {
-        type: 'line',
-        data: {
-          labels,
-          datasets: [{ label: 'ROAS', data: roasData, borderColor: '#ff6b2b', backgroundColor: 'rgba(255,107,43,.1)', tension: 0.3, borderWidth: 2 }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { labels: { color: 'rgba(255,255,255,.5)' } } },
-          scales: { y: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: 'rgba(255,255,255,.5)' } }, x: { ticks: { color: 'rgba(255,255,255,.5)' } } }
-        }
-      });
-
-      let tblHtml = '<thead><tr><th>Semana</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Cliques</th><th>PV</th><th>CK</th><th>Imp.</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Retorno</th><th>Status</th></tr></thead><tbody>';
-      semanas.forEach(s => {
-        tblHtml += `<tr>
-          <td>Sem ${s.semana}</td>
-          <td>${brl(s.inv)}</td>
-          <td>${brl(s.fat)}</td>
-          <td>${br(s.roas)}</td>
-          <td>${s.compras}</td>
-          <td>${s.cliques}</td>
-          <td>${s.pv}</td>
-          <td>${s.ck}</td>
-          <td>${s.imp}</td>
-          <td>${brl(s.cpc)}</td>
-          <td>${brl(s.cpm)}</td>
-          <td>${pct(s.connectRate)}</td>
-          <td>${brl(s.retorno)}</td>
-          <td>${statusBadge(s.inv, s.fat)}</td>
-        </tr>`;
-      });
-      tblHtml += '</tbody>';
-      document.getElementById('table-semanal').innerHTML = tblHtml;
+      document.getElementById('tbody-semanal').innerHTML=SEMANAL.map(w=>{
+        const wCac=w.compras>0?w.inv/w.compras:0;
+        const wTxConv=w.pv>0?w.compras/w.pv*100:0;
+        return `<tr><td>S${w.semana}</td><td>${brl(w.inv)}</td><td>${brl(w.fat)}</td><td class="${roasColor(w.roas)}">${br(w.roas,2)}x</td><td class="${w.retorno>=0?'green':'red'}">${brl(w.retorno)}</td><td>${br(w.compras,0)}</td><td>${brl(w.ticket)}</td><td>${brl(wCac)}</td><td>${pct(wTxConv)}</td><td>${brl(w.cpc)}</td><td>${brl(w.cpm)}</td><td>${pct(w.connectRate)}</td><td>${pct(w.taxaCompra)}</td><td>${statusBadge(w.inv,w.fat)}</td></tr>`;
+      }).join('');
     }
 
-    function renderMensal() {
-      const meses = filteredMensal();
-      const totInv = meses.reduce((a, m) => a + m.inv, 0);
-      const totFat = meses.reduce((a, m) => a + m.fat, 0);
-      const totCompras = meses.reduce((a, m) => a + m.compras, 0);
-      const roas = totInv > 0 ? Math.round(totFat / totInv * 100) / 100 : 0;
+    function renderMensal(){
+      const mFiltered = MENSAL.filter(m => m.inv > 0 || m.fat > 0);
+      const inv=mFiltered.reduce((s,m)=>s+m.inv,0);
+      const fat=mFiltered.reduce((s,m)=>s+m.fat,0);
+      const compras=mFiltered.reduce((s,m)=>s+m.compras,0);
+      const pvM=mFiltered.reduce((s,m)=>s+m.pv,0);
+      const roas=inv>0?fat/inv:0;
+      const ticketM=compras>0?fat/compras:0;
+      const cacM=compras>0?inv/compras:0;
+      const taxaConvM=pvM>0?compras/pvM*100:0;
+      document.getElementById('kpi-mensal').innerHTML=`
+        <div class="kpi-card"><div class="kpi-label">Investimento Total</div><div class="kpi-value orange">${brl(inv)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Faturamento Total</div><div class="kpi-value green">${brl(fat)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">ROAS Geral</div><div class="kpi-value ${roasColor(roas)}">${br(roas,2)}x</div></div>
+        <div class="kpi-card"><div class="kpi-label">Total Compras</div><div class="kpi-value orange">${br(compras,0)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value orange">${brl(ticketM)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">CAC</div><div class="kpi-value orange">${brl(cacM)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Taxa de Conversão</div><div class="kpi-value orange">${pct(taxaConvM)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Retorno</div><div class="kpi-value ${fat-inv>=0?'green':'red'}">${brl(fat-inv)}</div></div>`;
 
-      document.getElementById('kpi-mensal').innerHTML = `
-        <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${brl(totInv)}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Faturamento</div><div class="kpi-value green">${brl(totFat)}</div></div>
-        <div class="kpi-card"><div class="kpi-label">ROAS</div><div class="kpi-value">${br(roas)}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Compras</div><div class="kpi-value green">${totCompras}</div></div>
-      `;
+      const labelsM=mFiltered.map(m=>m.mes);
+      const noLegM={...chartDefaults,plugins:{...chartDefaults.plugins,legend:{display:false}}};
 
-      let tblHtml = '<thead><tr><th>Mês</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Cliques</th><th>PV</th><th>CK</th><th>Imp.</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Retorno</th><th>Status</th></tr></thead><tbody>';
-      meses.forEach(m => {
-        tblHtml += `<tr>
-          <td>${m.mes}</td>
-          <td>${brl(m.inv)}</td>
-          <td>${brl(m.fat)}</td>
-          <td>${br(m.roas)}</td>
-          <td>${m.compras}</td>
-          <td>${m.cliques}</td>
-          <td>${m.pv}</td>
-          <td>${m.ck}</td>
-          <td>${m.imp}</td>
-          <td>${brl(m.cpc)}</td>
-          <td>${brl(m.cpm)}</td>
-          <td>${pct(m.connectRate)}</td>
-          <td>${brl(m.retorno)}</td>
-          <td>${statusBadge(m.inv, m.fat)}</td>
-        </tr>`;
-      });
-      tblHtml += '</tbody>';
-      document.getElementById('table-mensal').innerHTML = tblHtml;
+      makeChart('chartMesInv',{type:'bar',data:{labels:labelsM,datasets:[{label:'Investimento',data:mFiltered.map(m=>m.inv),backgroundColor:'rgba(255,107,43,0.5)',borderRadius:4},{label:'Faturamento',data:mFiltered.map(m=>m.fat),backgroundColor:'rgba(46,204,113,0.5)',borderRadius:4}]},options:{...chartDefaults}});
+      makeChart('chartMesRoas',{type:'bar',data:{labels:labelsM,datasets:[{label:'ROAS',data:mFiltered.map(m=>m.roas),backgroundColor:mFiltered.map(m=>m.roas>=1.7?'rgba(46,204,113,0.6)':m.roas>=1?'rgba(241,196,15,0.6)':'rgba(231,76,60,0.6)'),borderRadius:4}]},options:noLegM});
+      makeChart('chartMesCompras',{type:'bar',data:{labels:labelsM,datasets:[{label:'Compras',data:mFiltered.map(m=>m.compras),backgroundColor:'rgba(255,107,43,0.5)',borderRadius:4}]},options:noLegM});
+      makeChart('chartMesTicket',{type:'bar',data:{labels:labelsM,datasets:[{label:'Ticket Médio',data:mFiltered.map(m=>m.ticket),backgroundColor:'rgba(52,152,219,0.5)',borderRadius:4}]},options:noLegM});
+      makeChart('chartMesCAC',{type:'bar',data:{labels:labelsM,datasets:[{label:'CAC',data:mFiltered.map(m=>m.compras>0?Math.round(m.inv/m.compras*100)/100:0),backgroundColor:'rgba(231,76,60,0.5)',borderRadius:4}]},options:noLegM});
+      makeChart('chartMesTxConv',{type:'bar',data:{labels:labelsM,datasets:[{label:'Taxa Conv. %',data:mFiltered.map(m=>m.pv>0?Math.round(m.compras/m.pv*100*100)/100:0),backgroundColor:'rgba(46,204,113,0.5)',borderRadius:4}]},options:noLegM});
+      makeChart('chartMesCPC',{type:'bar',data:{labels:labelsM,datasets:[{label:'CPC',data:mFiltered.map(m=>m.cpc),backgroundColor:'rgba(155,89,182,0.5)',borderRadius:4}]},options:noLegM});
+      makeChart('chartMesCPM',{type:'bar',data:{labels:labelsM,datasets:[{label:'CPM',data:mFiltered.map(m=>m.cpm),backgroundColor:'rgba(241,196,15,0.5)',borderRadius:4}]},options:noLegM});
+      makeChart('chartMesRetorno',{type:'bar',data:{labels:labelsM,datasets:[{label:'Retorno',data:mFiltered.map(m=>m.retorno),backgroundColor:mFiltered.map(m=>m.retorno>=0?'rgba(46,204,113,0.6)':'rgba(231,76,60,0.6)'),borderRadius:4}]},options:noLegM});
+      makeChart('chartMesCR',{type:'bar',data:{labels:labelsM,datasets:[{label:'Connect Rate %',data:mFiltered.map(m=>m.connectRate),backgroundColor:'rgba(52,152,219,0.5)',borderRadius:4}]},options:noLegM});
+
+      document.getElementById('tbody-mensal').innerHTML=mFiltered.map(m=>{
+        const mCac=m.compras>0?m.inv/m.compras:0;
+        const mTxConv=m.pv>0?m.compras/m.pv*100:0;
+        return `<tr><td>${m.mes}</td><td>${brl(m.inv)}</td><td>${brl(m.fat)}</td><td class="${roasColor(m.roas)}">${br(m.roas,2)}x</td><td class="${m.retorno>=0?'green':'red'}">${brl(m.retorno)}</td><td>${br(m.compras,0)}</td><td>${brl(m.ticket)}</td><td>${brl(mCac)}</td><td>${pct(mTxConv)}</td><td>${brl(m.cpc)}</td><td>${brl(m.cpm)}</td><td>${pct(m.connectRate)}</td><td>${pct(m.taxaCompra)}</td><td>${statusBadge(m.inv,m.fat)}</td></tr>`;
+      }).join('');
     }
 
     window.addEventListener('DOMContentLoaded', fetchData);
