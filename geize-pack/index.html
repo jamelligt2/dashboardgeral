@@ -414,7 +414,7 @@
     async function fetchData() {
       try {
         const gerURL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent('Gerenciador')}`;
-        const webURL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent('Vendas')}`;
+        const webURL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent('Webhook')}`;
 
         const gerRes = await fetch(gerURL);
         const gerText = await gerRes.text();
@@ -452,23 +452,24 @@
           diaMap[data].items.push({ adName, adset, spend, clicks, pv, ck, link, imp });
         });
 
-        // Aba Vendas: col1=Status, col10=Data Pagamento (DD/MM/AAAA HH:MM), col22=Valor da Venda, col47=UTM Source
+        // Aba Webhook: col3=data.status("paid"), col23=data.utm.source("meta_ads"), col28=data.createdAt(ISO), col33=data.price.paid.value
         const webPaid = webData.filter(row => {
-          const status = (row[1] || '').trim().toLowerCase();
-          const source = (row[47] || '').toLowerCase().replace(/[\s_-]/g, '');
-          return status === 'paga' && source === 'metaads';
+          const status = (row[3] || '').trim().toLowerCase();
+          const source = (row[23] || '').toLowerCase().replace(/[\s_-]/g, '');
+          return status === 'paid' && source === 'metaads';
         });
 
         const webByDate = {};
         const webCountByDate = {};
         webPaid.forEach(row => {
-          const datePag = (row[10] || '').trim();
-          if (!datePag) return;
-          const dateParts = datePag.split(' ')[0]; // "DD/MM/AAAA"
-          const value = parseBR(row[22]);
-          if (!webByDate[dateParts]) { webByDate[dateParts] = 0; webCountByDate[dateParts] = 0; }
-          webByDate[dateParts] += value;
-          webCountByDate[dateParts] += 1;
+          const dateISO = (row[28] || '').substring(0, 10); // "YYYY-MM-DD"
+          if (!dateISO || dateISO.length < 10) return;
+          const [yw, mw, dw] = dateISO.split('-');
+          const dateBR = `${dw}/${mw}/${yw}`; // "DD/MM/YYYY"
+          const value = parseBR(row[33]);
+          if (!webByDate[dateBR]) { webByDate[dateBR] = 0; webCountByDate[dateBR] = 0; }
+          webByDate[dateBR] += value;
+          webCountByDate[dateBR] += 1;
         });
 
         // Include dates that exist in Vendas but not in Gerenciador
