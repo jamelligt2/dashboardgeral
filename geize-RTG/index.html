@@ -216,7 +216,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
   </div>
   <div class="sec-title">Detalhamento Semanal</div>
   <div class="tbl-wrap"><table><thead><tr>
-    <th>Semana</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Retorno</th><th>Compras</th><th>Ticket</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Taxa Compra</th><th>Status</th>
+    <th>Semana</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Retorno</th><th>Compras</th><th>Ticket</th><th>CAC</th><th>Taxa Conv.</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Taxa Compra</th><th>Status</th>
   </tr></thead><tbody id="tbody-semanal"></tbody></table></div>
 </div>
 
@@ -225,7 +225,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
   <div class="kpi-grid" id="kpi-mensal"></div>
   <div class="sec-title">Detalhamento Mensal</div>
   <div class="tbl-wrap"><table><thead><tr>
-    <th>Mês</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Retorno</th><th>Compras</th><th>Ticket</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Taxa Compra</th><th>Status</th>
+    <th>Mês</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Retorno</th><th>Compras</th><th>Ticket</th><th>CAC</th><th>Taxa Conv.</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Taxa Compra</th><th>Status</th>
   </tr></thead><tbody id="tbody-mensal"></tbody></table></div>
 </div>
 
@@ -416,9 +416,14 @@ function processData(gerCSV,wkCSV,vDatesCSV,vValuesCSV,vContentCSV){
   }
   const hasVendas=Object.keys(vndDayMap).length>0;
 
-  // Merge vendas/webhook into days — Vendas tem prioridade
-  const salesDayMap=hasVendas?vndDayMap:wkDayMap;
-  const salesCriMap=hasVendas?vndCriMap:wkCriMap;
+  // Merge: Vendas tem prioridade, mas Webhook complementa datas que Vendas não cobre
+  const salesDayMap={}, salesCriMap={};
+  // 1) Copiar tudo de Vendas
+  Object.keys(vndDayMap).forEach(k=>{salesDayMap[k]={fat:vndDayMap[k].fat,compras:vndDayMap[k].compras};});
+  Object.keys(vndCriMap).forEach(k=>{salesCriMap[k]={fat:vndCriMap[k].fat,compras:vndCriMap[k].compras};});
+  // 2) Complementar com Webhook para datas que Vendas NÃO tem
+  Object.keys(wkDayMap).forEach(k=>{if(!salesDayMap[k]){salesDayMap[k]={fat:wkDayMap[k].fat,compras:wkDayMap[k].compras};}});
+  Object.keys(wkCriMap).forEach(k=>{if(!salesCriMap[k]){salesCriMap[k]={fat:wkCriMap[k].fat,compras:wkCriMap[k].compras};}else if(!hasVendas){/* se não tem vendas, já copiou tudo do wk */}});
   Object.keys(dayMap).forEach(k=>{if(salesDayMap[k]){dayMap[k].fat=Math.round(salesDayMap[k].fat*100)/100;dayMap[k].compras=salesDayMap[k].compras;}});
   Object.keys(salesDayMap).forEach(k=>{if(!dayMap[k])dayMap[k]={data:k,inv:0,fat:Math.round(salesDayMap[k].fat*100)/100,compras:salesDayMap[k].compras,cliques:0,pv:0,ck:0,imp:0};});
 
@@ -662,20 +667,30 @@ function renderSemanal(){
   const inv=SEMANAL.reduce((s,w)=>s+w.inv,0);
   const fat=SEMANAL.reduce((s,w)=>s+w.fat,0);
   const compras=SEMANAL.reduce((s,w)=>s+w.compras,0);
+  const pv=SEMANAL.reduce((s,w)=>s+w.pv,0);
   const roas=inv>0?fat/inv:0;
+  const ticket=compras>0?fat/compras:0;
+  const cac=compras>0?inv/compras:0;
+  const taxaConv=pv>0?compras/pv*100:0;
   document.getElementById('kpi-semanal').innerHTML=`
     <div class="kpi-card"><div class="kpi-label">Investimento Total</div><div class="kpi-value orange">${brl(inv)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Faturamento Total</div><div class="kpi-value green">${brl(fat)}</div></div>
     <div class="kpi-card"><div class="kpi-label">ROAS Geral</div><div class="kpi-value ${roasColor(roas)}">${br(roas,2)}x</div></div>
     <div class="kpi-card"><div class="kpi-label">Total Compras</div><div class="kpi-value orange">${br(compras,0)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value orange">${brl(ticket)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CAC</div><div class="kpi-value orange">${brl(cac)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Taxa de Conversão</div><div class="kpi-value orange">${pct(taxaConv)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Retorno</div><div class="kpi-value ${fat-inv>=0?'green':'red'}">${brl(fat-inv)}</div></div>`;
 
   const labels=SEMANAL.map(w=>'S'+w.semana);
   makeChart('chartSemInv',{type:'bar',data:{labels,datasets:[{label:'Investimento',data:SEMANAL.map(w=>w.inv),backgroundColor:'rgba(255,107,43,0.5)',borderRadius:4},{label:'Faturamento',data:SEMANAL.map(w=>w.fat),backgroundColor:'rgba(46,204,113,0.5)',borderRadius:4}]},options:{...chartDefaults}});
   makeChart('chartSemRoas',{type:'line',data:{labels,datasets:[{label:'ROAS',data:SEMANAL.map(w=>w.roas),borderColor:'#ff6b2b',backgroundColor:'rgba(255,107,43,0.1)',fill:true,tension:.3,pointRadius:3,pointBackgroundColor:SEMANAL.map(w=>w.roas>=1.7?'#2ecc71':w.roas>=1?'#f1c40f':'#e74c3c')}]},options:{...chartDefaults,plugins:{...chartDefaults.plugins,legend:{display:false}}}});
 
-  document.getElementById('tbody-semanal').innerHTML=SEMANAL.map(w=>`
-    <tr><td>S${w.semana}</td><td>${brl(w.inv)}</td><td>${brl(w.fat)}</td><td class="${roasColor(w.roas)}">${br(w.roas,2)}x</td><td class="${w.retorno>=0?'green':'red'}">${brl(w.retorno)}</td><td>${br(w.compras,0)}</td><td>${brl(w.ticket)}</td><td>${brl(w.cpc)}</td><td>${brl(w.cpm)}</td><td>${pct(w.connectRate)}</td><td>${pct(w.taxaCompra)}</td><td>${statusBadge(w.inv,w.fat)}</td></tr>`).join('');
+  document.getElementById('tbody-semanal').innerHTML=SEMANAL.map(w=>{
+    const wCac=w.compras>0?w.inv/w.compras:0;
+    const wTxConv=w.pv>0?w.compras/w.pv*100:0;
+    return `<tr><td>S${w.semana}</td><td>${brl(w.inv)}</td><td>${brl(w.fat)}</td><td class="${roasColor(w.roas)}">${br(w.roas,2)}x</td><td class="${w.retorno>=0?'green':'red'}">${brl(w.retorno)}</td><td>${br(w.compras,0)}</td><td>${brl(w.ticket)}</td><td>${brl(wCac)}</td><td>${pct(wTxConv)}</td><td>${brl(w.cpc)}</td><td>${brl(w.cpm)}</td><td>${pct(w.connectRate)}</td><td>${pct(w.taxaCompra)}</td><td>${statusBadge(w.inv,w.fat)}</td></tr>`;
+  }).join('');
 }
 
 // ===== ABA 5: MÊS A MÊS =====
@@ -683,16 +698,26 @@ function renderMensal(){
   const inv=MENSAL.reduce((s,m)=>s+m.inv,0);
   const fat=MENSAL.reduce((s,m)=>s+m.fat,0);
   const compras=MENSAL.reduce((s,m)=>s+m.compras,0);
+  const pvM=MENSAL.reduce((s,m)=>s+m.pv,0);
   const roas=inv>0?fat/inv:0;
+  const ticketM=compras>0?fat/compras:0;
+  const cacM=compras>0?inv/compras:0;
+  const taxaConvM=pvM>0?compras/pvM*100:0;
   document.getElementById('kpi-mensal').innerHTML=`
     <div class="kpi-card"><div class="kpi-label">Investimento Total</div><div class="kpi-value orange">${brl(inv)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Faturamento Total</div><div class="kpi-value green">${brl(fat)}</div></div>
     <div class="kpi-card"><div class="kpi-label">ROAS Geral</div><div class="kpi-value ${roasColor(roas)}">${br(roas,2)}x</div></div>
     <div class="kpi-card"><div class="kpi-label">Total Compras</div><div class="kpi-value orange">${br(compras,0)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value orange">${brl(ticketM)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CAC</div><div class="kpi-value orange">${brl(cacM)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Taxa de Conversão</div><div class="kpi-value orange">${pct(taxaConvM)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Retorno</div><div class="kpi-value ${fat-inv>=0?'green':'red'}">${brl(fat-inv)}</div></div>`;
 
-  document.getElementById('tbody-mensal').innerHTML=MENSAL.map(m=>`
-    <tr><td>${m.mes}</td><td>${brl(m.inv)}</td><td>${brl(m.fat)}</td><td class="${roasColor(m.roas)}">${br(m.roas,2)}x</td><td class="${m.retorno>=0?'green':'red'}">${brl(m.retorno)}</td><td>${br(m.compras,0)}</td><td>${brl(m.ticket)}</td><td>${brl(m.cpc)}</td><td>${brl(m.cpm)}</td><td>${pct(m.connectRate)}</td><td>${pct(m.taxaCompra)}</td><td>${statusBadge(m.inv,m.fat)}</td></tr>`).join('');
+  document.getElementById('tbody-mensal').innerHTML=MENSAL.map(m=>{
+    const mCac=m.compras>0?m.inv/m.compras:0;
+    const mTxConv=m.pv>0?m.compras/m.pv*100:0;
+    return `<tr><td>${m.mes}</td><td>${brl(m.inv)}</td><td>${brl(m.fat)}</td><td class="${roasColor(m.roas)}">${br(m.roas,2)}x</td><td class="${m.retorno>=0?'green':'red'}">${brl(m.retorno)}</td><td>${br(m.compras,0)}</td><td>${brl(m.ticket)}</td><td>${brl(mCac)}</td><td>${pct(mTxConv)}</td><td>${brl(m.cpc)}</td><td>${brl(m.cpm)}</td><td>${pct(m.connectRate)}</td><td>${pct(m.taxaCompra)}</td><td>${statusBadge(m.inv,m.fat)}</td></tr>`;
+  }).join('');
 }
 
 // ===== INIT =====
