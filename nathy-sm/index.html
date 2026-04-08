@@ -315,26 +315,66 @@ async function fetchSheetCSV(sheetName) {
 
 // ====== PROCESS DATA ======
 function processData(gRows, rRows, sRows, mRows) {
-  // === RESUMO → DIAS (vendas reais) ===
-  // Resumo: Data, Cliques, Pageview, Checkout, Compras, Investimento, Faturado, Impressão, Mensal, Semanal
-  const rHeader = rRows[0];
-  DIAS = [];
+  // === CONSTRUIR DIAS mesclando GERENCIADOR (investimento, métricas) + RESUMO (vendas reais) ===
+
+  // 1) Agregar Gerenciador por dia (formato YYYY-MM-DD → DD/MM/YYYY)
+  const gerDiaMap = {};
+  for (let i = 1; i < gRows.length; i++) {
+    const r = gRows[i];
+    const dateRaw = (r[0] || '').replace(/"/g, '').trim(); // YYYY-MM-DD
+    if (!dateRaw) continue;
+    if (!gerDiaMap[dateRaw]) gerDiaMap[dateRaw] = { inv: 0, cliques: 0, pv: 0, ck: 0, imp: 0 };
+    const d = gerDiaMap[dateRaw];
+    d.inv += parseNum(r[1]);
+    d.cliques += parseNum(r[2]);
+    d.pv += parseNum(r[3]);
+    d.ck += parseNum(r[4]);
+    d.imp += parseNum(r[11]);
+  }
+
+  // 2) Montar mapa do Resumo por data (vendas reais: compras + faturado)
+  const resumoMap = {};
   for (let i = 1; i < rRows.length; i++) {
     const r = rRows[i];
-    const data = parseDate_DDMMAAAA(r[0]);
-    if (!data) continue;
-    const inv = parseNum(r[5]);
-    if (inv === 0 && parseNum(r[1]) === 0) continue; // skip empty rows
-    DIAS.push({
-      data: data,
+    const dataDDMM = parseDate_DDMMAAAA(r[0]);
+    if (!dataDDMM) continue;
+    const iso = isoFromDDMM(dataDDMM);
+    resumoMap[iso] = {
+      compras: parseNum(r[4]),
+      fat: parseNum(r[6]),
+      // Usar cliques/pv/ck/imp do Resumo como fallback
       cliques: parseNum(r[1]),
       pv: parseNum(r[2]),
       ck: parseNum(r[3]),
-      compras: parseNum(r[4]),
-      inv: inv,
-      fat: parseNum(r[6]),
+      inv: parseNum(r[5]),
       imp: parseNum(r[7])
-    });
+    };
+  }
+
+  // 3) Mesclar: prioridade Gerenciador para inv/métricas, Resumo para vendas
+  const allDates = new Set([...Object.keys(gerDiaMap), ...Object.keys(resumoMap)]);
+  DIAS = [];
+  for (const iso of [...allDates].sort()) {
+    const g = gerDiaMap[iso] || { inv: 0, cliques: 0, pv: 0, ck: 0, imp: 0 };
+    const r = resumoMap[iso] || { compras: 0, fat: 0, cliques: 0, pv: 0, ck: 0, inv: 0, imp: 0 };
+
+    // Usar Gerenciador para inv (mais confiável), Resumo como fallback
+    const inv = g.inv > 0 ? g.inv : r.inv;
+    const cliques = g.cliques > 0 ? g.cliques : r.cliques;
+    const pv = g.pv > 0 ? g.pv : r.pv;
+    const ck = g.ck > 0 ? g.ck : r.ck;
+    const imp = g.imp > 0 ? g.imp : r.imp;
+    const compras = r.compras; // sempre do Resumo
+    const fat = r.fat; // sempre do Resumo
+
+    // Pular dias onde TUDO é zero
+    if (inv === 0 && cliques === 0 && fat === 0 && compras === 0 && imp === 0) continue;
+
+    // Converter ISO para DD/MM/YYYY
+    const [yy, mm, dd] = iso.split('-');
+    const dataDDMM = `${dd}/${mm}/${yy}`;
+
+    DIAS.push({ data: dataDDMM, cliques, pv, ck, compras, inv: Math.round(inv * 100) / 100, fat, imp });
   }
 
   // === SEMANAL ===
