@@ -136,15 +136,43 @@
 </div>
 
 <div class="tabs">
-  <div class="tab active" onclick="showTab('visao',this)">Visão Geral</div>
+  <div class="tab active" onclick="showTab('visao-geral',this)">Visão Geral</div>
+  <div class="tab" onclick="showTab('visao',this)">Visão Tráfego</div>
   <div class="tab" onclick="showTab('criativos',this)">Criativos</div>
   <div class="tab" onclick="showTab('publicos',this)">Públicos</div>
   <div class="tab" onclick="showTab('semanal',this)">Semana a Semana</div>
   <div class="tab" onclick="showTab('mensal',this)">Mês a Mês</div>
 </div>
 
-<!-- TAB: Visão Geral -->
-<div id="visao" class="content active">
+<!-- TAB: Visão Geral (TODAS as vendas: tráfego + orgânico) -->
+<div id="visao-geral" class="content active">
+  <div class="kpi-grid" id="kpi-geral"></div>
+  <div class="funil-section">
+    <div>
+      <div class="sec-title">Funil de Conversão</div>
+      <div id="funil-geral"></div>
+    </div>
+    <div>
+      <div class="sec-title">Taxas de Performance</div>
+      <div class="taxa-grid" id="taxa-geral"></div>
+    </div>
+  </div>
+  <div class="sec-title">Vendas por Fonte (UTM Source)</div>
+  <div class="chart-grid-2x2">
+    <div class="chart-card"><h4>Vendas por UTM Source</h4><canvas id="chart-utm-vendas"></canvas></div>
+    <div class="chart-card"><h4>Faturamento por UTM Source</h4><canvas id="chart-utm-fat"></canvas></div>
+  </div>
+  <div class="sec-title">Evolução</div>
+  <div class="chart-grid-2x2">
+    <div class="chart-card"><h4>Investimento vs Faturamento Total</h4><canvas id="chart-geral-inv-fat"></canvas></div>
+    <div class="chart-card"><h4>ROAS</h4><canvas id="chart-geral-roas"></canvas></div>
+  </div>
+  <div class="sec-title">Dia a Dia</div>
+  <div class="tbl-wrap"><table id="tbl-geral"></table></div>
+</div>
+
+<!-- TAB: Visão Tráfego (somente vendas Meta Ads) -->
+<div id="visao" class="content">
   <div class="kpi-grid" id="kpi-visao"></div>
   <div class="funil-section">
     <div>
@@ -236,6 +264,8 @@ const GERENCIADOR_SHEET = 'Campanhas';
 const WEBHOOK_SHEET = 'Webhook';
 
 let DIAS = [], SEMANAL = [], MENSAL = [], CRIATIVOS = [], PUBLICOS = [];
+let DIAS_GERAL = []; // Todas as vendas (tráfego + orgânico)
+let VENDAS_POR_SOURCE = {}; // { source: { count, total } }
 let dateFrom = null, dateTo = null;
 let currentCreativeFilter = 'todos', currentPublicoFilter = 'todos';
 let charts = {};
@@ -477,41 +507,73 @@ function processData(gerenciadorRows, webhookRows) {
   // Colunas exatas: trans_status (3=pago), tracker_utm_source, trans_value (em REAIS),
   // trans_paiddate (formato YYYYMMDD)
 
+  // Map para TODAS as vendas (Visão Geral)
+  const diaMapGeral = {};
+  // Copiar dados do gerenciador como base
+  for (const [date, data] of Object.entries(diaMap)) {
+    diaMapGeral[date] = { ...data, fatGeral: 0, comprasGeral: 0 };
+  }
+
+  VENDAS_POR_SOURCE = {};
+
   for (const row of webhookRows) {
-    // Status: "3" = pago
     const status = (row['trans_status'] || '').trim();
     if (status !== '3') continue;
 
-    // Source: filtrar meta_ads
-    const source = (row['tracker_utm_source'] || '').toLowerCase().trim().replace(/[\s_\-]/g, '');
-    if (source && !source.includes('meta') && !source.includes('facebook') && !source.includes('fb')) {
-      continue;
-    }
-    // Se source vazio, não contabilizar (não é atribuível ao tráfego pago)
-    if (!source) continue;
-
-    // Data: formato YYYYMMDD → YYYY-MM-DD
     const dateRaw = (row['trans_paiddate'] || row['trans_createdate'] || '').trim();
     const date = parseDateWebhook(dateRaw);
     if (!date) continue;
 
-    // Valor: JÁ em reais (ex: "36,9")
     const value = parseNum(row['trans_value'] || '0');
+    const sourceRaw = (row['tracker_utm_source'] || '').trim();
+    const sourceLabel = sourceRaw || 'Orgânico';
+    const sourceNorm = sourceRaw.toLowerCase().replace(/[\s_\-]/g, '');
 
-    if (diaMap[date]) {
-      diaMap[date].fat += value;
-      diaMap[date].compras += 1;
-    } else {
-      diaMap[date] = { inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: value, compras: 1 };
+    // --- Vendas por source (para gráfico) ---
+    if (!VENDAS_POR_SOURCE[sourceLabel]) VENDAS_POR_SOURCE[sourceLabel] = { count: 0, total: 0 };
+    VENDAS_POR_SOURCE[sourceLabel].count++;
+    VENDAS_POR_SOURCE[sourceLabel].total += value;
+
+    // --- DIAS_GERAL: TODAS as vendas ---
+    if (!diaMapGeral[date]) {
+      diaMapGeral[date] = { inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: 0, compras: 0, fatGeral: 0, comprasGeral: 0 };
+    }
+    diaMapGeral[date].fatGeral += value;
+    diaMapGeral[date].comprasGeral += 1;
+
+    // --- DIAS (só Meta Ads): filtrar por source ---
+    const isMeta = sourceNorm && (sourceNorm.includes('meta') || sourceNorm.includes('facebook') || sourceNorm.includes('fb'));
+    if (isMeta) {
+      if (diaMap[date]) {
+        diaMap[date].fat += value;
+        diaMap[date].compras += 1;
+      } else {
+        diaMap[date] = { inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: value, compras: 1 };
+      }
     }
   }
 
-  // Convert
+  // Convert DIAS (Meta Ads)
   DIAS = Object.entries(diaMap).map(([date, data]) => ({ date, ...data })).sort((a, b) => a.date.localeCompare(b.date));
+
+  // Convert DIAS_GERAL (todas as vendas)
+  DIAS_GERAL = Object.entries(diaMapGeral).map(([date, data]) => ({
+    date,
+    inv: data.inv || 0,
+    impr: data.impr || 0,
+    cliques: data.cliques || 0,
+    pv: data.pv || 0,
+    ck: data.ck || 0,
+    fat: data.fatGeral || 0,
+    compras: data.comprasGeral || 0,
+  })).sort((a, b) => a.date.localeCompare(b.date));
+
   CRIATIVOS = Object.entries(criativoMap).map(([nome, data]) => ({ nome, ...data, dates: Array.from(data.dates) }));
   PUBLICOS = Object.entries(publicoMap).map(([nome, data]) => ({ nome, ...data, dates: Array.from(data.dates) }));
 
-  console.log(`[RESULTADO] DIAS: ${DIAS.length} | Fat: R$ ${DIAS.reduce((s,d)=>s+d.fat,0).toFixed(2)} | Compras: ${DIAS.reduce((s,d)=>s+(d.compras||0),0)}`);
+  console.log(`[TRÁFEGO] Fat Meta: R$ ${DIAS.reduce((s,d)=>s+d.fat,0).toFixed(2)} | Compras Meta: ${DIAS.reduce((s,d)=>s+(d.compras||0),0)}`);
+  console.log(`[GERAL] Fat Total: R$ ${DIAS_GERAL.reduce((s,d)=>s+d.fat,0).toFixed(2)} | Compras Total: ${DIAS_GERAL.reduce((s,d)=>s+(d.compras||0),0)}`);
+  console.log('[SOURCES]', JSON.stringify(VENDAS_POR_SOURCE));
 
   fixFatFromDias();
   buildWeekly();
@@ -698,12 +760,218 @@ function aggregateData(data) {
   };
 }
 
+function filterDataGeral() {
+  if (!dateFrom || !dateTo) return [];
+  return DIAS_GERAL.filter(d => d.date >= dateFrom && d.date <= dateTo);
+}
+
 function renderAll() {
+  renderVisaoGeral();
   renderVisao();
   renderCreatives();
   renderPublicos();
   renderSemanal();
   renderMensal();
+}
+
+function renderVisaoGeral() {
+  const filtered = filterDataGeral();
+  const agg = aggregateData(filtered);
+
+  const retorno = agg.fat - agg.inv;
+  const roas = agg.inv > 0 ? agg.fat / agg.inv : 0;
+  const cpm = agg.impr > 0 ? (agg.inv / agg.impr) * 1000 : 0;
+  const cac = agg.compras > 0 ? agg.inv / agg.compras : 0;
+  const ticket = agg.compras > 0 ? agg.fat / agg.compras : 0;
+  const ctr = agg.impr > 0 ? (agg.cliques / agg.impr) * 100 : 0;
+  const connectRate = agg.cliques > 0 ? (agg.pv / agg.cliques) * 100 : 0;
+  const taxaCheckout = agg.pv > 0 ? (agg.ck / agg.pv) * 100 : 0;
+  const taxaCompra = agg.pv > 0 ? (agg.compras / agg.pv) * 100 : 0;
+  const cpcGeral = agg.cliques > 0 ? agg.inv / agg.cliques : 0;
+
+  // KPIs
+  const kpiHtml = `
+    <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${brl(agg.inv)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Faturamento Total</div><div class="kpi-value green">${brl(agg.fat)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Retorno Líquido</div><div class="kpi-value ${retorno >= 0 ? 'green' : 'red'}">${brl(retorno)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">ROAS</div><div class="kpi-value orange">${br(roas, 2)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Compras</div><div class="kpi-value orange">${agg.compras}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CPM</div><div class="kpi-value orange">${brl(cpm)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CAC</div><div class="kpi-value orange">${brl(cac)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value orange">${brl(ticket)}</div></div>
+  `;
+  document.getElementById('kpi-geral').innerHTML = kpiHtml;
+
+  // Funil
+  const funilHtml = `
+    <div class="funil-bar-wrap">
+      <div class="funil-label"><span>Cliques</span><span>${br(agg.cliques,0)}</span></div>
+      <div class="funil-bar-bg"><div class="funil-bar-fill" style="width:100%"></div></div>
+    </div>
+    <div class="funil-bar-wrap">
+      <div class="funil-label"><span>Pageviews</span><span>${br(agg.pv,0)}</span></div>
+      <div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${agg.cliques > 0 ? (agg.pv / agg.cliques) * 100 : 0}%"></div></div>
+    </div>
+    <div class="funil-bar-wrap">
+      <div class="funil-label"><span>Checkouts</span><span>${br(agg.ck,0)}</span></div>
+      <div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${agg.cliques > 0 ? (agg.ck / agg.cliques) * 100 : 0}%"></div></div>
+    </div>
+    <div class="funil-bar-wrap">
+      <div class="funil-label"><span>Compras</span><span>${br(agg.compras,0)}</span></div>
+      <div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${agg.cliques > 0 ? (agg.compras / agg.cliques) * 100 : 0}%"></div></div>
+    </div>
+  `;
+  document.getElementById('funil-geral').innerHTML = funilHtml;
+
+  // Taxas
+  const taxaHtml = `
+    <div class="taxa-item"><span>Connect Rate</span><span class="taxa-val">${pct(connectRate)}</span></div>
+    <div class="taxa-item"><span>Taxa Checkout</span><span class="taxa-val">${pct(taxaCheckout)}</span></div>
+    <div class="taxa-item"><span>Taxa Compra</span><span class="taxa-val">${pct(taxaCompra)}</span></div>
+    <div class="taxa-item"><span>CTR</span><span class="taxa-val">${pct(ctr)}</span></div>
+    <div class="taxa-item"><span>CPC</span><span class="taxa-val">${brl(cpcGeral)}</span></div>
+  `;
+  document.getElementById('taxa-geral').innerHTML = taxaHtml;
+
+  // UTM Source Charts
+  const sourceLabels = Object.keys(VENDAS_POR_SOURCE);
+  const sourceColors = ['#ff6b2b', '#ff9a3c', '#ffb347', '#ffd700', '#f0e68c', '#daa520'];
+  const sourceBgColors = sourceLabels.map((_, i) => sourceColors[i % sourceColors.length]);
+
+  if (charts['utm-vendas']) charts['utm-vendas'].destroy();
+  charts['utm-vendas'] = new Chart(document.getElementById('chart-utm-vendas'), {
+    type: 'bar',
+    data: {
+      labels: sourceLabels,
+      datasets: [{
+        label: 'Vendas',
+        data: sourceLabels.map(s => VENDAS_POR_SOURCE[s].count),
+        backgroundColor: sourceBgColors.map(c => c + 'dd'),
+        borderColor: sourceBgColors,
+        borderWidth: 1,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+    },
+  });
+
+  if (charts['utm-fat']) charts['utm-fat'].destroy();
+  charts['utm-fat'] = new Chart(document.getElementById('chart-utm-fat'), {
+    type: 'bar',
+    data: {
+      labels: sourceLabels,
+      datasets: [{
+        label: 'Faturamento (R$)',
+        data: sourceLabels.map(s => VENDAS_POR_SOURCE[s].total),
+        backgroundColor: sourceBgColors.map(c => c + 'dd'),
+        borderColor: sourceBgColors,
+        borderWidth: 1,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } },
+    },
+  });
+
+  // Evolution Charts
+  const chartLabels = filtered.map(d => {
+    const date = new Date(d.date + 'T00:00:00Z');
+    return `${date.getUTCDate()}/${date.getUTCMonth() + 1}`;
+  });
+
+  if (charts['geral-inv-fat']) charts['geral-inv-fat'].destroy();
+  charts['geral-inv-fat'] = new Chart(document.getElementById('chart-geral-inv-fat'), {
+    type: 'line',
+    data: {
+      labels: chartLabels,
+      datasets: [
+        {
+          label: 'Investimento',
+          data: filtered.map(d => d.inv),
+          borderColor: 'rgba(255,107,43,0.95)',
+          backgroundColor: 'rgba(255,107,43,0.13)',
+          tension: 0.3,
+          fill: true,
+          borderWidth: 2,
+        },
+        {
+          label: 'Faturamento Total',
+          data: filtered.map(d => d.fat),
+          borderColor: 'rgba(46,204,113,0.95)',
+          backgroundColor: 'rgba(46,204,113,0.13)',
+          tension: 0.3,
+          fill: true,
+          borderWidth: 2,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: { legend: { display: true, position: 'top' } },
+      scales: { y: { beginAtZero: true } },
+    },
+  });
+
+  if (charts['geral-roas']) charts['geral-roas'].destroy();
+  charts['geral-roas'] = new Chart(document.getElementById('chart-geral-roas'), {
+    type: 'bar',
+    data: {
+      labels: chartLabels,
+      datasets: [{
+        label: 'ROAS',
+        data: filtered.map(d => d.inv > 0 ? d.fat / d.inv : 0),
+        backgroundColor: 'rgba(255,107,43,0.85)',
+        borderColor: 'rgba(255,107,43,0.95)',
+        borderWidth: 1,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } },
+    },
+  });
+
+  // Day-by-day table
+  let tblHtml = '<thead><tr><th>Data</th><th>Investimento</th><th>Impressões</th><th>Cliques</th><th>CTR</th><th>Visualizações</th><th>Checkouts</th><th>Compras</th><th>Faturamento</th><th>ROAS</th><th>CPC</th><th>CPM</th><th>Status</th></tr></thead><tbody>';
+
+  for (const dia of filtered) {
+    const ctr = dia.impr > 0 ? (dia.cliques / dia.impr) * 100 : 0;
+    const roas = dia.inv > 0 ? dia.fat / dia.inv : 0;
+    const cpm = dia.impr > 0 ? (dia.inv / dia.impr) * 1000 : 0;
+    const cpc = dia.cliques > 0 ? dia.inv / dia.cliques : 0;
+
+    const date = new Date(dia.date + 'T00:00:00Z');
+    const dateStr = `${String(date.getUTCDate()).padStart(2, '0')}/${String(date.getUTCMonth() + 1).padStart(2, '0')}/${date.getUTCFullYear()}`;
+
+    tblHtml += `<tr>
+      <td>${dateStr}</td>
+      <td>${brl(dia.inv)}</td>
+      <td>${dia.impr}</td>
+      <td>${dia.cliques}</td>
+      <td>${pct(ctr)}</td>
+      <td>${dia.pv}</td>
+      <td>${dia.ck}</td>
+      <td>${dia.compras || 0}</td>
+      <td>${brl(dia.fat)}</td>
+      <td>${br(roas, 2)}</td>
+      <td>${brl(cpc)}</td>
+      <td>${brl(cpm)}</td>
+      <td>${statusBadge(dia.inv, dia.fat)}</td>
+    </tr>`;
+  }
+
+  tblHtml += '</tbody>';
+  document.getElementById('tbl-geral').innerHTML = tblHtml;
 }
 
 function renderVisao() {
