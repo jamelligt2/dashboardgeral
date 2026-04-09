@@ -344,34 +344,52 @@ function processData(gRows, vRows) {
     return st === 'paid' && src === 'metaads';
   });
 
-  // Build sales maps by date, ad name, and adset
+  // Build sales maps — agrupando por CLIENTE ÚNICO (email)
+  // Order bumps somam no faturamento mas NÃO contam como compra extra
+  const vEmail = findCol(vHeaders, 'email');
+  const vUtmCampaign = findCol(vHeaders, 'utm_campaign');
   const salesByDate = {};
   const salesByAd = {};
   const salesByAdset = {};
-  const vUtmCampaign = findCol(vHeaders, 'utm_campaign');
+  const dateEmails = {};   // track unique emails per date
+  const adEmails = {};     // track unique emails per ad
+  const adsetEmails = {};  // track unique emails per adset
+
   salesRows.forEach(r => {
     const rawDate = r[vDate] || '';
     const datePart = rawDate.split(' ')[0]; // DD/MM/YYYY
     const val = parseNum(r[vTotal]);
-    if (!salesByDate[datePart]) salesByDate[datePart] = { fat: 0, compras: 0 };
-    salesByDate[datePart].fat += val;
-    salesByDate[datePart].compras += 1;
+    const email = (r[vEmail] || '').toLowerCase().trim();
 
-    // Match to ad name via utm_content (first part before ::)
+    // BY DATE
+    if (!salesByDate[datePart]) { salesByDate[datePart] = { fat: 0, compras: 0 }; dateEmails[datePart] = new Set(); }
+    salesByDate[datePart].fat += val;
+    if (email && !dateEmails[datePart].has(email)) {
+      dateEmails[datePart].add(email);
+      salesByDate[datePart].compras += 1;
+    }
+
+    // BY AD NAME (utm_content before ::)
     const utmC = r[vUtmContent] || '';
     const adName = utmC.split('::')[0].trim();
     if (adName) {
-      if (!salesByAd[adName]) salesByAd[adName] = { fat: 0, compras: 0 };
+      if (!salesByAd[adName]) { salesByAd[adName] = { fat: 0, compras: 0 }; adEmails[adName] = new Set(); }
       salesByAd[adName].fat += val;
-      salesByAd[adName].compras += 1;
+      if (email && !adEmails[adName].has(email)) {
+        adEmails[adName].add(email);
+        salesByAd[adName].compras += 1;
+      }
     }
 
-    // Match to adset via utm_campaign
+    // BY ADSET (utm_campaign)
     const utmCamp = (r[vUtmCampaign] || '').trim();
     if (utmCamp) {
-      if (!salesByAdset[utmCamp]) salesByAdset[utmCamp] = { fat: 0, compras: 0 };
+      if (!salesByAdset[utmCamp]) { salesByAdset[utmCamp] = { fat: 0, compras: 0 }; adsetEmails[utmCamp] = new Set(); }
       salesByAdset[utmCamp].fat += val;
-      salesByAdset[utmCamp].compras += 1;
+      if (email && !adsetEmails[utmCamp].has(email)) {
+        adsetEmails[utmCamp].add(email);
+        salesByAdset[utmCamp].compras += 1;
+      }
     }
   });
 
