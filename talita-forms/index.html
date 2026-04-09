@@ -260,6 +260,10 @@
   <div class="section-title">Comparativo Mensal</div>
   <div class="comparison-grid" id="monthlyCards"></div>
   <div class="table-container" id="monthlyTableContainer"></div>
+  <div class="chart-container">
+    <div class="section-title" style="color:var(--green)">CMQL - Custo por Lead Qualificado (Comparativo Mensal)</div>
+    <div class="chart-area" style="height:320px"><canvas id="monthlyCmqlChart"></canvas></div>
+  </div>
   <div class="charts-row">
     <div class="chart-container" style="margin-bottom:0">
       <div class="section-title">Investimento Mensal</div>
@@ -1078,6 +1082,7 @@ function renderMonthly(data, qualData) {
       <div class="metric-row"><span class="metric-label">Investimento</span><span class="metric-value" style="color:var(--orange)">${fmtMoney(m.s)}</span></div>
       <div class="metric-row"><span class="metric-label">Leads</span><span class="metric-value">${m.l}</span></div>
       <div class="metric-row"><span class="metric-label">Leads Qualificados (est.)</span><span class="metric-value" style="color:var(--green)">${m.qual}</span></div>
+      <div class="metric-row" style="background:rgba(0,214,143,0.08);border-radius:8px;padding:8px 12px;margin:6px -4px"><span class="metric-label" style="color:var(--green)">CMQL</span><span class="metric-value" style="color:var(--green);font-size:20px;font-weight:800">${m.cplq>0?fmtMoney(m.cplq):'-'}</span></div>
       <div class="metric-row"><span class="metric-label">CPL</span><span class="metric-value">${m.cpl>0?fmtMoney(m.cpl):'-'}</span></div>
       <div class="metric-row"><span class="metric-label">CPC</span><span class="metric-value">${m.cpc>0?fmtMoney(m.cpc):'-'}</span></div>
       <div class="metric-row"><span class="metric-label">CTR</span><span class="metric-value">${fmtPct(m.ctr)}</span></div>
@@ -1116,6 +1121,20 @@ function renderMonthly(data, qualData) {
 
   // Charts
   const mCplQ = mCalc.map(m => m.cplq > 0 ? m.cplq : null);
+  const mCpl = mCalc.map(m => m.cpl > 0 ? m.cpl : null);
+
+  // CMQL Dedicated Chart
+  makeChart('monthlyCmqlChart', {
+    type:'bar', data:{labels:mCalc.map(m=>m.label),datasets:[
+      {label:'CMQL (R$)',data:mCplQ,backgroundColor:mCplQ.map(v=>!v?'transparent':v<=80?'rgba(0,214,143,0.7)':v<=130?'rgba(255,170,0,0.7)':'rgba(255,61,113,0.7)'),borderColor:mCplQ.map(v=>!v?'transparent':v<=80?'#00d68f':v<=130?'#ffaa00':'#ff3d71'),borderWidth:2,borderRadius:8,barThickness:60},
+      {label:'CPL (R$)',data:mCpl,type:'line',borderColor:'rgba(255,107,0,0.7)',borderDash:[6,4],pointRadius:6,pointBackgroundColor:'#ff6b00',fill:false,tension:0.3,borderWidth:2}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{
+      legend:{labels:{color:'#ffffff',font:{size:12,weight:'bold'}}},
+      tooltip:{callbacks:{label:function(ctx){return ctx.dataset.label+': '+fmtMoney(ctx.raw||0);}}}
+    },scales:{x:{ticks:{color:'#ffffff',font:{size:13,weight:'bold'}},grid:{display:false}},y:{ticks:{color:'#ffffff',font:{size:12},callback:v=>'R$ '+v},grid:{color:'rgba(255,255,255,0.12)'}}}}
+  });
+
   makeChart('monthlySpendChart', {
     type:'bar', data:{labels:mCalc.map(m=>m.label),datasets:[
       {label:'Investimento (R$)',data:mCalc.map(m=>m.s),backgroundColor:mCalc.map((_,i)=>bgColors[i%bgColors.length]),borderColor:mCalc.map((_,i)=>colors[i%colors.length]),borderWidth:2,borderRadius:8,barThickness:60,yAxisID:'y'},
@@ -1136,9 +1155,13 @@ function renderMonthly(data, qualData) {
     const a = mCalc[mCalc.length-2], b = mCalc[mCalc.length-1];
     const cplVar = a.cpl>0?((b.cpl-a.cpl)/a.cpl)*100:0;
     const leadsVar = a.l>0?((b.l-a.l)/a.l)*100:0;
+    const cmqlVar = a.cplq>0?((b.cplq-a.cplq)/a.cplq)*100:0;
+    const qualVar = a.qual>0?((b.qual-a.qual)/a.qual)*100:0;
     document.getElementById('monthlyInsights').innerHTML = `
       <h3>Insights Comparativo Mensal</h3>
-      <p><strong style="color:var(--orange)">Investimento:</strong> ${b.label} com ${fmtMoney(b.s)} vs ${a.label} com ${fmtMoney(a.s)}.<br>
+      <p><strong style="color:var(--green);font-size:15px">CMQL:</strong> ${b.cplq>0?fmtMoney(b.cplq):'-'} vs ${a.cplq>0?fmtMoney(a.cplq):'-'} <span style="color:${cmqlVar<=0?'var(--green)':'var(--red)'}"> (${cmqlVar>0?'+':''}${cmqlVar.toFixed(1).replace('.',',')}%)</span> ${cmqlVar<0?' - custo por lead qualificado melhorou!':cmqlVar>0?' - custo por lead qualificado piorou':''}<br>
+      <strong style="color:var(--green)">Leads Qualificados:</strong> ${b.qual} vs ${a.qual} (${qualVar>0?'+':''}${qualVar.toFixed(1).replace('.',',')}%).<br>
+      <strong style="color:var(--orange)">Investimento:</strong> ${b.label} com ${fmtMoney(b.s)} vs ${a.label} com ${fmtMoney(a.s)}.<br>
       <strong style="color:${leadsVar>=0?'var(--green)':'var(--red)'}">Leads:</strong> ${b.l} leads vs ${a.l} (${leadsVar>0?'+':''}${leadsVar.toFixed(1).replace('.',',')}%).<br>
       <strong style="color:${cplVar<=0?'var(--green)':'var(--red)'}">CPL:</strong> ${b.cpl>0?fmtMoney(b.cpl):'-'} vs ${a.cpl>0?fmtMoney(a.cpl):'-'} (${cplVar>0?'+':''}${cplVar.toFixed(1).replace('.',',')}%).</p>
     `;
