@@ -302,6 +302,24 @@ function parseFaturamento(str) {
   if (!str) return 0;
   str = String(str).trim().toLowerCase();
   str = str.replace('r$','').replace(/\s+/g,' ').trim();
+  // Detecta faixas tipo "entre_7000_a_12000", "faturar_de_10000_a_20000", "de 10k a 20k"
+  const faixaMatch = str.match(/(?:entre|de)[_ ]?([\d.,]+)[_ ]?(?:k|mil)?[_ ]?(?:a|ate|até)[_ ]?([\d.,]+)[_ ]?(?:k|mil)?/i);
+  if (faixaMatch) {
+    let v1 = parseFloat(faixaMatch[1].replace(/\./g,'').replace(',','.')) || 0;
+    let v2 = parseFloat(faixaMatch[2].replace(/\./g,'').replace(',','.')) || 0;
+    if (/k|mil/.test(str)) { if (v1 < 100) v1 *= 1000; if (v2 < 100) v2 *= 1000; }
+    if (v1 > 0 && v1 < 100) v1 *= 1000;
+    if (v2 > 0 && v2 < 100) v2 *= 1000;
+    return (v1 + v2) / 2;
+  }
+  // Detecta "acima_de_20000" ou "mais de 20k"
+  const acimaMatch = str.match(/(?:acima|mais)[_ ]?(?:de)?[_ ]?([\d.,]+)[_ ]?(?:k|mil)?/i);
+  if (acimaMatch) {
+    let v = parseFloat(acimaMatch[1].replace(/\./g,'').replace(',','.')) || 0;
+    if (/k|mil/.test(str) && v < 100) v *= 1000;
+    if (v > 0 && v < 100) v *= 1000;
+    return v;
+  }
   const hasK = /\dk/i.test(str) || str.includes('k ') || str.endsWith('k');
   const hasMil = str.includes('mil');
   let nums = str.match(/[\d.,]+/g);
