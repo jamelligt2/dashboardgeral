@@ -182,7 +182,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
   <div class="cri-grid" id="cri-cards"></div>
   <div class="sec-title">Tabela de Criativos</div>
   <div class="tbl-wrap"><table><thead><tr>
-    <th>Criativo</th><th>Invest.</th><th>Cliques</th><th>Imp.</th><th>PV</th><th>CK</th><th>Vendas</th><th>Fat. Est.</th><th>CTR</th><th>CPC</th><th>CPM</th><th>ROAS</th><th>Status</th>
+    <th>Criativo</th><th>Invest.</th><th>Cliques</th><th>Imp.</th><th>PV</th><th>CK</th><th>Vendas</th><th>Fat. Est.</th><th>Ticket Médio</th><th>CTR</th><th>CPC</th><th>CPM</th><th>ROAS</th><th>Status</th>
   </tr></thead><tbody id="tbody-criativos"></tbody></table></div>
 </div>
 
@@ -249,8 +249,8 @@ tr:hover td{background:rgba(255,255,255,.025)}
 const SHEET_ID = '1ikUwLG9hKAICgQ20fY2vaTfOYsjbAGUCsDatpmLbLog';
 const GERENCIADOR_SHEET = 'Gerenciador';
 const RESUMO_SHEET = 'Resumo';
-const SEMANAL_SHEET = 'Semanal';
-const MENSAL_SHEET = 'Mensal';
+const WEBHOOK_SHEET = 'Webhook';
+const META_SOURCE_FILTER = 'metaads';
 
 let DIAS = [], SEMANAL = [], MENSAL = [], CRIATIVOS = [], PUBLICOS = [];
 let RAW_GERENCIADOR = []; // dados brutos por linha do gerenciador
@@ -314,21 +314,82 @@ async function fetchSheetCSV(sheetName) {
 }
 
 // ====== PROCESS DATA ======
-function processData(gRows, rRows, sRows, mRows) {
-  // === CONSTRUIR DIAS mesclando GERENCIADOR (investimento, métricas) + RESUMO (vendas reais) ===
+function processData(gRows, rRows, wRows) {
+  // === CONSTRUIR DIAS mesclando GERENCIADOR (investimento) + WEBHOOK (vendas reais Meta Ads) ===
 
-  // 1) Agregar Gerenciador por dia (formato YYYY-MM-DD → DD/MM/YYYY)
+  // 0) Agregar Webhook por dia (vendas reais: paid + meta_ads)
+  const webhookDiaMap = {};
+  if (wRows && wRows.length > 1) {
+    const wHeader = wRows[0];
+
+    // Detecção de colunas — com fallback nos índices conhecidos
+    const findCol = (patterns, fallback) => {
+      let idx = wHeader.findIndex(h => {
+        const hn = h.toLowerCase().replace(/['".\s_-]/g, '');
+        return patterns.some(p => hn.includes(p));
+      });
+      return idx >= 0 ? idx : fallback;
+    };
+    const colStatus = findCol(['status'], 3);
+    const colSource = findCol(['utmsource', 'utmorigin', 'utmfont', 'origin', 'source'], 23);
+    const colValue  = findCol(['pricevalue', 'price', 'valor', 'value', 'amount'], 31);
+    const colDate   = findCol(['createdat', 'created', 'datavenda', 'data', 'date'], 28);
+
+    console.log('[WEBHOOK] Linhas:', wRows.length - 1,
+      '| cols status/source/value/date:', colStatus, colSource, colValue, colDate);
+    if (wRows.length > 1) console.log('[WEBHOOK] Header sample:', wHeader.slice(0, Math.min(35, wHeader.length)));
+
+    let wOk = 0;
+    for (let i = 1; i < wRows.length; i++) {
+      const r = wRows[i];
+      const status = (r[colStatus] || '').toLowerCase().trim();
+      // aceita "paid", "aprovado", "approved"
+      const isPaid = status === 'paid' || status === 'aprovado' || status === 'approved' || status === 'complete' || status === 'completed';
+      if (!isPaid) continue;
+
+      const rawSrc = (r[colSource] || '').toLowerCase().replace(/[\s_\-\.]/g, '').trim();
+      // META_SOURCE_FILTER = 'metaads'
+      // aceita metaads | facebook | fbads | meta | instagramads | instagram
+      const isMeta = !rawSrc || rawSrc === META_SOURCE_FILTER
+        || rawSrc.startsWith('meta') || rawSrc.startsWith('face') || rawSrc.startsWith('fb')
+        || rawSrc.startsWith('insta');
+      if (!isMeta) continue;
+
+      const dateStr = (r[colDate] || '').trim();
+      let day = '';
+      if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+        day = dateStr.substring(0, 10); // ISO: YYYY-MM-DD...
+      } else if (/^\d{2}\/\d{2}\/\d{4}/.test(dateStr)) {
+        const p = dateStr.split('/'); day = `${p[2].substring(0,4)}-${p[1]}-${p[0]}`; // DD/MM/YYYY
+      } else if (/^\d{2}\/\d{2}\/\d{2}/.test(dateStr)) {
+        const p = dateStr.split('/'); day = `20${p[2]}-${p[1]}-${p[0]}`; // DD/MM/YY
+      } else {
+        day = dateStr.substring(0, 10);
+      }
+      if (!day || day.length < 10) continue;
+
+      const value = parseNum(r[colValue]);
+      if (!webhookDiaMap[day]) webhookDiaMap[day] = { compras: 0, fat: 0 };
+      webhookDiaMap[day].compras++;
+      webhookDiaMap[day].fat += value;
+      wOk++;
+    }
+    console.log('[WEBHOOK] Vendas computadas:', wOk, '| dias:', Object.keys(webhookDiaMap).length, webhookDiaMap);
+  }
+
+  // 1) Agregar Gerenciador por dia (formato YYYY-MM-DD)
   const gerDiaMap = {};
   for (let i = 1; i < gRows.length; i++) {
     const r = gRows[i];
     const dateRaw = (r[0] || '').replace(/"/g, '').trim(); // YYYY-MM-DD
     if (!dateRaw) continue;
-    if (!gerDiaMap[dateRaw]) gerDiaMap[dateRaw] = { inv: 0, cliques: 0, pv: 0, ck: 0, imp: 0 };
+    if (!gerDiaMap[dateRaw]) gerDiaMap[dateRaw] = { inv: 0, cliques: 0, pv: 0, ck: 0, imp: 0, compras: 0 };
     const d = gerDiaMap[dateRaw];
     d.inv += parseNum(r[1]);
     d.cliques += parseNum(r[2]);
     d.pv += parseNum(r[3]);
     d.ck += parseNum(r[4]);
+    d.compras += parseNum(r[5]); // Action Omni Purchase
     d.imp += parseNum(r[11]);
   }
 
@@ -351,12 +412,13 @@ function processData(gRows, rRows, sRows, mRows) {
     };
   }
 
-  // 3) Mesclar: prioridade Gerenciador para inv/métricas, Resumo para vendas
-  const allDates = new Set([...Object.keys(gerDiaMap), ...Object.keys(resumoMap)]);
+  // 3) Mesclar: Gerenciador (inv/métricas) + Webhook (vendas) + Resumo (fallback)
+  const allDates = new Set([...Object.keys(gerDiaMap), ...Object.keys(resumoMap), ...Object.keys(webhookDiaMap)]);
   DIAS = [];
   for (const iso of [...allDates].sort()) {
-    const g = gerDiaMap[iso] || { inv: 0, cliques: 0, pv: 0, ck: 0, imp: 0 };
+    const g = gerDiaMap[iso] || { inv: 0, cliques: 0, pv: 0, ck: 0, imp: 0, compras: 0 };
     const r = resumoMap[iso] || { compras: 0, fat: 0, cliques: 0, pv: 0, ck: 0, inv: 0, imp: 0 };
+    const w = webhookDiaMap[iso] || { compras: 0, fat: 0 };
 
     // Usar Gerenciador para inv (mais confiável), Resumo como fallback
     const inv = g.inv > 0 ? g.inv : r.inv;
@@ -364,8 +426,9 @@ function processData(gRows, rRows, sRows, mRows) {
     const pv = g.pv > 0 ? g.pv : r.pv;
     const ck = g.ck > 0 ? g.ck : r.ck;
     const imp = g.imp > 0 ? g.imp : r.imp;
-    const compras = r.compras; // sempre do Resumo
-    const fat = r.fat; // sempre do Resumo
+    // Vendas: prioridade WEBHOOK (vendas reais Meta Ads), fallback Resumo, depois Gerenciador
+    const compras = w.compras > 0 ? w.compras : (r.compras > 0 ? r.compras : g.compras);
+    const fat = w.fat > 0 ? Math.round(w.fat * 100) / 100 : r.fat;
 
     // Pular dias onde TUDO é zero
     if (inv === 0 && cliques === 0 && fat === 0 && compras === 0 && imp === 0) continue;
@@ -377,59 +440,70 @@ function processData(gRows, rRows, sRows, mRows) {
     DIAS.push({ data: dataDDMM, cliques, pv, ck, compras, inv: Math.round(inv * 100) / 100, fat, imp });
   }
 
-  // === SEMANAL ===
-  // Semanal: Semanal, SUM de Investimento, SUM de Faturado, SUM de Cliques, SUM de Pageview, SUM de Checkout, SUM de Compras, SUM de Impressão
-  SEMANAL = [];
-  for (let i = 1; i < sRows.length; i++) {
-    const r = sRows[i];
-    const sem = r[0] ? r[0].replace(/"/g, '').trim() : '';
-    if (!sem) continue;
-    const inv = parseNum(r[1]);
-    const fat = parseNum(r[2]);
-    const cliques = parseNum(r[3]);
-    const pv = parseNum(r[4]);
-    const ck = parseNum(r[5]);
-    const compras = parseNum(r[6]);
-    const imp = parseNum(r[7]);
-    SEMANAL.push({
-      semana: sem,
-      inv, fat, compras, cliques, pv, ck, imp,
-      roas: inv > 0 ? Math.round(fat / inv * 100) / 100 : 0,
-      ticket: compras > 0 ? Math.round(fat / compras * 100) / 100 : 0,
-      retorno: Math.round((fat - inv) * 100) / 100,
-      taxaCompra: pv > 0 ? Math.round(compras / pv * 100 * 100) / 100 : 0,
-      cpc: cliques > 0 ? Math.round(inv / cliques * 100) / 100 : 0,
-      cpm: imp > 0 ? Math.round(inv / imp * 1000 * 100) / 100 : 0,
-      connectRate: cliques > 0 ? Math.round(pv / cliques * 100 * 100) / 100 : 0
-    });
-  }
+  // 4) Estimar faturamento para dias sem fat no Resumo mas com compras do Gerenciador
+  const diasComFat = DIAS.filter(d => d.fat > 0 && d.compras > 0);
+  const ticketMedioReal = diasComFat.length > 0
+    ? diasComFat.reduce((s, d) => s + d.fat, 0) / diasComFat.reduce((s, d) => s + d.compras, 0)
+    : 0;
+  DIAS.forEach(d => {
+    if (d.fat === 0 && d.compras > 0 && ticketMedioReal > 0) {
+      d.fat = Math.round(d.compras * ticketMedioReal * 100) / 100;
+    }
+  });
 
-  // === MENSAL ===
+  // === SEMANAL (construído dos DIAS para garantir dados completos) ===
   const ptMonFull = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-  MENSAL = [];
-  for (let i = 1; i < mRows.length; i++) {
-    const r = mRows[i];
-    const mesNum = parseInt((r[0] || '').replace(/"/g, '').trim());
-    if (isNaN(mesNum) || mesNum < 1 || mesNum > 12) continue;
-    const inv = parseNum(r[1]);
-    const fat = parseNum(r[2]);
-    const cliques = parseNum(r[3]);
-    const pv = parseNum(r[4]);
-    const ck = parseNum(r[5]);
-    const compras = parseNum(r[6]);
-    const imp = parseNum(r[7]);
-    MENSAL.push({
-      mes: ptMonFull[mesNum - 1],
-      inv, fat, compras, cliques, pv, ck, imp,
-      roas: inv > 0 ? Math.round(fat / inv * 100) / 100 : 0,
-      ticket: compras > 0 ? Math.round(fat / compras * 100) / 100 : 0,
-      retorno: Math.round((fat - inv) * 100) / 100,
-      taxaCompra: pv > 0 ? Math.round(compras / pv * 100 * 100) / 100 : 0,
-      cpc: cliques > 0 ? Math.round(inv / cliques * 100) / 100 : 0,
-      cpm: imp > 0 ? Math.round(inv / imp * 1000 * 100) / 100 : 0,
-      connectRate: cliques > 0 ? Math.round(pv / cliques * 100 * 100) / 100 : 0
-    });
+  function dateToWeekKey(d) {
+    const [dd, mm, yy] = d.split('/').map(Number);
+    const dt = new Date(yy, mm - 1, dd), jan1 = new Date(yy, 0, 1);
+    const w = Math.ceil((Math.floor((dt - jan1) / 86400000) + 1) / 7);
+    return String(yy).slice(-2) + String(w).padStart(2, '0');
   }
+  const semMap = {};
+  DIAS.forEach(d => {
+    const k = dateToWeekKey(d.data);
+    if (!semMap[k]) semMap[k] = { inv: 0, fat: 0, compras: 0, cliques: 0, pv: 0, ck: 0, imp: 0 };
+    const s = semMap[k];
+    s.inv += d.inv; s.fat += d.fat; s.compras += d.compras;
+    s.cliques += d.cliques; s.pv += d.pv; s.ck += d.ck; s.imp += d.imp;
+  });
+  SEMANAL = Object.entries(semMap).sort((a, b) => a[0].localeCompare(b[0])).map(([sem, s]) => {
+    const inv = Math.round(s.inv * 100) / 100, fat = Math.round(s.fat * 100) / 100;
+    return {
+      semana: sem, inv, fat, compras: s.compras, cliques: s.cliques, pv: s.pv, ck: s.ck, imp: s.imp,
+      roas: inv > 0 ? Math.round(fat / inv * 100) / 100 : 0,
+      ticket: s.compras > 0 ? Math.round(fat / s.compras * 100) / 100 : 0,
+      retorno: Math.round((fat - inv) * 100) / 100,
+      taxaCompra: s.pv > 0 ? Math.round(s.compras / s.pv * 100 * 100) / 100 : 0,
+      cpc: s.cliques > 0 ? Math.round(inv / s.cliques * 100) / 100 : 0,
+      cpm: s.imp > 0 ? Math.round(inv / s.imp * 1000 * 100) / 100 : 0,
+      connectRate: s.cliques > 0 ? Math.round(s.pv / s.cliques * 100 * 100) / 100 : 0
+    };
+  });
+
+  // === MENSAL (construído dos DIAS para garantir dados completos) ===
+  const mesMap = {};
+  DIAS.forEach(d => {
+    const mm = parseInt(d.data.split('/')[1]);
+    const mesNome = ptMonFull[mm - 1];
+    if (!mesMap[mesNome]) mesMap[mesNome] = { inv: 0, fat: 0, compras: 0, cliques: 0, pv: 0, ck: 0, imp: 0, ordem: mm };
+    const m = mesMap[mesNome];
+    m.inv += d.inv; m.fat += d.fat; m.compras += d.compras;
+    m.cliques += d.cliques; m.pv += d.pv; m.ck += d.ck; m.imp += d.imp;
+  });
+  MENSAL = Object.entries(mesMap).sort((a, b) => a[1].ordem - b[1].ordem).map(([mes, m]) => {
+    const inv = Math.round(m.inv * 100) / 100, fat = Math.round(m.fat * 100) / 100;
+    return {
+      mes, inv, fat, compras: m.compras, cliques: m.cliques, pv: m.pv, ck: m.ck, imp: m.imp,
+      roas: inv > 0 ? Math.round(fat / inv * 100) / 100 : 0,
+      ticket: m.compras > 0 ? Math.round(fat / m.compras * 100) / 100 : 0,
+      retorno: Math.round((fat - inv) * 100) / 100,
+      taxaCompra: m.pv > 0 ? Math.round(m.compras / m.pv * 100 * 100) / 100 : 0,
+      cpc: m.cliques > 0 ? Math.round(inv / m.cliques * 100) / 100 : 0,
+      cpm: m.imp > 0 ? Math.round(inv / m.imp * 1000 * 100) / 100 : 0,
+      connectRate: m.cliques > 0 ? Math.round(m.pv / m.cliques * 100 * 100) / 100 : 0
+    };
+  });
 
   // === GERENCIADOR → RAW_GERENCIADOR (dados brutos, filtrados depois) ===
   RAW_GERENCIADOR = [];
@@ -601,11 +675,15 @@ function renderKpiVisao(dias) {
   const roas = inv > 0 ? fat / inv : 0;
   const cpc = cliques > 0 ? inv / cliques : 0;
   const cpm = imp > 0 ? inv / imp * 1000 : 0;
+  const ticket = compras > 0 ? fat / compras : 0;
+  const cac = compras > 0 ? inv / compras : 0;
   document.getElementById('kpi-visao').innerHTML = `
     <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${brl(inv)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Faturamento</div><div class="kpi-value green">${brl(fat)}</div></div>
     <div class="kpi-card"><div class="kpi-label">ROAS</div><div class="kpi-value ${roas >= 1.7 ? 'green' : roas >= 1 ? 'yellow' : 'red'}">${br(roas, 2)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Compras</div><div class="kpi-value orange">${br(compras, 0)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value green">${brl(ticket)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CAC</div><div class="kpi-value yellow">${brl(cac)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Cliques</div><div class="kpi-value">${br(cliques, 0)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Impressões</div><div class="kpi-value">${br(imp, 0)}</div></div>
     <div class="kpi-card"><div class="kpi-label">CPC</div><div class="kpi-value">${brl(cpc)}</div></div>
@@ -662,7 +740,7 @@ function renderTbodyDias(dias) {
 
 function renderChartsVisao(dias) {
   const labels = dias.map(d => d.data.substring(0, 5));
-  const chartOpts = { responsive: true, plugins: { legend: { labels: { color: 'rgba(255,255,255,.5)', font: { size: 10 } } } }, scales: { x: { ticks: { color: 'rgba(255,255,255,.3)', font: { size: 9 }, maxRotation: 45 }, grid: { color: 'rgba(255,255,255,.04)' } }, y: { ticks: { color: 'rgba(255,255,255,.3)', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,.04)' } } } };
+  const chartOpts = { responsive: true, plugins: { legend: { labels: { color: '#ffffff', font: { size: 13, weight: '600' } } } }, scales: { x: { ticks: { color: '#ffffff', font: { size: 11 }, maxRotation: 45 }, grid: { color: 'rgba(255,255,255,.07)' } }, y: { ticks: { color: '#ffffff', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,.07)' } } } };
 
   getOrCreateChart('chartInvFat', {
     type: 'bar', data: {
@@ -729,6 +807,7 @@ function renderCriativos() {
         <div class="cri-metric"><div class="cri-metric-label">Invest.</div><div class="cri-metric-val hl">${brl(c.inv)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">Vendas</div><div class="cri-metric-val hl">${br(c.compras, 0)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">Fat. Est.</div><div class="cri-metric-val">${brl(c.fat)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">Ticket Médio</div><div class="cri-metric-val">${brl(c.ticket)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">ROAS</div><div class="cri-metric-val">${br(c.roas, 2)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">CTR</div><div class="cri-metric-val">${pct(c.ctr)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">CPC</div><div class="cri-metric-val">${brl(c.cpc)}</div></div>
@@ -740,7 +819,7 @@ function renderCriativos() {
   `).join('');
 
   document.getElementById('tbody-criativos').innerHTML = cris.map(c => `
-    <tr><td>${c.nome}</td><td>${brl(c.inv)}</td><td>${br(c.cliques, 0)}</td><td>${br(c.imp, 0)}</td><td>${br(c.pv, 0)}</td><td>${br(c.ck, 0)}</td><td>${br(c.compras, 0)}</td><td>${brl(c.fat)}</td><td>${pct(c.ctr)}</td><td>${brl(c.cpc)}</td><td>${brl(c.cpm)}</td><td>${br(c.roas, 2)}</td><td>${statusBadge(c.inv, c.fat)}</td></tr>
+    <tr><td>${c.nome}</td><td>${brl(c.inv)}</td><td>${br(c.cliques, 0)}</td><td>${br(c.imp, 0)}</td><td>${br(c.pv, 0)}</td><td>${br(c.ck, 0)}</td><td>${br(c.compras, 0)}</td><td>${brl(c.fat)}</td><td>${brl(c.ticket)}</td><td>${pct(c.ctr)}</td><td>${brl(c.cpc)}</td><td>${brl(c.cpm)}</td><td>${br(c.roas, 2)}</td><td>${statusBadge(c.inv, c.fat)}</td></tr>
   `).join('');
 }
 
@@ -816,7 +895,7 @@ function renderSemanal() {
 
   // Charts
   const labels = semData.map(w => 'S' + w.semana);
-  const chartOpts = { responsive: true, plugins: { legend: { labels: { color: 'rgba(255,255,255,.5)', font: { size: 10 } } } }, scales: { x: { ticks: { color: 'rgba(255,255,255,.3)', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,.04)' } }, y: { ticks: { color: 'rgba(255,255,255,.3)', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,.04)' } } } };
+  const chartOpts = { responsive: true, plugins: { legend: { labels: { color: '#ffffff', font: { size: 13, weight: '600' } } } }, scales: { x: { ticks: { color: '#ffffff', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,.07)' } }, y: { ticks: { color: '#ffffff', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,.07)' } } } };
 
   getOrCreateChart('chartSemInv', {
     type: 'bar', data: { labels, datasets: [
@@ -879,7 +958,7 @@ function renderMensal() {
 
   // Charts Mensal
   const labelsM = mesData.map(m => m.mes.substring(0, 3));
-  const chartOptsM = { responsive: true, plugins: { legend: { labels: { color: 'rgba(255,255,255,.5)', font: { size: 10 } } } }, scales: { x: { ticks: { color: 'rgba(255,255,255,.3)', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,.04)' } }, y: { ticks: { color: 'rgba(255,255,255,.3)', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,.04)' } } } };
+  const chartOptsM = { responsive: true, plugins: { legend: { labels: { color: '#ffffff', font: { size: 13, weight: '600' } } } }, scales: { x: { ticks: { color: '#ffffff', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,.07)' } }, y: { ticks: { color: '#ffffff', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,.07)' } } } };
 
   getOrCreateChart('chartMesInv', {
     type: 'bar', data: { labels: labelsM, datasets: [
@@ -963,20 +1042,18 @@ function renderAll() {
 async function loadData() {
   try {
     document.getElementById('loading-msg').textContent = 'Buscando dados da planilha...';
-    const [gCSV, rCSV, sCSV, mCSV] = await Promise.all([
+    const [gCSV, rCSV, wCSV] = await Promise.all([
       fetchSheetCSV(GERENCIADOR_SHEET),
       fetchSheetCSV(RESUMO_SHEET),
-      fetchSheetCSV(SEMANAL_SHEET),
-      fetchSheetCSV(MENSAL_SHEET)
+      fetchSheetCSV(WEBHOOK_SHEET)
     ]);
 
     document.getElementById('loading-msg').textContent = 'Processando dados...';
     const gRows = parseCSV(gCSV);
     const rRows = parseCSV(rCSV);
-    const sRows = parseCSV(sCSV);
-    const mRows = parseCSV(mCSV);
+    const wRows = parseCSV(wCSV);
 
-    processData(gRows, rRows, sRows, mRows);
+    processData(gRows, rRows, wRows);
     initDatePickers();
     renderAll();
 

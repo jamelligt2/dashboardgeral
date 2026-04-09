@@ -80,8 +80,8 @@
     .cri-metric-label{color:rgba(255,255,255,.4);font-size:9px;margin-bottom:2px;text-transform:uppercase}
     .cri-metric-val{font-family:'DM Mono',monospace;font-size:12px;font-weight:600;color:#e8e6f0}
     .cri-metric-val.hl{color:#ff6b2b;font-size:14px}
-    .cri-link{display:block;margin-top:8px;font-size:10px;color:rgba(255,107,43,.7);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .cri-link:hover{color:#ff6b2b}
+    .cri-link{display:inline-flex;align-items:center;gap:5px;margin-top:10px;font-size:11px;font-weight:600;color:#ff6b2b;text-decoration:none;background:rgba(255,107,43,.12);border:1px solid rgba(255,107,43,.3);border-radius:6px;padding:5px 10px;transition:all .2s}
+    .cri-link:hover{background:rgba(255,107,43,.22);border-color:#ff6b2b;color:#fff}
     .tbl-wrap{overflow-x:auto;border-radius:8px;border:1px solid rgba(255,255,255,.07)}
     .pub-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-bottom:24px}
     .pub-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:16px}
@@ -260,8 +260,8 @@ Chart.defaults.color = 'rgba(255,255,255,0.4)';
 Chart.defaults.borderColor = 'rgba(255,255,255,0.07)';
 
 const SHEET_ID = '1mDlr8MPXna2TUIKacQOlXvVnP9JkOmKwZuVmgNuig6E';
-const GERENCIADOR_SHEET = 'Campanhas';
-const WEBHOOK_SHEET = 'Webhook';
+const GERENCIADOR_SHEET = 'vendas';   // aba principal: tráfego + compras pixel FB
+const WEBHOOK_SHEET = 'Webhook';       // aba nova: webhook de compras (a partir de agora)
 
 let DIAS = [], SEMANAL = [], MENSAL = [], CRIATIVOS = [], PUBLICOS = [];
 let DIAS_GERAL = [];
@@ -372,15 +372,28 @@ function parseDateWebhook(v) {
   return null;
 }
 
+async function fetchSheetSafe(sheetName) {
+  try {
+    const csv = await fetchSheetCSV(sheetName);
+    const rows = parseCSV(csv);
+    console.log(`[${sheetName}] ${rows.length} linhas carregadas`);
+    return rows;
+  } catch (e) {
+    console.warn(`[${sheetName}] Não encontrada ou erro: ${e.message}`);
+    return [];
+  }
+}
+
 async function loadData() {
   try {
-    document.getElementById('loading-msg').textContent = 'Carregando Gerenciador...';
+    document.getElementById('loading-msg').textContent = 'Carregando Campanhas...';
     const gerenciadorCSV = await fetchSheetCSV(GERENCIADOR_SHEET);
     const gerenciadorRows = parseCSV(gerenciadorCSV);
 
+    // Carrega "Webhook" (novas compras) — não trava se ainda estiver vazio
     document.getElementById('loading-msg').textContent = 'Carregando Webhook...';
-    const webhookCSV = await fetchSheetCSV(WEBHOOK_SHEET);
-    const webhookRows = parseCSV(webhookCSV);
+    const webhookRows = await fetchSheetSafe(WEBHOOK_SHEET);
+    console.log(`[Webhook] ${webhookRows.length} linhas carregadas`);
 
     document.getElementById('loading-msg').textContent = 'Processando dados...';
     processData(gerenciadorRows, webhookRows);
@@ -398,7 +411,7 @@ async function loadData() {
     renderAll();
 
     if (totalCompras === 0) {
-      console.warn('[AVISO] Nenhuma compra encontrada no Webhook!');
+      console.warn('[AVISO] Nenhuma compra encontrada! Verifique as abas "vendas" e "Webhook".');
     }
   } catch (e) {
     console.error(e);
@@ -424,6 +437,9 @@ function processData(gerenciadorRows, webhookRows) {
     const pv = parseNum(row['Action Landing Page View']);
     const ck = parseNum(row['Action Omni Initiated Checkout']);
     const link = (row[' Instagram Permalink URL '] || row['Instagram Permalink URL'] || '').trim();
+    // Compras e faturamento atribuídos pelo pixel do Facebook (aba "vendas")
+    const omniCompras = parseNum(row['Action Omni Purchase'] || '0');
+    const omniFat = parseNum(row['Action Value Omni Purchase'] || '0');
 
     if (!diaMap[date]) diaMap[date] = { inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: 0, compras: 0 };
     diaMap[date].inv += spend;
@@ -431,22 +447,28 @@ function processData(gerenciadorRows, webhookRows) {
     diaMap[date].cliques += clicks;
     diaMap[date].pv += pv;
     diaMap[date].ck += ck;
+    diaMap[date].fat += omniFat;
+    diaMap[date].compras += omniCompras;
 
-    if (!criativoMap[adName]) criativoMap[adName] = { inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: 0, link: '', dates: new Set() };
+    if (!criativoMap[adName]) criativoMap[adName] = { inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: 0, compras: 0, link: '', dates: new Set() };
     criativoMap[adName].inv += spend;
     criativoMap[adName].impr += impr;
     criativoMap[adName].cliques += clicks;
     criativoMap[adName].pv += pv;
     criativoMap[adName].ck += ck;
+    criativoMap[adName].fat += omniFat;
+    criativoMap[adName].compras += omniCompras;
     if (link) criativoMap[adName].link = link;
     criativoMap[adName].dates.add(date);
 
-    if (!publicoMap[adset]) publicoMap[adset] = { inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: 0, dates: new Set() };
+    if (!publicoMap[adset]) publicoMap[adset] = { inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: 0, compras: 0, dates: new Set() };
     publicoMap[adset].inv += spend;
     publicoMap[adset].impr += impr;
     publicoMap[adset].cliques += clicks;
     publicoMap[adset].pv += pv;
     publicoMap[adset].ck += ck;
+    publicoMap[adset].fat += omniFat;
+    publicoMap[adset].compras += omniCompras;
     publicoMap[adset].dates.add(date);
   }
 
@@ -926,19 +948,22 @@ function sortAndRenderCreatives() {
           <div class="cri-metric"><div class="cri-metric-label">CTR</div><div class="cri-metric-val">${pct(ctr)}</div></div>
           <div class="cri-metric"><div class="cri-metric-label">CPC</div><div class="cri-metric-val">${brl(cpc)}</div></div>
         </div>
-        ${c.link ? `<a class="cri-link" href="${c.link}" target="_blank">${c.link}</a>` : ''}
+        ${c.link ? `<a class="cri-link" href="${c.link}" target="_blank"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg> Ver Criativo</a>` : '<span style="display:block;margin-top:10px;font-size:10px;color:rgba(255,255,255,.2)">Sem link</span>'}
       </div>
     `;
   }
   document.getElementById('cri-grid').innerHTML = gridHtml;
 
-  let tblHtml = '<thead><tr><th>Criativo</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>CTR</th><th>PV</th><th>CK</th><th>Vendas</th><th>Fat.</th><th>ROAS</th><th>CPC</th><th>CPM</th><th>Status</th></tr></thead><tbody>';
+  let tblHtml = '<thead><tr><th>Criativo</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>CTR</th><th>PV</th><th>CK</th><th>Vendas</th><th>Fat.</th><th>ROAS</th><th>CPC</th><th>CPM</th><th>Status</th><th style="text-align:center">Link</th></tr></thead><tbody>';
   for (const c of sorted) {
     const ctr = c.impr > 0 ? (c.cliques / c.impr) * 100 : 0;
     const roas = c.inv > 0 ? c.fat / c.inv : 0;
     const cpc = c.cliques > 0 ? c.inv / c.cliques : 0;
     const cpm = c.impr > 0 ? (c.inv / c.impr) * 1000 : 0;
-    tblHtml += `<tr><td>${c.nome}</td><td>${brl(c.inv)}</td><td>${c.impr}</td><td>${c.cliques}</td><td>${pct(ctr)}</td><td>${c.pv}</td><td>${c.ck}</td><td>${c.compras||0}</td><td>${brl(c.fat)}</td><td>${br(roas,2)}</td><td>${brl(cpc)}</td><td>${brl(cpm)}</td><td>${statusBadge(c.inv,c.fat)}</td></tr>`;
+    const linkCell = c.link
+      ? `<td style="text-align:center"><a href="${c.link}" target="_blank" style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;color:#ff6b2b;text-decoration:none;background:rgba(255,107,43,.12);border:1px solid rgba(255,107,43,.3);border-radius:5px;padding:3px 8px;" onmouseover="this.style.background='rgba(255,107,43,.25)'" onmouseout="this.style.background='rgba(255,107,43,.12)'"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg> Ver</a></td>`
+      : `<td style="text-align:center;color:rgba(255,255,255,.2);font-size:10px">—</td>`;
+    tblHtml += `<tr><td>${c.nome}</td><td>${brl(c.inv)}</td><td>${c.impr}</td><td>${c.cliques}</td><td>${pct(ctr)}</td><td>${c.pv}</td><td>${c.ck}</td><td>${c.compras||0}</td><td>${brl(c.fat)}</td><td>${br(roas,2)}</td><td>${brl(cpc)}</td><td>${brl(cpm)}</td><td>${statusBadge(c.inv,c.fat)}</td>${linkCell}</tr>`;
   }
   tblHtml += '</tbody>';
   document.getElementById('tbl-criativos').innerHTML = tblHtml;
