@@ -147,7 +147,7 @@
   <div class="kpi-grid" id="kpi-visao"></div>
   <div class="sec-title">Funil de Conversão</div>
   <div class="funil-section" id="funil-visao"></div>
-  <div class="sec-title">Taxas Principais</div>
+  <div class="sec-title">Taxas de Performance</div>
   <div class="taxa-grid" id="taxa-visao"></div>
   <div class="sec-title">Evolução</div>
   <div class="chart-grid-2x2">
@@ -332,7 +332,6 @@ function parseNum(v) {
 
 function parseDate(v) {
   if (!v || v === '') return null;
-
   v = String(v).trim();
 
   // DD/MM/YYYY
@@ -342,17 +341,47 @@ function parseDate(v) {
   }
 
   // YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
-    return v;
+  if (/^\d{4}-\d{2}-\d{2}/.test(v)) {
+    return v.substring(0, 10);
   }
 
-  // MM/DD/YYYY (US format)
+  return null;
+}
+
+// Versão mais flexível para o Webhook (lida com datetime, formatos variados)
+function parseDateFlexible(v) {
+  if (!v || v === '') return null;
+  v = String(v).trim();
+
+  // Remove hora se presente: "DD/MM/YYYY HH:MM:SS" ou "DD/MM/YYYY HH:MM"
+  v = v.split(' ')[0].split('T')[0];
+
+  // DD/MM/YYYY ou D/M/YYYY
+  if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(v)) {
+    const parts = v.split('/');
+    let [d, m, y] = parts;
+    // Ano com 2 dígitos
+    if (y.length === 2) y = '20' + y;
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  }
+
+  // YYYY-MM-DD
+  if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(v)) {
+    const [y, m, d] = v.split('-');
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  }
+
+  // DD-MM-YYYY
+  if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(v)) {
+    const [d, m, y] = v.split('-');
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  }
+
+  // MM/DD/YYYY (tentar como fallback se mês > 12, é dia)
   if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(v)) {
     const parts = v.split('/');
     if (parseInt(parts[0]) > 12) {
-      // Probably DD/MM
-      const [d, m, y] = parts;
-      return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      return `${parts[2]}-${String(parts[1]).padStart(2,'0')}-${String(parts[0]).padStart(2,'0')}`;
     }
   }
 
@@ -372,22 +401,39 @@ async function loadData() {
     document.getElementById('loading-msg').textContent = 'Processando dados...';
     processData(gerenciadorRows, webhookRows);
 
+    const totalCompras = DIAS.reduce((s,d) => s + (d.compras||0), 0);
+    const totalFat = DIAS.reduce((s,d) => s + d.fat, 0);
+    console.log(`[FINAL] Compras: ${totalCompras} | Faturamento: R$ ${totalFat.toFixed(2)}`);
+
     document.getElementById('loading-overlay').style.display = 'none';
 
     initializeDateInputs();
     renderAll();
+
+    // Aviso se não encontrou vendas
+    if (totalCompras === 0) {
+      console.warn('[AVISO] Nenhuma compra encontrada no Webhook! Verifique o console para detalhes de debug.');
+    }
   } catch (e) {
     console.error(e);
     document.getElementById('loading-msg').textContent = 'Erro ao carregar dados: ' + e.message;
+    document.getElementById('loading-msg').style.color = '#e74c3c';
   }
 }
 
 function processData(gerenciadorRows, webhookRows) {
   const headers = Object.keys(gerenciadorRows[0] || {});
+  console.log('[GERENCIADOR] Headers encontrados:', headers);
+  console.log('[GERENCIADOR] Total de linhas:', gerenciadorRows.length);
+  if (gerenciadorRows.length > 0) console.log('[GERENCIADOR] Exemplo primeira linha:', JSON.stringify(gerenciadorRows[0]));
 
   const colDate = findCol(headers, 'dia', 'data', 'date');
-  const colAdName = findCol(headers, 'nome do anúncio', 'nome do anuncio', 'anúncio', 'anuncio', 'ad name', 'ad_name');
-  const colAdset = findCol(headers, 'conjunto de anúncios', 'conjunto de anuncios', 'adset', 'ad set', 'ad_set');
+  const colAdName = findCol(headers, 'nome do anúncio', 'nome do anuncio', 'anúncio', 'anuncio', 'ad name', 'ad_name', 'nome_anuncio');
+  const colAdset = findCol(headers, 'conjunto de anúncios', 'conjunto de anuncios', 'adset', 'ad set', 'ad_set', 'nome_conjunto', 'conjunto');
+
+  console.log('[GERENCIADOR] Colunas → data:', colDate >= 0 ? headers[colDate] : 'NÃO',
+    '| anúncio:', colAdName >= 0 ? headers[colAdName] : 'NÃO',
+    '| adset:', colAdset >= 0 ? headers[colAdset] : 'NÃO');
   const colSpend = findCol(headers, 'valor gasto', 'investimento', 'gasto', 'spend', 'custo');
   const colImpr = findCol(headers, 'impressões', 'impressoes', 'impressions', 'impr');
   const colClicks = findCol(headers, 'cliques', 'cliques no link', 'clicks', 'link clicks', 'click');
@@ -448,31 +494,79 @@ function processData(gerenciadorRows, webhookRows) {
 
   // Process Webhook
   const webhookHeaders = Object.keys(webhookRows[0] || {});
-  const colWebhookDate = findCol(webhookHeaders, 'data', 'date', 'dia', 'data da compra', 'created_at');
-  const colStatus = findCol(webhookHeaders, 'status', 'situação', 'situacao', 'payment_status');
-  const colSource = findCol(webhookHeaders, 'source', 'utm_source', 'origem', 'utm source');
-  const colValue = findCol(webhookHeaders, 'valor', 'valor da kiwify', 'valor do produto', 'amount', 'price', 'comissão', 'valor kiwify');
+  console.log('[WEBHOOK] Headers encontrados:', webhookHeaders);
+  console.log('[WEBHOOK] Total de linhas:', webhookRows.length);
+  if (webhookRows.length > 0) console.log('[WEBHOOK] Exemplo primeira linha:', JSON.stringify(webhookRows[0]));
+
+  const colWebhookDate = findCol(webhookHeaders, 'data', 'date', 'dia', 'data da compra', 'created_at', 'data de criação', 'data criação', 'created');
+  const colStatus = findCol(webhookHeaders, 'status', 'situação', 'situacao', 'payment_status', 'estado', 'state');
+  const colSource = findCol(webhookHeaders, 'source', 'utm_source', 'origem', 'utm source', 'src', 'fonte');
+  const colValue = findCol(webhookHeaders, 'valor', 'valor da kiwify', 'valor do produto', 'amount', 'price', 'comissão', 'valor kiwify', 'revenue', 'receita', 'total', 'valor total', 'commission');
+
+  console.log('[WEBHOOK] Colunas detectadas → data:', colWebhookDate >= 0 ? webhookHeaders[colWebhookDate] : 'NÃO ENCONTRADA',
+    '| status:', colStatus >= 0 ? webhookHeaders[colStatus] : 'NÃO ENCONTRADA',
+    '| source:', colSource >= 0 ? webhookHeaders[colSource] : 'NÃO ENCONTRADA',
+    '| valor:', colValue >= 0 ? webhookHeaders[colValue] : 'NÃO ENCONTRADA');
+
+  // Primeiro passo: coletar todas as vendas válidas para detectar se valor é centavos ou reais
+  const vendasValidas = [];
+  let debugSkipStatus = 0, debugSkipSource = 0, debugSkipDate = 0, debugTotal = 0;
 
   for (const row of webhookRows) {
-    const status = (row[webhookHeaders[colStatus]] || '').toLowerCase().trim();
-    if (status !== 'paid') continue;
+    debugTotal++;
 
-    let source = (row[webhookHeaders[colSource]] || '').toLowerCase().trim();
-    source = source.replace(/\s|_/g, '');
-    if (!source.includes('meta')) continue;
+    // Filtro de status: "paid" ou "approved" ou "aprovado" ou "completed"
+    const statusRaw = colStatus >= 0 ? (row[webhookHeaders[colStatus]] || '') : '';
+    const status = statusRaw.toLowerCase().trim();
+    if (status !== 'paid' && status !== 'approved' && status !== 'aprovado' && status !== 'completed' && status !== 'completo') {
+      debugSkipStatus++;
+      continue;
+    }
 
-    const date = parseDate(row[webhookHeaders[colWebhookDate]]);
-    if (!date) continue;
+    // Filtro de source: contém "meta" (flexível)
+    if (colSource >= 0) {
+      let source = (row[webhookHeaders[colSource]] || '').toLowerCase().trim();
+      source = source.replace(/[\s_\-\.]/g, '');
+      if (source && !source.includes('meta') && !source.includes('facebook') && !source.includes('fb') && !source.includes('ig')) {
+        debugSkipSource++;
+        continue;
+      }
+      // Se source está vazio, permitir (pode não ter UTM preenchido)
+    }
 
-    const valueCentavos = parseNum(row[webhookHeaders[colValue]]);
-    const value = valueCentavos / 100;
+    // Data
+    const dateRaw = colWebhookDate >= 0 ? row[webhookHeaders[colWebhookDate]] : '';
+    const date = parseDateFlexible(dateRaw);
+    if (!date) {
+      debugSkipDate++;
+      continue;
+    }
 
-    if (diaMap[date]) {
-      diaMap[date].fat += value;
-      diaMap[date].compras += 1;
+    const valueRaw = colValue >= 0 ? row[webhookHeaders[colValue]] : '0';
+    const valueNum = parseNum(valueRaw);
+
+    vendasValidas.push({ date, valueNum, raw: valueRaw });
+  }
+
+  console.log(`[WEBHOOK] Total: ${debugTotal} | Status filtrado: ${debugSkipStatus} | Source filtrado: ${debugSkipSource} | Data inválida: ${debugSkipDate} | Vendas válidas: ${vendasValidas.length}`);
+  if (vendasValidas.length > 0) {
+    console.log('[WEBHOOK] Exemplo venda:', JSON.stringify(vendasValidas[0]));
+  }
+
+  // Auto-detectar centavos: se média dos valores > 500, provavelmente são centavos
+  const avgValue = vendasValidas.length > 0 ? vendasValidas.reduce((s, v) => s + v.valueNum, 0) / vendasValidas.length : 0;
+  const isCentavos = avgValue > 500;
+  console.log(`[WEBHOOK] Média valor: ${avgValue.toFixed(2)} → ${isCentavos ? 'CENTAVOS (÷100)' : 'REAIS (sem divisão)'}`);
+
+  // Aplicar vendas ao diaMap
+  for (const venda of vendasValidas) {
+    const value = isCentavos ? venda.valueNum / 100 : venda.valueNum;
+
+    if (diaMap[venda.date]) {
+      diaMap[venda.date].fat += value;
+      diaMap[venda.date].compras += 1;
     } else {
-      // Venda em dia sem gasto de ads — registrar mesmo assim
-      diaMap[date] = { inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: value, compras: 1 };
+      diaMap[venda.date] = { inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: value, compras: 1 };
     }
   }
 
@@ -480,6 +574,9 @@ function processData(gerenciadorRows, webhookRows) {
   DIAS = Object.entries(diaMap).map(([date, data]) => ({ date, ...data })).sort((a, b) => a.date.localeCompare(b.date));
   CRIATIVOS = Object.entries(criativoMap).map(([nome, data]) => ({ nome, ...data, dates: Array.from(data.dates) }));
   PUBLICOS = Object.entries(publicoMap).map(([nome, data]) => ({ nome, ...data, dates: Array.from(data.dates) }));
+
+  console.log(`[RESULTADO] DIAS: ${DIAS.length} | CRIATIVOS: ${CRIATIVOS.length} | PUBLICOS: ${PUBLICOS.length}`);
+  console.log(`[RESULTADO] Fat total: ${DIAS.reduce((s,d)=>s+d.fat,0).toFixed(2)} | Compras total: ${DIAS.reduce((s,d)=>s+(d.compras||0),0)}`);
 
   fixFatFromDias();
   buildWeekly();
@@ -725,13 +822,14 @@ function renderVisao() {
   const ticket = agg.compras > 0 ? agg.fat / agg.compras : 0;
   const cac = agg.compras > 0 ? agg.inv / agg.compras : 0;
 
+  const cpcGeral = agg.cliques > 0 ? agg.inv / agg.cliques : 0;
+
   const taxaHtml = `
-    <div class="taxa-item"><span>CTR</span><span class="taxa-val">${pct(ctr)}</span></div>
     <div class="taxa-item"><span>Connect Rate</span><span class="taxa-val">${pct(connectRate)}</span></div>
     <div class="taxa-item"><span>Taxa Checkout</span><span class="taxa-val">${pct(taxaCheckout)}</span></div>
-    <div class="taxa-item"><span>Taxa de Compra</span><span class="taxa-val">${pct(taxaCompra)}</span></div>
-    <div class="taxa-item"><span>Ticket Médio</span><span class="taxa-val">${brl(ticket)}</span></div>
-    <div class="taxa-item"><span>CAC</span><span class="taxa-val">${brl(cac)}</span></div>
+    <div class="taxa-item"><span>Taxa Compra</span><span class="taxa-val">${pct(taxaCompra)}</span></div>
+    <div class="taxa-item"><span>CTR</span><span class="taxa-val">${pct(ctr)}</span></div>
+    <div class="taxa-item"><span>CPC</span><span class="taxa-val">${brl(cpcGeral)}</span></div>
   `;
   document.getElementById('taxa-visao').innerHTML = taxaHtml;
 
