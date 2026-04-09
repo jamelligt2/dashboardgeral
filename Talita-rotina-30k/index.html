@@ -198,7 +198,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
   <div class="pub-grid" id="pub-cards"></div>
   <div class="sec-title">Tabela de Públicos</div>
   <div class="tbl-wrap"><table><thead><tr>
-    <th>Público (Adset)</th><th>Invest.</th><th>Cliques</th><th>Imp.</th><th>PV</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Status</th>
+    <th>Público (Adset)</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Vendas</th><th>Ticket</th><th>Cliques</th><th>Imp.</th><th>PV</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Status</th>
   </tr></thead><tbody id="tbody-publicos"></tbody></table></div>
 </div>
 
@@ -211,7 +211,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
   </div>
   <div class="sec-title">Semana a Semana</div>
   <div class="tbl-wrap"><table><thead><tr>
-    <th>Semana</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Cliques</th><th>PV</th><th>CK</th><th>Imp.</th><th>CPC</th><th>CPM</th><th>Retorno</th><th>Status</th>
+    <th>Semana</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Ticket</th><th>Cliques</th><th>PV</th><th>CK</th><th>Imp.</th><th>CPC</th><th>CPM</th><th>Retorno</th><th>Status</th>
   </tr></thead><tbody id="tbody-semanal"></tbody></table></div>
 </div>
 
@@ -220,7 +220,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
   <div class="kpi-grid" id="kpi-mensal"></div>
   <div class="sec-title">Mês a Mês</div>
   <div class="tbl-wrap"><table><thead><tr>
-    <th>Mês</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Cliques</th><th>PV</th><th>CK</th><th>Imp.</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Retorno</th><th>Status</th>
+    <th>Mês</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Ticket</th><th>Cliques</th><th>PV</th><th>CK</th><th>Imp.</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Retorno</th><th>Status</th>
   </tr></thead><tbody id="tbody-mensal"></tbody></table></div>
 </div>
 
@@ -344,9 +344,11 @@ function processData(gRows, vRows) {
     return st === 'paid' && src === 'metaads';
   });
 
-  // Build sales map by date (DD/MM/YYYY)
+  // Build sales maps by date, ad name, and adset
   const salesByDate = {};
   const salesByAd = {};
+  const salesByAdset = {};
+  const vUtmCampaign = findCol(vHeaders, 'utm_campaign');
   salesRows.forEach(r => {
     const rawDate = r[vDate] || '';
     const datePart = rawDate.split(' ')[0]; // DD/MM/YYYY
@@ -362,6 +364,14 @@ function processData(gRows, vRows) {
       if (!salesByAd[adName]) salesByAd[adName] = { fat: 0, compras: 0 };
       salesByAd[adName].fat += val;
       salesByAd[adName].compras += 1;
+    }
+
+    // Match to adset via utm_campaign
+    const utmCamp = (r[vUtmCampaign] || '').trim();
+    if (utmCamp) {
+      if (!salesByAdset[utmCamp]) salesByAdset[utmCamp] = { fat: 0, compras: 0 };
+      salesByAdset[utmCamp].fat += val;
+      salesByAdset[utmCamp].compras += 1;
     }
   });
 
@@ -452,6 +462,23 @@ function processData(gRows, vRows) {
     return c;
   });
 
+  // Merge sales into PUBLICOS (fuzzy match: adset name startsWith or includes)
+  Object.keys(pubMap).forEach(name => {
+    // Try exact match first, then startsWith match
+    let matched = salesByAdset[name];
+    if (!matched) {
+      const key = Object.keys(salesByAdset).find(k => k.startsWith(name) || name.startsWith(k));
+      if (key) matched = salesByAdset[key];
+    }
+    if (matched) {
+      pubMap[name].fat = matched.fat;
+      pubMap[name].compras = matched.compras;
+    } else {
+      pubMap[name].fat = 0;
+      pubMap[name].compras = 0;
+    }
+  });
+
   // Compute publicos metrics + ativo
   PUBLICOS = Object.values(pubMap).map(p => {
     const isoLast = p.lastDate ? toISO(p.lastDate) : '';
@@ -461,6 +488,8 @@ function processData(gRows, vRows) {
     p.cpm = p.imp > 0 ? Math.round(p.inv / p.imp * 1000 * 100) / 100 : 0;
     p.ctr = p.imp > 0 ? Math.round(p.cliques / p.imp * 100 * 100) / 100 : 0;
     p.connectRate = p.cliques > 0 ? Math.round(p.pv / p.cliques * 100 * 100) / 100 : 0;
+    p.roas = p.inv > 0 ? Math.round(p.fat / p.inv * 100) / 100 : 0;
+    p.ticket = p.compras > 0 ? Math.round(p.fat / p.compras * 100) / 100 : 0;
     return p;
   });
 
@@ -561,6 +590,7 @@ function renderKpiVisao(dias) {
     <div class="kpi-card"><div class="kpi-label">Compras</div><div class="kpi-value orange">${br(compras, 0)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Cliques</div><div class="kpi-value">${br(cliques, 0)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Impressões</div><div class="kpi-value">${br(imp, 0)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value orange">${brl(compras > 0 ? fat / compras : 0)}</div></div>
     <div class="kpi-card"><div class="kpi-label">CPC</div><div class="kpi-value">${brl(cpc)}</div></div>
     <div class="kpi-card"><div class="kpi-label">CPM</div><div class="kpi-value">${brl(cpm)}</div></div>`;
 }
@@ -643,6 +673,7 @@ function renderCriativos() {
         <div class="cri-metric"><div class="cri-metric-label">Vendas</div><div class="cri-metric-val">${br(c.compras, 0)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">Cliques</div><div class="cri-metric-val">${br(c.cliques, 0)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">CTR</div><div class="cri-metric-val">${pct(c.ctr)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">Ticket Médio</div><div class="cri-metric-val hl">${brl(c.ticket)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">CPC</div><div class="cri-metric-val">${brl(c.cpc)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">CPM</div><div class="cri-metric-val">${brl(c.cpm)}</div></div>
       </div>
@@ -678,10 +709,12 @@ function renderPublicos() {
       <div class="pub-card-header"><div class="pub-name">${p.nome}</div><div class="cri-badge ${p.ativo ? 'ativo' : 'inativo'}">${p.ativo ? 'Ativo' : 'Inativo'}</div></div>
       <div class="pub-metrics">
         <div class="pub-metric"><div class="pub-metric-val">${brl(p.inv)}</div><div class="pub-metric-lbl">Invest.</div></div>
-        <div class="pub-metric"><div class="pub-metric-val neutral">${pct(p.ctr)}</div><div class="pub-metric-lbl">CTR</div></div>
-        <div class="pub-metric"><div class="pub-metric-val neutral">${pct(p.connectRate)}</div><div class="pub-metric-lbl">Connect Rate</div></div>
+        <div class="pub-metric"><div class="pub-metric-val neutral">${br(p.roas)}x</div><div class="pub-metric-lbl">ROAS</div></div>
+        <div class="pub-metric"><div class="pub-metric-val neutral">${brl(p.ticket)}</div><div class="pub-metric-lbl">Ticket Médio</div></div>
       </div>
       <div class="cri-metrics">
+        <div class="cri-metric"><div class="cri-metric-label">CTR</div><div class="cri-metric-val">${pct(p.ctr)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">Connect Rate</div><div class="cri-metric-val">${pct(p.connectRate)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">CPC</div><div class="cri-metric-val">${brl(p.cpc)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">CPM</div><div class="cri-metric-val">${brl(p.cpm)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">Cliques</div><div class="cri-metric-val">${br(p.cliques, 0)}</div></div>
@@ -694,8 +727,8 @@ function renderPublicos() {
     </div>`;
   }).join('');
   document.getElementById('tbody-publicos').innerHTML = pubs.map(p => `
-    <tr><td>${p.nome}</td><td>${brl(p.inv)}</td><td>${br(p.cliques, 0)}</td><td>${br(p.imp, 0)}</td>
-    <td>${br(p.pv || 0, 0)}</td><td>${pct(p.ctr)}</td><td>${brl(p.cpc)}</td><td>${brl(p.cpm)}</td>
+    <tr><td>${p.nome}</td><td>${brl(p.inv)}</td><td>${brl(p.fat)}</td><td>${br(p.roas)}x</td><td>${br(p.compras, 0)}</td><td>${brl(p.ticket)}</td>
+    <td>${br(p.cliques, 0)}</td><td>${br(p.imp, 0)}</td><td>${br(p.pv || 0, 0)}</td><td>${pct(p.ctr)}</td><td>${brl(p.cpc)}</td><td>${brl(p.cpm)}</td>
     <td>${pct(p.connectRate)}</td>
     <td><span class="cri-badge ${p.ativo ? 'ativo' : 'inativo'}">${p.ativo ? 'Ativo' : 'Inativo'}</span></td></tr>`).join('');
 }
@@ -711,9 +744,10 @@ function renderSemanal() {
     <div class="kpi-card"><div class="kpi-label">Investimento Total</div><div class="kpi-value orange">${brl(inv)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Faturamento Total</div><div class="kpi-value green">${brl(fat)}</div></div>
     <div class="kpi-card"><div class="kpi-label">ROAS Geral</div><div class="kpi-value ${roasClass}">${br(roas)}x</div></div>
-    <div class="kpi-card"><div class="kpi-label">Compras Total</div><div class="kpi-value orange">${br(compras, 0)}</div></div>`;
+    <div class="kpi-card"><div class="kpi-label">Compras Total</div><div class="kpi-value orange">${br(compras, 0)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value orange">${brl(compras > 0 ? fat / compras : 0)}</div></div>`;
   document.getElementById('tbody-semanal').innerHTML = SEMANAL.map(s => `
-    <tr><td>S${s.semana}</td><td>${brl(s.inv)}</td><td>${brl(s.fat)}</td><td>${br(s.roas)}x</td><td>${br(s.compras, 0)}</td>
+    <tr><td>S${s.semana}</td><td>${brl(s.inv)}</td><td>${brl(s.fat)}</td><td>${br(s.roas)}x</td><td>${br(s.compras, 0)}</td><td>${brl(s.ticket)}</td>
     <td>${br(s.cliques, 0)}</td><td>${br(s.pv, 0)}</td><td>${br(s.ck, 0)}</td><td>${br(s.imp, 0)}</td>
     <td>${brl(s.cpc)}</td><td>${brl(s.cpm)}</td><td>${brl(s.retorno)}</td><td>${statusBadge(s.inv, s.fat)}</td></tr>`).join('');
 
@@ -739,9 +773,10 @@ function renderMensal() {
     <div class="kpi-card"><div class="kpi-label">Investimento Total</div><div class="kpi-value orange">${brl(inv)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Faturamento Total</div><div class="kpi-value green">${brl(fat)}</div></div>
     <div class="kpi-card"><div class="kpi-label">ROAS Geral</div><div class="kpi-value ${roasClass}">${br(roas)}x</div></div>
-    <div class="kpi-card"><div class="kpi-label">Compras Total</div><div class="kpi-value orange">${br(compras, 0)}</div></div>`;
+    <div class="kpi-card"><div class="kpi-label">Compras Total</div><div class="kpi-value orange">${br(compras, 0)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value orange">${brl(compras > 0 ? fat / compras : 0)}</div></div>`;
   document.getElementById('tbody-mensal').innerHTML = MENSAL.map(m => `
-    <tr><td>${m.mes}</td><td>${brl(m.inv)}</td><td>${brl(m.fat)}</td><td>${br(m.roas)}x</td><td>${br(m.compras, 0)}</td>
+    <tr><td>${m.mes}</td><td>${brl(m.inv)}</td><td>${brl(m.fat)}</td><td>${br(m.roas)}x</td><td>${br(m.compras, 0)}</td><td>${brl(m.ticket)}</td>
     <td>${br(m.cliques, 0)}</td><td>${br(m.pv, 0)}</td><td>${br(m.ck, 0)}</td><td>${br(m.imp, 0)}</td>
     <td>${brl(m.cpc)}</td><td>${brl(m.cpm)}</td><td>${pct(m.connectRate)}</td><td>${brl(m.retorno)}</td><td>${statusBadge(m.inv, m.fat)}</td></tr>`).join('');
 }
