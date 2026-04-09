@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>ICCB · Daniela Mara — Dashboard de Performance</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg viewBox='0 0 36 36' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='36' height='36' rx='8' fill='%23ff6b2b' fill-opacity='0.15'/%3E%3Crect width='36' height='36' rx='8' stroke='%23ff6b2b' stroke-opacity='0.4' stroke-width='1' fill='none'/%3E%3Ctext x='18' y='24' text-anchor='middle' font-family='DM Sans' font-weight='700' font-size='13' fill='%23ff6b2b'%3EJGT%3C/text%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
@@ -118,7 +119,7 @@
     </div>
     <div>
       <div class="brand">📊 ICCB · Daniela Mara</div>
-      <div class="subtitle">Dashboard de Performance — Perpétuo · Jamelli GT · 2025</div>
+      <div class="subtitle">Dashboard de Performance — Perpétuo · Jamelli GT · 2025 &nbsp; <span id="updated-at" style="color:rgba(255,255,255,.3)"></span></div>
     </div>
   </div>
   <div class="period-bar">
@@ -145,10 +146,16 @@
 <!-- TAB: Visão Geral -->
 <div id="visao" class="content active">
   <div class="kpi-grid" id="kpi-visao"></div>
-  <div class="sec-title">Funil de Conversão</div>
-  <div class="funil-section" id="funil-visao"></div>
-  <div class="sec-title">Taxas de Performance</div>
-  <div class="taxa-grid" id="taxa-visao"></div>
+  <div class="funil-section">
+    <div>
+      <div class="sec-title">Funil de Conversão</div>
+      <div id="funil-visao"></div>
+    </div>
+    <div>
+      <div class="sec-title">Taxas de Performance</div>
+      <div class="taxa-grid" id="taxa-visao"></div>
+    </div>
+  </div>
   <div class="sec-title">Evolução</div>
   <div class="chart-grid-2x2">
     <div class="chart-card"><h4>Investimento vs Faturamento</h4><canvas id="chart-inv-fat"></canvas></div>
@@ -389,6 +396,10 @@ async function loadData() {
     console.log(`[FINAL] Compras: ${totalCompras} | Faturamento: R$ ${totalFat.toFixed(2)}`);
 
     document.getElementById('loading-overlay').style.display = 'none';
+
+    // Timestamp atualização
+    const now = new Date();
+    document.getElementById('updated-at').textContent = `Atualizado: ${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
 
     initializeDateInputs();
     renderAll();
@@ -699,55 +710,53 @@ function renderVisao() {
   const filtered = filterData();
   const agg = aggregateData(filtered);
 
-  const kpiHtml = `
-    <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${brl(agg.inv)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Faturamento</div><div class="kpi-value green">${brl(agg.fat)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">ROAS</div><div class="kpi-value orange">${br(agg.inv > 0 ? agg.fat / agg.inv : 0, 2)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Compras</div><div class="kpi-value orange">${agg.compras}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Cliques</div><div class="kpi-value orange">${agg.cliques}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Impressões</div><div class="kpi-value orange">${agg.impr}</div></div>
-    <div class="kpi-card"><div class="kpi-label">CPC</div><div class="kpi-value orange">${brl(agg.cliques > 0 ? agg.inv / agg.cliques : 0)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">CPM</div><div class="kpi-value orange">${brl(agg.impr > 0 ? (agg.inv / agg.impr) * 1000 : 0)}</div></div>
-  `;
-  document.getElementById('kpi-visao').innerHTML = kpiHtml;
-
-  const maxClick = Math.max(...filtered.map(d => d.cliques || 0), 1);
-  const maxPV = Math.max(...filtered.map(d => d.pv || 0), 1);
-  const maxCK = Math.max(...filtered.map(d => d.ck || 0), 1);
-
-  const funilHtml = `
-    <div>
-      <div class="funil-bar-wrap">
-        <div class="funil-label"><span>Cliques</span><span>${agg.cliques}</span></div>
-        <div class="funil-bar-bg"><div class="funil-bar-fill" style="width:100%"></div></div>
-      </div>
-      <div class="funil-bar-wrap">
-        <div class="funil-label"><span>Visualizações</span><span>${agg.pv}</span></div>
-        <div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${agg.cliques > 0 ? (agg.pv / agg.cliques) * 100 : 0}%"></div></div>
-      </div>
-    </div>
-    <div>
-      <div class="funil-bar-wrap">
-        <div class="funil-label"><span>Checkouts</span><span>${agg.ck}</span></div>
-        <div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${agg.pv > 0 ? (agg.ck / agg.pv) * 100 : 0}%"></div></div>
-      </div>
-      <div class="funil-bar-wrap">
-        <div class="funil-label"><span>Compras</span><span>${agg.compras}</span></div>
-        <div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${agg.ck > 0 ? (agg.compras / agg.ck) * 100 : 0}%"></div></div>
-      </div>
-    </div>
-  `;
-  document.getElementById('funil-visao').innerHTML = funilHtml;
-
+  // Métricas calculadas
+  const retorno = agg.fat - agg.inv;
+  const roas = agg.inv > 0 ? agg.fat / agg.inv : 0;
+  const cpm = agg.impr > 0 ? (agg.inv / agg.impr) * 1000 : 0;
+  const cac = agg.compras > 0 ? agg.inv / agg.compras : 0;
+  const ticket = agg.compras > 0 ? agg.fat / agg.compras : 0;
   const ctr = agg.impr > 0 ? (agg.cliques / agg.impr) * 100 : 0;
   const connectRate = agg.cliques > 0 ? (agg.pv / agg.cliques) * 100 : 0;
   const taxaCheckout = agg.pv > 0 ? (agg.ck / agg.pv) * 100 : 0;
   const taxaCompra = agg.pv > 0 ? (agg.compras / agg.pv) * 100 : 0;
-  const ticket = agg.compras > 0 ? agg.fat / agg.compras : 0;
-  const cac = agg.compras > 0 ? agg.inv / agg.compras : 0;
-
   const cpcGeral = agg.cliques > 0 ? agg.inv / agg.cliques : 0;
 
+  // KPIs: Investimento | Faturamento(verde) | Retorno Líquido(verde) | ROAS | Compras | CPM | CAC | Ticket Médio
+  const kpiHtml = `
+    <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${brl(agg.inv)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Faturamento</div><div class="kpi-value green">${brl(agg.fat)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Retorno Líquido</div><div class="kpi-value ${retorno >= 0 ? 'green' : 'red'}">${brl(retorno)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">ROAS</div><div class="kpi-value orange">${br(roas, 2)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Compras</div><div class="kpi-value orange">${agg.compras}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CPM</div><div class="kpi-value orange">${brl(cpm)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CAC</div><div class="kpi-value orange">${brl(cac)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value orange">${brl(ticket)}</div></div>
+  `;
+  document.getElementById('kpi-visao').innerHTML = kpiHtml;
+
+  // Funil: 4 barras empilhadas na coluna esquerda (Cliques → Pageviews → Checkouts → Compras)
+  const funilHtml = `
+    <div class="funil-bar-wrap">
+      <div class="funil-label"><span>Cliques</span><span>${br(agg.cliques,0)}</span></div>
+      <div class="funil-bar-bg"><div class="funil-bar-fill" style="width:100%"></div></div>
+    </div>
+    <div class="funil-bar-wrap">
+      <div class="funil-label"><span>Pageviews</span><span>${br(agg.pv,0)}</span></div>
+      <div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${agg.cliques > 0 ? (agg.pv / agg.cliques) * 100 : 0}%"></div></div>
+    </div>
+    <div class="funil-bar-wrap">
+      <div class="funil-label"><span>Checkouts</span><span>${br(agg.ck,0)}</span></div>
+      <div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${agg.cliques > 0 ? (agg.ck / agg.cliques) * 100 : 0}%"></div></div>
+    </div>
+    <div class="funil-bar-wrap">
+      <div class="funil-label"><span>Compras</span><span>${br(agg.compras,0)}</span></div>
+      <div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${agg.cliques > 0 ? (agg.compras / agg.cliques) * 100 : 0}%"></div></div>
+    </div>
+  `;
+  document.getElementById('funil-visao').innerHTML = funilHtml;
+
+  // Taxas: coluna direita
   const taxaHtml = `
     <div class="taxa-item"><span>Connect Rate</span><span class="taxa-val">${pct(connectRate)}</span></div>
     <div class="taxa-item"><span>Taxa Checkout</span><span class="taxa-val">${pct(taxaCheckout)}</span></div>

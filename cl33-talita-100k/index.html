@@ -3,13 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>ICCB · Daniela Mara — Dashboard de Performance</title>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <title>PP125 · Talita Marques Checklist10k - Dashboard</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{background:#1a1a2e;color:#e8e6f0;font-family:'DM Sans',sans-serif;min-height:100vh}
-    ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:#12121f}::-webkit-scrollbar-thumb{background:#ff6b2b55;border-radius:3px}
+    ::-webkit-scrollbar{width:6px;height:6px}
+    ::-webkit-scrollbar-track{background:#12121f}
+    ::-webkit-scrollbar-thumb{background:#ff6b2b55;border-radius:3px}
     .topbar{background:#12121f;padding:12px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.07);position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:10px}
     .brand{font-size:17px;font-weight:700;color:#ff6b2b}
     .subtitle{font-size:11px;color:rgba(255,255,255,0.4);margin-top:2px}
@@ -29,13 +32,18 @@
     .range-info{font-size:11px;color:rgba(255,107,43,.75);font-family:'DM Mono',monospace;white-space:nowrap;padding-left:4px}
     .tabs{display:flex;border-bottom:1px solid rgba(255,255,255,0.07);background:#12121f;padding:0 28px;overflow-x:auto}
     .tab{padding:12px 20px;cursor:pointer;font-size:13px;color:rgba(255,255,255,0.5);border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
-    .tab:hover{color:#e8e6f0}.tab.active{color:#ff6b2b;border-bottom-color:#ff6b2b;font-weight:600}
-    .content{padding:24px 28px;display:none}.content.active{display:block}
+    .tab:hover{color:#e8e6f0}
+    .tab.active{color:#ff6b2b;border-bottom-color:#ff6b2b;font-weight:600}
+    .content{padding:24px 28px;display:none}
+    .content.active{display:block}
     .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:20px}
     .kpi-card{background:#12121f;border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:16px 18px}
     .kpi-label{font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
     .kpi-value{font-size:20px;font-weight:700;font-family:'DM Mono',monospace}
-    .orange{color:#ff6b2b}.green{color:#2ecc71}.red{color:#e74c3c}.yellow{color:#f1c40f}
+    .orange{color:#ff6b2b}
+    .green{color:#2ecc71}
+    .red{color:#e74c3c}
+    .yellow{color:#f1c40f}
     table{width:100%;border-collapse:collapse;font-size:12px}
     th{background:#12121f;color:rgba(255,255,255,.45);padding:8px 10px;text-align:right;font-weight:500;border-bottom:1px solid rgba(255,255,255,.07);white-space:nowrap}
     th:first-child{text-align:left}
@@ -96,1130 +104,1416 @@
     .pub-bar-label{display:flex;justify-content:space-between;font-size:10px;color:rgba(255,255,255,.35);margin-bottom:3px}
     .pub-bar-bg{height:5px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden}
     .pub-bar-fill{height:100%;background:linear-gradient(90deg,#ff6b2b,#ff9a3c);border-radius:3px;transition:width .5s}
+    .loading-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:#1a1a2e;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999}
+    .loading-spinner{width:40px;height:40px;border:3px solid rgba(255,107,43,.2);border-top-color:#ff6b2b;border-radius:50%;animation:spin 1s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .loading-text{margin-top:16px;color:rgba(255,255,255,.5);font-size:13px}
+    .update-badge{font-size:10px;color:rgba(255,255,255,.3);padding:2px 8px;background:rgba(255,255,255,.05);border-radius:4px}
+    .error-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:9998}
+    .error-box{background:#12121f;border:1px solid rgba(231,76,60,.3);border-radius:12px;padding:24px;max-width:400px;text-align:center}
+    .error-box h3{color:#e74c3c;margin-bottom:12px;font-size:16px}
+    .error-box p{color:rgba(255,255,255,.6);font-size:13px;line-height:1.6;margin-bottom:16px}
+    .error-box button{background:#ff6b2b;border:none;color:#fff;padding:8px 16px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600}
+    .period-filter-bar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+    .period-filter-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 12px;border-radius:5px;cursor:pointer;font-size:12px;transition:all .2s}
+    .period-filter-btn.active{background:rgba(255,107,43,.2);border-color:#ff6b2b;color:#ff6b2b}
   </style>
 </head>
+
 <body>
+  <div class="loading-overlay" id="loading">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Carregando dados...</div>
+  </div>
 
-<div id="loading-overlay" style="position:fixed;inset:0;background:#1a1a2e;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px">
-  <div style="width:40px;height:40px;border:3px solid rgba(255,107,43,.2);border-top-color:#ff6b2b;border-radius:50%;animation:spin 1s linear infinite"></div>
-  <div style="color:rgba(255,255,255,.5);font-size:13px" id="loading-msg">Conectando com a planilha...</div>
-  <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
-</div>
-
-<div class="topbar">
-  <div style="display:flex;align-items:center;gap:16px">
-    <div class="logo-jgt">
-      <svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
-        <rect width="36" height="36" rx="8" fill="#ff6b2b" fill-opacity="0.15"/>
-        <rect width="36" height="36" rx="8" stroke="#ff6b2b" stroke-opacity="0.4" stroke-width="1" fill="none"/>
-        <text x="18" y="24" text-anchor="middle" font-family="DM Sans" font-weight="700" font-size="13" fill="#ff6b2b">JGT</text>
-      </svg>
-      <div class="logo-text"><strong>Jamelli GT</strong><span>Tráfego Pago</span></div>
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:16px">
+      <div class="logo-jgt">
+        <svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+          <rect width="36" height="36" rx="8" fill="#ff6b2b" fill-opacity="0.15"/>
+          <rect width="36" height="36" rx="8" stroke="#ff6b2b" stroke-opacity="0.4" stroke-width="1" fill="none"/>
+          <text x="18" y="24" text-anchor="middle" font-family="DM Sans" font-weight="700" font-size="13" fill="#ff6b2b">JGT</text>
+        </svg>
+        <div class="logo-text"><strong>Jamelli GT</strong><span>Tráfego Pago</span></div>
+      </div>
+      <div>
+        <div class="brand">📊 PP125 · Talita Marques Checklist10k</div>
+        <div class="subtitle">Dashboard de Performance — Perpétuo · Jamelli GT · 2025 <span class="update-badge" id="update-badge"></span></div>
+      </div>
     </div>
-    <div>
-      <div class="brand">📊 ICCB · Daniela Mara</div>
-      <div class="subtitle">Dashboard de Performance — Perpétuo · Jamelli GT · 2025</div>
+    <div class="period-bar">
+      <label>De</label>
+      <input type="date" id="dateFrom" class="date-input" onchange="onDateChange()">
+      <span class="period-sep">→</span>
+      <input type="date" id="dateTo" class="date-input" onchange="onDateChange()">
+      <button class="preset-btn" onclick="setPreset(7,this)">7d</button>
+      <button class="preset-btn" onclick="setPreset(14,this)">14d</button>
+      <button class="preset-btn" onclick="setPreset(30,this)">30d</button>
+      <button class="preset-btn active" id="btn-all" onclick="setPreset('all',this)">Tudo</button>
+      <span class="range-info" id="range-info"></span>
     </div>
   </div>
-  <div class="period-bar">
-    <label>De</label>
-    <input type="date" id="dateFrom" class="date-input" onchange="onDateChange()">
-    <span class="period-sep">→</span>
-    <input type="date" id="dateTo" class="date-input" onchange="onDateChange()">
-    <button class="preset-btn" onclick="setPreset(7,this)">7d</button>
-    <button class="preset-btn" onclick="setPreset(14,this)">14d</button>
-    <button class="preset-btn" onclick="setPreset(30,this)">30d</button>
-    <button class="preset-btn active" id="btn-all" onclick="setPreset('all',this)">Tudo</button>
-    <span class="range-info" id="range-info"></span>
+
+  <div class="tabs">
+    <div class="tab active" onclick="showTab('visao',this)">Visão Geral</div>
+    <div class="tab" onclick="showTab('criativos',this)">Criativos</div>
+    <div class="tab" onclick="showTab('publicos',this)">Públicos</div>
+    <div class="tab" onclick="showTab('semanal',this)">Semana a Semana</div>
+    <div class="tab" onclick="showTab('mensal',this)">Mês a Mês</div>
   </div>
-</div>
 
-<div class="tabs">
-  <div class="tab active" onclick="showTab('visao',this)">Visão Geral</div>
-  <div class="tab" onclick="showTab('criativos',this)">Criativos</div>
-  <div class="tab" onclick="showTab('publicos',this)">Públicos</div>
-  <div class="tab" onclick="showTab('semanal',this)">Semana a Semana</div>
-  <div class="tab" onclick="showTab('mensal',this)">Mês a Mês</div>
-</div>
+  <!-- TAB 1: VISÃO GERAL -->
+  <div id="visao" class="content active">
+    <div class="kpi-grid" id="kpi-grid-visao"></div>
+    <div class="funil-section">
+      <div>
+        <h4 class="sec-title">Funil de Conversão</h4>
+        <div class="funil-bar-wrap">
+          <div class="funil-label"><span>Cliques</span><span id="funil-cliques">0</span></div>
+          <div class="funil-bar-bg"><div class="funil-bar-fill" id="funil-bar-cliques" style="width:100%"></div></div>
+        </div>
+        <div class="funil-bar-wrap">
+          <div class="funil-label"><span>Pageviews</span><span id="funil-pv">0</span></div>
+          <div class="funil-bar-bg"><div class="funil-bar-fill" id="funil-bar-pv"></div></div>
+        </div>
+        <div class="funil-bar-wrap">
+          <div class="funil-label"><span>Checkouts</span><span id="funil-ck">0</span></div>
+          <div class="funil-bar-bg"><div class="funil-bar-fill" id="funil-bar-ck"></div></div>
+        </div>
+        <div class="funil-bar-wrap">
+          <div class="funil-label"><span>Compras</span><span id="funil-compras">0</span></div>
+          <div class="funil-bar-bg"><div class="funil-bar-fill" id="funil-bar-compras"></div></div>
+        </div>
+      </div>
+      <div>
+        <h4 class="sec-title">Taxas de Performance</h4>
+        <div class="taxa-grid">
+          <div class="taxa-item">
+            <span>Connect Rate</span>
+            <span class="taxa-val" id="taxa-connect">0%</span>
+          </div>
+          <div class="taxa-item">
+            <span>Taxa Checkout</span>
+            <span class="taxa-val" id="taxa-checkout">0%</span>
+          </div>
+          <div class="taxa-item">
+            <span>Taxa Compra</span>
+            <span class="taxa-val" id="taxa-compra">0%</span>
+          </div>
+          <div class="taxa-item">
+            <span>CTR</span>
+            <span class="taxa-val" id="taxa-ctr">0%</span>
+          </div>
+          <div class="taxa-item">
+            <span>CPC</span>
+            <span class="taxa-val" id="taxa-cpc">R$ 0,00</span>
+          </div>
+        </div>
+      </div>
+    </div>
 
-<!-- TAB: Visão Geral -->
-<div id="visao" class="content active">
-  <div class="kpi-grid" id="kpi-visao"></div>
-  <div class="sec-title">Funil de Conversão</div>
-  <div class="funil-section" id="funil-visao"></div>
-  <div class="sec-title">Taxas de Performance</div>
-  <div class="taxa-grid" id="taxa-visao"></div>
-  <div class="sec-title">Evolução</div>
-  <div class="chart-grid-2x2">
-    <div class="chart-card"><h4>Investimento vs Faturamento</h4><canvas id="chart-inv-fat"></canvas></div>
-    <div class="chart-card"><h4>ROAS</h4><canvas id="chart-roas"></canvas></div>
+    <div class="chart-grid-2x2">
+      <div class="chart-card">
+        <h4>ROAS Diário</h4>
+        <canvas id="chart-roas-diario"></canvas>
+      </div>
+      <div class="chart-card">
+        <h4>Investimento Diário</h4>
+        <canvas id="chart-inv-diario"></canvas>
+      </div>
+      <div class="chart-card">
+        <h4>Compras Diárias</h4>
+        <canvas id="chart-compras-diario"></canvas>
+      </div>
+      <div class="chart-card">
+        <h4>Faturamento Diário</h4>
+        <canvas id="chart-fat-diario"></canvas>
+      </div>
+    </div>
+
+    <h4 class="sec-title">Dia a Dia</h4>
+    <div class="tbl-wrap">
+      <table id="tbl-diario"></table>
+    </div>
   </div>
-  <div class="sec-title">Dia a Dia</div>
-  <div class="tbl-wrap"><table id="tbl-visao"></table></div>
-</div>
 
-<!-- TAB: Criativos -->
-<div id="criativos" class="content">
-  <div class="cri-filterbar">
-    <button class="cri-filter-btn active" onclick="filterCreatives('todos',this)">Todos</button>
-    <button class="cri-filter-btn" onclick="filterCreatives('ativos',this)">Ativos</button>
-    <button class="cri-filter-btn" onclick="filterCreatives('inativos',this)">Inativos</button>
-    <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
-      <span class="cri-sort-label">Ordenar por:</span>
-      <select id="sort-cri" onchange="sortAndRenderCreatives()" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 8px;border-radius:5px;font-size:12px;font-family:'DM Sans',sans-serif">
-        <option value="invest">Investimento</option>
-        <option value="ctr">CTR</option>
-        <option value="cpc">CPC</option>
+  <!-- TAB 2: CRIATIVOS -->
+  <div id="criativos" class="content">
+    <div class="cri-filterbar">
+      <span class="cri-sort-label">Filtro:</span>
+      <button class="cri-filter-btn active" onclick="filterCreativos('todos',this)">Todos</button>
+      <button class="cri-filter-btn" onclick="filterCreativos('ativos',this)">Ativos</button>
+      <button class="cri-filter-btn" onclick="filterCreativos('inativos',this)">Inativos</button>
+      <span style="margin-left:auto"></span>
+      <span class="cri-sort-label">Ordenar:</span>
+      <select id="cri-sort" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#e8e6f0;padding:5px 10px;border-radius:5px;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer">
         <option value="roas">ROAS</option>
-        <option value="vendas">Vendas</option>
+        <option value="investimento">Investimento</option>
+        <option value="compras">Compras</option>
       </select>
-    </span>
-  </div>
-  <div class="cri-grid" id="cri-grid"></div>
-  <div class="sec-title">Tabela Completa</div>
-  <div class="tbl-wrap"><table id="tbl-criativos"></table></div>
-</div>
+    </div>
 
-<!-- TAB: Públicos -->
-<div id="publicos" class="content">
-  <div class="cri-filterbar">
-    <button class="cri-filter-btn active" onclick="filterPublicos('todos',this)">Todos</button>
-    <button class="cri-filter-btn" onclick="filterPublicos('ativos',this)">Ativos</button>
-    <button class="cri-filter-btn" onclick="filterPublicos('inativos',this)">Inativos</button>
-    <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
-      <span class="cri-sort-label">Ordenar por:</span>
-      <select id="sort-pub" onchange="sortAndRenderPublicos()" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 8px;border-radius:5px;font-size:12px;font-family:'DM Sans',sans-serif">
-        <option value="invest">Investimento</option>
-        <option value="ctr">CTR</option>
-        <option value="cpc">CPC</option>
-        <option value="connect">Connect Rate</option>
+    <div class="period-filter-bar">
+      <span class="cri-sort-label">Período:</span>
+      <button class="period-filter-btn active" onclick="setPeriodoCreativos('all',this)">Tudo</button>
+      <button class="period-filter-btn" onclick="setPeriodoCreativos('d7',this)">7d</button>
+      <button class="period-filter-btn" onclick="setPeriodoCreativos('d14',this)">14d</button>
+      <button class="period-filter-btn" onclick="setPeriodoCreativos('d30',this)">30d</button>
+    </div>
+
+    <div class="cri-grid" id="cri-grid"></div>
+
+    <h4 class="sec-title">Detalhamento de Criativos</h4>
+    <div class="tbl-wrap">
+      <table id="tbl-criativos"></table>
+    </div>
+  </div>
+
+  <!-- TAB 3: PÚBLICOS -->
+  <div id="publicos" class="content">
+    <div class="cri-filterbar">
+      <span class="cri-sort-label">Filtro:</span>
+      <button class="cri-filter-btn active" onclick="filterPublicos('todos',this)">Todos</button>
+      <button class="cri-filter-btn" onclick="filterPublicos('ativos',this)">Ativos</button>
+      <button class="cri-filter-btn" onclick="filterPublicos('inativos',this)">Inativos</button>
+      <span style="margin-left:auto"></span>
+      <span class="cri-sort-label">Ordenar:</span>
+      <select id="pub-sort" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#e8e6f0;padding:5px 10px;border-radius:5px;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer" onchange="renderPublicos()">
+        <option value="inv">Investimento</option>
+        <option value="roas">ROAS</option>
+        <option value="compras">Compras</option>
+        <option value="cac">CAC</option>
       </select>
-    </span>
+    </div>
+    <div class="pub-grid" id="pub-grid"></div>
+
+    <h4 class="sec-title">Detalhamento de Públicos</h4>
+    <div class="tbl-wrap">
+      <table id="tbl-publicos"></table>
+    </div>
   </div>
-  <div class="pub-grid" id="pub-grid"></div>
-  <div class="sec-title">Tabela Completa</div>
-  <div class="tbl-wrap"><table id="tbl-publicos"></table></div>
-</div>
 
-<!-- TAB: Semanal -->
-<div id="semanal" class="content">
-  <div class="kpi-grid" id="kpi-semanal"></div>
-  <div class="sec-title">Dados Semanais</div>
-  <div class="tbl-wrap"><table id="tbl-semanal"></table></div>
-  <div class="sec-title">Gráficos Semanais</div>
-  <div class="chart-grid-2x2">
-    <div class="chart-card"><h4>Investimento por Semana</h4><canvas id="chart-sem-invest"></canvas></div>
-    <div class="chart-card"><h4>CTR por Semana</h4><canvas id="chart-sem-ctr"></canvas></div>
+  <!-- TAB 4: SEMANA A SEMANA -->
+  <div id="semanal" class="content">
+    <div class="kpi-grid" id="kpi-grid-semanal"></div>
+
+    <div class="chart-grid-2x2">
+      <div class="chart-card">
+        <h4>ROAS por Semana</h4>
+        <canvas id="chart-roas-semanal"></canvas>
+      </div>
+      <div class="chart-card">
+        <h4>Investimento por Semana</h4>
+        <canvas id="chart-inv-semanal"></canvas>
+      </div>
+      <div class="chart-card">
+        <h4>Compras por Semana</h4>
+        <canvas id="chart-compras-semanal"></canvas>
+      </div>
+      <div class="chart-card">
+        <h4>CPC por Semana</h4>
+        <canvas id="chart-cpc-semanal"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-grid-2x2">
+      <div class="chart-card">
+        <h4>Taxa de Conversão</h4>
+        <canvas id="chart-taxa-semanal"></canvas>
+      </div>
+      <div class="chart-card">
+        <h4>CPM por Semana</h4>
+        <canvas id="chart-cpm-semanal"></canvas>
+      </div>
+      <div class="chart-card">
+        <h4>Connect Rate</h4>
+        <canvas id="chart-connect-semanal"></canvas>
+      </div>
+      <div class="chart-card">
+        <h4>Ticket Médio</h4>
+        <canvas id="chart-ticket-semanal"></canvas>
+      </div>
+    </div>
+
+    <h4 class="sec-title">Semana a Semana</h4>
+    <div class="tbl-wrap">
+      <table id="tbl-semanal"></table>
+    </div>
   </div>
-</div>
 
-<!-- TAB: Mensal -->
-<div id="mensal" class="content">
-  <div class="kpi-grid" id="kpi-mensal"></div>
-  <div class="sec-title">Dados Mensais</div>
-  <div class="tbl-wrap"><table id="tbl-mensal"></table></div>
-</div>
+  <!-- TAB 5: MÊS A MÊS -->
+  <div id="mensal" class="content">
+    <div class="kpi-grid" id="kpi-grid-mensal"></div>
 
-<script>
-Chart.defaults.color = 'rgba(255,255,255,0.4)';
-Chart.defaults.borderColor = 'rgba(255,255,255,0.07)';
+    <div class="chart-grid-2x2">
+      <div class="chart-card">
+        <h4>ROAS por Mês</h4>
+        <canvas id="chart-roas-mensal"></canvas>
+      </div>
+      <div class="chart-card">
+        <h4>Investimento vs Faturamento</h4>
+        <canvas id="chart-inv-fat-mensal"></canvas>
+      </div>
+      <div class="chart-card">
+        <h4>Compras por Mês</h4>
+        <canvas id="chart-compras-mensal"></canvas>
+      </div>
+      <div class="chart-card">
+        <h4>CPC por Mês</h4>
+        <canvas id="chart-cpc-mensal"></canvas>
+      </div>
+    </div>
 
-const SHEET_ID = '1mDlr8MPXna2TUIKacQOlXvVnP9JkOmKwZuVmgNuig6E';
-const GERENCIADOR_SHEET = 'Campanhas';
-const WEBHOOK_SHEET = 'Webhook';
+    <div class="chart-grid-2x2">
+      <div class="chart-card">
+        <h4>Taxa de Conversão</h4>
+        <canvas id="chart-taxa-mensal"></canvas>
+      </div>
+      <div class="chart-card">
+        <h4>CPM por Mês</h4>
+        <canvas id="chart-cpm-mensal"></canvas>
+      </div>
+      <div class="chart-card">
+        <h4>Connect Rate</h4>
+        <canvas id="chart-connect-mensal"></canvas>
+      </div>
+      <div class="chart-card">
+        <h4>Ticket Médio</h4>
+        <canvas id="chart-ticket-mensal"></canvas>
+      </div>
+    </div>
 
-let DIAS = [], SEMANAL = [], MENSAL = [], CRIATIVOS = [], PUBLICOS = [];
-let dateFrom = null, dateTo = null;
-let currentCreativeFilter = 'todos', currentPublicoFilter = 'todos';
-let charts = {};
+    <h4 class="sec-title">Mês a Mês</h4>
+    <div class="tbl-wrap">
+      <table id="tbl-mensal"></table>
+    </div>
+  </div>
 
-function br(n, d = 2) {
-  if (n === null || n === undefined || isNaN(n)) return '—';
-  return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d }).format(n);
-}
-
-function brl(n) {
-  if (n === null || n === undefined) return '—';
-  return 'R$ ' + br(n, 2);
-}
-
-function pct(n) {
-  if (n === null || n === undefined || isNaN(n)) return '—';
-  return br(n, 2) + '%';
-}
-
-function statusBadge(inv, fat) {
-  if (!inv || inv === 0) return '<span class="badge aguardar">Aguardar</span>';
-  const r = inv > 0 ? fat / inv : 0;
-  if (r >= 1.7) return '<span class="badge escalar">Escalar</span>';
-  if (r >= 1) return '<span class="badge otimizar">Otimizar</span>';
-  return '<span class="badge corrigir">Corrigir</span>';
-}
-
-function parseCSV(csv) {
-  const lines = csv.trim().split('\n');
-  if (lines.length === 0) return [];
-
-  const header = parseCSVLine(lines[0]);
-  const rows = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    if (!lines[i].trim()) continue;
-    const cells = parseCSVLine(lines[i]);
-    const row = {};
-    for (let j = 0; j < header.length; j++) {
-      row[header[j]] = cells[j] || '';
+  <script>
+    // ===== HELPERS =====
+    function brl(n){n=parseFloat(n)||0;return 'R$ '+n.toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');}
+    function pct(n){n=parseFloat(n)||0;return n.toFixed(2).replace('.',',')+' %';}
+    function num(n){return (parseFloat(n)||0).toLocaleString('pt-BR');}
+    function roasColor(r){return r>=1.7?'green':r>=1.3?'yellow':r>0?'red':'';}
+    function statusBadge(roas,fat){
+      if(fat<=0&&roas<=0) return '<span class="badge aguardar">Aguardar</span>';
+      if(roas>=1.7) return '<span class="badge escalar">Escalar</span>';
+      if(roas>=1.3) return '<span class="badge otimizar">Otimizar</span>';
+      return '<span class="badge corrigir">Corrigir</span>';
     }
-    rows.push(row);
-  }
+    function formatDateDisplay(d){const dd=String(d.getDate()).padStart(2,'0');const mm=String(d.getMonth()+1).padStart(2,'0');const yyyy=d.getFullYear();return `${dd}/${mm}/${yyyy}`;}
+    function formatYMD(d){const dd=String(d.getDate()).padStart(2,'0');const mm=String(d.getMonth()+1).padStart(2,'0');const yyyy=d.getFullYear();return `${yyyy}-${mm}-${dd}`;}
+    function dateFromYMD(ymd){return new Date(ymd+'T00:00:00');}
+    function daysAgo(days){const d=new Date();d.setDate(d.getDate()-days);return formatYMD(d);}
 
-  return rows;
-}
-
-function parseCSVLine(line) {
-  const cells = [];
-  let current = '';
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    if (char === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        current += '"';
-        i++;
-      } else {
-        inQuotes = !inQuotes;
+    // ===== CSV PARSER =====
+    function parseCSV(csv){
+      const lines=csv.trim().split('\n');
+      const result=[];
+      for(const line of lines){
+        const row=[];let inQuote=false,val='';
+        for(let i=0;i<line.length;i++){
+          const c=line[i];
+          if(c==='"'){inQuote=!inQuote;continue;}
+          if(c===','&&!inQuote){row.push(val.trim());val='';continue;}
+          val+=c;
+        }
+        row.push(val.trim());
+        result.push(row);
       }
-    } else if (char === ',' && !inQuotes) {
-      cells.push(current.trim());
-      current = '';
-    } else {
-      current += char;
+      return result;
     }
-  }
-  cells.push(current.trim());
+    function parseMoney(s){return parseFloat((s||'').replace('R$','').replace(/\s/g,'').replace(/\./g,'').replace(',','.'))||0;}
+    function parseNum(s){return parseInt(String(s).replace(/[^\d-]/g,''))||0;}
 
-  return cells;
-}
+    // ===== GLOBAL STATE =====
+    let DIAS=[],SEMANAL=[],MENSAL=[],CRIATIVOS=[],CRIATIVOS_PERIODOS=[],PUBLICOS=[];
+    let dateRangeFilter={from:null,to:null};
+    let criativoFilterMode='todos',criativoPeriodo='all',sortCreativos='roas';
+    let charts={};
 
-async function fetchSheetCSV(sheetName) {
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error(`Erro ao carregar "${sheetName}": ${resp.status}`);
-  return await resp.text();
-}
-
-function findCol(headers, ...keywords) {
-  for (const kw of keywords) {
-    const idx = headers.findIndex(h => h.toLowerCase().includes(kw.toLowerCase()));
-    if (idx !== -1) return idx;
-  }
-  return -1;
-}
-
-function parseNum(v) {
-  if (!v || v === '' || v === '—') return 0;
-  v = String(v).replace(/[R$%\s]/g, '');
-  if (v.includes(',') && v.includes('.')) {
-    v = v.replace(/\./g, '').replace(',', '.');
-  } else if (v.includes(',')) {
-    v = v.replace(',', '.');
-  }
-  const n = parseFloat(v);
-  return isNaN(n) ? 0 : n;
-}
-
-function parseDate(v) {
-  if (!v || v === '') return null;
-  v = String(v).trim();
-
-  // DD/MM/YYYY
-  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(v)) {
-    const [d, m, y] = v.split('/');
-    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-  }
-
-  // YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}/.test(v)) {
-    return v.substring(0, 10);
-  }
-
-  return null;
-}
-
-// Webhook: formato YYYYMMDD (ex: "20260317") → "2026-03-17"
-function parseDateWebhook(v) {
-  if (!v || v === '') return null;
-  v = String(v).trim();
-
-  // YYYYMMDD (8 dígitos sem separador)
-  if (/^\d{8}$/.test(v)) {
-    return `${v.slice(0,4)}-${v.slice(4,6)}-${v.slice(6,8)}`;
-  }
-
-  // YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}/.test(v)) {
-    return v.substring(0, 10);
-  }
-
-  // DD/MM/YYYY
-  if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(v)) {
-    const [d, m, y] = v.split('/');
-    return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-  }
-
-  return null;
-}
-
-async function loadData() {
-  try {
-    document.getElementById('loading-msg').textContent = 'Carregando Gerenciador...';
-    const gerenciadorCSV = await fetchSheetCSV(GERENCIADOR_SHEET);
-    const gerenciadorRows = parseCSV(gerenciadorCSV);
-
-    document.getElementById('loading-msg').textContent = 'Carregando Webhook...';
-    const webhookCSV = await fetchSheetCSV(WEBHOOK_SHEET);
-    const webhookRows = parseCSV(webhookCSV);
-
-    document.getElementById('loading-msg').textContent = 'Processando dados...';
-    processData(gerenciadorRows, webhookRows);
-
-    const totalCompras = DIAS.reduce((s,d) => s + (d.compras||0), 0);
-    const totalFat = DIAS.reduce((s,d) => s + d.fat, 0);
-    console.log(`[FINAL] Compras: ${totalCompras} | Faturamento: R$ ${totalFat.toFixed(2)}`);
-
-    document.getElementById('loading-overlay').style.display = 'none';
-
-    initializeDateInputs();
-    renderAll();
-
-    // Aviso se não encontrou vendas
-    if (totalCompras === 0) {
-      console.warn('[AVISO] Nenhuma compra encontrada no Webhook! Verifique o console para detalhes de debug.');
+    // ===== FETCH SHEETS (JSONP via script tag - funciona de file://) =====
+    let _jsonpCounter=0;
+    function fetchSheet(sheetName){
+      return new Promise((resolve,reject)=>{
+        const cbName='_sheetCB'+(++_jsonpCounter)+'_'+Date.now();
+        const id='1-augBdC-rKepadG4j4W2pxfeZYaIjivRARDfJ-Sjr_I';
+        const url=`https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=responseHandler:${cbName}&sheet=${encodeURIComponent(sheetName)}`;
+        const timeout=setTimeout(()=>{delete window[cbName];script.remove();reject(new Error('Timeout ao carregar '+sheetName));},30000);
+        window[cbName]=function(json){
+          clearTimeout(timeout);
+          delete window[cbName];
+          script.remove();
+          try{
+            if(json.status==='error'){reject(new Error(json.errors[0].detailed_message));return;}
+            const table=json.table;
+            const result=[];
+            const header=[];
+            for(let c=0;c<table.cols.length;c++) header.push(table.cols[c].label||'');
+            result.push(header);
+            for(let r=0;r<table.rows.length;r++){
+              const row=[];
+              for(let c=0;c<table.rows[r].c.length;c++){
+                const cell=table.rows[r].c[c];
+                row.push(cell&&cell.v!=null?String(cell.f||cell.v):'');
+              }
+              result.push(row);
+            }
+            resolve(result);
+          }catch(e){reject(e);}
+        };
+        const script=document.createElement('script');
+        script.src=url;
+        script.onerror=()=>{clearTimeout(timeout);delete window[cbName];reject(new Error('Erro de rede ao carregar '+sheetName));};
+        document.head.appendChild(script);
+      });
     }
-  } catch (e) {
-    console.error(e);
-    document.getElementById('loading-msg').textContent = 'Erro ao carregar dados: ' + e.message;
-    document.getElementById('loading-msg').style.color = '#e74c3c';
-  }
-}
 
-function processData(gerenciadorRows, webhookRows) {
-  // ===== CAMPANHAS (Gerenciador) =====
-  // Colunas exatas da planilha:
-  // "Date", "Action Link Clicks", "Action Omni Initiated Checkout", "Campaign Name",
-  // " Adset Name ", "Ad Name", "Impressions", "Spend (Cost, Amount Spent)",
-  // " Instagram Permalink URL ", "Action Landing Page View"
-
-  const diaMap = {};
-  const criativoMap = {};
-  const publicoMap = {};
-
-  for (const row of gerenciadorRows) {
-    const date = parseDate(row['Date']);
-    if (!date) continue;
-
-    const adName = (row['Ad Name'] || '').trim() || 'Sem anúncio';
-    const adset = (row[' Adset Name '] || row['Adset Name'] || '').trim() || 'Sem público';
-    const spend = parseNum(row['Spend (Cost, Amount Spent)']);
-    const impr = parseNum(row['Impressions']);
-    const clicks = parseNum(row['Action Link Clicks']);
-    const pv = parseNum(row['Action Landing Page View']);
-    const ck = parseNum(row['Action Omni Initiated Checkout']);
-    const link = (row[' Instagram Permalink URL '] || row['Instagram Permalink URL'] || '').trim();
-
-    // DIAS
-    if (!diaMap[date]) {
-      diaMap[date] = { inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: 0, compras: 0 };
+    async function loadData(){
+      try{
+        document.getElementById('loading').style.display='flex';
+        const [gerenciadorData,webhookData,linksData]=await Promise.all([
+          fetchSheet('Gerenciador'),
+          fetchSheet('Webhook'),
+          fetchSheet('Links Criativos')
+        ]);
+        processDataFromArrays(gerenciadorData,webhookData,linksData);
+        document.getElementById('loading').style.display='none';
+        updateTimestamp();
+        renderDashboard();
+      }catch(err){
+        document.getElementById('loading').style.display='none';
+        showError('Erro ao carregar dados',err.message+' | '+err.stack);
+        console.error('DASHBOARD ERROR:',err);
+      }
     }
-    diaMap[date].inv += spend;
-    diaMap[date].impr += impr;
-    diaMap[date].cliques += clicks;
-    diaMap[date].pv += pv;
-    diaMap[date].ck += ck;
 
-    // CRIATIVOS
-    if (!criativoMap[adName]) {
-      criativoMap[adName] = { inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: 0, link: '', dates: new Set() };
-    }
-    criativoMap[adName].inv += spend;
-    criativoMap[adName].impr += impr;
-    criativoMap[adName].cliques += clicks;
-    criativoMap[adName].pv += pv;
-    criativoMap[adName].ck += ck;
-    if (link) criativoMap[adName].link = link;
-    criativoMap[adName].dates.add(date);
-
-    // PUBLICOS
-    if (!publicoMap[adset]) {
-      publicoMap[adset] = { inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: 0, dates: new Set() };
-    }
-    publicoMap[adset].inv += spend;
-    publicoMap[adset].impr += impr;
-    publicoMap[adset].cliques += clicks;
-    publicoMap[adset].pv += pv;
-    publicoMap[adset].ck += ck;
-    publicoMap[adset].dates.add(date);
-  }
-
-  // ===== WEBHOOK =====
-  // Colunas exatas: trans_status (3=pago), tracker_utm_source, trans_value (em REAIS),
-  // trans_paiddate (formato YYYYMMDD)
-
-  for (const row of webhookRows) {
-    // Status: "3" = pago
-    const status = (row['trans_status'] || '').trim();
-    if (status !== '3') continue;
-
-    // Source: filtrar meta_ads
-    const source = (row['tracker_utm_source'] || '').toLowerCase().trim().replace(/[\s_\-]/g, '');
-    if (source && !source.includes('meta') && !source.includes('facebook') && !source.includes('fb')) {
-      continue;
-    }
-    // Se source vazio, não contabilizar (não é atribuível ao tráfego pago)
-    if (!source) continue;
-
-    // Data: formato YYYYMMDD → YYYY-MM-DD
-    const dateRaw = (row['trans_paiddate'] || row['trans_createdate'] || '').trim();
-    const date = parseDateWebhook(dateRaw);
-    if (!date) continue;
-
-    // Valor: JÁ em reais (ex: "36,9")
-    const value = parseNum(row['trans_value'] || '0');
-
-    if (diaMap[date]) {
-      diaMap[date].fat += value;
-      diaMap[date].compras += 1;
-    } else {
-      diaMap[date] = { inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: value, compras: 1 };
-    }
-  }
-
-  // Convert
-  DIAS = Object.entries(diaMap).map(([date, data]) => ({ date, ...data })).sort((a, b) => a.date.localeCompare(b.date));
-  CRIATIVOS = Object.entries(criativoMap).map(([nome, data]) => ({ nome, ...data, dates: Array.from(data.dates) }));
-  PUBLICOS = Object.entries(publicoMap).map(([nome, data]) => ({ nome, ...data, dates: Array.from(data.dates) }));
-
-  console.log(`[RESULTADO] DIAS: ${DIAS.length} | Fat: R$ ${DIAS.reduce((s,d)=>s+d.fat,0).toFixed(2)} | Compras: ${DIAS.reduce((s,d)=>s+(d.compras||0),0)}`);
-
-  fixFatFromDias();
-  buildWeekly();
-  buildMonthly();
-}
-
-function fixFatFromDias() {
-  const totalVendas = DIAS.reduce((sum, d) => sum + d.fat, 0);
-  const totalCompras = DIAS.reduce((sum, d) => sum + (d.compras || 0), 0);
-
-  // Distribute fat + compras to CRIATIVOS (proportional to cliques)
-  const totalCliques = CRIATIVOS.reduce((sum, c) => sum + c.cliques, 0);
-  for (const c of CRIATIVOS) {
-    if (totalCliques > 0) {
-      const ratio = c.cliques / totalCliques;
-      c.fat = totalVendas * ratio;
-      c.compras = Math.round(totalCompras * ratio);
-    } else {
-      c.fat = 0;
-      c.compras = 0;
-    }
-  }
-
-  // Distribute fat + compras to PUBLICOS (proportional to cliques)
-  const totalCliquesP = PUBLICOS.reduce((sum, p) => sum + p.cliques, 0);
-  for (const p of PUBLICOS) {
-    if (totalCliquesP > 0) {
-      const ratio = p.cliques / totalCliquesP;
-      p.fat = totalVendas * ratio;
-      p.compras = Math.round(totalCompras * ratio);
-    } else {
-      p.fat = 0;
-      p.compras = 0;
-    }
-  }
-
-  // Mark "ativo" - had spend in last 7 days
-  const today = new Date();
-  const d7ago = new Date(today);
-  d7ago.setDate(d7ago.getDate() - 7);
-  const d7str = d7ago.toISOString().split('T')[0];
-
-  for (const c of CRIATIVOS) {
-    c.ativo = c.dates.some(d => d >= d7str);
-    c.roas = c.inv > 0 ? c.fat / c.inv : 0;
-    c.cpc = c.cliques > 0 ? c.inv / c.cliques : 0;
-    c.cpm = c.impr > 0 ? (c.inv / c.impr) * 1000 : 0;
-    c.ctr = c.impr > 0 ? (c.cliques / c.impr) * 100 : 0;
-    c.cac = c.compras > 0 ? c.inv / c.compras : 0;
-    c.ticket = c.compras > 0 ? c.fat / c.compras : 0;
-    c.connectRate = c.cliques > 0 ? (c.pv / c.cliques) * 100 : 0;
-  }
-
-  for (const p of PUBLICOS) {
-    p.ativo = p.dates.some(d => d >= d7str);
-    p.cpc = p.cliques > 0 ? p.inv / p.cliques : 0;
-    p.cpm = p.impr > 0 ? (p.inv / p.impr) * 1000 : 0;
-    p.ctr = p.impr > 0 ? (p.cliques / p.impr) * 100 : 0;
-    p.connectRate = p.cliques > 0 ? (p.pv / p.cliques) * 100 : 0;
-  }
-}
-
-function buildWeekly() {
-  const weekMap = {};
-
-  for (const dia of DIAS) {
-    const date = new Date(dia.date + 'T00:00:00Z');
-    const weekStart = new Date(date);
-    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-    const weekKey = weekStart.toISOString().split('T')[0];
-
-    if (!weekMap[weekKey]) {
-      weekMap[weekKey] = { week: weekKey, inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: 0, compras: 0 };
-    }
-    weekMap[weekKey].inv += dia.inv;
-    weekMap[weekKey].impr += dia.impr;
-    weekMap[weekKey].cliques += dia.cliques;
-    weekMap[weekKey].pv += dia.pv;
-    weekMap[weekKey].ck += dia.ck;
-    weekMap[weekKey].fat += dia.fat;
-    weekMap[weekKey].compras += (dia.compras || 0);
-  }
-
-  SEMANAL = Object.values(weekMap).sort((a, b) => a.week.localeCompare(b.week));
-}
-
-function buildMonthly() {
-  const monthMap = {};
-
-  for (const dia of DIAS) {
-    const date = new Date(dia.date + 'T00:00:00Z');
-    const monthKey = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
-
-    if (!monthMap[monthKey]) {
-      monthMap[monthKey] = { month: monthKey, inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: 0, compras: 0 };
-    }
-    monthMap[monthKey].inv += dia.inv;
-    monthMap[monthKey].impr += dia.impr;
-    monthMap[monthKey].cliques += dia.cliques;
-    monthMap[monthKey].pv += dia.pv;
-    monthMap[monthKey].ck += dia.ck;
-    monthMap[monthKey].fat += dia.fat;
-    monthMap[monthKey].compras += (dia.compras || 0);
-  }
-
-  MENSAL = Object.values(monthMap).sort((a, b) => a.month.localeCompare(b.month));
-}
-
-function initializeDateInputs() {
-  if (DIAS.length === 0) return;
-
-  const minDate = DIAS[0].date;
-  const maxDate = DIAS[DIAS.length - 1].date;
-
-  document.getElementById('dateFrom').value = minDate;
-  document.getElementById('dateTo').value = maxDate;
-
-  dateFrom = minDate;
-  dateTo = maxDate;
-  updateRangeInfo();
-}
-
-function onDateChange() {
-  dateFrom = document.getElementById('dateFrom').value;
-  dateTo = document.getElementById('dateTo').value;
-
-  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-
-  updateRangeInfo();
-  renderAll();
-}
-
-function setPreset(days, btn) {
-  const today = new Date();
-  const from = new Date();
-
-  if (days === 'all') {
-    if (DIAS.length > 0) {
-      dateFrom = DIAS[0].date;
-      dateTo = DIAS[DIAS.length - 1].date;
-    }
-  } else {
-    from.setDate(today.getDate() - days);
-    dateFrom = from.toISOString().split('T')[0];
-    dateTo = today.toISOString().split('T')[0];
-  }
-
-  document.getElementById('dateFrom').value = dateFrom;
-  document.getElementById('dateTo').value = dateTo;
-
-  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-
-  updateRangeInfo();
-  renderAll();
-}
-
-function updateRangeInfo() {
-  if (!dateFrom || !dateTo) return;
-
-  const from = new Date(dateFrom + 'T00:00:00Z');
-  const to = new Date(dateTo + 'T00:00:00Z');
-  const days = Math.ceil((to - from) / (1000 * 60 * 60 * 24)) + 1;
-
-  document.getElementById('range-info').textContent = `${days} dias`;
-}
-
-function filterData() {
-  if (!dateFrom || !dateTo) return [];
-  return DIAS.filter(d => d.date >= dateFrom && d.date <= dateTo);
-}
-
-function aggregateData(data) {
-  if (data.length === 0) return { inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: 0, compras: 0 };
-
-  return {
-    inv: data.reduce((s, d) => s + d.inv, 0),
-    impr: data.reduce((s, d) => s + d.impr, 0),
-    cliques: data.reduce((s, d) => s + d.cliques, 0),
-    pv: data.reduce((s, d) => s + d.pv, 0),
-    ck: data.reduce((s, d) => s + d.ck, 0),
-    fat: data.reduce((s, d) => s + d.fat, 0),
-    compras: data.reduce((s, d) => s + (d.compras || 0), 0),
-  };
-}
-
-function renderAll() {
-  renderVisao();
-  renderCreatives();
-  renderPublicos();
-  renderSemanal();
-  renderMensal();
-}
-
-function renderVisao() {
-  const filtered = filterData();
-  const agg = aggregateData(filtered);
-
-  const kpiHtml = `
-    <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${brl(agg.inv)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Faturamento</div><div class="kpi-value green">${brl(agg.fat)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">ROAS</div><div class="kpi-value orange">${br(agg.inv > 0 ? agg.fat / agg.inv : 0, 2)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Compras</div><div class="kpi-value orange">${agg.compras}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Cliques</div><div class="kpi-value orange">${agg.cliques}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Impressões</div><div class="kpi-value orange">${agg.impr}</div></div>
-    <div class="kpi-card"><div class="kpi-label">CPC</div><div class="kpi-value orange">${brl(agg.cliques > 0 ? agg.inv / agg.cliques : 0)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">CPM</div><div class="kpi-value orange">${brl(agg.impr > 0 ? (agg.inv / agg.impr) * 1000 : 0)}</div></div>
-  `;
-  document.getElementById('kpi-visao').innerHTML = kpiHtml;
-
-  const maxClick = Math.max(...filtered.map(d => d.cliques || 0), 1);
-  const maxPV = Math.max(...filtered.map(d => d.pv || 0), 1);
-  const maxCK = Math.max(...filtered.map(d => d.ck || 0), 1);
-
-  const funilHtml = `
-    <div>
-      <div class="funil-bar-wrap">
-        <div class="funil-label"><span>Cliques</span><span>${agg.cliques}</span></div>
-        <div class="funil-bar-bg"><div class="funil-bar-fill" style="width:100%"></div></div>
-      </div>
-      <div class="funil-bar-wrap">
-        <div class="funil-label"><span>Visualizações</span><span>${agg.pv}</span></div>
-        <div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${agg.cliques > 0 ? (agg.pv / agg.cliques) * 100 : 0}%"></div></div>
-      </div>
-    </div>
-    <div>
-      <div class="funil-bar-wrap">
-        <div class="funil-label"><span>Checkouts</span><span>${agg.ck}</span></div>
-        <div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${agg.pv > 0 ? (agg.ck / agg.pv) * 100 : 0}%"></div></div>
-      </div>
-      <div class="funil-bar-wrap">
-        <div class="funil-label"><span>Compras</span><span>${agg.compras}</span></div>
-        <div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${agg.ck > 0 ? (agg.compras / agg.ck) * 100 : 0}%"></div></div>
-      </div>
-    </div>
-  `;
-  document.getElementById('funil-visao').innerHTML = funilHtml;
-
-  const ctr = agg.impr > 0 ? (agg.cliques / agg.impr) * 100 : 0;
-  const connectRate = agg.cliques > 0 ? (agg.pv / agg.cliques) * 100 : 0;
-  const taxaCheckout = agg.pv > 0 ? (agg.ck / agg.pv) * 100 : 0;
-  const taxaCompra = agg.pv > 0 ? (agg.compras / agg.pv) * 100 : 0;
-  const ticket = agg.compras > 0 ? agg.fat / agg.compras : 0;
-  const cac = agg.compras > 0 ? agg.inv / agg.compras : 0;
-
-  const cpcGeral = agg.cliques > 0 ? agg.inv / agg.cliques : 0;
-
-  const taxaHtml = `
-    <div class="taxa-item"><span>Connect Rate</span><span class="taxa-val">${pct(connectRate)}</span></div>
-    <div class="taxa-item"><span>Taxa Checkout</span><span class="taxa-val">${pct(taxaCheckout)}</span></div>
-    <div class="taxa-item"><span>Taxa Compra</span><span class="taxa-val">${pct(taxaCompra)}</span></div>
-    <div class="taxa-item"><span>CTR</span><span class="taxa-val">${pct(ctr)}</span></div>
-    <div class="taxa-item"><span>CPC</span><span class="taxa-val">${brl(cpcGeral)}</span></div>
-  `;
-  document.getElementById('taxa-visao').innerHTML = taxaHtml;
-
-  const daysForChart = filtered;
-  const chartLabels = daysForChart.map(d => {
-    const date = new Date(d.date + 'T00:00:00Z');
-    return `${date.getUTCDate()}/${date.getUTCMonth() + 1}`;
-  });
-
-  // Chart: Investimento vs Faturamento
-  if (charts['inv-fat']) charts['inv-fat'].destroy();
-  charts['inv-fat'] = new Chart(document.getElementById('chart-inv-fat'), {
-    type: 'line',
-    data: {
-      labels: chartLabels,
-      datasets: [
-        {
-          label: 'Investimento',
-          data: daysForChart.map(d => d.inv),
-          borderColor: 'rgba(255,107,43,0.95)',
-          backgroundColor: 'rgba(255,107,43,0.13)',
-          tension: 0.3,
-          fill: true,
-          borderWidth: 2,
-        },
-        {
-          label: 'Faturamento',
-          data: daysForChart.map(d => d.fat),
-          borderColor: 'rgba(255,183,55,0.95)',
-          backgroundColor: 'rgba(255,183,55,0.13)',
-          tension: 0.3,
-          fill: true,
-          borderWidth: 2,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      plugins: { legend: { display: true, position: 'top' } },
-      scales: { y: { beginAtZero: true } },
-    },
-  });
-
-  // Chart: ROAS
-  if (charts['roas']) charts['roas'].destroy();
-  charts['roas'] = new Chart(document.getElementById('chart-roas'), {
-    type: 'bar',
-    data: {
-      labels: chartLabels,
-      datasets: [{
-        label: 'ROAS',
-        data: daysForChart.map(d => d.inv > 0 ? d.fat / d.inv : 0),
-        backgroundColor: 'rgba(255,107,43,0.85)',
-        borderColor: 'rgba(255,107,43,0.95)',
-        borderWidth: 1,
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true } },
-    },
-  });
-
-  // Table
-  let tblHtml = '<thead><tr><th>Data</th><th>Investimento</th><th>Impressões</th><th>Cliques</th><th>CTR</th><th>Visualizações</th><th>Checkouts</th><th>Compras</th><th>Faturamento</th><th>ROAS</th><th>CPC</th><th>CPM</th><th>Status</th></tr></thead><tbody>';
-
-  for (const dia of filtered) {
-    const ctr = dia.impr > 0 ? (dia.cliques / dia.impr) * 100 : 0;
-    const roas = dia.inv > 0 ? dia.fat / dia.inv : 0;
-    const cpc = dia.cliques > 0 ? dia.inv / dia.cliques : 0;
-    const cpm = dia.impr > 0 ? (dia.inv / dia.impr) * 1000 : 0;
-
-    const dateObj = new Date(dia.date + 'T00:00:00Z');
-    const dateStr = `${String(dateObj.getUTCDate()).padStart(2, '0')}/${String(dateObj.getUTCMonth() + 1).padStart(2, '0')}/${dateObj.getUTCFullYear()}`;
-
-    tblHtml += `<tr>
-      <td>${dateStr}</td>
-      <td>${brl(dia.inv)}</td>
-      <td>${dia.impr}</td>
-      <td>${dia.cliques}</td>
-      <td>${pct(ctr)}</td>
-      <td>${dia.pv}</td>
-      <td>${dia.ck}</td>
-      <td>${dia.compras || 0}</td>
-      <td>${brl(dia.fat)}</td>
-      <td>${br(roas, 2)}</td>
-      <td>${brl(cpc)}</td>
-      <td>${brl(cpm)}</td>
-      <td>${statusBadge(dia.inv, dia.fat)}</td>
-    </tr>`;
-  }
-
-  tblHtml += '</tbody>';
-  document.getElementById('tbl-visao').innerHTML = tblHtml;
-}
-
-function renderCreatives() {
-  const last7 = new Date();
-  last7.setDate(last7.getDate() - 7);
-  const last7Str = last7.toISOString().split('T')[0];
-
-  for (const c of CRIATIVOS) {
-    c.ativo = c.dates.some(d => d >= last7Str);
-  }
-
-  sortAndRenderCreatives();
-}
-
-function filterCreatives(filter, btn) {
-  currentCreativeFilter = filter;
-  document.querySelectorAll('#criativos .cri-filter-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  sortAndRenderCreatives();
-}
-
-function sortAndRenderCreatives() {
-  let sorted = [...CRIATIVOS];
-
-  if (currentCreativeFilter === 'ativos') {
-    sorted = sorted.filter(c => c.ativo);
-  } else if (currentCreativeFilter === 'inativos') {
-    sorted = sorted.filter(c => !c.ativo);
-  }
-
-  const sortBy = document.getElementById('sort-cri').value;
-  if (sortBy === 'invest') sorted.sort((a, b) => b.inv - a.inv);
-  else if (sortBy === 'ctr') sorted.sort((a, b) => (b.cliques / Math.max(b.impr, 1)) - (a.cliques / Math.max(a.impr, 1)));
-  else if (sortBy === 'cpc') sorted.sort((a, b) => (a.inv / Math.max(a.cliques, 1)) - (b.inv / Math.max(b.cliques, 1)));
-  else if (sortBy === 'roas') sorted.sort((a, b) => (b.fat / Math.max(b.inv, 1)) - (a.fat / Math.max(a.inv, 1)));
-  else if (sortBy === 'vendas') sorted.sort((a, b) => (b.compras || 0) - (a.compras || 0));
-
-  let gridHtml = '';
-  for (const c of sorted) {
-    const ctr = c.impr > 0 ? (c.cliques / c.impr) * 100 : 0;
-    const cpc = c.cliques > 0 ? c.inv / c.cliques : 0;
-    const roas = c.inv > 0 ? c.fat / c.inv : 0;
-
-    gridHtml += `
-      <div class="cri-card ${c.ativo ? 'ativo' : ''}">
-        <div class="cri-card-header">
-          <div class="cri-name">${c.nome}</div>
-          <span class="cri-badge ${c.ativo ? 'ativo' : 'inativo'}">${c.ativo ? 'Ativo' : 'Inativo'}</span>
-        </div>
-        <div class="cri-metrics">
-          <div class="cri-metric">
-            <div class="cri-metric-label">Investimento</div>
-            <div class="cri-metric-val hl">${brl(c.inv)}</div>
-          </div>
-          <div class="cri-metric">
-            <div class="cri-metric-label">Faturamento</div>
-            <div class="cri-metric-val">${brl(c.fat)}</div>
-          </div>
-          <div class="cri-metric">
-            <div class="cri-metric-label">ROAS</div>
-            <div class="cri-metric-val hl">${br(roas, 2)}</div>
-          </div>
-          <div class="cri-metric">
-            <div class="cri-metric-label">Vendas</div>
-            <div class="cri-metric-val">${c.compras || 0}</div>
-          </div>
-          <div class="cri-metric">
-            <div class="cri-metric-label">CTR</div>
-            <div class="cri-metric-val">${pct(ctr)}</div>
-          </div>
-          <div class="cri-metric">
-            <div class="cri-metric-label">CPC</div>
-            <div class="cri-metric-val">${brl(cpc)}</div>
+    function showError(title,msg){
+      const html=`
+        <div class="error-overlay">
+          <div class="error-box">
+            <h3>${title}</h3>
+            <p>${msg}</p>
+            <button onclick="location.reload()">Tentar Novamente</button>
           </div>
         </div>
-        ${c.link ? `<a class="cri-link" href="${c.link}" target="_blank">${c.link}</a>` : ''}
-      </div>
-    `;
-  }
-  document.getElementById('cri-grid').innerHTML = gridHtml;
+      `;
+      document.body.insertAdjacentHTML('beforeend',html);
+    }
 
-  // Table
-  let tblHtml = '<thead><tr><th>Criativo</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>CTR</th><th>PV</th><th>CK</th><th>Vendas</th><th>Fat.</th><th>ROAS</th><th>CPC</th><th>CPM</th><th>Status</th></tr></thead><tbody>';
+    function updateTimestamp(){
+      const now=new Date();
+      const dd=String(now.getDate()).padStart(2,'0');
+      const mm=String(now.getMonth()+1).padStart(2,'0');
+      const hh=String(now.getHours()).padStart(2,'0');
+      const mi=String(now.getMinutes()).padStart(2,'0');
+      document.getElementById('update-badge').textContent=`Atualizado: ${dd}/${mm} ${hh}:${mi}`;
+    }
 
-  for (const c of sorted) {
-    const ctr = c.impr > 0 ? (c.cliques / c.impr) * 100 : 0;
-    const roas = c.inv > 0 ? c.fat / c.inv : 0;
-    const cpc = c.cliques > 0 ? c.inv / c.cliques : 0;
-    const cpm = c.impr > 0 ? (c.inv / c.impr) * 1000 : 0;
+    // ===== DATA PROCESSING =====
+    const DATA_INICIO='2026-01-01'; // Filtro: apenas dados a partir dessa data
+    function cleanName(name){return (name||'').split('::')[0].trim();}
+    function isChecklist(row){return (row[3]||'').toLowerCase().includes('checklist');}
+    function isMetaUTM(row){return (row[5]||'').toLowerCase().includes('meta')||(row[5]||'').toLowerCase().includes('facebook');}
 
-    tblHtml += `<tr>
-      <td>${c.nome}</td>
-      <td>${brl(c.inv)}</td>
-      <td>${c.impr}</td>
-      <td>${c.cliques}</td>
-      <td>${pct(ctr)}</td>
-      <td>${c.pv}</td>
-      <td>${c.ck}</td>
-      <td>${c.compras || 0}</td>
-      <td>${brl(c.fat)}</td>
-      <td>${br(roas, 2)}</td>
-      <td>${brl(cpc)}</td>
-      <td>${brl(cpm)}</td>
-      <td>${statusBadge(c.inv, c.fat)}</td>
-    </tr>`;
-  }
+    function processDataFromArrays(gerData,webhookData,linksData){
 
-  tblHtml += '</tbody>';
-  document.getElementById('tbl-criativos').innerHTML = tblHtml;
-}
+      // Mapa de datas ativas por criativo (TODO o histórico, sem filtro de data)
+      // Usado para corrigir inflação de atribuição: só conta venda se o criativo
+      // tinha gasto no Gerenciador nos 7 dias anteriores à compra.
+      const criAtiveDates={};
+      for(let i=1;i<gerData.length;i++){
+        const row=gerData[i];
+        const nome=cleanName(row[3]);
+        const data=row[0];
+        if(!nome||!data) continue;
+        if(!criAtiveDates[nome]) criAtiveDates[nome]=[];
+        criAtiveDates[nome].push(data);
+      }
+      function estaAtivoNaData(nome,dataCompra){
+        const datas=criAtiveDates[nome];
+        if(!datas) return false;
+        const compra=new Date(dataCompra+'T00:00:00');
+        for(const d of datas){
+          const ativo=new Date(d+'T00:00:00');
+          const diff=(compra-ativo)/86400000;
+          if(diff>=0&&diff<=7) return true;
+        }
+        return false;
+      }
 
-function renderPublicos() {
-  const last7 = new Date();
-  last7.setDate(last7.getDate() - 7);
-  const last7Str = last7.toISOString().split('T')[0];
+      // Build DIAS
+      const diasMap={};
+      for(let i=1;i<gerData.length;i++){
+        const row=gerData[i];
+        if(!row[0]) continue;
+        const data=row[0];
+        if(data<DATA_INICIO) continue; // somente jan/2026 em diante
+        if(!diasMap[data]) diasMap[data]={data,ymd:data,inv:0,fat:0,compras:0,cliques:0,pv:0,ck:0,imp:0};
+        diasMap[data].inv+=parseMoney(row[4]);
+        diasMap[data].imp+=parseNum(row[5]);
+        diasMap[data].cliques+=parseNum(row[7]);
+        diasMap[data].pv+=parseNum(row[8]);
+        diasMap[data].ck+=parseNum(row[9]);
+      }
 
-  for (const p of PUBLICOS) {
-    p.ativo = p.dates.some(d => d >= last7Str);
-  }
+      // Passo 1: Identificar compras do Checklist (email+datetime) para incluir order bumps
+      const checklistBuyers = new Set();
+      for(let i=1;i<webhookData.length;i++){
+        const row=webhookData[i];
+        if(!row[2]||row[2].toLowerCase()!=='paid') continue;
+        if(!isMetaUTM(row)) continue;
+        if(!isChecklist(row)) continue;
+        const email=(row[0]||'').toLowerCase().trim();
+        const dt=(row[11]||row[8]||'').trim().substring(0,16);
+        if(dt.substring(0,10)<DATA_INICIO) continue;
+        checklistBuyers.add(email+'|'+dt);
+      }
 
-  sortAndRenderPublicos();
-}
+      // Passo 2: Compras (só Checklist) + Faturamento (Checklist + order bumps da mesma compra)
+      for(let i=1;i<webhookData.length;i++){
+        const row=webhookData[i];
+        if(!row[2]||row[2].toLowerCase()!=='paid') continue;
+        if(!isMetaUTM(row)) continue;
+        const rawDate=(row[11]||row[8]||'').trim();
+        if(!rawDate) continue;
+        const dataKey=rawDate.substring(0,10);
+        if(dataKey<DATA_INICIO) continue;
+        const email=(row[0]||'').toLowerCase().trim();
+        const dt=rawDate.substring(0,16);
+        if(!checklistBuyers.has(email+'|'+dt)) continue;
+        if(!diasMap[dataKey]) diasMap[dataKey]={data:dataKey,ymd:dataKey,inv:0,fat:0,compras:0,cliques:0,pv:0,ck:0,imp:0};
+        if(isChecklist(row)) diasMap[dataKey].compras++;
+        diasMap[dataKey].fat+=parseNum(row[4])/100;
+      }
 
-function filterPublicos(filter, btn) {
-  currentPublicoFilter = filter;
-  document.querySelectorAll('#publicos .cri-filter-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  sortAndRenderPublicos();
-}
+      DIAS=Object.values(diasMap).sort((a,b)=>new Date(a.ymd)-new Date(b.ymd));
+      DIAS=DIAS.map(d=>({...d,data:formatDateDisplay(dateFromYMD(d.ymd))}));
 
-function sortAndRenderPublicos() {
-  let sorted = [...PUBLICOS];
+      // Build SEMANAL
+      const semanalMap={};
+      for(const dia of DIAS){
+        const date=dateFromYMD(dia.ymd);
+        const y=date.getFullYear();
+        const jan1=new Date(y,0,1);
+        const w=Math.ceil((Math.floor((date-jan1)/86400000)+1)/7);
+        const key=String(y).slice(-2)+String(w).padStart(2,'0');
+        if(!semanalMap[key]) semanalMap[key]={key,inv:0,fat:0,compras:0,cliques:0,pv:0,ck:0,imp:0};
+        semanalMap[key].inv+=dia.inv;
+        semanalMap[key].fat+=dia.fat;
+        semanalMap[key].compras+=dia.compras;
+        semanalMap[key].cliques+=dia.cliques;
+        semanalMap[key].pv+=dia.pv;
+        semanalMap[key].ck+=dia.ck;
+        semanalMap[key].imp+=dia.imp;
+      }
+      SEMANAL=Object.values(semanalMap).map(s=>({
+        ...s,
+        roas:s.inv>0?s.fat/s.inv:0,
+        ticket:s.compras>0?s.fat/s.compras:0,
+        cac:s.compras>0?s.inv/s.compras:0,
+        cpc:s.cliques>0?s.inv/s.cliques:0,
+        cpm:s.imp>0?s.inv/(s.imp/1000):0,
+        retorno:s.fat-s.inv,
+        taxaCompra:s.pv>0?s.compras/s.pv*100:0,
+        connectRate:s.cliques>0?s.pv/s.cliques*100:0
+      }));
 
-  if (currentPublicoFilter === 'ativos') {
-    sorted = sorted.filter(p => p.ativo);
-  } else if (currentPublicoFilter === 'inativos') {
-    sorted = sorted.filter(p => !p.ativo);
-  }
+      // Build MENSAL
+      const mesesNomes=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+      const mensalMap={};
+      for(const dia of DIAS){
+        const date=dateFromYMD(dia.ymd);
+        const m=date.getMonth();
+        const y=date.getFullYear();
+        const key=`${y}-${String(m+1).padStart(2,'0')}`;
+        if(!mensalMap[key]) mensalMap[key]={key,mes:mesesNomes[m],ano:y,inv:0,fat:0,compras:0,cliques:0,pv:0,ck:0,imp:0};
+        mensalMap[key].inv+=dia.inv;
+        mensalMap[key].fat+=dia.fat;
+        mensalMap[key].compras+=dia.compras;
+        mensalMap[key].cliques+=dia.cliques;
+        mensalMap[key].pv+=dia.pv;
+        mensalMap[key].ck+=dia.ck;
+        mensalMap[key].imp+=dia.imp;
+      }
+      MENSAL=Object.values(mensalMap).sort((a,b)=>new Date(a.key)-new Date(b.key)).map(m=>({
+        ...m,
+        roas:m.inv>0?m.fat/m.inv:0,
+        ticket:m.compras>0?m.fat/m.compras:0,
+        cac:m.compras>0?m.inv/m.compras:0,
+        cpc:m.cliques>0?m.inv/m.cliques:0,
+        cpm:m.imp>0?m.inv/(m.imp/1000):0,
+        retorno:m.fat-m.inv,
+        taxaCompra:m.pv>0?m.compras/m.pv*100:0,
+        connectRate:m.cliques>0?m.pv/m.cliques*100:0
+      }));
 
-  const sortBy = document.getElementById('sort-pub').value;
-  if (sortBy === 'invest') sorted.sort((a, b) => b.inv - a.inv);
-  else if (sortBy === 'ctr') sorted.sort((a, b) => (b.cliques / Math.max(b.impr, 1)) - (a.cliques / Math.max(a.impr, 1)));
-  else if (sortBy === 'cpc') sorted.sort((a, b) => (a.inv / Math.max(a.cliques, 1)) - (b.inv / Math.max(b.cliques, 1)));
-  else if (sortBy === 'connect') sorted.sort((a, b) => (b.pv / Math.max(b.cliques, 1)) - (a.pv / Math.max(a.cliques, 1)));
+      // Build CRIATIVOS
+      const criativosMap={};
+      for(let i=1;i<gerData.length;i++){
+        const row=gerData[i];
+        if(!row[3]||!row[0]) continue;
+        if(row[0]<DATA_INICIO) continue;
+        const nome=cleanName(row[3]);
+        if(!criativosMap[nome]) criativosMap[nome]={nome,inv:0,cliques:0,imp:0,pv:0,ck:0,fat:0,compras:0,lastDate:'',link:''};
+        criativosMap[nome].inv+=parseMoney(row[4]);
+        criativosMap[nome].imp+=parseNum(row[5]);
+        criativosMap[nome].cliques+=parseNum(row[7]);
+        criativosMap[nome].pv+=parseNum(row[8]);
+        criativosMap[nome].ck+=parseNum(row[9]);
+        if(row[0]>criativosMap[nome].lastDate) criativosMap[nome].lastDate=row[0];
+      }
 
-  let gridHtml = '';
-  for (const p of sorted) {
-    const ctr = p.impr > 0 ? (p.cliques / p.impr) * 100 : 0;
-    const cpc = p.cliques > 0 ? p.inv / p.cliques : 0;
-    const connectRate = p.cliques > 0 ? (p.pv / p.cliques) * 100 : 0;
+      for(let i=1;i<linksData.length;i++){
+        const row=linksData[i];
+        if(!row[0]) continue;
+        if(criativosMap[row[0]]) criativosMap[row[0]].link=row[2]||'';
+      }
 
-    gridHtml += `
-      <div class="pub-card ${p.ativo ? 'ativo' : ''}">
-        <div class="pub-card-header">
-          <div class="pub-name">${p.nome}</div>
-          <span class="cri-badge ${p.ativo ? 'ativo' : 'inativo'}">${p.ativo ? 'Ativo' : 'Inativo'}</span>
+      // Criativos: só valor do Checklist (sem order bumps) para ROAS real do criativo
+      for(let i=1;i<webhookData.length;i++){
+        const row=webhookData[i];
+        if(!row[2]||row[2].toLowerCase()!=='paid') continue;
+        if(!isMetaUTM(row)) continue;
+        if(!isChecklist(row)) continue;
+        const rawDate2=(row[11]||row[8]||'').trim();
+        const dataKey2=rawDate2.substring(0,10);
+        if(dataKey2<DATA_INICIO) continue;
+        const nome=cleanName(row[12]||row[10]);
+        if(!nome) continue;
+        if(!estaAtivoNaData(nome,dataKey2)) continue;
+        if(!criativosMap[nome]) criativosMap[nome]={nome,inv:0,cliques:0,imp:0,pv:0,ck:0,fat:0,compras:0,lastDate:'',link:''};
+        criativosMap[nome].compras++;
+        criativosMap[nome].fat+=parseNum(row[4])/100;
+      }
+
+      const today=formatYMD(new Date());
+      const sevenDaysAgo=daysAgo(7);
+      CRIATIVOS=Object.values(criativosMap).map(c=>({
+        ...c,
+        ativo:c.lastDate>=sevenDaysAgo,
+        roas:c.inv>0?c.fat/c.inv:0,
+        cac:c.compras>0?c.inv/c.compras:0,
+        ticket:c.compras>0?c.fat/c.compras:0,
+        cpc:c.cliques>0?c.inv/c.cliques:0,
+        cpm:c.imp>0?c.inv/(c.imp/1000):0,
+        ctr:c.imp>0?c.cliques/c.imp*100:0
+      })).sort((a,b)=>b.inv-a.inv);
+
+      // Build CRIATIVOS_PERIODOS - pre-index by creative+date
+      const criDateMap={};
+      for(let i=1;i<gerData.length;i++){
+        const row=gerData[i];
+        if(!row[3]||!row[0]) continue;
+        const nome=cleanName(row[3]),date=row[0];
+        if(date<DATA_INICIO) continue;
+        const k=nome+'|'+date;
+        if(!criDateMap[k]) criDateMap[k]={inv:0,c:0,imp:0,pv:0,ck:0};
+        criDateMap[k].inv+=parseMoney(row[4]);
+        criDateMap[k].c+=parseNum(row[7]);
+        criDateMap[k].imp+=parseNum(row[5]);
+        criDateMap[k].pv+=parseNum(row[8]);
+        criDateMap[k].ck+=parseNum(row[9]);
+      }
+      // Criativos períodos: só valor do Checklist (sem order bumps)
+      const criWkMap={};
+      for(let i=1;i<webhookData.length;i++){
+        const row=webhookData[i];
+        if(!row[2]||row[2].toLowerCase()!=='paid') continue;
+        if(!isMetaUTM(row)) continue;
+        if(!isChecklist(row)) continue;
+        const rawDt=(row[11]||row[8]||'').trim();
+        const date=rawDt.substring(0,10);
+        if(!date||date<DATA_INICIO) continue;
+        const nome=cleanName(row[12]||row[10]);
+        if(!nome) continue;
+        if(!estaAtivoNaData(nome,date)) continue;
+        const k=nome+'|'+date;
+        if(!criWkMap[k]) criWkMap[k]={fat:0,v:0};
+        criWkMap[k].v++;
+        criWkMap[k].fat+=parseNum(row[4])/100;
+      }
+      const allDatesSet=[...new Set(DIAS.map(d=>d.ymd))].sort();
+      CRIATIVOS_PERIODOS=CRIATIVOS.map(c=>{
+        const periods={};
+        for(const pkey of ['all','d7','d14','d30']){
+          const cutoff=pkey==='all'?'0000-00-00':daysAgo(pkey==='d7'?7:pkey==='d14'?14:30);
+          let inv=0,cl=0,imp=0,pv=0,ck=0,fat=0,compras=0;
+          for(const date of allDatesSet){
+            if(date<cutoff) continue;
+            const gk=c.nome+'|'+date;
+            const g=criDateMap[gk];
+            if(g){inv+=g.inv;cl+=g.c;imp+=g.imp;pv+=g.pv;ck+=g.ck;}
+            const w=criWkMap[gk];
+            if(w){fat+=w.fat;compras+=w.v;}
+          }
+          periods[pkey]={inv,c:cl,pv,ck,imp,fat,v:compras,roas:inv>0?fat/inv:0,cac:compras>0?inv/compras:0,cpc:cl>0?inv/cl:0,cpm:imp>0?inv/(imp/1000):0,ctr:imp>0?cl/imp*100:0};
+        }
+        return {nome:c.nome,link:c.link,...periods};
+      });
+
+      // Build PÚBLICOS
+      const publicosMap={};
+      // Mapa criativo|data → público para atribuir compras/fat ao público correto
+      const criDatePubMap={};
+      for(let i=1;i<gerData.length;i++){
+        const row=gerData[i];
+        if(!row[2]||!row[0]) continue;
+        if(row[0]<DATA_INICIO) continue;
+        const nome=row[2];
+        const criNome=cleanName(row[3]);
+        if(!publicosMap[nome]) publicosMap[nome]={nome,inv:0,cliques:0,imp:0,pv:0,ck:0,fat:0,compras:0,lastDate:''};
+        publicosMap[nome].inv+=parseMoney(row[4]);
+        publicosMap[nome].imp+=parseNum(row[5]);
+        publicosMap[nome].cliques+=parseNum(row[7]);
+        publicosMap[nome].pv+=parseNum(row[8]);
+        publicosMap[nome].ck+=parseNum(row[9]);
+        if(row[0]>publicosMap[nome].lastDate) publicosMap[nome].lastDate=row[0];
+        if(criNome) criDatePubMap[criNome+'|'+row[0]]=nome;
+      }
+      // Atribui compras e faturamento ao público via webhook (só Checklist, sem order bumps)
+      for(let i=1;i<webhookData.length;i++){
+        const row=webhookData[i];
+        if(!row[2]||row[2].toLowerCase()!=='paid') continue;
+        if(!isMetaUTM(row)) continue;
+        if(!isChecklist(row)) continue;
+        const rawDate=(row[11]||row[8]||'').trim();
+        const dateKey=rawDate.substring(0,10);
+        if(!dateKey||dateKey<DATA_INICIO) continue;
+        const criNome=cleanName(row[12]||row[10]);
+        if(!estaAtivoNaData(criNome,dateKey)) continue;
+        let pub=criDatePubMap[criNome+'|'+dateKey];
+        if(!pub){
+          for(let d=1;d<=7;d++){
+            const dtx=new Date(dateKey+'T00:00:00');
+            dtx.setDate(dtx.getDate()-d);
+            pub=criDatePubMap[criNome+'|'+formatYMD(dtx)];
+            if(pub) break;
+          }
+        }
+        if(!pub||!publicosMap[pub]) continue;
+        publicosMap[pub].compras++;
+        publicosMap[pub].fat+=parseNum(row[4])/100;
+      }
+      PUBLICOS=Object.values(publicosMap).map(p=>({
+        ...p,
+        ativo:p.lastDate>=sevenDaysAgo,
+        cpc:p.cliques>0?p.inv/p.cliques:0,
+        cpm:p.imp>0?p.inv/(p.imp/1000):0,
+        ctr:p.imp>0?p.cliques/p.imp*100:0,
+        connectRate:p.cliques>0?p.pv/p.cliques*100:0,
+        roas:p.inv>0?p.fat/p.inv:0,
+        ticket:p.compras>0?p.fat/p.compras:0,
+        cac:p.compras>0?p.inv/p.compras:0
+      })).sort((a,b)=>b.inv-a.inv);
+    }
+
+    // ===== FILTERING =====
+    function getFilteredDias(){
+      let dias=DIAS;
+      if(dateRangeFilter.from||dateRangeFilter.to){
+        dias=dias.filter(d=>{
+          if(dateRangeFilter.from&&d.ymd<dateRangeFilter.from) return false;
+          if(dateRangeFilter.to&&d.ymd>dateRangeFilter.to) return false;
+          return true;
+        });
+      }
+      return dias;
+    }
+
+    function onDateChange(){
+      const from=document.getElementById('dateFrom').value;
+      const to=document.getElementById('dateTo').value;
+      dateRangeFilter={from,to};
+      document.getElementById('btn-all').classList.remove('active');
+      document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+      document.getElementById('range-info').textContent=from&&to?`(${Math.ceil((new Date(to)-new Date(from))/86400000)} dias)`:'';
+      renderDashboard();
+    }
+
+    function setPreset(days,el){
+      const to=new Date();
+      const from=new Date();
+      if(days==='all'){
+        dateRangeFilter={from:null,to:null};
+        document.getElementById('dateFrom').value='';
+        document.getElementById('dateTo').value='';
+        document.getElementById('range-info').textContent='';
+      }else{
+        from.setDate(from.getDate()-days);
+        dateRangeFilter={from:formatYMD(from),to:formatYMD(to)};
+        document.getElementById('dateFrom').value=dateRangeFilter.from;
+        document.getElementById('dateTo').value=dateRangeFilter.to;
+        document.getElementById('range-info').textContent=`(${days} dias)`;
+      }
+      document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+      el.classList.add('active');
+      renderDashboard();
+    }
+
+    // ===== RENDERING =====
+    function renderDashboard(){
+      renderVisaoGeral();
+      renderCriativos();
+      renderPublicos();
+      renderSemanal();
+      renderMensal();
+    }
+
+    function renderVisaoGeral(){
+      const dias=getFilteredDias();
+      const inv=dias.reduce((s,d)=>s+d.inv,0);
+      const fat=dias.reduce((s,d)=>s+d.fat,0);
+      const compras=dias.reduce((s,d)=>s+d.compras,0);
+      const cliques=dias.reduce((s,d)=>s+d.cliques,0);
+      const pv=dias.reduce((s,d)=>s+d.pv,0);
+      const ck=dias.reduce((s,d)=>s+d.ck,0);
+      const imp=dias.reduce((s,d)=>s+d.imp,0);
+      const retorno=fat-inv;
+      const roas=inv>0?fat/inv:0;
+      const cpm=imp>0?inv/(imp/1000):0;
+      const cac=compras>0?inv/compras:0;
+      const ticket=compras>0?fat/compras:0;
+      const cpc=cliques>0?inv/cliques:0;
+      const connectRate=cliques>0?pv/cliques*100:0;
+      const taxaCheckout=pv>0?ck/pv*100:0;
+      const taxaCompra=pv>0?compras/pv*100:0;
+      const ctr=imp>0?cliques/imp*100:0;
+
+      const html=`
+        <div class="kpi-card">
+          <div class="kpi-label">Investimento</div>
+          <div class="kpi-value">${brl(inv)}</div>
         </div>
-        <div class="pub-metrics">
-          <div class="pub-metric">
-            <div class="pub-metric-val">${brl(p.inv)}</div>
-            <div class="pub-metric-lbl">Investimento</div>
+        <div class="kpi-card">
+          <div class="kpi-label">Faturamento</div>
+          <div class="kpi-value orange">${brl(fat)}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Retorno Líquido</div>
+          <div class="kpi-value ${retorno>=0?'green':'red'}">${brl(retorno)}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">ROAS</div>
+          <div class="kpi-value ${roasColor(roas)}">${roas.toFixed(2)}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Compras</div>
+          <div class="kpi-value">${num(compras)}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">CPM</div>
+          <div class="kpi-value">${brl(cpm)}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">CAC</div>
+          <div class="kpi-value">${brl(cac)}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Ticket Médio</div>
+          <div class="kpi-value">${brl(ticket)}</div>
+        </div>
+      `;
+      document.getElementById('kpi-grid-visao').innerHTML=html;
+
+      // Funil
+      const maxVal=Math.max(cliques,pv,ck,compras);
+      document.getElementById('funil-cliques').textContent=num(cliques);
+      document.getElementById('funil-pv').textContent=num(pv);
+      document.getElementById('funil-ck').textContent=num(ck);
+      document.getElementById('funil-compras').textContent=num(compras);
+      document.getElementById('funil-bar-cliques').style.width='100%';
+      document.getElementById('funil-bar-pv').style.width=(maxVal>0?pv/maxVal*100:0)+'%';
+      document.getElementById('funil-bar-ck').style.width=(maxVal>0?ck/maxVal*100:0)+'%';
+      document.getElementById('funil-bar-compras').style.width=(maxVal>0?compras/maxVal*100:0)+'%';
+
+      // Taxas
+      document.getElementById('taxa-connect').textContent=pct(connectRate);
+      document.getElementById('taxa-checkout').textContent=pct(taxaCheckout);
+      document.getElementById('taxa-compra').textContent=pct(taxaCompra);
+      document.getElementById('taxa-ctr').textContent=pct(ctr);
+      document.getElementById('taxa-cpc').textContent=brl(cpc);
+
+      // Charts
+      renderChartsVisao(dias);
+
+      // Table
+      const tblHtml=`
+        <tr>
+          <th>Data</th>
+          <th>Inv</th>
+          <th>Fat</th>
+          <th>Retorno</th>
+          <th>Compras</th>
+          <th>Ticket</th>
+          <th>CAC</th>
+          <th>ROAS</th>
+          <th>Status</th>
+        </tr>
+        ${dias.map(d=>`
+          <tr>
+            <td>${d.data}</td>
+            <td>${brl(d.inv)}</td>
+            <td>${brl(d.fat)}</td>
+            <td>${brl(d.fat-d.inv)}</td>
+            <td>${num(d.compras)}</td>
+            <td>${brl(d.compras>0?d.fat/d.compras:0)}</td>
+            <td>${brl(d.compras>0?d.inv/d.compras:0)}</td>
+            <td class="${roasColor(d.inv>0?d.fat/d.inv:0)}">${(d.inv>0?d.fat/d.inv:0).toFixed(2)}</td>
+            <td>${statusBadge(d.inv>0?d.fat/d.inv:0,d.fat)}</td>
+          </tr>
+        `).join('')}
+      `;
+      document.getElementById('tbl-diario').innerHTML=tblHtml;
+    }
+
+    function renderChartsVisao(dias){
+      destroyCharts(['chart-roas-diario','chart-inv-diario','chart-compras-diario','chart-fat-diario']);
+
+      const labels=dias.map(d=>d.data);
+      const roas=dias.map(d=>d.inv>0?d.fat/d.inv:0);
+      const inv=dias.map(d=>d.inv);
+      const compras=dias.map(d=>d.compras);
+      const fat=dias.map(d=>d.fat);
+
+      charts['chart-roas-diario']=new Chart(document.getElementById('chart-roas-diario'),{
+        type:'line',responsive:true,maintainAspectRatio:true,
+        data:{labels,datasets:[{label:'ROAS',data:roas,borderColor:'rgba(255,107,43,0.85)',backgroundColor:'rgba(255,107,43,0.1)',borderWidth:2,fill:true,tension:0.4}]},
+        options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'rgba(255,255,255,0.4)'}},x:{grid:{display:false},ticks:{color:'rgba(255,255,255,0.4)'}}}}
+      });
+
+      charts['chart-inv-diario']=new Chart(document.getElementById('chart-inv-diario'),{
+        type:'bar',responsive:true,maintainAspectRatio:true,
+        data:{labels,datasets:[{label:'Inv',data:inv,backgroundColor:'rgba(255,107,43,0.85)',borderColor:'rgba(255,107,43,0.85)',borderWidth:1}]},
+        options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'rgba(255,255,255,0.4)'}},x:{grid:{display:false},ticks:{color:'rgba(255,255,255,0.4)'}}}}
+      });
+
+      charts['chart-compras-diario']=new Chart(document.getElementById('chart-compras-diario'),{
+        type:'bar',responsive:true,maintainAspectRatio:true,
+        data:{labels,datasets:[{label:'Compras',data:compras,backgroundColor:'rgba(255,183,55,0.85)',borderColor:'rgba(255,183,55,0.85)',borderWidth:1}]},
+        options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'rgba(255,255,255,0.4)'}},x:{grid:{display:false},ticks:{color:'rgba(255,255,255,0.4)'}}}}
+      });
+
+      charts['chart-fat-diario']=new Chart(document.getElementById('chart-fat-diario'),{
+        type:'line',responsive:true,maintainAspectRatio:true,
+        data:{labels,datasets:[{label:'Fat',data:fat,borderColor:'rgba(46,204,113,0.85)',backgroundColor:'rgba(46,204,113,0.1)',borderWidth:2,fill:true,tension:0.4}]},
+        options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'rgba(255,255,255,0.4)'}},x:{grid:{display:false},ticks:{color:'rgba(255,255,255,0.4)'}}}}
+      });
+    }
+
+    function renderCriativos(){
+      let items=CRIATIVOS;
+      if(criativoFilterMode==='ativos') items=items.filter(c=>c.ativo);
+      else if(criativoFilterMode==='inativos') items=items.filter(c=>!c.ativo);
+
+      // Compute periodData FIRST, then sort both arrays together by period values
+      let periodData=items.map(c=>{
+        const per=CRIATIVOS_PERIODOS.find(cp=>cp.nome===c.nome);
+        return per?per[criativoPeriodo]:{inv:c.inv,c:c.cliques,pv:c.pv,ck:c.ck,imp:c.imp,fat:c.fat,v:c.compras,roas:c.roas,cac:c.cac,cpc:c.cpc,cpm:c.cpm,ctr:c.ctr};
+      });
+      const combined=items.map((c,i)=>({c,pd:periodData[i]}));
+      if(sortCreativos==='investimento') combined.sort((a,b)=>(b.pd.inv||0)-(a.pd.inv||0));
+      else if(sortCreativos==='compras') combined.sort((a,b)=>(b.pd.v||0)-(a.pd.v||0));
+      else combined.sort((a,b)=>(b.pd.roas||0)-(a.pd.roas||0));
+      items=combined.map(x=>x.c);
+      periodData=combined.map(x=>x.pd);
+
+      const gridHtml=items.map((c,i)=>`
+        <div class="cri-card ${c.ativo?'ativo':''}">
+          <div class="cri-card-header">
+            <span class="cri-name">${c.nome}</span>
+            <span class="cri-badge ${c.ativo?'ativo':'inativo'}">${c.ativo?'Ativo':'Inativo'}</span>
           </div>
-          <div class="pub-metric">
-            <div class="pub-metric-val neutral">${pct(ctr)}</div>
-            <div class="pub-metric-lbl">CTR</div>
+          <div class="cri-metrics">
+            <div class="cri-metric">
+              <div class="cri-metric-label">Inv</div>
+              <div class="cri-metric-val">${brl(periodData[i].inv)}</div>
+            </div>
+            <div class="cri-metric">
+              <div class="cri-metric-label">Compras</div>
+              <div class="cri-metric-val">${num(periodData[i].v)}</div>
+            </div>
+            <div class="cri-metric">
+              <div class="cri-metric-label">ROAS</div>
+              <div class="cri-metric-val hl ${roasColor(periodData[i].roas)}">${(periodData[i].roas||0).toFixed(2)}</div>
+            </div>
+            <div class="cri-metric">
+              <div class="cri-metric-label">CAC</div>
+              <div class="cri-metric-val">${brl(periodData[i].cac)}</div>
+            </div>
+            <div class="cri-metric">
+              <div class="cri-metric-label">CPC</div>
+              <div class="cri-metric-val">${brl(periodData[i].cpc)}</div>
+            </div>
+            <div class="cri-metric">
+              <div class="cri-metric-label">CPM</div>
+              <div class="cri-metric-val">${brl(periodData[i].cpm)}</div>
+            </div>
           </div>
-          <div class="pub-metric">
-            <div class="pub-metric-val neutral">${pct(connectRate)}</div>
-            <div class="pub-metric-lbl">Connect</div>
+          ${c.link?`<a href="${c.link}" target="_blank" class="cri-link">${c.link}</a>`:''}
+        </div>
+      `).join('');
+      document.getElementById('cri-grid').innerHTML=gridHtml;
+
+      const tblHtml=`
+        <tr>
+          <th>Ad Name</th>
+          <th>Inv</th>
+          <th>Compras</th>
+          <th>ROAS</th>
+          <th>CAC</th>
+          <th>CPC</th>
+          <th>CPM</th>
+          <th>CTR</th>
+        </tr>
+        ${items.map((c,i)=>`
+          <tr>
+            <td>${c.nome}</td>
+            <td>${brl(periodData[i].inv)}</td>
+            <td>${num(periodData[i].v)}</td>
+            <td class="${roasColor(periodData[i].roas)}">${(periodData[i].roas||0).toFixed(2)}</td>
+            <td>${brl(periodData[i].cac)}</td>
+            <td>${brl(periodData[i].cpc)}</td>
+            <td>${brl(periodData[i].cpm)}</td>
+            <td>${(periodData[i].ctr||0).toFixed(2)}%</td>
+          </tr>
+        `).join('')}
+      `;
+      document.getElementById('tbl-criativos').innerHTML=tblHtml;
+    }
+
+    let publicoFilterMode='todos';
+    function filterPublicos(mode,el){
+      publicoFilterMode=mode;
+      document.querySelectorAll('#publicos .cri-filter-btn').forEach(b=>b.classList.remove('active'));
+      el.classList.add('active');
+      renderPublicos();
+    }
+
+    function renderPublicos(){
+      let items=[...PUBLICOS];
+      if(publicoFilterMode==='ativos') items=items.filter(p=>p.ativo);
+      else if(publicoFilterMode==='inativos') items=items.filter(p=>!p.ativo);
+      const sortPub=document.getElementById('pub-sort')?.value||'inv';
+      if(sortPub==='roas') items.sort((a,b)=>b.roas-a.roas);
+      else if(sortPub==='compras') items.sort((a,b)=>b.compras-a.compras);
+      else if(sortPub==='cac') items.sort((a,b)=>(a.cac||999)-(b.cac||999));
+      else items.sort((a,b)=>b.inv-a.inv);
+
+      const gridHtml=items.map(p=>`
+        <div class="pub-card ${p.ativo?'ativo':''}">
+          <div class="pub-card-header">
+            <span class="pub-name">${p.nome}</span>
+            <span class="cri-badge ${p.ativo?'ativo':'inativo'}">${p.ativo?'Ativo':'Inativo'}</span>
+          </div>
+          <div class="pub-metrics">
+            <div class="pub-metric">
+              <div class="pub-metric-val neutral">${brl(p.inv)}</div>
+              <div class="pub-metric-lbl">Investimento</div>
+            </div>
+            <div class="pub-metric">
+              <div class="pub-metric-val ${roasColor(p.roas)}">${(p.roas||0).toFixed(2)}</div>
+              <div class="pub-metric-lbl">ROAS</div>
+            </div>
+            <div class="pub-metric">
+              <div class="pub-metric-val">${num(p.compras)}</div>
+              <div class="pub-metric-lbl">Compras</div>
+            </div>
+          </div>
+          <div class="pub-metrics">
+            <div class="pub-metric">
+              <div class="pub-metric-val">${brl(p.cac)}</div>
+              <div class="pub-metric-lbl">CAC</div>
+            </div>
+            <div class="pub-metric">
+              <div class="pub-metric-val">${brl(p.ticket)}</div>
+              <div class="pub-metric-lbl">Ticket</div>
+            </div>
+            <div class="pub-metric">
+              <div class="pub-metric-val">${brl(p.cpc)}</div>
+              <div class="pub-metric-lbl">CPC</div>
+            </div>
+          </div>
+          <div class="pub-metrics">
+            <div class="pub-metric">
+              <div class="pub-metric-val">${brl(p.cpm)}</div>
+              <div class="pub-metric-lbl">CPM</div>
+            </div>
+            <div class="pub-metric">
+              <div class="pub-metric-val">${(p.ctr||0).toFixed(2)}%</div>
+              <div class="pub-metric-lbl">CTR</div>
+            </div>
+            <div class="pub-metric">
+              <div class="pub-metric-val">${(p.connectRate||0).toFixed(2)}%</div>
+              <div class="pub-metric-lbl">Connect</div>
+            </div>
+          </div>
+          <div class="pub-bar-wrap">
+            <div class="pub-bar-label"><span>ROAS</span><span class="${roasColor(p.roas)}">${(p.roas||0).toFixed(2)}</span></div>
+            <div class="pub-bar-bg"><div class="pub-bar-fill" style="width:${Math.min((p.roas||0)/2*100,100)}%"></div></div>
           </div>
         </div>
-        <div class="pub-bar-wrap">
-          <div class="pub-bar-label"><span>Gasto</span><span>${brl(p.inv)}</span></div>
-          <div class="pub-bar-bg"><div class="pub-bar-fill" style="width:100%"></div></div>
+      `).join('');
+      document.getElementById('pub-grid').innerHTML=gridHtml;
+
+      const tblHtml=`
+        <tr>
+          <th>Público</th><th>Inv</th><th>Fat</th><th>Compras</th>
+          <th>ROAS</th><th>CAC</th><th>Ticket</th>
+          <th>CPC</th><th>CPM</th><th>CTR</th><th>Connect Rate</th>
+        </tr>
+        ${items.map(p=>`
+          <tr>
+            <td>${p.nome}</td>
+            <td>${brl(p.inv)}</td>
+            <td>${brl(p.fat)}</td>
+            <td>${num(p.compras)}</td>
+            <td class="${roasColor(p.roas)}">${(p.roas||0).toFixed(2)}</td>
+            <td>${brl(p.cac)}</td>
+            <td>${brl(p.ticket)}</td>
+            <td>${brl(p.cpc)}</td>
+            <td>${brl(p.cpm)}</td>
+            <td>${(p.ctr||0).toFixed(2)}%</td>
+            <td>${(p.connectRate||0).toFixed(2)}%</td>
+          </tr>
+        `).join('')}
+      `;
+      document.getElementById('tbl-publicos').innerHTML=tblHtml;
+    }
+
+    function renderSemanal(){
+      const inv=SEMANAL.reduce((s,d)=>s+d.inv,0);
+      const fat=SEMANAL.reduce((s,d)=>s+d.fat,0);
+      const compras=SEMANAL.reduce((s,d)=>s+d.compras,0);
+      const roas=inv>0?fat/inv:0;
+      const ticket=compras>0?fat/compras:0;
+      const cac=compras>0?inv/compras:0;
+      const cpm=SEMANAL.reduce((s,d)=>s+d.cpm*d.inv,0)/inv;
+      const retorno=fat-inv;
+
+      const html=`
+        <div class="kpi-card">
+          <div class="kpi-label">Investimento</div>
+          <div class="kpi-value">${brl(inv)}</div>
         </div>
-      </div>
-    `;
-  }
-  document.getElementById('pub-grid').innerHTML = gridHtml;
+        <div class="kpi-card">
+          <div class="kpi-label">Faturamento</div>
+          <div class="kpi-value orange">${brl(fat)}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Retorno Líquido</div>
+          <div class="kpi-value ${retorno>=0?'green':'red'}">${brl(retorno)}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">ROAS</div>
+          <div class="kpi-value ${roasColor(roas)}">${roas.toFixed(2)}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Compras</div>
+          <div class="kpi-value">${num(compras)}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">CPM</div>
+          <div class="kpi-value">${brl(cpm)}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">CAC</div>
+          <div class="kpi-value">${brl(cac)}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Ticket Médio</div>
+          <div class="kpi-value">${brl(ticket)}</div>
+        </div>
+      `;
+      document.getElementById('kpi-grid-semanal').innerHTML=html;
 
-  // Table
-  let tblHtml = '<thead><tr><th>Público</th><th>Investimento</th><th>Impressões</th><th>Cliques</th><th>CTR</th><th>Visualizações</th><th>Connect Rate</th><th>Checkouts</th><th>CPC</th><th>Status</th></tr></thead><tbody>';
+      renderChartsSemanal();
 
-  for (const p of sorted) {
-    const ctr = p.impr > 0 ? (p.cliques / p.impr) * 100 : 0;
-    const cpc = p.cliques > 0 ? p.inv / p.cliques : 0;
-    const connectRate = p.cliques > 0 ? (p.pv / p.cliques) * 100 : 0;
+      const tblHtml=`
+        <tr>
+          <th>Semana</th>
+          <th>Inv</th>
+          <th>Fat</th>
+          <th>Retorno</th>
+          <th>Compras</th>
+          <th>ROAS</th>
+          <th>Ticket</th>
+          <th>CAC</th>
+          <th>CPC</th>
+          <th>CPM</th>
+          <th>Taxa Conv.</th>
+        </tr>
+        ${SEMANAL.map(s=>`
+          <tr>
+            <td>${s.key}</td>
+            <td>${brl(s.inv)}</td>
+            <td>${brl(s.fat)}</td>
+            <td>${brl(s.fat-s.inv)}</td>
+            <td>${num(s.compras)}</td>
+            <td class="${roasColor(s.roas)}">${(s.roas||0).toFixed(2)}</td>
+            <td>${brl(s.ticket)}</td>
+            <td>${brl(s.cac)}</td>
+            <td>${brl(s.cpc)}</td>
+            <td>${brl(s.cpm)}</td>
+            <td>${(s.taxaCompra||0).toFixed(2)}%</td>
+          </tr>
+        `).join('')}
+      `;
+      document.getElementById('tbl-semanal').innerHTML=tblHtml;
+    }
 
-    tblHtml += `<tr>
-      <td>${p.nome}</td>
-      <td>${brl(p.inv)}</td>
-      <td>${p.impr}</td>
-      <td>${p.cliques}</td>
-      <td>${pct(ctr)}</td>
-      <td>${p.pv}</td>
-      <td>${pct(connectRate)}</td>
-      <td>${p.ck}</td>
-      <td>${brl(cpc)}</td>
-      <td>${statusBadge(p.inv, p.fat)}</td>
-    </tr>`;
-  }
+    function renderChartsSemanal(){
+      destroyCharts(['chart-roas-semanal','chart-inv-semanal','chart-compras-semanal','chart-cpc-semanal','chart-taxa-semanal','chart-cpm-semanal','chart-connect-semanal','chart-ticket-semanal']);
 
-  tblHtml += '</tbody>';
-  document.getElementById('tbl-publicos').innerHTML = tblHtml;
-}
+      const labels=SEMANAL.map(s=>s.key);
+      const roas=SEMANAL.map(s=>s.roas);
+      const inv=SEMANAL.map(s=>s.inv);
+      const compras=SEMANAL.map(s=>s.compras);
+      const cpc=SEMANAL.map(s=>s.cpc);
+      const taxa=SEMANAL.map(s=>s.taxaCompra);
+      const cpm=SEMANAL.map(s=>s.cpm);
+      const connect=SEMANAL.map(s=>s.connectRate);
+      const ticket=SEMANAL.map(s=>s.ticket);
 
-function renderSemanal() {
-  const filtered = SEMANAL.filter(s => {
-    const weekStart = s.week;
-    const weekEnd = new Date(weekStart + 'T00:00:00Z');
-    weekEnd.setDate(weekEnd.getDate() + 6);
-    const weekEndStr = weekEnd.toISOString().split('T')[0];
-    return weekEndStr >= dateFrom && weekStart <= dateTo;
-  });
+      charts['chart-roas-semanal']=new Chart(document.getElementById('chart-roas-semanal'),{
+        type:'line',responsive:true,maintainAspectRatio:true,
+        data:{labels,datasets:[{label:'ROAS',data:roas,borderColor:'rgba(255,107,43,0.85)',backgroundColor:'rgba(255,107,43,0.1)',borderWidth:2,fill:true,tension:0.4}]},
+        options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'rgba(255,255,255,0.4)'}},x:{grid:{display:false},ticks:{color:'rgba(255,255,255,0.4)'}}}}
+      });
 
-  const agg = aggregateData(filtered);
+      charts['chart-inv-semanal']=new Chart(document.getElementById('chart-inv-semanal'),{
+        type:'bar',responsive:true,maintainAspectRatio:true,
+        data:{labels,datasets:[{label:'Inv',data:inv,backgroundColor:'rgba(255,107,43,0.85)',borderColor:'rgba(255,107,43,0.85)',borderWidth:1}]},
+        options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'rgba(255,255,255,0.4)'}},x:{grid:{display:false},ticks:{color:'rgba(255,255,255,0.4)'}}}}
+      });
 
-  const kpiHtml = `
-    <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${brl(agg.inv)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Faturamento</div><div class="kpi-value green">${brl(agg.fat)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">ROAS</div><div class="kpi-value orange">${br(agg.inv > 0 ? agg.fat / agg.inv : 0, 2)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Cliques</div><div class="kpi-value orange">${agg.cliques}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Impressões</div><div class="kpi-value orange">${agg.impr}</div></div>
-  `;
-  document.getElementById('kpi-semanal').innerHTML = kpiHtml;
+      charts['chart-compras-semanal']=new Chart(document.getElementById('chart-compras-semanal'),{
+        type:'bar',responsive:true,maintainAspectRatio:true,
+        data:{labels,datasets:[{label:'Compras',data:compras,backgroundColor:'rgba(255,183,55,0.85)',borderColor:'rgba(255,183,55,0.85)',borderWidth:1}]},
+        options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'rgba(255,255,255,0.4)'}},x:{grid:{display:false},ticks:{color:'rgba(255,255,255,0.4)'}}}}
+      });
 
-  let tblHtml = '<thead><tr><th>Semana</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>CTR</th><th>PV</th><th>CK</th><th>Compras</th><th>Fat.</th><th>ROAS</th><th>Retorno</th></tr></thead><tbody>';
+      charts['chart-cpc-semanal']=new Chart(document.getElementById('chart-cpc-semanal'),{
+        type:'line',responsive:true,maintainAspectRatio:true,
+        data:{labels,datasets:[{label:'CPC',data:cpc,borderColor:'rgba(46,204,113,0.85)',backgroundColor:'rgba(46,204,113,0.1)',borderWidth:2,fill:true,tension:0.4}]},
+        options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'rgba(255,255,255,0.4)'}},x:{grid:{display:false},ticks:{color:'rgba(255,255,255,0.4)'}}}}
+      });
 
-  for (const s of filtered) {
-    const ctr = s.impr > 0 ? (s.cliques / s.impr) * 100 : 0;
-    const roas = s.inv > 0 ? s.fat / s.inv : 0;
-    const retorno = s.fat - s.inv;
+      charts['chart-taxa-semanal']=new Chart(document.getElementById('chart-taxa-semanal'),{
+        type:'line',responsive:true,maintainAspectRatio:true,
+        data:{labels,datasets:[{label:'Taxa',data:taxa,borderColor:'rgba(255,107,43,0.85)',backgroundColor:'rgba(255,107,43,0.1)',borderWidth:2,fill:true,tension:0.4}]},
+        options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,max:100,grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'rgba(255,255,255,0.4)'}},x:{grid:{display:false},ticks:{color:'rgba(255,255,255,0.4)'}}}}
+      });
 
-    const weekStart = new Date(s.week + 'T00:00:00Z');
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 6);
+      charts['chart-cpm-semanal']=new Chart(document.getElementById('chart-cpm-semanal'),{
+        type:'bar',responsive:true,maintainAspectRatio:true,
+        data:{labels,datasets:[{label:'CPM',data:cpm,backgroundColor:'rgba(255,183,55,0.85)',borderColor:'rgba(255,183,55,0.85)',borderWidth:1}]},
+        options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'rgba(255,255,255,0.4)'}},x:{grid:{display:false},ticks:{color:'rgba(255,255,255,0.4)'}}}}
+      });
 
-    const weekStr = `${String(weekStart.getUTCDate()).padStart(2, '0')}/${String(weekStart.getUTCMonth() + 1).padStart(2, '0')} - ${String(weekEnd.getUTCDate()).padStart(2, '0')}/${String(weekEnd.getUTCMonth() + 1).padStart(2, '0')}`;
+      charts['chart-connect-semanal']=new Chart(document.getElementById('chart-connect-semanal'),{
+        type:'line',responsive:true,maintainAspectRatio:true,
+        data:{labels,datasets:[{label:'Connect',data:connect,borderColor:'rgba(46,204,113,0.85)',backgroundColor:'rgba(46,204,113,0.1)',borderWidth:2,fill:true,tension:0.4}]},
+        options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,max:100,grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'rgba(255,255,255,0.4)'}},x:{grid:{display:false},ticks:{color:'rgba(255,255,255,0.4)'}}}}
+      });
 
-    tblHtml += `<tr>
-      <td>${weekStr}</td>
-      <td>${brl(s.inv)}</td>
-      <td>${s.impr}</td>
-      <td>${s.cliques}</td>
-      <td>${pct(ctr)}</td>
-      <td>${s.pv}</td>
-      <td>${s.ck}</td>
-      <td>${s.compras || 0}</td>
-      <td>${brl(s.fat)}</td>
-      <td>${br(roas, 2)}</td>
-      <td class="${retorno >= 0 ? 'green' : 'red'}">${brl(retorno)}</td>
-    </tr>`;
-  }
+      charts['chart-ticket-semanal']=new Chart(document.getElementById('chart-ticket-semanal'),{
+        type:'bar',responsive:true,maintainAspectRatio:true,
+        data:{labels,datasets:[{label:'Ticket',data:ticket,backgroundColor:'rgba(46,204,113,0.85)',borderColor:'rgba(46,204,113,0.85)',borderWidth:1}]},
+        options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'rgba(255,255,255,0.4)'}},x:{grid:{display:false},ticks:{color:'rgba(255,255,255,0.4)'}}}}
+      });
+    }
 
-  tblHtml += '</tbody>';
-  document.getElementById('tbl-semanal').innerHTML = tblHtml;
+    function renderMensal(){
+      const inv=MENSAL.reduce((s,d)=>s+d.inv,0);
+      const fat=MENSAL.reduce((s,d)=>s+d.fat,0);
+      const compras=MENSAL.reduce((s,d)=>s+d.compras,0);
+      const roas=inv>0?fat/inv:0;
+      const ticket=compras>0?fat/compras:0;
+      const cac=compras>0?inv/compras:0;
+      const cpm=MENSAL.reduce((s,d)=>s+d.cpm*d.inv,0)/inv;
+      const retorno=fat-inv;
 
-  // Charts
-  const chartLabels = filtered.map(s => {
-    const date = new Date(s.week + 'T00:00:00Z');
-    return `Sem ${String(date.getUTCDate()).padStart(2, '0')}/${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
-  });
+      const html=`
+        <div class="kpi-card">
+          <div class="kpi-label">Investimento</div>
+          <div class="kpi-value">${brl(inv)}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Faturamento</div>
+          <div class="kpi-value orange">${brl(fat)}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Retorno Líquido</div>
+          <div class="kpi-value ${retorno>=0?'green':'red'}">${brl(retorno)}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">ROAS</div>
+          <div class="kpi-value ${roasColor(roas)}">${roas.toFixed(2)}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Compras</div>
+          <div class="kpi-value">${num(compras)}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">CPM</div>
+          <div class="kpi-value">${brl(cpm)}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">CAC</div>
+          <div class="kpi-value">${brl(cac)}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Ticket Médio</div>
+          <div class="kpi-value">${brl(ticket)}</div>
+        </div>
+      `;
+      document.getElementById('kpi-grid-mensal').innerHTML=html;
 
-  if (charts['sem-invest']) charts['sem-invest'].destroy();
-  charts['sem-invest'] = new Chart(document.getElementById('chart-sem-invest'), {
-    type: 'bar',
-    data: {
-      labels: chartLabels,
-      datasets: [{
-        label: 'Investimento',
-        data: filtered.map(s => s.inv),
-        backgroundColor: 'rgba(255,107,43,0.85)',
-        borderColor: 'rgba(255,107,43,0.95)',
-        borderWidth: 1,
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true } },
-    },
-  });
+      renderChartsMensal();
 
-  if (charts['sem-ctr']) charts['sem-ctr'].destroy();
-  charts['sem-ctr'] = new Chart(document.getElementById('chart-sem-ctr'), {
-    type: 'line',
-    data: {
-      labels: chartLabels,
-      datasets: [{
-        label: 'CTR (%)',
-        data: filtered.map(s => s.impr > 0 ? (s.cliques / s.impr) * 100 : 0),
-        borderColor: 'rgba(255,107,43,0.95)',
-        backgroundColor: 'rgba(255,107,43,0.13)',
-        tension: 0.3,
-        fill: true,
-        borderWidth: 2,
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true } },
-    },
-  });
-}
+      const tblHtml=`
+        <tr>
+          <th>Mês</th>
+          <th>Inv</th>
+          <th>Fat</th>
+          <th>Retorno</th>
+          <th>Compras</th>
+          <th>ROAS</th>
+          <th>Ticket</th>
+          <th>CAC</th>
+          <th>CPC</th>
+          <th>CPM</th>
+          <th>Taxa Conv.</th>
+        </tr>
+        ${MENSAL.map(m=>`
+          <tr>
+            <td>${m.mes} ${m.ano}</td>
+            <td>${brl(m.inv)}</td>
+            <td>${brl(m.fat)}</td>
+            <td>${brl(m.fat-m.inv)}</td>
+            <td>${num(m.compras)}</td>
+            <td class="${roasColor(m.roas)}">${(m.roas||0).toFixed(2)}</td>
+            <td>${brl(m.ticket)}</td>
+            <td>${brl(m.cac)}</td>
+            <td>${brl(m.cpc)}</td>
+            <td>${brl(m.cpm)}</td>
+            <td>${(m.taxaCompra||0).toFixed(2)}%</td>
+          </tr>
+        `).join('')}
+      `;
+      document.getElementById('tbl-mensal').innerHTML=tblHtml;
+    }
 
-function renderMensal() {
-  const filtered = MENSAL.filter(m => {
-    const monthStart = m.month;
-    const monthEnd = new Date(monthStart + '-01T00:00:00Z');
-    monthEnd.setMonth(monthEnd.getMonth() + 1);
-    monthEnd.setDate(0);
-    const monthEndStr = monthEnd.toISOString().split('T')[0];
-    return monthStart >= dateFrom && monthEndStr <= dateTo;
-  });
+    function renderChartsMensal(){
+      destroyCharts(['chart-roas-mensal','chart-inv-fat-mensal','chart-compras-mensal','chart-cpc-mensal','chart-taxa-mensal','chart-cpm-mensal','chart-connect-mensal','chart-ticket-mensal']);
 
-  const agg = aggregateData(filtered);
+      const labels=MENSAL.map(m=>`${m.mes.slice(0,3)} ${m.ano}`);
+      const roas=MENSAL.map(m=>m.roas);
+      const inv=MENSAL.map(m=>m.inv);
+      const fat=MENSAL.map(m=>m.fat);
+      const compras=MENSAL.map(m=>m.compras);
+      const cpc=MENSAL.map(m=>m.cpc);
+      const taxa=MENSAL.map(m=>m.taxaCompra);
+      const cpm=MENSAL.map(m=>m.cpm);
+      const connect=MENSAL.map(m=>m.connectRate);
+      const ticket=MENSAL.map(m=>m.ticket);
 
-  const kpiHtml = `
-    <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${brl(agg.inv)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Faturamento</div><div class="kpi-value green">${brl(agg.fat)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">ROAS</div><div class="kpi-value orange">${br(agg.inv > 0 ? agg.fat / agg.inv : 0, 2)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Cliques</div><div class="kpi-value orange">${agg.cliques}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Impressões</div><div class="kpi-value orange">${agg.impr}</div></div>
-  `;
-  document.getElementById('kpi-mensal').innerHTML = kpiHtml;
+      charts['chart-roas-mensal']=new Chart(document.getElementById('chart-roas-mensal'),{
+        type:'line',responsive:true,maintainAspectRatio:true,
+        data:{labels,datasets:[{label:'ROAS',data:roas,borderColor:'rgba(255,107,43,0.85)',backgroundColor:'rgba(255,107,43,0.1)',borderWidth:2,fill:true,tension:0.4}]},
+        options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'rgba(255,255,255,0.4)'}},x:{grid:{display:false},ticks:{color:'rgba(255,255,255,0.4)'}}}}
+      });
 
-  let tblHtml = '<thead><tr><th>Mês</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>CTR</th><th>PV</th><th>CK</th><th>Compras</th><th>Fat.</th><th>ROAS</th><th>Retorno</th><th>Status</th></tr></thead><tbody>';
+      charts['chart-inv-fat-mensal']=new Chart(document.getElementById('chart-inv-fat-mensal'),{
+        type:'bar',responsive:true,maintainAspectRatio:true,
+        data:{labels,datasets:[
+          {label:'Inv',data:inv,backgroundColor:'rgba(255,107,43,0.85)',borderColor:'rgba(255,107,43,0.85)',borderWidth:1},
+          {label:'Fat',data:fat,backgroundColor:'rgba(46,204,113,0.85)',borderColor:'rgba(46,204,113,0.85)',borderWidth:1}
+        ]},
+        options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'rgba(255,255,255,0.4)'}},x:{grid:{display:false},ticks:{color:'rgba(255,255,255,0.4)'}}}}
+      });
 
-  for (const m of filtered) {
-    const ctr = m.impr > 0 ? (m.cliques / m.impr) * 100 : 0;
-    const roas = m.inv > 0 ? m.fat / m.inv : 0;
-    const retorno = m.fat - m.inv;
+      charts['chart-compras-mensal']=new Chart(document.getElementById('chart-compras-mensal'),{
+        type:'bar',responsive:true,maintainAspectRatio:true,
+        data:{labels,datasets:[{label:'Compras',data:compras,backgroundColor:'rgba(255,183,55,0.85)',borderColor:'rgba(255,183,55,0.85)',borderWidth:1}]},
+        options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'rgba(255,255,255,0.4)'}},x:{grid:{display:false},ticks:{color:'rgba(255,255,255,0.4)'}}}}
+      });
 
-    const [year, month] = m.month.split('-');
-    const monthName = new Date(year, parseInt(month) - 1).toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+      charts['chart-cpc-mensal']=new Chart(document.getElementById('chart-cpc-mensal'),{
+        type:'line',responsive:true,maintainAspectRatio:true,
+        data:{labels,datasets:[{label:'CPC',data:cpc,borderColor:'rgba(46,204,113,0.85)',backgroundColor:'rgba(46,204,113,0.1)',borderWidth:2,fill:true,tension:0.4}]},
+        options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'rgba(255,255,255,0.4)'}},x:{grid:{display:false},ticks:{color:'rgba(255,255,255,0.4)'}}}}
+      });
 
-    tblHtml += `<tr>
-      <td>${monthName}</td>
-      <td>${brl(m.inv)}</td>
-      <td>${m.impr}</td>
-      <td>${m.cliques}</td>
-      <td>${pct(ctr)}</td>
-      <td>${m.pv}</td>
-      <td>${m.ck}</td>
-      <td>${m.compras || 0}</td>
-      <td>${brl(m.fat)}</td>
-      <td>${br(roas, 2)}</td>
-      <td class="${retorno >= 0 ? 'green' : 'red'}">${brl(retorno)}</td>
-      <td>${statusBadge(m.inv, m.fat)}</td>
-    </tr>`;
-  }
+      charts['chart-taxa-mensal']=new Chart(document.getElementById('chart-taxa-mensal'),{
+        type:'line',responsive:true,maintainAspectRatio:true,
+        data:{labels,datasets:[{label:'Taxa',data:taxa,borderColor:'rgba(255,107,43,0.85)',backgroundColor:'rgba(255,107,43,0.1)',borderWidth:2,fill:true,tension:0.4}]},
+        options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,max:100,grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'rgba(255,255,255,0.4)'}},x:{grid:{display:false},ticks:{color:'rgba(255,255,255,0.4)'}}}}
+      });
 
-  tblHtml += '</tbody>';
-  document.getElementById('tbl-mensal').innerHTML = tblHtml;
-}
+      charts['chart-cpm-mensal']=new Chart(document.getElementById('chart-cpm-mensal'),{
+        type:'bar',responsive:true,maintainAspectRatio:true,
+        data:{labels,datasets:[{label:'CPM',data:cpm,backgroundColor:'rgba(255,183,55,0.85)',borderColor:'rgba(255,183,55,0.85)',borderWidth:1}]},
+        options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'rgba(255,255,255,0.4)'}},x:{grid:{display:false},ticks:{color:'rgba(255,255,255,0.4)'}}}}
+      });
 
-function showTab(tabName, elem) {
-  document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      charts['chart-connect-mensal']=new Chart(document.getElementById('chart-connect-mensal'),{
+        type:'line',responsive:true,maintainAspectRatio:true,
+        data:{labels,datasets:[{label:'Connect',data:connect,borderColor:'rgba(46,204,113,0.85)',backgroundColor:'rgba(46,204,113,0.1)',borderWidth:2,fill:true,tension:0.4}]},
+        options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,max:100,grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'rgba(255,255,255,0.4)'}},x:{grid:{display:false},ticks:{color:'rgba(255,255,255,0.4)'}}}}
+      });
 
-  document.getElementById(tabName).classList.add('active');
-  elem.classList.add('active');
-}
+      charts['chart-ticket-mensal']=new Chart(document.getElementById('chart-ticket-mensal'),{
+        type:'bar',responsive:true,maintainAspectRatio:true,
+        data:{labels,datasets:[{label:'Ticket',data:ticket,backgroundColor:'rgba(46,204,113,0.85)',borderColor:'rgba(46,204,113,0.85)',borderWidth:1}]},
+        options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'rgba(255,255,255,0.4)'}},x:{grid:{display:false},ticks:{color:'rgba(255,255,255,0.4)'}}}}
+      });
+    }
 
-loadData();
-</script>
+    // ===== TAB & FILTER LOGIC =====
+    function showTab(tabName,el){
+      document.querySelectorAll('.content').forEach(c=>c.classList.remove('active'));
+      document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+      document.getElementById(tabName).classList.add('active');
+      el.classList.add('active');
+    }
 
+    function filterCreativos(mode,el){
+      criativoFilterMode=mode;
+      document.querySelectorAll('.cri-filter-btn').forEach(b=>b.classList.remove('active'));
+      el.classList.add('active');
+      renderCriativos();
+    }
+
+    function setPeriodoCreativos(periodo,el){
+      criativoPeriodo=periodo;
+      document.querySelectorAll('.period-filter-btn').forEach(b=>b.classList.remove('active'));
+      el.classList.add('active');
+      renderCriativos();
+    }
+
+    document.getElementById('cri-sort').addEventListener('change',function(){
+      sortCreativos=this.value;
+      renderCriativos();
+    });
+
+    function destroyCharts(chartIds){
+      for(const id of chartIds){
+        if(charts[id]){
+          charts[id].destroy();
+          delete charts[id];
+        }
+        const canvas=document.getElementById(id);
+        if(canvas){
+          const ctx=canvas.getContext('2d');
+          ctx.clearRect(0,0,canvas.width,canvas.height);
+        }
+      }
+    }
+
+    // ===== INIT =====
+    loadData();
+  </script>
 </body>
 </html>
