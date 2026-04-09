@@ -604,9 +604,9 @@
         if(dataKey<DATA_INICIO) continue; // somente jan/2026 em diante
         if(!diasMap[dataKey]) diasMap[dataKey]={data:dataKey,ymd:dataKey,inv:0,fat:0,compras:0,cliques:0,pv:0,ck:0,imp:0};
         // Compras e Faturamento: somente produto Checklist + UTM Meta
-        if(isChecklist(row)){
+        if(isChecklist(row) && isMetaUTM(row)){
           diasMap[dataKey].compras++;
-          if(isMetaUTM(row)) diasMap[dataKey].fat+=parseNum(row[4])/100;
+          diasMap[dataKey].fat+=parseNum(row[4])/100;
         }
       }
 
@@ -703,12 +703,10 @@
         if(!nome) continue;
         // Só atribui se o criativo estava ativo nos 7 dias antes da compra
         if(!estaAtivoNaData(nome,rawDate2)) continue;
+        if(!isMetaUTM(row)) continue;
         if(!criativosMap[nome]) criativosMap[nome]={nome,inv:0,cliques:0,imp:0,pv:0,ck:0,fat:0,compras:0,lastDate:'',link:''};
-        // Compras e Faturamento: somente Checklist + UTM Meta
-        if(isChecklist(row)){
-          criativosMap[nome].compras++;
-          if(isMetaUTM(row)) criativosMap[nome].fat+=parseNum(row[4])/100;
-        }
+        criativosMap[nome].compras++;
+        criativosMap[nome].fat+=parseNum(row[4])/100;
       }
 
       const today=formatYMD(new Date());
@@ -749,12 +747,10 @@
         // Só atribui se o criativo estava ativo nos 7 dias antes da compra
         if(!estaAtivoNaData(nome,date)) continue;
         const k=nome+'|'+date;
+        if(!isChecklist(row) || !isMetaUTM(row)) continue;
         if(!criWkMap[k]) criWkMap[k]={fat:0,v:0};
-        // Compras e Faturamento: somente Checklist + UTM Meta
-        if(isChecklist(row)){
-          criWkMap[k].v++;
-          if(isMetaUTM(row)) criWkMap[k].fat+=parseNum(row[4])/100;
-        }
+        criWkMap[k].v++;
+        criWkMap[k].fat+=parseNum(row[4])/100;
       }
       const allDatesSet=[...new Set(DIAS.map(d=>d.ymd))].sort();
       CRIATIVOS_PERIODOS=CRIATIVOS.map(c=>{
@@ -798,7 +794,7 @@
       for(let i=1;i<webhookData.length;i++){
         const row=webhookData[i];
         if(!row[2]||row[2].toLowerCase()!=='paid') continue;
-        if(!isChecklist(row)) continue;
+        if(!isChecklist(row) || !isMetaUTM(row)) continue;
         const rawDate=(row[11]||row[8]||'').trim().substring(0,10);
         if(!rawDate||rawDate<DATA_INICIO) continue;
         const criNome=cleanName(row[12]||row[10]);
@@ -815,7 +811,7 @@
         }
         if(!pub||!publicosMap[pub]) continue;
         publicosMap[pub].compras++;
-        if(isChecklist(row) && isMetaUTM(row)) publicosMap[pub].fat+=parseNum(row[4])/100;
+        publicosMap[pub].fat+=parseNum(row[4])/100;
       }
       PUBLICOS=Object.values(publicosMap).map(p=>({
         ...p,
