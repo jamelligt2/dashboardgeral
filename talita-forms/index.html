@@ -11,8 +11,8 @@
   :root {
     --bg-primary: #0d0d0d; --bg-secondary: #1a1a1a; --bg-card: #1e1e1e; --bg-card-hover: #252525;
     --orange: #ff6b00; --orange-light: #ff8533; --green: #00d68f; --red: #ff3d71;
-    --yellow: #ffaa00; --blue: #3366ff; --text-primary: #ffffff; --text-secondary: #a0a0a0;
-    --text-muted: #666666; --border: #2a2a2a;
+    --yellow: #ffaa00; --blue: #3366ff; --text-primary: #ffffff; --text-secondary: #d0d0d0;
+    --text-muted: #999999; --border: #2a2a2a;
   }
   body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; }
   .header { background: linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%); border-bottom: 2px solid var(--orange); padding: 20px 30px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
@@ -292,6 +292,7 @@ const CONFIG = {
 //  GLOBALS
 // ============================================================
 let DAILY = [], CREATIVES = [], ADSETS = [], WEEKLY = [], FORMS_QUAL = {};
+let FORMS_RAW = []; // {date, adName, qualified} for each form entry
 let ALL_DATES = {min: null, max: null};
 let activeCharts = {};
 
@@ -360,6 +361,24 @@ function makeChart(id, config) {
 }
 
 function colorCPL(v) { if (v <= 20) return '#00d68f'; if (v <= 30) return '#ffaa00'; return '#ff3d71'; }
+
+// Returns {total, byAd} of qualified leads filtered by date range
+function getFilteredQual(startDate, endDate) {
+  const result = {total: 0, byAd: {}};
+  FORMS_RAW.forEach(f => {
+    if (!f.qualified) return;
+    // If form has a date, filter by range; if no date, include always
+    if (f.date && startDate && endDate) {
+      if (f.date < startDate || f.date > endDate) return;
+    }
+    result.total++;
+    if (f.adName) {
+      if (!result.byAd[f.adName]) result.byAd[f.adName] = 0;
+      result.byAd[f.adName]++;
+    }
+  });
+  return result;
+}
 
 // ============================================================
 //  FETCH & PARSE
@@ -498,14 +517,27 @@ function processData(capData, formsData) {
   const FCOL = {
     adName: findCol(fSample, ['ad_name', 'Ad Name', 'anuncio']) || 'ad_name',
     fat: findCol(fSample, ['faturamento']) || 'qual_é_o_seu_faturamento_mensal_médio?',
+    date: findCol(fSample, ['created_time', 'Timestamp', 'data', 'Date', 'date', 'created']) || 'created_time',
   };
 
+  FORMS_RAW = [];
   FORMS_QUAL = {};
   let totalQual = 0;
   formsData.forEach(row => {
     const ad = (row[FCOL.adName] || '').trim();
     const fat = parseFaturamento(row[FCOL.fat]);
-    if (fat >= CONFIG.qualThreshold) {
+    const qualified = fat >= CONFIG.qualThreshold;
+    // Parse date from Forms
+    const rawDate = row[FCOL.date] || '';
+    let fDate = null;
+    if (rawDate) {
+      const d = new Date(rawDate);
+      if (!isNaN(d.getTime())) {
+        fDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      }
+    }
+    FORMS_RAW.push({date: fDate, adName: ad, qualified});
+    if (qualified) {
       totalQual++;
       if (ad) {
         if (!FORMS_QUAL[ad]) FORMS_QUAL[ad] = 0;
@@ -599,33 +631,40 @@ function buildWeekly(daily) {
 // ============================================================
 function renderAll(filteredDaily) {
   const data = filteredDaily || DAILY;
-  renderKPIs(data);
-  renderFunnel(data);
+  // Compute date range for qual filtering
+  let qStart = null, qEnd = null;
+  if (data.length > 0) {
+    qStart = data[0].date;
+    qEnd = data[data.length - 1].date;
+  }
+  const qualData = getFilteredQual(qStart, qEnd);
+  renderKPIs(data, qualData);
+  renderFunnel(data, qualData);
   renderCPLChart(data);
   renderSpendLeadsChart(data);
-  renderCreativesTable();
+  renderCreativesTable(qualData);
   renderHookHoldChart();
-  renderCreativesInsights();
-  renderPublicosTable();
-  renderPublicosInsights();
+  renderCreativesInsights(qualData);
+  renderPublicosTable(qualData);
+  renderPublicosInsights(qualData);
   renderWeeklyTable();
-  renderWeeklyCplChart();
+  renderWeeklyCplChart(qualData);
   renderCpcVsCplChart();
-  renderCplQualWeeklyChart();
+  renderCplQualWeeklyChart(qualData);
   renderWeeklyInsights();
-  renderMonthly(data);
+  renderMonthly(data, qualData);
 }
 
 // ============================================================
 //  RENDER: KPIs
 // ============================================================
-function renderKPIs(data) {
+function renderKPIs(data, qualData) {
   const totalSpend = data.reduce((a,d)=>a+d.s,0);
   const totalLeads = data.reduce((a,d)=>a+d.l,0);
   const totalClicks = data.reduce((a,d)=>a+d.c,0);
   const totalImp = data.reduce((a,d)=>a+d.imp,0);
   const days = data.length;
-  const totalQual = Object.values(FORMS_QUAL).reduce((a,v)=>a+v,0);
+  const totalQual = qualData ? qualData.total : Object.values(FORMS_QUAL).reduce((a,v)=>a+v,0);
   const cpl = totalLeads > 0 ? totalSpend / totalLeads : 0;
   const cplQ = totalQual > 0 ? totalSpend / totalQual : 0;
   const qualRate = totalLeads > 0 ? (totalQual/totalLeads)*100 : 0;
@@ -650,12 +689,12 @@ function renderKPIs(data) {
 // ============================================================
 //  RENDER: Funnel
 // ============================================================
-function renderFunnel(data) {
+function renderFunnel(data, qualData) {
   const s = data.reduce((a,d)=>a+d.s,0);
   const imp = data.reduce((a,d)=>a+d.imp,0);
   const clicks = data.reduce((a,d)=>a+d.c,0);
   const leads = data.reduce((a,d)=>a+d.l,0);
-  const qual = Object.values(FORMS_QUAL).reduce((a,v)=>a+v,0);
+  const qual = qualData ? qualData.total : Object.values(FORMS_QUAL).reduce((a,v)=>a+v,0);
   const ctr = imp>0?(clicks/imp)*100:0;
   const conv = clicks>0?(leads/clicks)*100:0;
   const qualRate = leads>0?(qual/leads)*100:0;
@@ -700,9 +739,9 @@ function renderCPLChart(data) {
       labels: data.map(d=>d.dateKey),
       datasets:[
         {label:'CPL (R$)',data:cplF,borderColor:'#ff6b00',backgroundColor:'rgba(255,107,0,0.1)',fill:true,tension:0.3,pointRadius:4,spanGaps:true,pointBackgroundColor:cplF.map(v=>v===null?'transparent':colorCPL(v)),pointBorderColor:'transparent'},
-        {label:'Media CPL ('+fmtMoney(avgCPL)+')',data:Array(data.length).fill(avgCPL),borderColor:'rgba(255,255,255,0.3)',borderDash:[5,5],pointRadius:0,fill:false}
+        {label:'Media CPL ('+fmtMoney(avgCPL)+')',data:Array(data.length).fill(avgCPL),borderColor:'rgba(255,255,255,0.6)',borderDash:[5,5],pointRadius:0,fill:false}
       ]
-    }, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#a0a0a0',font:{size:11}}}},scales:{x:{ticks:{color:'#666',font:{size:9},maxRotation:45},grid:{color:'rgba(255,255,255,0.05)'}},y:{ticks:{color:'#a0a0a0',callback:v=>'R$ '+v},grid:{color:'rgba(255,255,255,0.05)'}}}}
+    }, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#ffffff',font:{size:11}}}},scales:{x:{ticks:{color:'#cccccc',font:{size:11},maxRotation:45},grid:{color:'rgba(255,255,255,0.12)'}},y:{ticks:{color:'#ffffff',callback:v=>'R$ '+v},grid:{color:'rgba(255,255,255,0.12)'}}}}
   });
 }
 
@@ -714,16 +753,17 @@ function renderSpendLeadsChart(data) {
         {label:'Investimento (R$)',data:data.map(d=>d.s),backgroundColor:'rgba(255,107,0,0.4)',borderColor:'#ff6b00',borderWidth:1,yAxisID:'y'},
         {label:'Leads',data:data.map(d=>d.l),type:'line',borderColor:'#00d68f',backgroundColor:'rgba(0,214,143,0.1)',pointRadius:3,pointBackgroundColor:'#00d68f',fill:true,tension:0.3,yAxisID:'y1'}
       ]
-    }, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#a0a0a0',font:{size:11}}}},scales:{x:{ticks:{color:'#666',font:{size:9},maxRotation:45},grid:{color:'rgba(255,255,255,0.05)'}},y:{position:'left',ticks:{color:'#ff6b00',callback:v=>'R$ '+v},grid:{color:'rgba(255,255,255,0.05)'}},y1:{position:'right',ticks:{color:'#00d68f'},grid:{display:false}}}}
+    }, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#ffffff',font:{size:11}}}},scales:{x:{ticks:{color:'#cccccc',font:{size:11},maxRotation:45},grid:{color:'rgba(255,255,255,0.12)'}},y:{position:'left',ticks:{color:'#ff6b00',callback:v=>'R$ '+v},grid:{color:'rgba(255,255,255,0.12)'}},y1:{position:'right',ticks:{color:'#00d68f'},grid:{display:false}}}}
   });
 }
 
 // ============================================================
 //  RENDER: Criativos Table
 // ============================================================
-function renderCreativesTable() {
+function renderCreativesTable(qualData) {
   // Determine last data date for active/inactive
   const lastDataDate = DAILY.length > 0 ? DAILY[DAILY.length - 1].date : new Date();
+  const qualByAd = qualData ? qualData.byAd : FORMS_QUAL;
 
   let html = '<table id="tableCriativos"><thead><tr>';
   const cols = ['#','Ativo','Criativo','Invest.','Leads','Qual.','% Qual.','CPC','CPL','CPL Qual.','CTR','Hook Rate','Hold Rate','Status','Link'];
@@ -736,9 +776,10 @@ function renderCreativesTable() {
   html += '</tr></thead><tbody>';
 
   CREATIVES.forEach((cr, idx) => {
+    const crQual = qualByAd[cr.name] || 0;
     const cpl = cr.l > 0 ? cr.s / cr.l : 0;
-    const cplQ = cr.qual > 0 ? cr.s / cr.qual : 0;
-    const qualPct = cr.l > 0 ? (cr.qual / cr.l) * 100 : 0;
+    const cplQ = crQual > 0 ? cr.s / crQual : 0;
+    const qualPct = cr.l > 0 ? (crQual / cr.l) * 100 : 0;
     const cpc = cr.c > 0 ? cr.s / cr.c : 0;
     const ctr = cr.imp > 0 ? (cr.c / cr.imp) * 100 : 0;
     const hookRate = cr.imp > 0 ? (cr.v3 / cr.imp) * 100 : 0;
@@ -746,13 +787,13 @@ function renderCreativesTable() {
 
     // Active = had spend on the last day of data
     const isActive = cr.lastDate && cr.lastDate.getTime() === lastDataDate.getTime();
-    const opacity = !isActive && cr.qual === 0 && cr.l > 0 ? 'opacity:0.5' : !isActive && cr.l === 0 ? 'opacity:0.35' : '';
+    const opacity = !isActive && crQual === 0 && cr.l > 0 ? 'opacity:0.5' : !isActive && cr.l === 0 ? 'opacity:0.35' : '';
 
     // Status
     let status, statusClass;
-    if (cr.qual > 0 && cplQ <= 80) { status = 'ESCALAR'; statusClass = 'badge-green'; }
-    else if (cr.qual > 0 && cplQ <= 110) { status = 'TESTAR'; statusClass = 'badge-yellow'; }
-    else if (cr.qual > 0) { status = 'MONITORAR'; statusClass = 'badge-yellow'; }
+    if (crQual > 0 && cplQ <= 80) { status = 'ESCALAR'; statusClass = 'badge-green'; }
+    else if (crQual > 0 && cplQ <= 110) { status = 'TESTAR'; statusClass = 'badge-yellow'; }
+    else if (crQual > 0) { status = 'MONITORAR'; statusClass = 'badge-yellow'; }
     else if (cr.l >= 3 && cpl <= 25) { status = 'MONITORAR'; statusClass = 'badge-yellow'; }
     else { status = 'PAUSAR'; statusClass = 'badge-red'; }
 
@@ -769,7 +810,7 @@ function renderCreativesTable() {
       <td style="color:var(--text-primary);font-weight:600">${cr.name}</td>
       <td class="num">${fmtMoney(cr.s)}</td>
       <td class="num">${cr.l}</td>
-      <td class="num" style="color:${cr.qual>0?'var(--green)':'var(--red)'};font-weight:700">${cr.qual}</td>
+      <td class="num" style="color:${crQual>0?'var(--green)':'var(--red)'};font-weight:700">${crQual}</td>
       <td class="num">${cr.l>0?fmtPct(qualPct):'-'}</td>
       <td class="num">${cpc>0?fmtMoney(cpc):'-'}</td>
       <td class="num" style="color:${cpl>0?(cpl<=20?'var(--green)':cpl<=30?'var(--yellow)':'var(--red)'):'inherit'}">${cpl>0?fmtMoney(cpl):'-'}</td>
@@ -803,17 +844,22 @@ function renderHookHoldChart() {
         {label:'Hook Rate (%)',data:vids.map(v=>v.imp>0?(v.v3/v.imp)*100:0),backgroundColor:'rgba(255,107,0,0.7)',borderColor:'#ff6b00',borderWidth:1},
         {label:'Hold Rate (%)',data:vids.map(v=>v.v3>0?(v.v95/v.v3)*100:0),backgroundColor:'rgba(51,102,255,0.7)',borderColor:'#3366ff',borderWidth:1}
       ]
-    }, options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{labels:{color:'#a0a0a0',font:{size:11}}}},scales:{x:{ticks:{color:'#a0a0a0',callback:v=>v+'%'},grid:{color:'rgba(255,255,255,0.05)'}},y:{ticks:{color:'#a0a0a0',font:{size:11,weight:'bold'}},grid:{color:'rgba(255,255,255,0.05)'}}}
+    }, options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{labels:{color:'#ffffff',font:{size:11}}}},scales:{x:{ticks:{color:'#ffffff',callback:v=>v+'%'},grid:{color:'rgba(255,255,255,0.12)'}},y:{ticks:{color:'#ffffff',font:{size:11,weight:'bold'}},grid:{color:'rgba(255,255,255,0.12)'}}}
   }});
 }
 
-function renderCreativesInsights() {
-  const top = CREATIVES.filter(c=>c.qual>0).slice(0,3);
+function renderCreativesInsights(qualData) {
+  const qualByAd = qualData ? qualData.byAd : FORMS_QUAL;
+  const withQual = CREATIVES.filter(c=>(qualByAd[c.name]||0)>0).sort((a,b)=>{
+    const aQ=qualByAd[a.name]||0, bQ=qualByAd[b.name]||0;
+    return (a.s/aQ) - (b.s/bQ);
+  }).slice(0,3);
   let html = '<h3>Insights Criativos - Analise por Lead Qualificado</h3><p>';
-  top.forEach(c => {
-    const cplQ = c.s/c.qual;
+  withQual.forEach(c => {
+    const q = qualByAd[c.name]||0;
+    const cplQ = c.s/q;
     const cpl = c.l>0?c.s/c.l:0;
-    html += `<strong style="color:var(--green)">${c.name}</strong> CPL Qual. ${fmtMoney(cplQ)} com ${c.qual} qualificados de ${c.l} leads (CPL ${cpl>0?fmtMoney(cpl):'-'}).<br>`;
+    html += `<strong style="color:var(--green)">${c.name}</strong> CPL Qual. ${fmtMoney(cplQ)} com ${q} qualificados de ${c.l} leads (CPL ${cpl>0?fmtMoney(cpl):'-'}).<br>`;
   });
   html += '</p>';
   document.getElementById('creativesInsights').innerHTML = html;
@@ -917,17 +963,25 @@ function renderWeeklyTable() {
   initSortable('tableSemanal');
 }
 
-function renderWeeklyCplChart() {
+function renderWeeklyCplChart(qualData) {
+  const totalQual = qualData ? qualData.total : Object.values(FORMS_QUAL).reduce((a,v)=>a+v,0);
+  const totalLeads = WEEKLY.reduce((a,w)=>a+w.l,0);
+  const qRate = totalLeads > 0 ? totalQual / totalLeads : 0;
   const wkL = WEEKLY.map(w=>w.label);
   const wkC = WEEKLY.map(w=>w.cpl);
   const wkR = WEEKLY.map(w=>w.conv);
+  const wkCPLQ = WEEKLY.map(w => {
+    const estQ = Math.round(w.l * qRate);
+    return estQ > 0 ? w.s / estQ : null;
+  });
   makeChart('weeklyCplChart', {
     type:'bar', data:{ labels:wkL,
       datasets:[
         {label:'CPL (R$)',data:wkC,backgroundColor:wkC.map(v=>v<=20?'rgba(0,214,143,0.6)':v<=27?'rgba(255,170,0,0.6)':'rgba(255,61,113,0.6)'),borderColor:wkC.map(v=>colorCPL(v)),borderWidth:1,yAxisID:'y'},
-        {label:'Conv. Rate (%)',data:wkR,type:'line',borderColor:'#ff6b00',pointRadius:5,pointBackgroundColor:'#ff6b00',fill:false,tension:0.3,yAxisID:'y1'}
+        {label:'CMQL (R$)',data:wkCPLQ,type:'line',borderColor:'#00d68f',backgroundColor:'rgba(0,214,143,0.1)',pointRadius:6,pointBackgroundColor:wkCPLQ.map(v=>!v?'transparent':v<=80?'#00d68f':v<=130?'#ffaa00':'#ff3d71'),fill:false,tension:0.3,borderWidth:3,spanGaps:true,yAxisID:'y'},
+        {label:'Conv. Rate (%)',data:wkR,type:'line',borderColor:'#ff6b00',pointRadius:4,pointBackgroundColor:'#ff6b00',fill:false,tension:0.3,borderDash:[5,5],borderWidth:2,yAxisID:'y1'}
       ]
-    }, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#a0a0a0',font:{size:11}}}},scales:{x:{ticks:{color:'#a0a0a0',font:{size:10}},grid:{color:'rgba(255,255,255,0.05)'}},y:{position:'left',ticks:{color:'#ff3d71',callback:v=>'R$ '+v},grid:{color:'rgba(255,255,255,0.05)'}},y1:{position:'right',ticks:{color:'#ff6b00',callback:v=>v+'%'},grid:{display:false}}}}
+    }, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#ffffff',font:{size:11}}}},scales:{x:{ticks:{color:'#ffffff',font:{size:10}},grid:{color:'rgba(255,255,255,0.12)'}},y:{position:'left',ticks:{color:'#ffffff',callback:v=>'R$ '+v},grid:{color:'rgba(255,255,255,0.12)'}},y1:{position:'right',ticks:{color:'#ff6b00',callback:v=>v+'%'},grid:{display:false}}}}
   });
 }
 
@@ -938,12 +992,12 @@ function renderCpcVsCplChart() {
         {label:'CPC (R$)',data:WEEKLY.map(w=>w.cpc),backgroundColor:'rgba(51,102,255,0.6)',borderColor:'#3366ff',borderWidth:1},
         {label:'CPL (R$)',data:WEEKLY.map(w=>w.cpl),backgroundColor:'rgba(255,107,0,0.6)',borderColor:'#ff6b00',borderWidth:1}
       ]
-    }, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#a0a0a0',font:{size:11}}}},scales:{x:{ticks:{color:'#a0a0a0',font:{size:9}},grid:{color:'rgba(255,255,255,0.05)'}},y:{ticks:{color:'#a0a0a0',callback:v=>'R$ '+v},grid:{color:'rgba(255,255,255,0.05)'}}}}
+    }, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#ffffff',font:{size:11}}}},scales:{x:{ticks:{color:'#ffffff',font:{size:11}},grid:{color:'rgba(255,255,255,0.12)'}},y:{ticks:{color:'#ffffff',callback:v=>'R$ '+v},grid:{color:'rgba(255,255,255,0.12)'}}}}
   });
 }
 
-function renderCplQualWeeklyChart() {
-  const totalQual = Object.values(FORMS_QUAL).reduce((a,v)=>a+v,0);
+function renderCplQualWeeklyChart(qualData) {
+  const totalQual = qualData ? qualData.total : Object.values(FORMS_QUAL).reduce((a,v)=>a+v,0);
   const totalLeads = WEEKLY.reduce((a,w)=>a+w.l,0);
   const qRate = totalLeads > 0 ? totalQual / totalLeads : 0;
   const wkCPLQ = WEEKLY.map(w => {
@@ -956,7 +1010,7 @@ function renderCplQualWeeklyChart() {
         {label:'CPL Qualificado (R$)',data:wkCPLQ,borderColor:'#00d68f',backgroundColor:'rgba(0,214,143,0.15)',fill:true,tension:0.3,pointRadius:6,spanGaps:true,pointBackgroundColor:wkCPLQ.map(v=>!v?'transparent':v<=80?'#00d68f':v<=130?'#ffaa00':'#ff3d71')},
         {label:'CPL (R$)',data:WEEKLY.map(w=>w.cpl),borderColor:'rgba(255,107,0,0.5)',borderDash:[5,5],pointRadius:3,fill:false,tension:0.3,pointBackgroundColor:'#ff6b00'}
       ]
-    }, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#a0a0a0',font:{size:11}}}},scales:{x:{ticks:{color:'#a0a0a0',font:{size:9}},grid:{color:'rgba(255,255,255,0.05)'}},y:{ticks:{color:'#a0a0a0',callback:v=>'R$ '+v},grid:{color:'rgba(255,255,255,0.05)'}}}}
+    }, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#ffffff',font:{size:11}}}},scales:{x:{ticks:{color:'#ffffff',font:{size:11}},grid:{color:'rgba(255,255,255,0.12)'}},y:{ticks:{color:'#ffffff',callback:v=>'R$ '+v},grid:{color:'rgba(255,255,255,0.12)'}}}}
   });
 }
 
@@ -975,7 +1029,7 @@ function renderWeeklyInsights() {
 // ============================================================
 //  RENDER: Comparativo Mensal
 // ============================================================
-function renderMonthly(data) {
+function renderMonthly(data, qualData) {
   // Group by month
   const months = {};
   data.forEach(d => {
@@ -995,7 +1049,7 @@ function renderMonthly(data) {
     return;
   }
 
-  const totalQual = Object.values(FORMS_QUAL).reduce((a,v)=>a+v,0);
+  const totalQual = qualData ? qualData.total : Object.values(FORMS_QUAL).reduce((a,v)=>a+v,0);
   const totalLeads = data.reduce((a,d)=>a+d.l,0);
   const qRate = totalLeads > 0 ? totalQual / totalLeads : 0;
 
@@ -1061,16 +1115,20 @@ function renderMonthly(data) {
   }
 
   // Charts
+  const mCplQ = mCalc.map(m => m.cplq > 0 ? m.cplq : null);
   makeChart('monthlySpendChart', {
-    type:'bar', data:{labels:mCalc.map(m=>m.label),datasets:[{label:'Investimento (R$)',data:mCalc.map(m=>m.s),backgroundColor:mCalc.map((_,i)=>bgColors[i%bgColors.length]),borderColor:mCalc.map((_,i)=>colors[i%colors.length]),borderWidth:2,borderRadius:8,barThickness:60}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#a0a0a0',font:{size:13,weight:'bold'}},grid:{display:false}},y:{ticks:{color:'#a0a0a0',callback:v=>'R$ '+v},grid:{color:'rgba(255,255,255,0.05)'}}}}
+    type:'bar', data:{labels:mCalc.map(m=>m.label),datasets:[
+      {label:'Investimento (R$)',data:mCalc.map(m=>m.s),backgroundColor:mCalc.map((_,i)=>bgColors[i%bgColors.length]),borderColor:mCalc.map((_,i)=>colors[i%colors.length]),borderWidth:2,borderRadius:8,barThickness:60,yAxisID:'y'},
+      {label:'CMQL (R$)',data:mCplQ,type:'line',borderColor:'#00d68f',backgroundColor:'rgba(0,214,143,0.1)',pointRadius:8,pointBackgroundColor:mCplQ.map(v=>!v?'transparent':v<=80?'#00d68f':v<=130?'#ffaa00':'#ff3d71'),fill:false,tension:0.3,borderWidth:3,spanGaps:true,yAxisID:'y1'}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#ffffff',font:{size:11}}}},scales:{x:{ticks:{color:'#ffffff',font:{size:13,weight:'bold'}},grid:{display:false}},y:{position:'left',ticks:{color:'#ffffff',callback:v=>'R$ '+v},grid:{color:'rgba(255,255,255,0.12)'}},y1:{position:'right',title:{display:true,text:'CMQL',color:'#00d68f',font:{size:11,weight:'bold'}},ticks:{color:'#00d68f',callback:v=>'R$ '+v},grid:{display:false}}}}
   });
 
   makeChart('monthlyCplLeadsChart', {
     type:'bar', data:{labels:mCalc.map(m=>m.label),datasets:[
       {label:'CPL (R$)',data:mCalc.map(m=>m.cpl),backgroundColor:mCalc.map((_,i)=>bgColors[i%bgColors.length]),borderColor:mCalc.map((_,i)=>colors[i%colors.length]),borderWidth:2,borderRadius:8,barThickness:40,yAxisID:'y'},
       {label:'Leads',data:mCalc.map(m=>m.l),type:'line',borderColor:'#00d68f',pointRadius:8,pointBackgroundColor:'#00d68f',fill:false,borderWidth:3,yAxisID:'y1'}
-    ]}, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#a0a0a0',font:{size:11}}}},scales:{x:{ticks:{color:'#a0a0a0',font:{size:13,weight:'bold'}},grid:{display:false}},y:{position:'left',ticks:{color:'#ff6b00',callback:v=>'R$ '+v},grid:{color:'rgba(255,255,255,0.05)'}},y1:{position:'right',ticks:{color:'#00d68f'},grid:{display:false}}}}
+    ]}, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#ffffff',font:{size:11}}}},scales:{x:{ticks:{color:'#ffffff',font:{size:13,weight:'bold'}},grid:{display:false}},y:{position:'left',ticks:{color:'#ff6b00',callback:v=>'R$ '+v},grid:{color:'rgba(255,255,255,0.12)'}},y1:{position:'right',ticks:{color:'#00d68f'},grid:{display:false}}}}
   });
 
   // Insights
