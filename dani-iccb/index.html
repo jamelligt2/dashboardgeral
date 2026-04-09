@@ -264,8 +264,8 @@ const GERENCIADOR_SHEET = 'Campanhas';
 const WEBHOOK_SHEET = 'Webhook';
 
 let DIAS = [], SEMANAL = [], MENSAL = [], CRIATIVOS = [], PUBLICOS = [];
-let DIAS_GERAL = []; // Todas as vendas (tráfego + orgânico)
-let VENDAS_POR_SOURCE = {}; // { source: { count, total } }
+let DIAS_GERAL = [];
+let VENDAS_POR_SOURCE = {};
 let dateFrom = null, dateTo = null;
 let currentCreativeFilter = 'todos', currentPublicoFilter = 'todos';
 let charts = {};
@@ -296,10 +296,8 @@ function statusBadge(inv, fat) {
 function parseCSV(csv) {
   const lines = csv.trim().split('\n');
   if (lines.length === 0) return [];
-
   const header = parseCSVLine(lines[0]);
   const rows = [];
-
   for (let i = 1; i < lines.length; i++) {
     if (!lines[i].trim()) continue;
     const cells = parseCSVLine(lines[i]);
@@ -309,7 +307,6 @@ function parseCSV(csv) {
     }
     rows.push(row);
   }
-
   return rows;
 }
 
@@ -317,16 +314,11 @@ function parseCSVLine(line) {
   const cells = [];
   let current = '';
   let inQuotes = false;
-
   for (let i = 0; i < line.length; i++) {
     const char = line[i];
     if (char === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        current += '"';
-        i++;
-      } else {
-        inQuotes = !inQuotes;
-      }
+      if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+      else { inQuotes = !inQuotes; }
     } else if (char === ',' && !inQuotes) {
       cells.push(current.trim());
       current = '';
@@ -335,7 +327,6 @@ function parseCSVLine(line) {
     }
   }
   cells.push(current.trim());
-
   return cells;
 }
 
@@ -344,14 +335,6 @@ async function fetchSheetCSV(sheetName) {
   const resp = await fetch(url);
   if (!resp.ok) throw new Error(`Erro ao carregar "${sheetName}": ${resp.status}`);
   return await resp.text();
-}
-
-function findCol(headers, ...keywords) {
-  for (const kw of keywords) {
-    const idx = headers.findIndex(h => h.toLowerCase().includes(kw.toLowerCase()));
-    if (idx !== -1) return idx;
-  }
-  return -1;
 }
 
 function parseNum(v) {
@@ -369,42 +352,23 @@ function parseNum(v) {
 function parseDate(v) {
   if (!v || v === '') return null;
   v = String(v).trim();
-
-  // DD/MM/YYYY
   if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(v)) {
     const [d, m, y] = v.split('/');
     return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
   }
-
-  // YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}/.test(v)) {
-    return v.substring(0, 10);
-  }
-
+  if (/^\d{4}-\d{2}-\d{2}/.test(v)) return v.substring(0, 10);
   return null;
 }
 
-// Webhook: formato YYYYMMDD (ex: "20260317") → "2026-03-17"
 function parseDateWebhook(v) {
   if (!v || v === '') return null;
   v = String(v).trim();
-
-  // YYYYMMDD (8 dígitos sem separador)
-  if (/^\d{8}$/.test(v)) {
-    return `${v.slice(0,4)}-${v.slice(4,6)}-${v.slice(6,8)}`;
-  }
-
-  // YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}/.test(v)) {
-    return v.substring(0, 10);
-  }
-
-  // DD/MM/YYYY
+  if (/^\d{8}$/.test(v)) return `${v.slice(0,4)}-${v.slice(4,6)}-${v.slice(6,8)}`;
+  if (/^\d{4}-\d{2}-\d{2}/.test(v)) return v.substring(0, 10);
   if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(v)) {
     const [d, m, y] = v.split('/');
     return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
   }
-
   return null;
 }
 
@@ -427,16 +391,14 @@ async function loadData() {
 
     document.getElementById('loading-overlay').style.display = 'none';
 
-    // Timestamp atualização
     const now = new Date();
     document.getElementById('updated-at').textContent = `Atualizado: ${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
 
     initializeDateInputs();
     renderAll();
 
-    // Aviso se não encontrou vendas
     if (totalCompras === 0) {
-      console.warn('[AVISO] Nenhuma compra encontrada no Webhook! Verifique o console para detalhes de debug.');
+      console.warn('[AVISO] Nenhuma compra encontrada no Webhook!');
     }
   } catch (e) {
     console.error(e);
@@ -446,12 +408,6 @@ async function loadData() {
 }
 
 function processData(gerenciadorRows, webhookRows) {
-  // ===== CAMPANHAS (Gerenciador) =====
-  // Colunas exatas da planilha:
-  // "Date", "Action Link Clicks", "Action Omni Initiated Checkout", "Campaign Name",
-  // " Adset Name ", "Ad Name", "Impressions", "Spend (Cost, Amount Spent)",
-  // " Instagram Permalink URL ", "Action Landing Page View"
-
   const diaMap = {};
   const criativoMap = {};
   const publicoMap = {};
@@ -469,20 +425,14 @@ function processData(gerenciadorRows, webhookRows) {
     const ck = parseNum(row['Action Omni Initiated Checkout']);
     const link = (row[' Instagram Permalink URL '] || row['Instagram Permalink URL'] || '').trim();
 
-    // DIAS
-    if (!diaMap[date]) {
-      diaMap[date] = { inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: 0, compras: 0 };
-    }
+    if (!diaMap[date]) diaMap[date] = { inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: 0, compras: 0 };
     diaMap[date].inv += spend;
     diaMap[date].impr += impr;
     diaMap[date].cliques += clicks;
     diaMap[date].pv += pv;
     diaMap[date].ck += ck;
 
-    // CRIATIVOS
-    if (!criativoMap[adName]) {
-      criativoMap[adName] = { inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: 0, link: '', dates: new Set() };
-    }
+    if (!criativoMap[adName]) criativoMap[adName] = { inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: 0, link: '', dates: new Set() };
     criativoMap[adName].inv += spend;
     criativoMap[adName].impr += impr;
     criativoMap[adName].cliques += clicks;
@@ -491,10 +441,7 @@ function processData(gerenciadorRows, webhookRows) {
     if (link) criativoMap[adName].link = link;
     criativoMap[adName].dates.add(date);
 
-    // PUBLICOS
-    if (!publicoMap[adset]) {
-      publicoMap[adset] = { inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: 0, dates: new Set() };
-    }
+    if (!publicoMap[adset]) publicoMap[adset] = { inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: 0, dates: new Set() };
     publicoMap[adset].inv += spend;
     publicoMap[adset].impr += impr;
     publicoMap[adset].cliques += clicks;
@@ -504,16 +451,10 @@ function processData(gerenciadorRows, webhookRows) {
   }
 
   // ===== WEBHOOK =====
-  // Colunas exatas: trans_status (3=pago), tracker_utm_source, trans_value (em REAIS),
-  // trans_paiddate (formato YYYYMMDD)
-
-  // Map para TODAS as vendas (Visão Geral)
   const diaMapGeral = {};
-  // Copiar dados do gerenciador como base
   for (const [date, data] of Object.entries(diaMap)) {
     diaMapGeral[date] = { ...data, fatGeral: 0, comprasGeral: 0 };
   }
-
   VENDAS_POR_SOURCE = {};
 
   for (const row of webhookRows) {
@@ -529,43 +470,28 @@ function processData(gerenciadorRows, webhookRows) {
     const sourceLabel = sourceRaw || 'Orgânico';
     const sourceNorm = sourceRaw.toLowerCase().replace(/[\s_\-]/g, '');
 
-    // --- Vendas por source (para gráfico) ---
     if (!VENDAS_POR_SOURCE[sourceLabel]) VENDAS_POR_SOURCE[sourceLabel] = { count: 0, total: 0 };
     VENDAS_POR_SOURCE[sourceLabel].count++;
     VENDAS_POR_SOURCE[sourceLabel].total += value;
 
-    // --- DIAS_GERAL: TODAS as vendas ---
     if (!diaMapGeral[date]) {
       diaMapGeral[date] = { inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: 0, compras: 0, fatGeral: 0, comprasGeral: 0 };
     }
     diaMapGeral[date].fatGeral += value;
     diaMapGeral[date].comprasGeral += 1;
 
-    // --- DIAS (só Meta Ads): filtrar por source ---
     const isMeta = sourceNorm && (sourceNorm.includes('meta') || sourceNorm.includes('facebook') || sourceNorm.includes('fb'));
     if (isMeta) {
-      if (diaMap[date]) {
-        diaMap[date].fat += value;
-        diaMap[date].compras += 1;
-      } else {
-        diaMap[date] = { inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: value, compras: 1 };
-      }
+      if (diaMap[date]) { diaMap[date].fat += value; diaMap[date].compras += 1; }
+      else { diaMap[date] = { inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: value, compras: 1 }; }
     }
   }
 
-  // Convert DIAS (Meta Ads)
   DIAS = Object.entries(diaMap).map(([date, data]) => ({ date, ...data })).sort((a, b) => a.date.localeCompare(b.date));
 
-  // Convert DIAS_GERAL (todas as vendas)
   DIAS_GERAL = Object.entries(diaMapGeral).map(([date, data]) => ({
-    date,
-    inv: data.inv || 0,
-    impr: data.impr || 0,
-    cliques: data.cliques || 0,
-    pv: data.pv || 0,
-    ck: data.ck || 0,
-    fat: data.fatGeral || 0,
-    compras: data.comprasGeral || 0,
+    date, inv: data.inv || 0, impr: data.impr || 0, cliques: data.cliques || 0,
+    pv: data.pv || 0, ck: data.ck || 0, fat: data.fatGeral || 0, compras: data.comprasGeral || 0,
   })).sort((a, b) => a.date.localeCompare(b.date));
 
   CRIATIVOS = Object.entries(criativoMap).map(([nome, data]) => ({ nome, ...data, dates: Array.from(data.dates) }));
@@ -584,33 +510,24 @@ function fixFatFromDias() {
   const totalVendas = DIAS.reduce((sum, d) => sum + d.fat, 0);
   const totalCompras = DIAS.reduce((sum, d) => sum + (d.compras || 0), 0);
 
-  // Distribute fat + compras to CRIATIVOS (proportional to cliques)
   const totalCliques = CRIATIVOS.reduce((sum, c) => sum + c.cliques, 0);
   for (const c of CRIATIVOS) {
     if (totalCliques > 0) {
       const ratio = c.cliques / totalCliques;
       c.fat = totalVendas * ratio;
       c.compras = Math.round(totalCompras * ratio);
-    } else {
-      c.fat = 0;
-      c.compras = 0;
-    }
+    } else { c.fat = 0; c.compras = 0; }
   }
 
-  // Distribute fat + compras to PUBLICOS (proportional to cliques)
   const totalCliquesP = PUBLICOS.reduce((sum, p) => sum + p.cliques, 0);
   for (const p of PUBLICOS) {
     if (totalCliquesP > 0) {
       const ratio = p.cliques / totalCliquesP;
       p.fat = totalVendas * ratio;
       p.compras = Math.round(totalCompras * ratio);
-    } else {
-      p.fat = 0;
-      p.compras = 0;
-    }
+    } else { p.fat = 0; p.compras = 0; }
   }
 
-  // Mark "ativo" - had spend in last 7 days
   const today = new Date();
   const d7ago = new Date(today);
   d7ago.setDate(d7ago.getDate() - 7);
@@ -638,16 +555,12 @@ function fixFatFromDias() {
 
 function buildWeekly() {
   const weekMap = {};
-
   for (const dia of DIAS) {
     const date = new Date(dia.date + 'T00:00:00Z');
     const weekStart = new Date(date);
     weekStart.setDate(weekStart.getDate() - weekStart.getDay());
     const weekKey = weekStart.toISOString().split('T')[0];
-
-    if (!weekMap[weekKey]) {
-      weekMap[weekKey] = { week: weekKey, inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: 0, compras: 0 };
-    }
+    if (!weekMap[weekKey]) weekMap[weekKey] = { week: weekKey, inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: 0, compras: 0 };
     weekMap[weekKey].inv += dia.inv;
     weekMap[weekKey].impr += dia.impr;
     weekMap[weekKey].cliques += dia.cliques;
@@ -656,20 +569,15 @@ function buildWeekly() {
     weekMap[weekKey].fat += dia.fat;
     weekMap[weekKey].compras += (dia.compras || 0);
   }
-
   SEMANAL = Object.values(weekMap).sort((a, b) => a.week.localeCompare(b.week));
 }
 
 function buildMonthly() {
   const monthMap = {};
-
   for (const dia of DIAS) {
     const date = new Date(dia.date + 'T00:00:00Z');
     const monthKey = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
-
-    if (!monthMap[monthKey]) {
-      monthMap[monthKey] = { month: monthKey, inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: 0, compras: 0 };
-    }
+    if (!monthMap[monthKey]) monthMap[monthKey] = { month: monthKey, inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: 0, compras: 0 };
     monthMap[monthKey].inv += dia.inv;
     monthMap[monthKey].impr += dia.impr;
     monthMap[monthKey].cliques += dia.cliques;
@@ -678,19 +586,15 @@ function buildMonthly() {
     monthMap[monthKey].fat += dia.fat;
     monthMap[monthKey].compras += (dia.compras || 0);
   }
-
   MENSAL = Object.values(monthMap).sort((a, b) => a.month.localeCompare(b.month));
 }
 
 function initializeDateInputs() {
   if (DIAS.length === 0) return;
-
   const minDate = DIAS[0].date;
   const maxDate = DIAS[DIAS.length - 1].date;
-
   document.getElementById('dateFrom').value = minDate;
   document.getElementById('dateTo').value = maxDate;
-
   dateFrom = minDate;
   dateTo = maxDate;
   updateRangeInfo();
@@ -699,9 +603,7 @@ function initializeDateInputs() {
 function onDateChange() {
   dateFrom = document.getElementById('dateFrom').value;
   dateTo = document.getElementById('dateTo').value;
-
   document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-
   updateRangeInfo();
   renderAll();
 }
@@ -709,35 +611,26 @@ function onDateChange() {
 function setPreset(days, btn) {
   const today = new Date();
   const from = new Date();
-
   if (days === 'all') {
-    if (DIAS.length > 0) {
-      dateFrom = DIAS[0].date;
-      dateTo = DIAS[DIAS.length - 1].date;
-    }
+    if (DIAS.length > 0) { dateFrom = DIAS[0].date; dateTo = DIAS[DIAS.length - 1].date; }
   } else {
     from.setDate(today.getDate() - days);
     dateFrom = from.toISOString().split('T')[0];
     dateTo = today.toISOString().split('T')[0];
   }
-
   document.getElementById('dateFrom').value = dateFrom;
   document.getElementById('dateTo').value = dateTo;
-
   document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-
   updateRangeInfo();
   renderAll();
 }
 
 function updateRangeInfo() {
   if (!dateFrom || !dateTo) return;
-
   const from = new Date(dateFrom + 'T00:00:00Z');
   const to = new Date(dateTo + 'T00:00:00Z');
   const days = Math.ceil((to - from) / (1000 * 60 * 60 * 24)) + 1;
-
   document.getElementById('range-info').textContent = `${days} dias`;
 }
 
@@ -746,9 +639,13 @@ function filterData() {
   return DIAS.filter(d => d.date >= dateFrom && d.date <= dateTo);
 }
 
+function filterDataGeral() {
+  if (!dateFrom || !dateTo) return [];
+  return DIAS_GERAL.filter(d => d.date >= dateFrom && d.date <= dateTo);
+}
+
 function aggregateData(data) {
   if (data.length === 0) return { inv: 0, impr: 0, cliques: 0, pv: 0, ck: 0, fat: 0, compras: 0 };
-
   return {
     inv: data.reduce((s, d) => s + d.inv, 0),
     impr: data.reduce((s, d) => s + d.impr, 0),
@@ -760,11 +657,6 @@ function aggregateData(data) {
   };
 }
 
-function filterDataGeral() {
-  if (!dateFrom || !dateTo) return [];
-  return DIAS_GERAL.filter(d => d.date >= dateFrom && d.date <= dateTo);
-}
-
 function renderAll() {
   renderVisaoGeral();
   renderVisao();
@@ -774,6 +666,7 @@ function renderAll() {
   renderMensal();
 }
 
+// ========== VISÃO GERAL (TODAS AS VENDAS) ==========
 function renderVisaoGeral() {
   const filtered = filterDataGeral();
   const agg = aggregateData(filtered);
@@ -787,10 +680,9 @@ function renderVisaoGeral() {
   const connectRate = agg.cliques > 0 ? (agg.pv / agg.cliques) * 100 : 0;
   const taxaCheckout = agg.pv > 0 ? (agg.ck / agg.pv) * 100 : 0;
   const taxaCompra = agg.pv > 0 ? (agg.compras / agg.pv) * 100 : 0;
-  const cpcGeral = agg.cliques > 0 ? agg.inv / agg.cliques : 0;
+  const cpcVal = agg.cliques > 0 ? agg.inv / agg.cliques : 0;
 
-  // KPIs
-  const kpiHtml = `
+  document.getElementById('kpi-geral').innerHTML = `
     <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${brl(agg.inv)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Faturamento Total</div><div class="kpi-value green">${brl(agg.fat)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Retorno Líquido</div><div class="kpi-value ${retorno >= 0 ? 'green' : 'red'}">${brl(retorno)}</div></div>
@@ -800,10 +692,8 @@ function renderVisaoGeral() {
     <div class="kpi-card"><div class="kpi-label">CAC</div><div class="kpi-value orange">${brl(cac)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value orange">${brl(ticket)}</div></div>
   `;
-  document.getElementById('kpi-geral').innerHTML = kpiHtml;
 
-  // Funil
-  const funilHtml = `
+  document.getElementById('funil-geral').innerHTML = `
     <div class="funil-bar-wrap">
       <div class="funil-label"><span>Cliques</span><span>${br(agg.cliques,0)}</span></div>
       <div class="funil-bar-bg"><div class="funil-bar-fill" style="width:100%"></div></div>
@@ -821,42 +711,28 @@ function renderVisaoGeral() {
       <div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${agg.cliques > 0 ? (agg.compras / agg.cliques) * 100 : 0}%"></div></div>
     </div>
   `;
-  document.getElementById('funil-geral').innerHTML = funilHtml;
 
-  // Taxas
-  const taxaHtml = `
+  document.getElementById('taxa-geral').innerHTML = `
     <div class="taxa-item"><span>Connect Rate</span><span class="taxa-val">${pct(connectRate)}</span></div>
     <div class="taxa-item"><span>Taxa Checkout</span><span class="taxa-val">${pct(taxaCheckout)}</span></div>
     <div class="taxa-item"><span>Taxa Compra</span><span class="taxa-val">${pct(taxaCompra)}</span></div>
     <div class="taxa-item"><span>CTR</span><span class="taxa-val">${pct(ctr)}</span></div>
-    <div class="taxa-item"><span>CPC</span><span class="taxa-val">${brl(cpcGeral)}</span></div>
+    <div class="taxa-item"><span>CPC</span><span class="taxa-val">${brl(cpcVal)}</span></div>
   `;
-  document.getElementById('taxa-geral').innerHTML = taxaHtml;
 
   // UTM Source Charts
   const sourceLabels = Object.keys(VENDAS_POR_SOURCE);
   const sourceColors = ['#ff6b2b', '#ff9a3c', '#ffb347', '#ffd700', '#f0e68c', '#daa520'];
-  const sourceBgColors = sourceLabels.map((_, i) => sourceColors[i % sourceColors.length]);
+  const sourceBg = sourceLabels.map((_, i) => sourceColors[i % sourceColors.length]);
 
   if (charts['utm-vendas']) charts['utm-vendas'].destroy();
   charts['utm-vendas'] = new Chart(document.getElementById('chart-utm-vendas'), {
     type: 'bar',
     data: {
       labels: sourceLabels,
-      datasets: [{
-        label: 'Vendas',
-        data: sourceLabels.map(s => VENDAS_POR_SOURCE[s].count),
-        backgroundColor: sourceBgColors.map(c => c + 'dd'),
-        borderColor: sourceBgColors,
-        borderWidth: 1,
-      }],
+      datasets: [{ label: 'Vendas', data: sourceLabels.map(s => VENDAS_POR_SOURCE[s].count), backgroundColor: sourceBg.map(c => c + 'dd'), borderColor: sourceBg, borderWidth: 1 }],
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
-    },
+    options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } },
   });
 
   if (charts['utm-fat']) charts['utm-fat'].destroy();
@@ -864,27 +740,13 @@ function renderVisaoGeral() {
     type: 'bar',
     data: {
       labels: sourceLabels,
-      datasets: [{
-        label: 'Faturamento (R$)',
-        data: sourceLabels.map(s => VENDAS_POR_SOURCE[s].total),
-        backgroundColor: sourceBgColors.map(c => c + 'dd'),
-        borderColor: sourceBgColors,
-        borderWidth: 1,
-      }],
+      datasets: [{ label: 'Faturamento (R$)', data: sourceLabels.map(s => VENDAS_POR_SOURCE[s].total), backgroundColor: sourceBg.map(c => c + 'dd'), borderColor: sourceBg, borderWidth: 1 }],
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true } },
-    },
+    options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
   });
 
   // Evolution Charts
-  const chartLabels = filtered.map(d => {
-    const date = new Date(d.date + 'T00:00:00Z');
-    return `${date.getUTCDate()}/${date.getUTCMonth() + 1}`;
-  });
+  const chartLabels = filtered.map(d => { const dt = new Date(d.date + 'T00:00:00Z'); return `${dt.getUTCDate()}/${dt.getUTCMonth() + 1}`; });
 
   if (charts['geral-inv-fat']) charts['geral-inv-fat'].destroy();
   charts['geral-inv-fat'] = new Chart(document.getElementById('chart-geral-inv-fat'), {
@@ -892,32 +754,11 @@ function renderVisaoGeral() {
     data: {
       labels: chartLabels,
       datasets: [
-        {
-          label: 'Investimento',
-          data: filtered.map(d => d.inv),
-          borderColor: 'rgba(255,107,43,0.95)',
-          backgroundColor: 'rgba(255,107,43,0.13)',
-          tension: 0.3,
-          fill: true,
-          borderWidth: 2,
-        },
-        {
-          label: 'Faturamento Total',
-          data: filtered.map(d => d.fat),
-          borderColor: 'rgba(46,204,113,0.95)',
-          backgroundColor: 'rgba(46,204,113,0.13)',
-          tension: 0.3,
-          fill: true,
-          borderWidth: 2,
-        },
+        { label: 'Investimento', data: filtered.map(d => d.inv), borderColor: 'rgba(255,107,43,0.95)', backgroundColor: 'rgba(255,107,43,0.13)', tension: 0.3, fill: true, borderWidth: 2 },
+        { label: 'Faturamento Total', data: filtered.map(d => d.fat), borderColor: 'rgba(46,204,113,0.95)', backgroundColor: 'rgba(46,204,113,0.13)', tension: 0.3, fill: true, borderWidth: 2 },
       ],
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      plugins: { legend: { display: true, position: 'top' } },
-      scales: { y: { beginAtZero: true } },
-    },
+    options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: true, position: 'top' } }, scales: { y: { beginAtZero: true } } },
   });
 
   if (charts['geral-roas']) charts['geral-roas'].destroy();
@@ -925,60 +766,31 @@ function renderVisaoGeral() {
     type: 'bar',
     data: {
       labels: chartLabels,
-      datasets: [{
-        label: 'ROAS',
-        data: filtered.map(d => d.inv > 0 ? d.fat / d.inv : 0),
-        backgroundColor: 'rgba(255,107,43,0.85)',
-        borderColor: 'rgba(255,107,43,0.95)',
-        borderWidth: 1,
-      }],
+      datasets: [{ label: 'ROAS', data: filtered.map(d => d.inv > 0 ? d.fat / d.inv : 0), backgroundColor: 'rgba(255,107,43,0.85)', borderColor: 'rgba(255,107,43,0.95)', borderWidth: 1 }],
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true } },
-    },
+    options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
   });
 
   // Day-by-day table
   let tblHtml = '<thead><tr><th>Data</th><th>Investimento</th><th>Impressões</th><th>Cliques</th><th>CTR</th><th>Visualizações</th><th>Checkouts</th><th>Compras</th><th>Faturamento</th><th>ROAS</th><th>CPC</th><th>CPM</th><th>Status</th></tr></thead><tbody>';
-
   for (const dia of filtered) {
-    const ctr = dia.impr > 0 ? (dia.cliques / dia.impr) * 100 : 0;
-    const roas = dia.inv > 0 ? dia.fat / dia.inv : 0;
-    const cpm = dia.impr > 0 ? (dia.inv / dia.impr) * 1000 : 0;
-    const cpc = dia.cliques > 0 ? dia.inv / dia.cliques : 0;
-
-    const date = new Date(dia.date + 'T00:00:00Z');
-    const dateStr = `${String(date.getUTCDate()).padStart(2, '0')}/${String(date.getUTCMonth() + 1).padStart(2, '0')}/${date.getUTCFullYear()}`;
-
-    tblHtml += `<tr>
-      <td>${dateStr}</td>
-      <td>${brl(dia.inv)}</td>
-      <td>${dia.impr}</td>
-      <td>${dia.cliques}</td>
-      <td>${pct(ctr)}</td>
-      <td>${dia.pv}</td>
-      <td>${dia.ck}</td>
-      <td>${dia.compras || 0}</td>
-      <td>${brl(dia.fat)}</td>
-      <td>${br(roas, 2)}</td>
-      <td>${brl(cpc)}</td>
-      <td>${brl(cpm)}</td>
-      <td>${statusBadge(dia.inv, dia.fat)}</td>
-    </tr>`;
+    const dCtr = dia.impr > 0 ? (dia.cliques / dia.impr) * 100 : 0;
+    const dRoas = dia.inv > 0 ? dia.fat / dia.inv : 0;
+    const dCpm = dia.impr > 0 ? (dia.inv / dia.impr) * 1000 : 0;
+    const dCpc = dia.cliques > 0 ? dia.inv / dia.cliques : 0;
+    const dt = new Date(dia.date + 'T00:00:00Z');
+    const dateStr = `${String(dt.getUTCDate()).padStart(2,'0')}/${String(dt.getUTCMonth()+1).padStart(2,'0')}/${dt.getUTCFullYear()}`;
+    tblHtml += `<tr><td>${dateStr}</td><td>${brl(dia.inv)}</td><td>${dia.impr}</td><td>${dia.cliques}</td><td>${pct(dCtr)}</td><td>${dia.pv}</td><td>${dia.ck}</td><td>${dia.compras||0}</td><td>${brl(dia.fat)}</td><td>${br(dRoas,2)}</td><td>${brl(dCpc)}</td><td>${brl(dCpm)}</td><td>${statusBadge(dia.inv,dia.fat)}</td></tr>`;
   }
-
   tblHtml += '</tbody>';
   document.getElementById('tbl-geral').innerHTML = tblHtml;
 }
 
+// ========== VISÃO TRÁFEGO (SOMENTE META ADS) ==========
 function renderVisao() {
   const filtered = filterData();
   const agg = aggregateData(filtered);
 
-  // Métricas calculadas
   const retorno = agg.fat - agg.inv;
   const roas = agg.inv > 0 ? agg.fat / agg.inv : 0;
   const cpm = agg.impr > 0 ? (agg.inv / agg.impr) * 1000 : 0;
@@ -988,10 +800,9 @@ function renderVisao() {
   const connectRate = agg.cliques > 0 ? (agg.pv / agg.cliques) * 100 : 0;
   const taxaCheckout = agg.pv > 0 ? (agg.ck / agg.pv) * 100 : 0;
   const taxaCompra = agg.pv > 0 ? (agg.compras / agg.pv) * 100 : 0;
-  const cpcGeral = agg.cliques > 0 ? agg.inv / agg.cliques : 0;
+  const cpcVal = agg.cliques > 0 ? agg.inv / agg.cliques : 0;
 
-  // KPIs: Investimento | Faturamento(verde) | Retorno Líquido(verde) | ROAS | Compras | CPM | CAC | Ticket Médio
-  const kpiHtml = `
+  document.getElementById('kpi-visao').innerHTML = `
     <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${brl(agg.inv)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Faturamento</div><div class="kpi-value green">${brl(agg.fat)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Retorno Líquido</div><div class="kpi-value ${retorno >= 0 ? 'green' : 'red'}">${brl(retorno)}</div></div>
@@ -1001,10 +812,8 @@ function renderVisao() {
     <div class="kpi-card"><div class="kpi-label">CAC</div><div class="kpi-value orange">${brl(cac)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value orange">${brl(ticket)}</div></div>
   `;
-  document.getElementById('kpi-visao').innerHTML = kpiHtml;
 
-  // Funil: 4 barras empilhadas na coluna esquerda (Cliques → Pageviews → Checkouts → Compras)
-  const funilHtml = `
+  document.getElementById('funil-visao').innerHTML = `
     <div class="funil-bar-wrap">
       <div class="funil-label"><span>Cliques</span><span>${br(agg.cliques,0)}</span></div>
       <div class="funil-bar-bg"><div class="funil-bar-fill" style="width:100%"></div></div>
@@ -1022,123 +831,60 @@ function renderVisao() {
       <div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${agg.cliques > 0 ? (agg.compras / agg.cliques) * 100 : 0}%"></div></div>
     </div>
   `;
-  document.getElementById('funil-visao').innerHTML = funilHtml;
 
-  // Taxas: coluna direita
-  const taxaHtml = `
+  document.getElementById('taxa-visao').innerHTML = `
     <div class="taxa-item"><span>Connect Rate</span><span class="taxa-val">${pct(connectRate)}</span></div>
     <div class="taxa-item"><span>Taxa Checkout</span><span class="taxa-val">${pct(taxaCheckout)}</span></div>
     <div class="taxa-item"><span>Taxa Compra</span><span class="taxa-val">${pct(taxaCompra)}</span></div>
     <div class="taxa-item"><span>CTR</span><span class="taxa-val">${pct(ctr)}</span></div>
-    <div class="taxa-item"><span>CPC</span><span class="taxa-val">${brl(cpcGeral)}</span></div>
+    <div class="taxa-item"><span>CPC</span><span class="taxa-val">${brl(cpcVal)}</span></div>
   `;
-  document.getElementById('taxa-visao').innerHTML = taxaHtml;
 
-  const daysForChart = filtered;
-  const chartLabels = daysForChart.map(d => {
-    const date = new Date(d.date + 'T00:00:00Z');
-    return `${date.getUTCDate()}/${date.getUTCMonth() + 1}`;
-  });
+  const chartLabels = filtered.map(d => { const dt = new Date(d.date + 'T00:00:00Z'); return `${dt.getUTCDate()}/${dt.getUTCMonth() + 1}`; });
 
-  // Chart: Investimento vs Faturamento
   if (charts['inv-fat']) charts['inv-fat'].destroy();
   charts['inv-fat'] = new Chart(document.getElementById('chart-inv-fat'), {
     type: 'line',
     data: {
       labels: chartLabels,
       datasets: [
-        {
-          label: 'Investimento',
-          data: daysForChart.map(d => d.inv),
-          borderColor: 'rgba(255,107,43,0.95)',
-          backgroundColor: 'rgba(255,107,43,0.13)',
-          tension: 0.3,
-          fill: true,
-          borderWidth: 2,
-        },
-        {
-          label: 'Faturamento',
-          data: daysForChart.map(d => d.fat),
-          borderColor: 'rgba(255,183,55,0.95)',
-          backgroundColor: 'rgba(255,183,55,0.13)',
-          tension: 0.3,
-          fill: true,
-          borderWidth: 2,
-        },
+        { label: 'Investimento', data: filtered.map(d => d.inv), borderColor: 'rgba(255,107,43,0.95)', backgroundColor: 'rgba(255,107,43,0.13)', tension: 0.3, fill: true, borderWidth: 2 },
+        { label: 'Faturamento', data: filtered.map(d => d.fat), borderColor: 'rgba(255,183,55,0.95)', backgroundColor: 'rgba(255,183,55,0.13)', tension: 0.3, fill: true, borderWidth: 2 },
       ],
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      plugins: { legend: { display: true, position: 'top' } },
-      scales: { y: { beginAtZero: true } },
-    },
+    options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: true, position: 'top' } }, scales: { y: { beginAtZero: true } } },
   });
 
-  // Chart: ROAS
   if (charts['roas']) charts['roas'].destroy();
   charts['roas'] = new Chart(document.getElementById('chart-roas'), {
     type: 'bar',
     data: {
       labels: chartLabels,
-      datasets: [{
-        label: 'ROAS',
-        data: daysForChart.map(d => d.inv > 0 ? d.fat / d.inv : 0),
-        backgroundColor: 'rgba(255,107,43,0.85)',
-        borderColor: 'rgba(255,107,43,0.95)',
-        borderWidth: 1,
-      }],
+      datasets: [{ label: 'ROAS', data: filtered.map(d => d.inv > 0 ? d.fat / d.inv : 0), backgroundColor: 'rgba(255,107,43,0.85)', borderColor: 'rgba(255,107,43,0.95)', borderWidth: 1 }],
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true } },
-    },
+    options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
   });
 
-  // Table
   let tblHtml = '<thead><tr><th>Data</th><th>Investimento</th><th>Impressões</th><th>Cliques</th><th>CTR</th><th>Visualizações</th><th>Checkouts</th><th>Compras</th><th>Faturamento</th><th>ROAS</th><th>CPC</th><th>CPM</th><th>Status</th></tr></thead><tbody>';
-
   for (const dia of filtered) {
-    const ctr = dia.impr > 0 ? (dia.cliques / dia.impr) * 100 : 0;
-    const roas = dia.inv > 0 ? dia.fat / dia.inv : 0;
-    const cpc = dia.cliques > 0 ? dia.inv / dia.cliques : 0;
-    const cpm = dia.impr > 0 ? (dia.inv / dia.impr) * 1000 : 0;
-
-    const dateObj = new Date(dia.date + 'T00:00:00Z');
-    const dateStr = `${String(dateObj.getUTCDate()).padStart(2, '0')}/${String(dateObj.getUTCMonth() + 1).padStart(2, '0')}/${dateObj.getUTCFullYear()}`;
-
-    tblHtml += `<tr>
-      <td>${dateStr}</td>
-      <td>${brl(dia.inv)}</td>
-      <td>${dia.impr}</td>
-      <td>${dia.cliques}</td>
-      <td>${pct(ctr)}</td>
-      <td>${dia.pv}</td>
-      <td>${dia.ck}</td>
-      <td>${dia.compras || 0}</td>
-      <td>${brl(dia.fat)}</td>
-      <td>${br(roas, 2)}</td>
-      <td>${brl(cpc)}</td>
-      <td>${brl(cpm)}</td>
-      <td>${statusBadge(dia.inv, dia.fat)}</td>
-    </tr>`;
+    const dCtr = dia.impr > 0 ? (dia.cliques / dia.impr) * 100 : 0;
+    const dRoas = dia.inv > 0 ? dia.fat / dia.inv : 0;
+    const dCpc = dia.cliques > 0 ? dia.inv / dia.cliques : 0;
+    const dCpm = dia.impr > 0 ? (dia.inv / dia.impr) * 1000 : 0;
+    const dt = new Date(dia.date + 'T00:00:00Z');
+    const dateStr = `${String(dt.getUTCDate()).padStart(2,'0')}/${String(dt.getUTCMonth()+1).padStart(2,'0')}/${dt.getUTCFullYear()}`;
+    tblHtml += `<tr><td>${dateStr}</td><td>${brl(dia.inv)}</td><td>${dia.impr}</td><td>${dia.cliques}</td><td>${pct(dCtr)}</td><td>${dia.pv}</td><td>${dia.ck}</td><td>${dia.compras||0}</td><td>${brl(dia.fat)}</td><td>${br(dRoas,2)}</td><td>${brl(dCpc)}</td><td>${brl(dCpm)}</td><td>${statusBadge(dia.inv,dia.fat)}</td></tr>`;
   }
-
   tblHtml += '</tbody>';
   document.getElementById('tbl-visao').innerHTML = tblHtml;
 }
 
+// ========== CRIATIVOS ==========
 function renderCreatives() {
   const last7 = new Date();
   last7.setDate(last7.getDate() - 7);
   const last7Str = last7.toISOString().split('T')[0];
-
-  for (const c of CRIATIVOS) {
-    c.ativo = c.dates.some(d => d >= last7Str);
-  }
-
+  for (const c of CRIATIVOS) { c.ativo = c.dates.some(d => d >= last7Str); }
   sortAndRenderCreatives();
 }
 
@@ -1151,12 +897,8 @@ function filterCreatives(filter, btn) {
 
 function sortAndRenderCreatives() {
   let sorted = [...CRIATIVOS];
-
-  if (currentCreativeFilter === 'ativos') {
-    sorted = sorted.filter(c => c.ativo);
-  } else if (currentCreativeFilter === 'inativos') {
-    sorted = sorted.filter(c => !c.ativo);
-  }
+  if (currentCreativeFilter === 'ativos') sorted = sorted.filter(c => c.ativo);
+  else if (currentCreativeFilter === 'inativos') sorted = sorted.filter(c => !c.ativo);
 
   const sortBy = document.getElementById('sort-cri').value;
   if (sortBy === 'invest') sorted.sort((a, b) => b.inv - a.inv);
@@ -1170,7 +912,6 @@ function sortAndRenderCreatives() {
     const ctr = c.impr > 0 ? (c.cliques / c.impr) * 100 : 0;
     const cpc = c.cliques > 0 ? c.inv / c.cliques : 0;
     const roas = c.inv > 0 ? c.fat / c.inv : 0;
-
     gridHtml += `
       <div class="cri-card ${c.ativo ? 'ativo' : ''}">
         <div class="cri-card-header">
@@ -1178,30 +919,12 @@ function sortAndRenderCreatives() {
           <span class="cri-badge ${c.ativo ? 'ativo' : 'inativo'}">${c.ativo ? 'Ativo' : 'Inativo'}</span>
         </div>
         <div class="cri-metrics">
-          <div class="cri-metric">
-            <div class="cri-metric-label">Investimento</div>
-            <div class="cri-metric-val hl">${brl(c.inv)}</div>
-          </div>
-          <div class="cri-metric">
-            <div class="cri-metric-label">Faturamento</div>
-            <div class="cri-metric-val">${brl(c.fat)}</div>
-          </div>
-          <div class="cri-metric">
-            <div class="cri-metric-label">ROAS</div>
-            <div class="cri-metric-val hl">${br(roas, 2)}</div>
-          </div>
-          <div class="cri-metric">
-            <div class="cri-metric-label">Vendas</div>
-            <div class="cri-metric-val">${c.compras || 0}</div>
-          </div>
-          <div class="cri-metric">
-            <div class="cri-metric-label">CTR</div>
-            <div class="cri-metric-val">${pct(ctr)}</div>
-          </div>
-          <div class="cri-metric">
-            <div class="cri-metric-label">CPC</div>
-            <div class="cri-metric-val">${brl(cpc)}</div>
-          </div>
+          <div class="cri-metric"><div class="cri-metric-label">Investimento</div><div class="cri-metric-val hl">${brl(c.inv)}</div></div>
+          <div class="cri-metric"><div class="cri-metric-label">Faturamento</div><div class="cri-metric-val">${brl(c.fat)}</div></div>
+          <div class="cri-metric"><div class="cri-metric-label">ROAS</div><div class="cri-metric-val hl">${br(roas, 2)}</div></div>
+          <div class="cri-metric"><div class="cri-metric-label">Vendas</div><div class="cri-metric-val">${c.compras || 0}</div></div>
+          <div class="cri-metric"><div class="cri-metric-label">CTR</div><div class="cri-metric-val">${pct(ctr)}</div></div>
+          <div class="cri-metric"><div class="cri-metric-label">CPC</div><div class="cri-metric-val">${brl(cpc)}</div></div>
         </div>
         ${c.link ? `<a class="cri-link" href="${c.link}" target="_blank">${c.link}</a>` : ''}
       </div>
@@ -1209,45 +932,24 @@ function sortAndRenderCreatives() {
   }
   document.getElementById('cri-grid').innerHTML = gridHtml;
 
-  // Table
   let tblHtml = '<thead><tr><th>Criativo</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>CTR</th><th>PV</th><th>CK</th><th>Vendas</th><th>Fat.</th><th>ROAS</th><th>CPC</th><th>CPM</th><th>Status</th></tr></thead><tbody>';
-
   for (const c of sorted) {
     const ctr = c.impr > 0 ? (c.cliques / c.impr) * 100 : 0;
     const roas = c.inv > 0 ? c.fat / c.inv : 0;
     const cpc = c.cliques > 0 ? c.inv / c.cliques : 0;
     const cpm = c.impr > 0 ? (c.inv / c.impr) * 1000 : 0;
-
-    tblHtml += `<tr>
-      <td>${c.nome}</td>
-      <td>${brl(c.inv)}</td>
-      <td>${c.impr}</td>
-      <td>${c.cliques}</td>
-      <td>${pct(ctr)}</td>
-      <td>${c.pv}</td>
-      <td>${c.ck}</td>
-      <td>${c.compras || 0}</td>
-      <td>${brl(c.fat)}</td>
-      <td>${br(roas, 2)}</td>
-      <td>${brl(cpc)}</td>
-      <td>${brl(cpm)}</td>
-      <td>${statusBadge(c.inv, c.fat)}</td>
-    </tr>`;
+    tblHtml += `<tr><td>${c.nome}</td><td>${brl(c.inv)}</td><td>${c.impr}</td><td>${c.cliques}</td><td>${pct(ctr)}</td><td>${c.pv}</td><td>${c.ck}</td><td>${c.compras||0}</td><td>${brl(c.fat)}</td><td>${br(roas,2)}</td><td>${brl(cpc)}</td><td>${brl(cpm)}</td><td>${statusBadge(c.inv,c.fat)}</td></tr>`;
   }
-
   tblHtml += '</tbody>';
   document.getElementById('tbl-criativos').innerHTML = tblHtml;
 }
 
+// ========== PÚBLICOS ==========
 function renderPublicos() {
   const last7 = new Date();
   last7.setDate(last7.getDate() - 7);
   const last7Str = last7.toISOString().split('T')[0];
-
-  for (const p of PUBLICOS) {
-    p.ativo = p.dates.some(d => d >= last7Str);
-  }
-
+  for (const p of PUBLICOS) { p.ativo = p.dates.some(d => d >= last7Str); }
   sortAndRenderPublicos();
 }
 
@@ -1260,12 +962,8 @@ function filterPublicos(filter, btn) {
 
 function sortAndRenderPublicos() {
   let sorted = [...PUBLICOS];
-
-  if (currentPublicoFilter === 'ativos') {
-    sorted = sorted.filter(p => p.ativo);
-  } else if (currentPublicoFilter === 'inativos') {
-    sorted = sorted.filter(p => !p.ativo);
-  }
+  if (currentPublicoFilter === 'ativos') sorted = sorted.filter(p => p.ativo);
+  else if (currentPublicoFilter === 'inativos') sorted = sorted.filter(p => !p.ativo);
 
   const sortBy = document.getElementById('sort-pub').value;
   if (sortBy === 'invest') sorted.sort((a, b) => b.inv - a.inv);
@@ -1276,9 +974,7 @@ function sortAndRenderPublicos() {
   let gridHtml = '';
   for (const p of sorted) {
     const ctr = p.impr > 0 ? (p.cliques / p.impr) * 100 : 0;
-    const cpc = p.cliques > 0 ? p.inv / p.cliques : 0;
     const connectRate = p.cliques > 0 ? (p.pv / p.cliques) * 100 : 0;
-
     gridHtml += `
       <div class="pub-card ${p.ativo ? 'ativo' : ''}">
         <div class="pub-card-header">
@@ -1286,18 +982,9 @@ function sortAndRenderPublicos() {
           <span class="cri-badge ${p.ativo ? 'ativo' : 'inativo'}">${p.ativo ? 'Ativo' : 'Inativo'}</span>
         </div>
         <div class="pub-metrics">
-          <div class="pub-metric">
-            <div class="pub-metric-val">${brl(p.inv)}</div>
-            <div class="pub-metric-lbl">Investimento</div>
-          </div>
-          <div class="pub-metric">
-            <div class="pub-metric-val neutral">${pct(ctr)}</div>
-            <div class="pub-metric-lbl">CTR</div>
-          </div>
-          <div class="pub-metric">
-            <div class="pub-metric-val neutral">${pct(connectRate)}</div>
-            <div class="pub-metric-lbl">Connect</div>
-          </div>
+          <div class="pub-metric"><div class="pub-metric-val">${brl(p.inv)}</div><div class="pub-metric-lbl">Investimento</div></div>
+          <div class="pub-metric"><div class="pub-metric-val neutral">${pct(ctr)}</div><div class="pub-metric-lbl">CTR</div></div>
+          <div class="pub-metric"><div class="pub-metric-val neutral">${pct(connectRate)}</div><div class="pub-metric-lbl">Connect</div></div>
         </div>
         <div class="pub-bar-wrap">
           <div class="pub-bar-label"><span>Gasto</span><span>${brl(p.inv)}</span></div>
@@ -1308,181 +995,90 @@ function sortAndRenderPublicos() {
   }
   document.getElementById('pub-grid').innerHTML = gridHtml;
 
-  // Table
   let tblHtml = '<thead><tr><th>Público</th><th>Investimento</th><th>Impressões</th><th>Cliques</th><th>CTR</th><th>Visualizações</th><th>Connect Rate</th><th>Checkouts</th><th>CPC</th><th>Status</th></tr></thead><tbody>';
-
   for (const p of sorted) {
     const ctr = p.impr > 0 ? (p.cliques / p.impr) * 100 : 0;
     const cpc = p.cliques > 0 ? p.inv / p.cliques : 0;
     const connectRate = p.cliques > 0 ? (p.pv / p.cliques) * 100 : 0;
-
-    tblHtml += `<tr>
-      <td>${p.nome}</td>
-      <td>${brl(p.inv)}</td>
-      <td>${p.impr}</td>
-      <td>${p.cliques}</td>
-      <td>${pct(ctr)}</td>
-      <td>${p.pv}</td>
-      <td>${pct(connectRate)}</td>
-      <td>${p.ck}</td>
-      <td>${brl(cpc)}</td>
-      <td>${statusBadge(p.inv, p.fat)}</td>
-    </tr>`;
+    tblHtml += `<tr><td>${p.nome}</td><td>${brl(p.inv)}</td><td>${p.impr}</td><td>${p.cliques}</td><td>${pct(ctr)}</td><td>${p.pv}</td><td>${pct(connectRate)}</td><td>${p.ck}</td><td>${brl(cpc)}</td><td>${statusBadge(p.inv,p.fat)}</td></tr>`;
   }
-
   tblHtml += '</tbody>';
   document.getElementById('tbl-publicos').innerHTML = tblHtml;
 }
 
+// ========== SEMANAL ==========
 function renderSemanal() {
   const filtered = SEMANAL.filter(s => {
-    const weekStart = s.week;
-    const weekEnd = new Date(weekStart + 'T00:00:00Z');
+    const weekEnd = new Date(s.week + 'T00:00:00Z');
     weekEnd.setDate(weekEnd.getDate() + 6);
-    const weekEndStr = weekEnd.toISOString().split('T')[0];
-    return weekEndStr >= dateFrom && weekStart <= dateTo;
+    return weekEnd.toISOString().split('T')[0] >= dateFrom && s.week <= dateTo;
   });
-
   const agg = aggregateData(filtered);
 
-  const kpiHtml = `
+  document.getElementById('kpi-semanal').innerHTML = `
     <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${brl(agg.inv)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Faturamento</div><div class="kpi-value green">${brl(agg.fat)}</div></div>
     <div class="kpi-card"><div class="kpi-label">ROAS</div><div class="kpi-value orange">${br(agg.inv > 0 ? agg.fat / agg.inv : 0, 2)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Cliques</div><div class="kpi-value orange">${agg.cliques}</div></div>
     <div class="kpi-card"><div class="kpi-label">Impressões</div><div class="kpi-value orange">${agg.impr}</div></div>
   `;
-  document.getElementById('kpi-semanal').innerHTML = kpiHtml;
 
   let tblHtml = '<thead><tr><th>Semana</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>CTR</th><th>PV</th><th>CK</th><th>Compras</th><th>Fat.</th><th>ROAS</th><th>Retorno</th></tr></thead><tbody>';
-
   for (const s of filtered) {
     const ctr = s.impr > 0 ? (s.cliques / s.impr) * 100 : 0;
     const roas = s.inv > 0 ? s.fat / s.inv : 0;
     const retorno = s.fat - s.inv;
-
-    const weekStart = new Date(s.week + 'T00:00:00Z');
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 6);
-
-    const weekStr = `${String(weekStart.getUTCDate()).padStart(2, '0')}/${String(weekStart.getUTCMonth() + 1).padStart(2, '0')} - ${String(weekEnd.getUTCDate()).padStart(2, '0')}/${String(weekEnd.getUTCMonth() + 1).padStart(2, '0')}`;
-
-    tblHtml += `<tr>
-      <td>${weekStr}</td>
-      <td>${brl(s.inv)}</td>
-      <td>${s.impr}</td>
-      <td>${s.cliques}</td>
-      <td>${pct(ctr)}</td>
-      <td>${s.pv}</td>
-      <td>${s.ck}</td>
-      <td>${s.compras || 0}</td>
-      <td>${brl(s.fat)}</td>
-      <td>${br(roas, 2)}</td>
-      <td class="${retorno >= 0 ? 'green' : 'red'}">${brl(retorno)}</td>
-    </tr>`;
+    const ws = new Date(s.week + 'T00:00:00Z');
+    const we = new Date(ws); we.setDate(we.getDate() + 6);
+    const weekStr = `${String(ws.getUTCDate()).padStart(2,'0')}/${String(ws.getUTCMonth()+1).padStart(2,'0')} - ${String(we.getUTCDate()).padStart(2,'0')}/${String(we.getUTCMonth()+1).padStart(2,'0')}`;
+    tblHtml += `<tr><td>${weekStr}</td><td>${brl(s.inv)}</td><td>${s.impr}</td><td>${s.cliques}</td><td>${pct(ctr)}</td><td>${s.pv}</td><td>${s.ck}</td><td>${s.compras||0}</td><td>${brl(s.fat)}</td><td>${br(roas,2)}</td><td class="${retorno>=0?'green':'red'}">${brl(retorno)}</td></tr>`;
   }
-
   tblHtml += '</tbody>';
   document.getElementById('tbl-semanal').innerHTML = tblHtml;
 
-  // Charts
-  const chartLabels = filtered.map(s => {
-    const date = new Date(s.week + 'T00:00:00Z');
-    return `Sem ${String(date.getUTCDate()).padStart(2, '0')}/${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
-  });
+  const chartLabels = filtered.map(s => { const d = new Date(s.week + 'T00:00:00Z'); return `Sem ${String(d.getUTCDate()).padStart(2,'0')}/${String(d.getUTCMonth()+1).padStart(2,'0')}`; });
 
   if (charts['sem-invest']) charts['sem-invest'].destroy();
   charts['sem-invest'] = new Chart(document.getElementById('chart-sem-invest'), {
     type: 'bar',
-    data: {
-      labels: chartLabels,
-      datasets: [{
-        label: 'Investimento',
-        data: filtered.map(s => s.inv),
-        backgroundColor: 'rgba(255,107,43,0.85)',
-        borderColor: 'rgba(255,107,43,0.95)',
-        borderWidth: 1,
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true } },
-    },
+    data: { labels: chartLabels, datasets: [{ label: 'Investimento', data: filtered.map(s => s.inv), backgroundColor: 'rgba(255,107,43,0.85)', borderColor: 'rgba(255,107,43,0.95)', borderWidth: 1 }] },
+    options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
   });
 
   if (charts['sem-ctr']) charts['sem-ctr'].destroy();
   charts['sem-ctr'] = new Chart(document.getElementById('chart-sem-ctr'), {
     type: 'line',
-    data: {
-      labels: chartLabels,
-      datasets: [{
-        label: 'CTR (%)',
-        data: filtered.map(s => s.impr > 0 ? (s.cliques / s.impr) * 100 : 0),
-        borderColor: 'rgba(255,107,43,0.95)',
-        backgroundColor: 'rgba(255,107,43,0.13)',
-        tension: 0.3,
-        fill: true,
-        borderWidth: 2,
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true } },
-    },
+    data: { labels: chartLabels, datasets: [{ label: 'CTR (%)', data: filtered.map(s => s.impr > 0 ? (s.cliques / s.impr) * 100 : 0), borderColor: 'rgba(255,107,43,0.95)', backgroundColor: 'rgba(255,107,43,0.13)', tension: 0.3, fill: true, borderWidth: 2 }] },
+    options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
   });
 }
 
+// ========== MENSAL ==========
 function renderMensal() {
   const filtered = MENSAL.filter(m => {
-    const monthStart = m.month;
-    const monthEnd = new Date(monthStart + '-01T00:00:00Z');
-    monthEnd.setMonth(monthEnd.getMonth() + 1);
-    monthEnd.setDate(0);
-    const monthEndStr = monthEnd.toISOString().split('T')[0];
-    return monthStart >= dateFrom && monthEndStr <= dateTo;
+    const me = new Date(m.month + '-01T00:00:00Z');
+    me.setMonth(me.getMonth() + 1); me.setDate(0);
+    return m.month >= dateFrom && me.toISOString().split('T')[0] <= dateTo;
   });
-
   const agg = aggregateData(filtered);
 
-  const kpiHtml = `
+  document.getElementById('kpi-mensal').innerHTML = `
     <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${brl(agg.inv)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Faturamento</div><div class="kpi-value green">${brl(agg.fat)}</div></div>
     <div class="kpi-card"><div class="kpi-label">ROAS</div><div class="kpi-value orange">${br(agg.inv > 0 ? agg.fat / agg.inv : 0, 2)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Cliques</div><div class="kpi-value orange">${agg.cliques}</div></div>
     <div class="kpi-card"><div class="kpi-label">Impressões</div><div class="kpi-value orange">${agg.impr}</div></div>
   `;
-  document.getElementById('kpi-mensal').innerHTML = kpiHtml;
 
   let tblHtml = '<thead><tr><th>Mês</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>CTR</th><th>PV</th><th>CK</th><th>Compras</th><th>Fat.</th><th>ROAS</th><th>Retorno</th><th>Status</th></tr></thead><tbody>';
-
   for (const m of filtered) {
     const ctr = m.impr > 0 ? (m.cliques / m.impr) * 100 : 0;
     const roas = m.inv > 0 ? m.fat / m.inv : 0;
     const retorno = m.fat - m.inv;
-
     const [year, month] = m.month.split('-');
     const monthName = new Date(year, parseInt(month) - 1).toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
-
-    tblHtml += `<tr>
-      <td>${monthName}</td>
-      <td>${brl(m.inv)}</td>
-      <td>${m.impr}</td>
-      <td>${m.cliques}</td>
-      <td>${pct(ctr)}</td>
-      <td>${m.pv}</td>
-      <td>${m.ck}</td>
-      <td>${m.compras || 0}</td>
-      <td>${brl(m.fat)}</td>
-      <td>${br(roas, 2)}</td>
-      <td class="${retorno >= 0 ? 'green' : 'red'}">${brl(retorno)}</td>
-      <td>${statusBadge(m.inv, m.fat)}</td>
-    </tr>`;
+    tblHtml += `<tr><td>${monthName}</td><td>${brl(m.inv)}</td><td>${m.impr}</td><td>${m.cliques}</td><td>${pct(ctr)}</td><td>${m.pv}</td><td>${m.ck}</td><td>${m.compras||0}</td><td>${brl(m.fat)}</td><td>${br(roas,2)}</td><td class="${retorno>=0?'green':'red'}">${brl(retorno)}</td><td>${statusBadge(m.inv,m.fat)}</td></tr>`;
   }
-
   tblHtml += '</tbody>';
   document.getElementById('tbl-mensal').innerHTML = tblHtml;
 }
@@ -1490,7 +1086,6 @@ function renderMensal() {
 function showTab(tabName, elem) {
   document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-
   document.getElementById(tabName).classList.add('active');
   elem.classList.add('active');
 }
