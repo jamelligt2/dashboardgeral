@@ -595,19 +595,34 @@
         diasMap[data].ck+=parseNum(row[9]);
       }
 
+      // Passo 1: Identificar compras do Checklist (email+datetime) para incluir order bumps
+      const checklistBuyers = new Set();
       for(let i=1;i<webhookData.length;i++){
         const row=webhookData[i];
         if(!row[2]||row[2].toLowerCase()!=='paid') continue;
+        if(!isMetaUTM(row)) continue;
+        if(!isChecklist(row)) continue;
+        const email=(row[0]||'').toLowerCase().trim();
+        const dt=(row[11]||row[8]||'').trim().substring(0,16);
+        if(dt.substring(0,10)<DATA_INICIO) continue;
+        checklistBuyers.add(email+'|'+dt);
+      }
+
+      // Passo 2: Compras (só Checklist) + Faturamento (Checklist + order bumps da mesma compra)
+      for(let i=1;i<webhookData.length;i++){
+        const row=webhookData[i];
+        if(!row[2]||row[2].toLowerCase()!=='paid') continue;
+        if(!isMetaUTM(row)) continue;
         const rawDate=(row[11]||row[8]||'').trim();
         if(!rawDate) continue;
         const dataKey=rawDate.substring(0,10);
-        if(dataKey<DATA_INICIO) continue; // somente jan/2026 em diante
+        if(dataKey<DATA_INICIO) continue;
+        const email=(row[0]||'').toLowerCase().trim();
+        const dt=rawDate.substring(0,16);
+        if(!checklistBuyers.has(email+'|'+dt)) continue;
         if(!diasMap[dataKey]) diasMap[dataKey]={data:dataKey,ymd:dataKey,inv:0,fat:0,compras:0,cliques:0,pv:0,ck:0,imp:0};
-        // Compras e Faturamento: somente produto Checklist + UTM Meta
-        if(isChecklist(row) && isMetaUTM(row)){
-          diasMap[dataKey].compras++;
-          diasMap[dataKey].fat+=parseNum(row[4])/100;
-        }
+        if(isChecklist(row)) diasMap[dataKey].compras++;
+        diasMap[dataKey].fat+=parseNum(row[4])/100;
       }
 
       DIAS=Object.values(diasMap).sort((a,b)=>new Date(a.ymd)-new Date(b.ymd));
@@ -696,16 +711,18 @@
       for(let i=1;i<webhookData.length;i++){
         const row=webhookData[i];
         if(!row[2]||row[2].toLowerCase()!=='paid') continue;
-        if(!isChecklist(row)) continue;
-        const rawDate2=(row[11]||row[8]||'').trim().substring(0,10);
-        if(rawDate2<DATA_INICIO) continue;
+        if(!isMetaUTM(row)) continue;
+        const rawDate2=(row[11]||row[8]||'').trim();
+        const dataKey2=rawDate2.substring(0,10);
+        if(dataKey2<DATA_INICIO) continue;
+        const email=(row[0]||'').toLowerCase().trim();
+        const dt=rawDate2.substring(0,16);
+        if(!checklistBuyers.has(email+'|'+dt)) continue;
         const nome=cleanName(row[12]||row[10]);
         if(!nome) continue;
-        // Só atribui se o criativo estava ativo nos 7 dias antes da compra
-        if(!estaAtivoNaData(nome,rawDate2)) continue;
-        if(!isMetaUTM(row)) continue;
+        if(!estaAtivoNaData(nome,dataKey2)) continue;
         if(!criativosMap[nome]) criativosMap[nome]={nome,inv:0,cliques:0,imp:0,pv:0,ck:0,fat:0,compras:0,lastDate:'',link:''};
-        criativosMap[nome].compras++;
+        if(isChecklist(row)) criativosMap[nome].compras++;
         criativosMap[nome].fat+=parseNum(row[4])/100;
       }
 
@@ -741,15 +758,19 @@
       for(let i=1;i<webhookData.length;i++){
         const row=webhookData[i];
         if(!row[2]||row[2].toLowerCase()!=='paid') continue;
+        if(!isMetaUTM(row)) continue;
+        const rawDt=(row[11]||row[8]||'').trim();
+        const date=rawDt.substring(0,10);
+        if(!date||date<DATA_INICIO) continue;
+        const email=(row[0]||'').toLowerCase().trim();
+        const dt=rawDt.substring(0,16);
+        if(!checklistBuyers.has(email+'|'+dt)) continue;
         const nome=cleanName(row[12]||row[10]);
-        const date=(row[11]||row[8]||'').trim().substring(0,10);
-        if(!nome||!date||date<DATA_INICIO) continue;
-        // Só atribui se o criativo estava ativo nos 7 dias antes da compra
+        if(!nome) continue;
         if(!estaAtivoNaData(nome,date)) continue;
         const k=nome+'|'+date;
-        if(!isChecklist(row) || !isMetaUTM(row)) continue;
         if(!criWkMap[k]) criWkMap[k]={fat:0,v:0};
-        criWkMap[k].v++;
+        if(isChecklist(row)) criWkMap[k].v++;
         criWkMap[k].fat+=parseNum(row[4])/100;
       }
       const allDatesSet=[...new Set(DIAS.map(d=>d.ymd))].sort();
@@ -790,27 +811,31 @@
         if(row[0]>publicosMap[nome].lastDate) publicosMap[nome].lastDate=row[0];
         if(criNome) criDatePubMap[criNome+'|'+row[0]]=nome;
       }
-      // Atribui compras e faturamento ao público via webhook
+      // Atribui compras e faturamento ao público via webhook (inclui order bumps)
       for(let i=1;i<webhookData.length;i++){
         const row=webhookData[i];
         if(!row[2]||row[2].toLowerCase()!=='paid') continue;
-        if(!isChecklist(row) || !isMetaUTM(row)) continue;
-        const rawDate=(row[11]||row[8]||'').trim().substring(0,10);
-        if(!rawDate||rawDate<DATA_INICIO) continue;
+        if(!isMetaUTM(row)) continue;
+        const rawDate=(row[11]||row[8]||'').trim();
+        const dateKey=rawDate.substring(0,10);
+        if(!dateKey||dateKey<DATA_INICIO) continue;
+        const email=(row[0]||'').toLowerCase().trim();
+        const dtPub=rawDate.substring(0,16);
+        if(!checklistBuyers.has(email+'|'+dtPub)) continue;
         const criNome=cleanName(row[12]||row[10]);
-        if(!estaAtivoNaData(criNome,rawDate)) continue;
+        if(!estaAtivoNaData(criNome,dateKey)) continue;
         // Acha o público do criativo nessa data (busca até 7 dias antes)
-        let pub=criDatePubMap[criNome+'|'+rawDate];
+        let pub=criDatePubMap[criNome+'|'+dateKey];
         if(!pub){
           for(let d=1;d<=7;d++){
-            const dt=new Date(rawDate+'T00:00:00');
-            dt.setDate(dt.getDate()-d);
-            pub=criDatePubMap[criNome+'|'+formatYMD(dt)];
+            const dtx=new Date(dateKey+'T00:00:00');
+            dtx.setDate(dtx.getDate()-d);
+            pub=criDatePubMap[criNome+'|'+formatYMD(dtx)];
             if(pub) break;
           }
         }
         if(!pub||!publicosMap[pub]) continue;
-        publicosMap[pub].compras++;
+        if(isChecklist(row)) publicosMap[pub].compras++;
         publicosMap[pub].fat+=parseNum(row[4])/100;
       }
       PUBLICOS=Object.values(publicosMap).map(p=>({
