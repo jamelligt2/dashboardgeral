@@ -321,15 +321,19 @@ async function fetchSheetCSV(sheetName){
 async function loadData(){
   try{
     document.getElementById('loading-msg').textContent='Carregando dados do Gerenciador...';
-    const [gCSV, wCSV] = await Promise.all([
-      fetchSheetCSV(GERENCIADOR_SHEET),
-      fetchSheetCSV(WEBHOOK_SHEET)
+
+    // Gerenciador é obrigatório; Webhook e vendas são opcionais
+    const gCSV = await fetchSheetCSV(GERENCIADOR_SHEET);
+    const [wResult, vResult] = await Promise.allSettled([
+      fetchSheetCSV(WEBHOOK_SHEET),
+      fetchSheetCSV('vendas')
     ]);
+    const wCSV = wResult.status==='fulfilled' ? wResult.value : '';
+    const vCSV = vResult.status==='fulfilled' ? vResult.value : '';
+
     document.getElementById('loading-msg').textContent='Processando dados...';
 
     const gRows=parseCSV(gCSV);
-    const wRows=parseCSV(wCSV);
-
     if(gRows.length<2){throw new Error('Planilha Gerenciador vazia');}
 
     // --- GERENCIADOR COLUMNS ---
@@ -344,15 +348,6 @@ async function loadData(){
     const colAdName=findCol(gH,['Ad Name','Nome do anúncio','Ad']);
     const colImp=findCol(gH,['Impressions','Impressões']);
     const colLink=findCol(gH,['Instagram Permalink URL','Link','URL']);
-
-    // --- WEBHOOK COLUMNS ---
-    const wH=wRows[0]||[];
-    const wColStatus=findCol(wH,['Status']);
-    const wColSource=findCol(wH,['UTM Source','Source','utm_source']);
-    const wColValor=findCol(wH,['Valor da Venda','Valor','valor_venda']);
-    const wColData=findCol(wH,['Data de Pagamento','Data de Criação','Data']);
-    const wColContent=findCol(wH,['UTM Content','Content','utm_content']);
-    const wColCampaign=findCol(wH,['UTM Campaign','Campaign','utm_campaign']);
 
     // --- Parse raw gerenciador rows ---
     RAW_G=[];
@@ -375,23 +370,47 @@ async function loadData(){
       });
     });
 
-    // --- Parse raw webhook rows (already filtered by status+source) ---
     RAW_W=[];
-    wRows.slice(1).forEach(r=>{
-      const status=r[wColStatus]?r[wColStatus].toLowerCase().trim():'';
-      const source=r[wColSource]?r[wColSource].toLowerCase().replace(/[\s_\-]/g,''):'';
-      if(!((status==='paga'||status==='paid') && source===META_SOURCE_FILTER))return;
-      const rawDate=r[wColData]||'';
-      const dateBR=parseDateBR(rawDate);
-      if(!dateBR)return;
-      RAW_W.push({
-        dateISO: toISO(dateBR),
-        dateBR,
-        valor: parseNum(r[wColValor]),
-        adName: (r[wColContent]||'').trim(),
-        adsetName: (wColCampaign>=0?(r[wColCampaign]||''):'').trim()
+
+    // --- Aba Webhook (dados via webhook, com filtro de source) ---
+    if(wCSV){
+      const wRows=parseCSV(wCSV);
+      const wH=wRows[0]||[];
+      const wColStatus=findCol(wH,['Status']);
+      const wColSource=findCol(wH,['UTM Source','Source','utm_source']);
+      const wColValor=findCol(wH,['Valor da Venda','Valor','valor_venda']);
+      const wColData=findCol(wH,['Data de Pagamento','Data de Criação','Data']);
+      const wColContent=findCol(wH,['UTM Content','Content','utm_content']);
+      const wColCampaign=findCol(wH,['UTM Campaign','Campaign','utm_campaign']);
+      wRows.slice(1).forEach(r=>{
+        const status=r[wColStatus]?r[wColStatus].toLowerCase().trim():'';
+        const source=r[wColSource]?r[wColSource].toLowerCase().replace(/[\s_\-]/g,''):'';
+        if(!((status==='paga'||status==='paid')&&source===META_SOURCE_FILTER))return;
+        const rawDate=r[wColData]||'';
+        const dateBR=parseDateBR(rawDate);
+        if(!dateBR)return;
+        RAW_W.push({dateISO:toISO(dateBR),dateBR,valor:parseNum(r[wColValor]),adName:(r[wColContent]||'').trim(),adsetName:(wColCampaign>=0?(r[wColCampaign]||''):'').trim()});
       });
-    });
+    }
+
+    // --- Aba vendas (dados manuais Eduzz, sem filtro de source) ---
+    if(vCSV){
+      const vRows=parseCSV(vCSV);
+      const vH=vRows[0]||[];
+      const vColStatus=findCol(vH,['Status']);
+      const vColValor=findCol(vH,['Valor da Venda','Valor da Venda com Juros','Ganho Líquido','Ganho Liquido','Valor','valor_venda']);
+      const vColData=findCol(vH,['Data de Pagamento','Data de Crédito','Data de Criação','Data']);
+      const vColContent=findCol(vH,['UTM Content','Content','utm_content']);
+      const vColCampaign=findCol(vH,['UTM Campaign','Campaign','utm_campaign']);
+      vRows.slice(1).forEach(r=>{
+        const status=vColStatus>=0?(r[vColStatus]?r[vColStatus].toLowerCase().trim():''):'pago';
+        if(!status.match(/pag[ao]|paid|aprovado|approved/))return;
+        const rawDate=r[vColData]||'';
+        const dateBR=parseDateBR(rawDate);
+        if(!dateBR)return;
+        RAW_W.push({dateISO:toISO(dateBR),dateBR,valor:parseNum(r[vColValor]),adName:(vColContent>=0?(r[vColContent]||''):'').trim(),adsetName:(vColCampaign>=0?(r[vColCampaign]||''):'').trim()});
+      });
+    }
 
     // Init date pickers from ALL data
     const allDates=RAW_G.map(r=>r.dateISO).sort();
