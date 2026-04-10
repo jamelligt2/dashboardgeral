@@ -6,6 +6,7 @@
 <title>CL32FORM01 - Dashboard Captação</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23ff6b2b'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-family='Arial,Helvetica,sans-serif' font-weight='900' font-size='12' fill='%23ffffff' letter-spacing='0.5'%3EJGT%3C/text%3E%3C/svg%3E">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
@@ -348,15 +349,56 @@ async function fetchCSV(sheetName) {
   return Papa.parse(text, { header: true, skipEmptyLines: true }).data;
 }
 
+async function fetchViaXLSX() {
+  const url = `https://docs.google.com/spreadsheets/d/${CONFIG.sheetId}/export?format=xlsx`;
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error('XLSX export failed: ' + resp.status);
+  const buf = await resp.arrayBuffer();
+  const wb = XLSX.read(buf, { type: 'array' });
+  const result = {};
+  for (const name of wb.SheetNames) {
+    const ws = wb.Sheets[name];
+    if (ws) result[name] = XLSX.utils.sheet_to_json(ws, { defval: '' });
+  }
+  return result;
+}
+
 async function loadAllData() {
   const ls = document.getElementById('loadingScreen');
   const es = document.getElementById('errorScreen');
   ls.classList.remove('hidden'); es.classList.remove('show');
-  document.getElementById('loadingStatus').textContent = 'Buscando dados de captação...';
+  document.getElementById('loadingStatus').textContent = 'Buscando dados da planilha...';
   try {
-    RAW_CAP = await fetchCSV(CONFIG.capSheet);
-    document.getElementById('loadingStatus').textContent = 'Buscando dados de formulários...';
-    RAW_FORMS = await fetchCSV(CONFIG.formsSheet);
+    /* Strategy 1: XLSX export (resolves ALL formulas) */
+    let xlsxOk = false;
+    try {
+      const sheets = await fetchViaXLSX();
+      const capData = sheets[CONFIG.capSheet];
+      const formsData = sheets[CONFIG.formsSheet];
+      if (capData && capData.length && formsData && formsData.length) {
+        RAW_CAP = capData;
+        RAW_FORMS = formsData;
+        xlsxOk = true;
+        console.log('[XLSX] OK — Captação:', capData.length, 'rows, Forms:', formsData.length, 'rows');
+        /* Diagnostic: check fatura col */
+        const fs = formsData[0] || {};
+        const fatCol = findCol(fs, ['fatura 6','fatura 6 meses','quanto fatura 6']);
+        const nonEmpty = formsData.filter(r => r[fatCol] && String(r[fatCol]).trim()).length;
+        console.log('[XLSX] fatura col:', fatCol, '— non-empty:', nonEmpty, '/', formsData.length);
+      }
+    } catch (xlsxErr) {
+      console.log('[XLSX] Failed, falling back to CSV:', xlsxErr.message);
+    }
+
+    /* Strategy 2: CSV fallback via gviz */
+    if (!xlsxOk) {
+      document.getElementById('loadingStatus').textContent = 'Buscando dados de captação...';
+      RAW_CAP = await fetchCSV(CONFIG.capSheet);
+      document.getElementById('loadingStatus').textContent = 'Buscando dados de formulários...';
+      RAW_FORMS = await fetchCSV(CONFIG.formsSheet);
+      console.log('[CSV] Captação:', RAW_CAP.length, 'rows, Forms:', RAW_FORMS.length, 'rows');
+    }
+
     document.getElementById('loadingStatus').textContent = 'Processando dados...';
     FILTERED_CAP = [...RAW_CAP];
     setDateBounds();

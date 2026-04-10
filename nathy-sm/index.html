@@ -317,7 +317,7 @@ async function fetchSheetCSV(sheetName) {
 function processData(gRows, rRows, wRows) {
   // === CONSTRUIR DIAS mesclando GERENCIADOR (investimento) + WEBHOOK (vendas reais Meta Ads) ===
 
-  // 0) Agregar Webhook por dia (vendas reais: paid + meta_ads)
+  // 0) Agregar Webhook por dia — filtra apenas status=paid (todas as origens)
   const webhookDiaMap = {};
   if (wRows && wRows.length > 1) {
     const wHeader = wRows[0];
@@ -331,34 +331,26 @@ function processData(gRows, rRows, wRows) {
       return idx >= 0 ? idx : fallback;
     };
     const colStatus = findCol(['status'], 3);
-    const colSource = findCol(['utmsource', 'utmorigin', 'utmfont', 'origin', 'source'], 23);
     const colValue  = findCol(['pricevalue', 'price', 'valor', 'value', 'amount'], 31);
     const colDate   = findCol(['createdat', 'created', 'datavenda', 'data', 'date'], 28);
 
     console.log('[WEBHOOK] Linhas:', wRows.length - 1,
-      '| cols status/source/value/date:', colStatus, colSource, colValue, colDate);
+      '| cols status/value/date:', colStatus, colValue, colDate);
     if (wRows.length > 1) console.log('[WEBHOOK] Header sample:', wHeader.slice(0, Math.min(35, wHeader.length)));
 
     let wOk = 0;
     for (let i = 1; i < wRows.length; i++) {
       const r = wRows[i];
       const status = (r[colStatus] || '').toLowerCase().trim();
-      // aceita "paid", "aprovado", "approved"
-      const isPaid = status === 'paid' || status === 'aprovado' || status === 'approved' || status === 'complete' || status === 'completed';
+      // Aceita paid / aprovado / approved / complete / completed
+      const isPaid = status === 'paid' || status === 'aprovado' || status === 'approved'
+        || status === 'complete' || status === 'completed';
       if (!isPaid) continue;
-
-      const rawSrc = (r[colSource] || '').toLowerCase().replace(/[\s_\-\.]/g, '').trim();
-      // META_SOURCE_FILTER = 'metaads'
-      // aceita metaads | facebook | fbads | meta | instagramads | instagram
-      const isMeta = !rawSrc || rawSrc === META_SOURCE_FILTER
-        || rawSrc.startsWith('meta') || rawSrc.startsWith('face') || rawSrc.startsWith('fb')
-        || rawSrc.startsWith('insta');
-      if (!isMeta) continue;
 
       const dateStr = (r[colDate] || '').trim();
       let day = '';
       if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
-        day = dateStr.substring(0, 10); // ISO: YYYY-MM-DD...
+        day = dateStr.substring(0, 10); // ISO: YYYY-MM-DD ou YYYY-MM-DDTHH:MM...
       } else if (/^\d{2}\/\d{2}\/\d{4}/.test(dateStr)) {
         const p = dateStr.split('/'); day = `${p[2].substring(0,4)}-${p[1]}-${p[0]}`; // DD/MM/YYYY
       } else if (/^\d{2}\/\d{2}\/\d{2}/.test(dateStr)) {
