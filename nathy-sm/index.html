@@ -344,21 +344,23 @@ function processData(gRows, rRows, wRows) {
   if (wRows && wRows.length > 1) {
     const wHeader = wRows[0];
 
-    // Detecção de colunas — com fallback nos índices conhecidos
+    // Índices confirmados da planilha Webhook (Kirvano):
+    // 3 = data.status | 28 = data.createdAt | 31 = data.price.value
+    // Tenta detectar pelos headers, mas usa índices fixos como fallback garantido
     const findCol = (patterns, fallback) => {
       let idx = wHeader.findIndex(h => {
         const hn = h.toLowerCase().replace(/['".\s_-]/g, '');
-        return patterns.some(p => hn.includes(p));
+        return patterns.some(p => hn === p || hn.endsWith(p));
       });
       return idx >= 0 ? idx : fallback;
     };
-    const colStatus = findCol(['status'], 3);
-    const colValue  = findCol(['pricevalue', 'price', 'valor', 'value', 'amount'], 31);
-    const colDate   = findCol(['createdat', 'created', 'datavenda', 'data', 'date'], 28);
+    const colStatus = findCol(['datastatus', 'status'], 3);
+    const colValue  = findCol(['datapricevalue', 'pricevalue'], 31);  // NÃO 'price' genérico
+    const colDate   = findCol(['datacreatedat', 'createdat'], 28);
 
     console.log('[WEBHOOK] Linhas:', wRows.length - 1,
-      '| cols status/value/date:', colStatus, colValue, colDate);
-    if (wRows.length > 1) console.log('[WEBHOOK] Header sample:', wHeader.slice(0, Math.min(35, wHeader.length)));
+      '| cols status/value/date:', colStatus, colValue, colDate,
+      '| header[31]:', wHeader[31]);
 
     let wOk = 0;
     for (let i = 1; i < wRows.length; i++) {
