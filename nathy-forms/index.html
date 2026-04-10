@@ -273,12 +273,14 @@ function findCol(row, keywords) {
 }
 
 function parseMoney(str) {
+  if (typeof str === 'number') return str;
   if (!str || str === '-') return 0;
   let s = String(str).replace('R$','').replace(/\s/g,'').replace(/\./g,'').replace(',','.');
   return parseFloat(s) || 0;
 }
 
 function parseNum(str) {
+  if (typeof str === 'number') return str;
   if (!str || str === '-') return 0;
   let s = String(str).replace(/\s/g,'').replace(/\./g,'').replace(',','.');
   return parseFloat(s) || 0;
@@ -286,6 +288,12 @@ function parseNum(str) {
 
 function parseDate(str) {
   if (!str) return null;
+  if (str instanceof Date) return str;
+  if (typeof str === 'number') {
+    /* SheetJS serial date → JS Date */
+    const epoch = new Date(1899, 11, 30);
+    return new Date(epoch.getTime() + str * 86400000);
+  }
   str = String(str).trim();
   if (/^\d{4}-\d{2}-\d{2}/.test(str)) return new Date(str.substring(0,10)+'T00:00:00');
   if (/^\d{2}\/\d{2}\/\d{4}/.test(str)) {
@@ -301,7 +309,8 @@ function fmtPct(v) { return v.toFixed(2).replace('.',',') + '%'; }
 function fmtDate(d) { return d.toLocaleDateString('pt-BR'); }
 
 function parseFaturamento(str) {
-  if (!str) return 0;
+  if (!str && str !== 0) return 0;
+  if (typeof str === 'number') return str;
   str = String(str).trim().toLowerCase();
   str = str.replace('r$','').replace(/\s+/g,' ').trim();
   // Detecta faixas tipo "entre_7000_a_12000", "faturar_de_10000_a_20000", "de 10k a 20k"
@@ -354,11 +363,11 @@ async function fetchViaXLSX() {
   const resp = await fetch(url);
   if (!resp.ok) throw new Error('XLSX export failed: ' + resp.status);
   const buf = await resp.arrayBuffer();
-  const wb = XLSX.read(buf, { type: 'array' });
+  const wb = XLSX.read(buf, { type: 'array', cellDates: true });
   const result = {};
   for (const name of wb.SheetNames) {
     const ws = wb.Sheets[name];
-    if (ws) result[name] = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    if (ws) result[name] = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false, dateNF: 'dd/mm/yyyy' });
   }
   return result;
 }

@@ -1030,26 +1030,62 @@ function renderAll() {
   renderCriativos(); renderPublicos(); renderSemanal(); renderMensal();
 }
 
+// Verifica se o conteúdo retornado é um CSV válido (não HTML de erro)
+function isValidCSV(text) {
+  if (!text || text.length < 5) return false;
+  const start = text.trimStart().substring(0, 20).toLowerCase();
+  return !start.startsWith('<!doctype') && !start.startsWith('<html') && !start.startsWith('<head');
+}
+
 // ====== MAIN LOAD ======
 async function loadData() {
   try {
     document.getElementById('loading-msg').textContent = 'Buscando dados da planilha...';
-    const [gCSV, rCSV, wCSV] = await Promise.all([
+
+    // Busca Gerenciador e Resumo (essenciais — erro aqui para tudo)
+    const [gCSV, rCSV] = await Promise.all([
       fetchSheetCSV(GERENCIADOR_SHEET),
-      fetchSheetCSV(RESUMO_SHEET),
-      fetchSheetCSV(WEBHOOK_SHEET)
+      fetchSheetCSV(RESUMO_SHEET)
     ]);
+
+    // Webhook — falha silenciosa se aba não existir ou retornar HTML
+    document.getElementById('loading-msg').textContent = 'Buscando vendas do Webhook...';
+    let wCSV = '';
+    try {
+      const raw = await fetchSheetCSV(WEBHOOK_SHEET);
+      if (isValidCSV(raw)) {
+        wCSV = raw;
+        console.log('[WEBHOOK] CSV válido recebido, tamanho:', raw.length);
+      } else {
+        console.warn('[WEBHOOK] Retornou HTML em vez de CSV. Verifique o nome da aba "' + WEBHOOK_SHEET + '" na planilha.');
+        console.log('[WEBHOOK] Primeiros 200 chars:', raw.substring(0, 200));
+      }
+    } catch (wErr) {
+      console.warn('[WEBHOOK] Erro ao buscar aba Webhook:', wErr.message);
+    }
 
     document.getElementById('loading-msg').textContent = 'Processando dados...';
     const gRows = parseCSV(gCSV);
     const rRows = parseCSV(rCSV);
-    const wRows = parseCSV(wCSV);
+    const wRows = wCSV ? parseCSV(wCSV) : [];
 
     processData(gRows, rRows, wRows);
     initDatePickers();
     renderAll();
 
     document.getElementById('loading-overlay').style.display = 'none';
+
+    // Mostra status do webhook para diagnóstico (some após 8s)
+    const wStatus = document.createElement('div');
+    wStatus.id = 'webhook-status';
+    wStatus.style.cssText = 'position:fixed;bottom:16px;right:16px;background:#12121f;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:10px 14px;font-size:11px;color:rgba(255,255,255,.6);z-index:9999;max-width:320px';
+    const wDias = Object.keys((() => { try { return window._webhookDias || {}; } catch(e) { return {}; } })());
+    wStatus.innerHTML = wCSV
+      ? `📡 <strong style="color:#ff6b2b">Webhook OK</strong> — ${wRows.length - 1} linhas carregadas`
+      : `⚠️ <strong style="color:#e74c3c">Webhook não lido</strong> — aba "<strong>${WEBHOOK_SHEET}</strong>" não encontrada ou sem acesso. Verifique o nome exato da aba.`;
+    document.body.appendChild(wStatus);
+    setTimeout(() => { if (wStatus.parentNode) wStatus.parentNode.removeChild(wStatus); }, 10000);
+
   } catch (err) {
     document.getElementById('loading-msg').textContent = 'Erro: ' + err.message;
     document.getElementById('loading-msg').style.color = '#e74c3c';
