@@ -376,20 +376,25 @@ async function loadData(){
     if(wCSV){
       const wRows=parseCSV(wCSV);
       const wH=wRows[0]||[];
-      const wColStatus=findCol(wH,['Status']);
-      const wColSource=findCol(wH,['UTM Source','Source','utm_source']);
-      const wColValor=findCol(wH,['Valor da Venda','Valor','valor_venda']);
-      const wColData=findCol(wH,['Data de Pagamento','Data de Criação','Data']);
-      const wColContent=findCol(wH,['UTM Content','Content','utm_content']);
-      const wColCampaign=findCol(wH,['UTM Campaign','Campaign','utm_campaign']);
+      const wColStatus=findCol(wH,['data.status','Status']);
+      const wColSource=findCol(wH,['data.utm.source','UTM Source','Source','utm_source']);
+      const wColValor=findCol(wH,['data.price.value','Valor da Venda','Valor','valor_venda']);
+      const wColData=findCol(wH,['data.createdAt','Data de Pagamento','Data de Criação','Data']);
+      const wColContent=findCol(wH,['data.utm.content','UTM Content','Content','utm_content']);
+      const wColCampaign=findCol(wH,['data.utm.campaign','UTM Campaign','Campaign','utm_campaign']);
       wRows.slice(1).forEach(r=>{
         const status=r[wColStatus]?r[wColStatus].toLowerCase().trim():'';
         const source=r[wColSource]?r[wColSource].toLowerCase().replace(/[\s_\-]/g,''):'';
-        if(!((status==='paga'||status==='paid')&&source===META_SOURCE_FILTER))return;
+        if(!(status.match(/paid|pag[ao]/)&&source===META_SOURCE_FILTER))return;
         const rawDate=r[wColData]||'';
-        const dateBR=parseDateBR(rawDate);
+        // Suporta ISO datetime: 2026-04-10T10:54:32.000Z
+        let dateBR=null;
+        if(/^\d{4}-\d{2}-\d{2}/.test(rawDate)){
+          const [y,m,d]=rawDate.substring(0,10).split('-');
+          dateBR=`${d}/${m}/${y}`;
+        } else { dateBR=parseDateBR(rawDate); }
         if(!dateBR)return;
-        RAW_W.push({dateISO:toISO(dateBR),dateBR,valor:parseNum(r[wColValor]),adName:(r[wColContent]||'').trim(),adsetName:(wColCampaign>=0?(r[wColCampaign]||''):'').trim()});
+        RAW_W.push({dateISO:toISO(dateBR),dateBR,valor:parseNum(r[wColValor]),adName:(wColContent>=0?(r[wColContent]||''):'').trim(),adsetName:(wColCampaign>=0?(r[wColCampaign]||''):'').trim()});
       });
     }
 
