@@ -768,11 +768,13 @@ function renderTab2(D) {
     const cpc = d.clicks > 0 ? d.spend / d.clicks : 0;
     const cpl = d.leads > 0 ? d.spend / d.leads : 0;
     const ctr = d.imp > 0 ? (d.clicks / d.imp * 100) : 0;
+    const qualEst = Math.round(d.leads * D.qualRate);
+    const cplQual = qualEst > 0 ? d.spend / qualEst : 0;
     let status = 'PAUSAR';
     if (cpl > 0 && cpl <= 20) status = 'ESCALAR';
     else if (cpl > 0 && cpl <= 30) status = 'TESTAR';
     else if (cpl > 0 && cpl <= 40) status = 'MONITORAR';
-    return { name, ...d, cpc, cpl, ctr, status };
+    return { name, ...d, cpc, cpl, ctr, qualEst, cplQual, status };
   }).sort((a,b) => {
     if (a.leads > 0 && b.leads > 0) return a.cpl - b.cpl;
     if (a.leads > 0) return -1;
@@ -791,8 +793,10 @@ function renderTab2(D) {
     <td>${fmtMoney(p.spend)}</td>
     <td>${fmtNum(p.clicks)}</td>
     <td>${fmtNum(p.leads)}</td>
+    <td>${fmtNum(p.qualEst)}</td>
     <td>${fmtMoney(p.cpc)}</td>
     <td style="color:${p.cpl<=20?'var(--green)':p.cpl<=30?'var(--yellow)':'var(--red)'}">${p.leads > 0 ? fmtMoney(p.cpl) : '-'}</td>
+    <td style="color:${p.cplQual<=80?'var(--green)':p.cplQual<=110?'var(--yellow)':'var(--red)'}">${p.cplQual > 0 ? fmtMoney(p.cplQual) : '-'}</td>
     <td>${fmtPct(p.ctr)}</td>
     <td>${statusBadge(p.status)}</td>
   </tr>`).join('');
@@ -811,8 +815,10 @@ function renderTab2(D) {
       <th data-type="money">Investimento <span class="sort-icon">⇅</span></th>
       <th data-type="num">Cliques <span class="sort-icon">⇅</span></th>
       <th data-type="num">Leads <span class="sort-icon">⇅</span></th>
+      <th data-type="num">Qual. <span class="sort-icon">⇅</span></th>
       <th data-type="money">CPC <span class="sort-icon">⇅</span></th>
       <th data-type="money">CPL <span class="sort-icon">⇅</span></th>
+      <th data-type="money">CPL Qual. <span class="sort-icon">⇅</span></th>
       <th data-type="pct">CTR <span class="sort-icon">⇅</span></th>
       <th data-type="text">Status <span class="sort-icon">⇅</span></th>
     </tr></thead>
@@ -851,6 +857,8 @@ function renderTab3(D) {
     const cpm = w.imp > 0 ? (w.spend / w.imp * 1000) : 0;
     const cpl = w.leads > 0 ? w.spend / w.leads : 0;
     const conv = w.clicks > 0 ? (w.leads / w.clicks * 100) : 0;
+    const qualEst = Math.round(w.leads * D.qualRate);
+    const cplQual = qualEst > 0 ? w.spend / qualEst : 0;
     let trend = '►', trendClass = 'var-neutral';
     if (i > 0) {
       const prev = wkKeys[i-1];
@@ -863,7 +871,7 @@ function renderTab3(D) {
     }
     const endDate = new Date(wk+'T00:00:00'); endDate.setDate(endDate.getDate()+6);
     const label = fmtDate(new Date(wk+'T00:00:00')) + ' - ' + fmtDate(endDate);
-    return { wk, label, ...w, cpc, cpm, cpl, conv, trend, trendClass };
+    return { wk, label, ...w, cpc, cpm, cpl, conv, qualEst, cplQual, trend, trendClass };
   });
 
   let rows = wkData.map(w => `<tr>
@@ -871,9 +879,11 @@ function renderTab3(D) {
     <td>${fmtMoney(w.spend)}</td>
     <td>${fmtNum(w.clicks)}</td>
     <td>${fmtNum(w.leads)}</td>
+    <td>${fmtNum(w.qualEst)}</td>
     <td>${fmtMoney(w.cpc)}</td>
     <td>${fmtMoney(w.cpm)}</td>
     <td style="color:${w.cpl<=20?'var(--green)':w.cpl<=30?'var(--yellow)':'var(--red)'}">${w.leads > 0 ? fmtMoney(w.cpl) : '-'}</td>
+    <td style="color:${w.cplQual<=80?'var(--green)':w.cplQual<=110?'var(--yellow)':'var(--red)'}">${w.cplQual > 0 ? fmtMoney(w.cplQual) : '-'}</td>
     <td>${fmtPct(w.conv)}</td>
     <td><span class="${w.trendClass}" style="font-size:16px;font-weight:700;">${w.trend}</span></td>
   </tr>`).join('');
@@ -894,9 +904,11 @@ function renderTab3(D) {
       <th data-type="money">Invest. <span class="sort-icon">⇅</span></th>
       <th data-type="num">Cliques <span class="sort-icon">⇅</span></th>
       <th data-type="num">Leads <span class="sort-icon">⇅</span></th>
+      <th data-type="num">Qual. <span class="sort-icon">⇅</span></th>
       <th data-type="money">CPC <span class="sort-icon">⇅</span></th>
       <th data-type="money">CPM <span class="sort-icon">⇅</span></th>
       <th data-type="money">CPL <span class="sort-icon">⇅</span></th>
+      <th data-type="money">CPL Qual. <span class="sort-icon">⇅</span></th>
       <th data-type="pct">Conv. Rate <span class="sort-icon">⇅</span></th>
       <th data-type="text">Tendência <span class="sort-icon">⇅</span></th>
     </tr></thead>
@@ -1009,6 +1021,7 @@ function renderTab4(D) {
     <div class="mc-row"><span>Leads</span><span class="mc-val">${fmtNum(m.leads)}</span></div>
     <div class="mc-row"><span>Leads Qualif. (est.)</span><span class="mc-val">${fmtNum(m.qualEst)}</span></div>
     <div class="mc-row"><span>CPL</span><span class="mc-val">${m.leads > 0 ? fmtMoney(m.cpl) : '-'}</span></div>
+    <div class="mc-row"><span>CPL Qualificado</span><span class="mc-val" style="color:${m.cplQual<=80?'var(--green)':m.cplQual<=110?'var(--yellow)':'var(--red)'}">${m.cplQual > 0 ? fmtMoney(m.cplQual) : '-'}</span></div>
     <div class="mc-row"><span>CPC</span><span class="mc-val">${m.clicks > 0 ? fmtMoney(m.cpc) : '-'}</span></div>
     <div class="mc-row"><span>CTR</span><span class="mc-val">${fmtPct(m.ctr)}</span></div>
   </div>`).join('');
