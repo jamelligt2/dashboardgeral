@@ -134,6 +134,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
     <button class="preset-btn" onclick="setPreset(30,this)">30d</button>
     <button class="preset-btn active" id="btn-all" onclick="setPreset('all',this)">Tudo</button>
     <span class="range-info" id="range-info"></span>
+    <button class="preset-btn" onclick="showWebhookDebug()" title="Ver dados do Webhook" style="border-color:rgba(255,107,43,.4);margin-left:8px">🔍 Webhook</button>
   </div>
 </div>
 
@@ -303,6 +304,27 @@ function parseDate_DDMMAAAA(s) {
 function isoFromDDMM(d) {
   const [dd, mm, yy] = d.split('/');
   return `${yy}-${mm}-${dd}`;
+}
+
+// ====== DEBUG PANEL ======
+let _debugWRows = [];
+function showWebhookDebug() {
+  const rows = _debugWRows;
+  if (!rows || rows.length === 0) {
+    alert('⚠️ Webhook vazio ou não carregado.\n\nVerifique:\n1) Nome da aba na planilha (deve ser exatamente "Webhook")\n2) Planilha está pública');
+    return;
+  }
+  const header = rows[0];
+  const statusList = rows.slice(1, 20).map((r, i) => {
+    const s = (r[3] || '').trim();
+    const d = (r[28] || '').trim();
+    const v = (r[31] || '').trim();
+    return `Linha ${i+2}: status="${s}" | data="${d}" | valor="${v}"`;
+  }).join('\n');
+  const msg = `📡 WEBHOOK — ${rows.length - 1} linhas\n\n`
+    + `HEADER[0]="${header[0]}" [3]="${header[3]}" [28]="${header[28]}" [31]="${header[31]}"\n\n`
+    + `PRIMEIRAS LINHAS (cols 3,28,31):\n${statusList}`;
+  alert(msg);
 }
 
 // ====== FETCH ======
@@ -1068,6 +1090,7 @@ async function loadData() {
     const gRows = parseCSV(gCSV);
     const rRows = parseCSV(rCSV);
     const wRows = wCSV ? parseCSV(wCSV) : [];
+    _debugWRows = wRows; // salva para diagnóstico
 
     processData(gRows, rRows, wRows);
     initDatePickers();

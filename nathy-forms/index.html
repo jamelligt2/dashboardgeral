@@ -358,54 +358,43 @@ async function fetchCSV(sheetName) {
   return Papa.parse(text, { header: true, skipEmptyLines: true }).data;
 }
 
-async function fetchViaXLSX() {
+async function fetchFormsXLSX() {
   const url = `https://docs.google.com/spreadsheets/d/${CONFIG.sheetId}/export?format=xlsx`;
   const resp = await fetch(url);
   if (!resp.ok) throw new Error('XLSX export failed: ' + resp.status);
   const buf = await resp.arrayBuffer();
   const wb = XLSX.read(buf, { type: 'array', cellDates: true });
-  const result = {};
-  for (const name of wb.SheetNames) {
-    const ws = wb.Sheets[name];
-    if (ws) result[name] = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false, dateNF: 'dd/mm/yyyy' });
-  }
-  return result;
+  const ws = wb.Sheets[CONFIG.formsSheet];
+  if (!ws) throw new Error('Aba "' + CONFIG.formsSheet + '" não encontrada no XLSX');
+  return XLSX.utils.sheet_to_json(ws, { defval: '', raw: false, dateNF: 'dd/mm/yyyy' });
 }
 
 async function loadAllData() {
   const ls = document.getElementById('loadingScreen');
   const es = document.getElementById('errorScreen');
   ls.classList.remove('hidden'); es.classList.remove('show');
-  document.getElementById('loadingStatus').textContent = 'Buscando dados da planilha...';
   try {
-    /* Strategy 1: XLSX export (resolves ALL formulas) */
-    let xlsxOk = false;
-    try {
-      const sheets = await fetchViaXLSX();
-      const capData = sheets[CONFIG.capSheet];
-      const formsData = sheets[CONFIG.formsSheet];
-      if (capData && capData.length && formsData && formsData.length) {
-        RAW_CAP = capData;
-        RAW_FORMS = formsData;
-        xlsxOk = true;
-        console.log('[XLSX] OK — Captação:', capData.length, 'rows, Forms:', formsData.length, 'rows');
-        /* Diagnostic: check fatura col */
-        const fs = formsData[0] || {};
-        const fatCol = findCol(fs, ['fatura 6','fatura 6 meses','quanto fatura 6']);
-        const nonEmpty = formsData.filter(r => r[fatCol] && String(r[fatCol]).trim()).length;
-        console.log('[XLSX] fatura col:', fatCol, '— non-empty:', nonEmpty, '/', formsData.length);
-      }
-    } catch (xlsxErr) {
-      console.log('[XLSX] Failed, falling back to CSV:', xlsxErr.message);
-    }
+    /* Captação: sempre via CSV (funciona perfeitamente) */
+    document.getElementById('loadingStatus').textContent = 'Buscando dados de captação...';
+    RAW_CAP = await fetchCSV(CONFIG.capSheet);
+    console.log('[CSV] Captação:', RAW_CAP.length, 'rows');
 
-    /* Strategy 2: CSV fallback via gviz */
-    if (!xlsxOk) {
-      document.getElementById('loadingStatus').textContent = 'Buscando dados de captação...';
-      RAW_CAP = await fetchCSV(CONFIG.capSheet);
-      document.getElementById('loadingStatus').textContent = 'Buscando dados de formulários...';
+    /* Forms: tenta XLSX primeiro (resolve fórmulas), fallback CSV */
+    document.getElementById('loadingStatus').textContent = 'Buscando dados de formulários...';
+    let formsOk = false;
+    try {
+      RAW_FORMS = await fetchFormsXLSX();
+      formsOk = true;
+      const fs = RAW_FORMS[0] || {};
+      const fatCol = findCol(fs, ['fatura 6','fatura 6 meses','quanto fatura 6']);
+      const nonEmpty = RAW_FORMS.filter(r => r[fatCol] && String(r[fatCol]).trim()).length;
+      console.log('[XLSX] Forms:', RAW_FORMS.length, 'rows | fatura col:', fatCol, '| non-empty:', nonEmpty);
+    } catch (xlsxErr) {
+      console.log('[XLSX Forms] Falhou, usando CSV:', xlsxErr.message);
+    }
+    if (!formsOk) {
       RAW_FORMS = await fetchCSV(CONFIG.formsSheet);
-      console.log('[CSV] Captação:', RAW_CAP.length, 'rows, Forms:', RAW_FORMS.length, 'rows');
+      console.log('[CSV] Forms:', RAW_FORMS.length, 'rows');
     }
 
     document.getElementById('loadingStatus').textContent = 'Processando dados...';
