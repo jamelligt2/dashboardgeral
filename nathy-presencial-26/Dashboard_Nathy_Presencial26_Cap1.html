@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Nathy Presencial 26</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; background: #0f0f1a; color: #fff; min-height: 100vh; }
+
+  /* ── HEADER ── */
+  .header { background: #16213e; padding: 20px 32px 16px; border-bottom: 2px solid #ff6b35; }
+  .header h1 { font-size: 22px; font-weight: 700; color: #fff; letter-spacing: .5px; }
+  .header p  { font-size: 12px; color: #808080; margin-top: 4px; }
+
+  /* ── TABS ── */
+  .tabs { display: flex; background: #16213e; padding: 0 32px; gap: 4px; border-bottom: 1px solid #262640; }
+  .tab-btn {
+    padding: 12px 20px; font-size: 13px; font-weight: 600; cursor: pointer;
+    background: transparent; border: none; color: #808080;
+    border-bottom: 3px solid transparent; transition: all .2s;
+  }
+  .tab-btn:hover { color: #fff; }
+  .tab-btn.active { color: #ff6b35; border-bottom-color: #ff6b35; }
+
+  /* ── CONTENT ── */
+  .tab-content { display: none; padding: 28px 32px; }
+  .tab-content.active { display: block; }
+
+  /* ── SECTION TITLE ── */
+  .section-title {
+    font-size: 14px; font-weight: 700; color: #ff6b35;
+    text-transform: uppercase; letter-spacing: 1px;
+    margin: 28px 0 14px; padding-bottom: 6px;
+    border-bottom: 1px solid #262640;
+  }
+  .section-title:first-child { margin-top: 0; }
+
+  /* ── KPI CARDS ── */
+  .kpi-row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .kpi-card {
+    background: #1e1e35; border-radius: 10px; padding: 16px 20px;
+    flex: 1; min-width: 130px; border: 1px solid #262650;
+  }
+  .kpi-card .label { font-size: 11px; color: #808080; text-transform: uppercase; letter-spacing: .5px; }
+  .kpi-card .value { font-size: 28px; font-weight: 700; color: #fff; margin-top: 6px; line-height: 1; }
+  .kpi-card .sub   { font-size: 11px; color: #555; margin-top: 5px; }
+
+  /* ── HOT / COLD CARDS ── */
+  .audience-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 10px; }
+  .audience-card {
+    flex: 1; min-width: 280px; border-radius: 12px; padding: 18px 22px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .audience-card.hot { background: #2a0a0a; border: 2px solid #ff1744; }
+  .audience-card.cold { background: #061428; border: 2px solid #42a5f5; }
+  .audience-card .aud-title { font-size: 13px; font-weight: 700; }
+  .audience-card.hot  .aud-title { color: #ff1744; }
+  .audience-card.cold .aud-title { color: #42a5f5; }
+  .audience-card .aud-metrics { display: flex; gap: 20px; }
+  .audience-card .aud-metric .lbl { font-size: 10px; color: #aaa; text-transform: uppercase; }
+  .audience-card .aud-metric .val { font-size: 24px; font-weight: 700; margin-top: 2px; }
+  .audience-card.hot  .aud-metric .val { color: #ff4d6d; }
+  .audience-card.cold .aud-metric .val { color: #64b5f6; }
+  .audience-card .aud-detail { font-size: 11px; color: #aaa; border-top: 1px solid #333; padding-top: 8px; }
+  .audience-compare {
+    flex: 0 0 200px; min-width: 180px; background: #1e1e35; border-radius: 12px;
+    padding: 16px 20px; border: 1px solid #262650; display: flex;
+    flex-direction: column; justify-content: center; gap: 8px;
+  }
+  .audience-compare .comp-title { font-size: 11px; color: #ff6b35; font-weight: 700; text-transform: uppercase; }
+  .audience-compare .comp-item  { font-size: 12px; color: #ccc; }
+  .audience-compare .comp-item span.hot-val  { color: #ff4d6d; font-weight: 700; }
+  .audience-compare .comp-item span.cold-val { color: #64b5f6; font-weight: 700; }
+
+  /* ── FUNNEL ── */
+  .funnel { display: flex; align-items: center; justify-content: center; gap: 0; flex-wrap: wrap; margin: 8px 0; }
+  .funnel-step {
+    background: #1e1e35; border-radius: 10px; padding: 16px 24px;
+    text-align: center; min-width: 120px; border: 1px solid #262650;
+  }
+  .funnel-step .f-label { font-size: 11px; color: #808080; text-transform: uppercase; letter-spacing: .5px; }
+  .funnel-step .f-value { font-size: 26px; font-weight: 700; color: #fff; margin: 6px 0 4px; }
+  .funnel-arrow { font-size: 22px; color: #ff6b35; padding: 0 10px; display: flex; flex-direction: column; align-items: center; }
+  .funnel-arrow .f-rate { font-size: 11px; color: #ff6b35; font-weight: 700; white-space: nowrap; margin-top: 4px; }
+
+  /* ── TABLES ── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead tr { background: #ff6b35; }
+  thead th { padding: 10px 14px; text-align: center; font-size: 12px; font-weight: 700; color: #fff; white-space: nowrap; }
+  tbody tr { background: #1e1e35; border-bottom: 1px solid #262640; }
+  tbody tr:hover { background: #252545; }
+  tbody td { padding: 9px 14px; text-align: center; color: #ddd; white-space: nowrap; }
+  tbody td.left { text-align: left; font-weight: 600; }
+  tbody td.total { background: #262640; font-weight: 700; color: #ff6b35; }
+  tbody td a { color: #4fc3f7; text-decoration: underline; font-size: 12px; }
+
+  /* ── STATUS BADGES ── */
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+  .badge.escalar { background: #003020; color: #00c853; border: 1px solid #00c853; }
+  .badge.manter  { background: #2a1a00; color: #ff6b35; border: 1px solid #ff6b35; }
+  .badge.avaliar { background: #1a1600; color: #ffd600; border: 1px solid #ffd600; }
+  .badge.pausar  { background: #2a0000; color: #ff1744; border: 1px solid #ff1744; }
+  .badge.testar  { background: #1a1600; color: #ffd600; border: 1px solid #ffd600; }
+
+  /* ── METRIC COLORS ── */
+  .green  { color: #00c853; font-weight: 700; }
+  .red    { color: #ff1744; font-weight: 700; }
+  .orange { color: #ff6b35; font-weight: 700; }
+  .yellow { color: #ffd600; font-weight: 700; }
+  .blue   { color: #42a5f5; font-weight: 700; }
+
+  /* ── INSIGHT BOXES ── */
+  .insight-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+  .insight-item {
+    background: #1e1e35; border-radius: 8px; padding: 12px 16px;
+    font-size: 13px; color: #ddd; border-left: 3px solid #ff6b35;
+  }
+  .insight-item.good { border-left-color: #00c853; }
+  .insight-item.bad  { border-left-color: #ff1744; }
+  .insight-item.warn { border-left-color: #ffd600; }
+  .insight-item.info { border-left-color: #42a5f5; }
+
+  /* ── ACTION BOXES ── */
+  .action-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 10px; }
+  .action-box { background: #1e1e35; border-radius: 10px; padding: 18px 20px; }
+  .action-box.pausar-box { border: 1px solid #ff1744; }
+  .action-box.escalar-box { border: 1px solid #00c853; }
+  .action-box.testar-box  { border: 1px solid #ffd600; }
+  .action-box h4 { font-size: 14px; font-weight: 700; margin-bottom: 12px; }
+  .action-box.pausar-box  h4 { color: #ff1744; }
+  .action-box.escalar-box h4 { color: #00c853; }
+  .action-box.testar-box  h4 { color: #ffd600; }
+  .action-box ul { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+  .action-box ul li { font-size: 13px; color: #ccc; padding-left: 14px; position: relative; }
+  .action-box ul li::before { content: "•"; position: absolute; left: 0; }
+  .action-box.pausar-box  ul li::before { color: #ff1744; }
+  .action-box.escalar-box ul li::before { color: #00c853; }
+  .action-box.testar-box  ul li::before { color: #ffd600; }
+
+  /* ── HYPOTHESIS BOX ── */
+  .hyp-box {
+    background: #1e1e35; border: 1px solid #ff6b35; border-radius: 10px;
+    padding: 20px 24px; margin-top: 10px;
+  }
+  .hyp-box h4 { color: #ff6b35; font-size: 14px; font-weight: 700; margin-bottom: 12px; }
+  .hyp-box p  { font-size: 13px; color: #ccc; margin-bottom: 8px; line-height: 1.6; }
+  .hyp-box p strong { color: #fff; }
+
+  /* ── CHART CONTAINERS ── */
+  .chart-row { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px; }
+  .chart-box {
+    background: #1e1e35; border-radius: 10px; padding: 18px 20px;
+    flex: 1; min-width: 260px; border: 1px solid #262650;
+  }
+  .chart-box h4 { font-size: 13px; color: #ff6b35; font-weight: 700; margin-bottom: 14px; text-transform: uppercase; }
+
+  /* ── DIAG TABLE ── */
+  .diag-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .diag-table td { padding: 10px 14px; border-bottom: 1px solid #262640; color: #ccc; vertical-align: top; }
+  .diag-table td:first-child { color: #ff6b35; font-weight: 700; width: 38%; background: #1a1a30; }
+  .diag-table tr:last-child td { border-bottom: none; }
+
+  /* ── VARIATION ── */
+  .var-up   { color: #ff1744; }
+  .var-down { color: #00c853; }
+
+  /* ── NOTE ── */
+  .note { font-size: 11px; color: #555; margin-top: 10px; font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>📊 DASHBOARD CAPTAÇÃO — NATHY PRESENCIAL 26</h1>
+  <p>Campanha: [JGT] [PRESENCIAL26] [AGO.26] CAP060426 &nbsp;|&nbsp; Período: 07/04 a 10/04/2026 &nbsp;|&nbsp; Gerado automaticamente</p>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="showTab('geral')">VISÃO GERAL</button>
+  <button class="tab-btn" onclick="showTab('criativos')">CRIATIVOS</button>
+  <button class="tab-btn" onclick="showTab('publicos')">PÚBLICOS</button>
+  <button class="tab-btn" onclick="showTab('diaria')">ANÁLISE DIÁRIA</button>
+  <button class="tab-btn" onclick="showTab('diagnostico')">DIAGNÓSTICO E AÇÃO</button>
+</div>
+
+<!-- ========================================================
+     ABA 1: VISÃO GERAL
+======================================================== -->
+<div id="tab-geral" class="tab-content active">
+
+  <div class="section-title">KPIs GERAIS</div>
+  <div class="kpi-row">
+    <div class="kpi-card"><div class="label">Investimento</div><div class="value orange">R$ 837,40</div></div>
+    <div class="kpi-card"><div class="label">Impressões</div><div class="value">22.834</div></div>
+    <div class="kpi-card"><div class="label">Cliques</div><div class="value">397</div></div>
+    <div class="kpi-card"><div class="label">Page Views</div><div class="value">264</div></div>
+    <div class="kpi-card"><div class="label">Leads</div><div class="value green">70</div></div>
+    <div class="kpi-card"><div class="label">CTR</div><div class="value">1,74%</div></div>
+    <div class="kpi-card"><div class="label">CPC</div><div class="value">R$ 2,11</div></div>
+    <div class="kpi-card"><div class="label">CPM</div><div class="value">R$ 36,67</div></div>
+    <div class="kpi-card"><div class="label">CPL</div><div class="value green">R$ 11,96</div></div>
+  </div>
+
+  <div class="kpi-row" style="margin-top:12px;">
+    <div class="kpi-card"><div class="label">TX Entrada</div><div class="value">66,50%</div><div class="sub">PV / Cliques</div></div>
+    <div class="kpi-card"><div class="label">TX Cadastro</div><div class="value">26,52%</div><div class="sub">Leads / PV</div></div>
+    <div class="kpi-card"><div class="label">Hook Rate</div><div class="value yellow">0,37%</div><div class="sub">3s Views / Imp.</div></div>
+  </div>
+
+  <!-- PÚBLICO QUENTE VS FRIO -->
+  <div class="section-title">🔥❄ INVESTIMENTO E CPL POR TEMPERATURA DE PÚBLICO</div>
+  <div class="audience-row">
+
+    <div class="audience-card hot">
+      <div class="aud-title">🔥 PÚBLICO QUENTE — ENGAJAMENTO 365D</div>
+      <div class="aud-metrics">
+        <div class="aud-metric"><div class="lbl">Investimento</div><div class="val">R$ 501,74</div></div>
+        <div class="aud-metric"><div class="lbl">CPL</div><div class="val">R$ 12,54</div></div>
+        <div class="aud-metric"><div class="lbl">Leads</div><div class="val">40</div></div>
+      </div>
+      <div class="aud-detail">
+        Feed: 30 leads · CPL R$ 8,31 &nbsp;|&nbsp; Stories: 10 leads · CPL R$ 25,25
+      </div>
+    </div>
+
+    <div class="audience-card cold">
+      <div class="aud-title">❄ PÚBLICO FRIO — LAK 1% + PARENTAL SP</div>
+      <div class="aud-metrics">
+        <div class="aud-metric"><div class="lbl">Investimento</div><div class="val">R$ 335,66</div></div>
+        <div class="aud-metric"><div class="lbl">CPL</div><div class="val">R$ 11,19</div></div>
+        <div class="aud-metric"><div class="lbl">Leads</div><div class="val">30</div></div>
+      </div>
+      <div class="aud-detail">
+        LAK 1%: 17 leads · CPL R$ 9,70 &nbsp;|&nbsp; Parental SP: 13 leads · CPL R$ 13,13
+      </div>
+    </div>
+
+    <div class="audience-compare">
+      <div class="comp-title">Comparativo</div>
+      <div class="comp-item">Quente: <span class="hot-val">57% dos leads</span></div>
+      <div class="comp-item">Frio: <span class="cold-val">43% dos leads</span></div>
+      <div class="comp-item" style="margin-top:6px;">CPL Quente vs Frio:<br><span class="hot-val">+12% mais caro</span></div>
+    </div>
+
+  </div>
+
+  <!-- FUNIL -->
+  <div class="section-title">FUNIL DE CONVERSÃO</div>
+  <div class="funnel">
+    <div class="funnel-step">
+      <div class="f-label">Impressões</div>
+      <div class="f-value">22.834</div>
+    </div>
+    <div class="funnel-arrow">
+      <span>→</span>
+      <span class="f-rate">CTR 1,74%</span>
+    </div>
+    <div class="funnel-step">
+      <div class="f-label">Cliques</div>
+      <div class="f-value">397</div>
+    </div>
+    <div class="funnel-arrow">
+      <span>→</span>
+      <span class="f-rate">Entrada 66,5%</span>
+    </div>
+    <div class="funnel-step">
+      <div class="f-label">Page Views</div>
+      <div class="f-value">264</div>
+    </div>
+    <div class="funnel-arrow">
+      <span>→</span>
+      <span class="f-rate">Cadastro 26,5%</span>
+    </div>
+    <div class="funnel-step">
+      <div class="f-label">Leads</div>
+      <div class="f-value green">70</div>
+    </div>
+  </div>
+  <p class="note">⚠ 33,5% dos cliques não chegam na página — principal gargalo do funil (~R$ 280 perdidos)</p>
+
+  <!-- EVOLUÇÃO DIÁRIA -->
+  <div class="section-title">EVOLUÇÃO DIÁRIA</div>
+  <div class="chart-row">
+    <div class="chart-box" style="max-width:520px;">
+      <h4>Leads & CPL por dia</h4>
+      <canvas id="chartDiario" height="180"></canvas>
+    </div>
+    <div style="flex:1; min-width:260px;">
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>DIA</th><th>INVEST.</th><th>IMP.</th><th>CLIQUES</th><th>PV</th><th>LEADS</th><th>CPL</th><th>TX CAD.</th>
+          </tr></thead>
+          <tbody>
+            <tr><td>07/04</td><td>R$ 311,05</td><td>8.637</td><td>137</td><td>92</td><td class="green">27</td><td class="green">R$ 11,52</td><td>29,3%</td></tr>
+            <tr><td>08/04</td><td>R$ 269,45</td><td>7.394</td><td>132</td><td>83</td><td>22</td><td>R$ 12,25</td><td>26,5%</td></tr>
+            <tr><td>09/04</td><td>R$ 235,83</td><td>6.412</td><td>116</td><td>81</td><td class="yellow">19</td><td class="yellow">R$ 12,41</td><td>23,5%</td></tr>
+            <tr><td>10/04 *</td><td>R$ 21,07</td><td>391</td><td>12</td><td>8</td><td>2</td><td>R$ 10,54</td><td>25,0%</td></tr>
+            <tr class="total">
+              <td class="total">TOTAL</td><td class="total">R$ 837,40</td><td class="total">22.834</td><td class="total">397</td><td class="total">264</td><td class="total">70</td><td class="total">R$ 11,96</td><td class="total">26,5%</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="note">* 10/04 dia parcial</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ========================================================
+     ABA 2: CRIATIVOS
+======================================================== -->
+<div id="tab-criativos" class="tab-content">
+
+  <div class="section-title">RANKING DE CRIATIVOS — DO MELHOR AO PIOR</div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>#</th><th>CRIATIVO</th><th>INVEST.</th><th>IMP.</th><th>CLIQUES</th><th>PV</th><th>LEADS</th>
+        <th>CTR</th><th>CPC</th><th>CPL</th><th>TX ENTRADA</th><th>TX CADASTRO</th><th>HOOK RATE</th><th>LINK</th><th>STATUS</th>
+      </tr></thead>
+      <tbody>
+        <tr><td>1</td><td class="left">PRES-ADE02</td><td>R$ 287,65</td><td>8.754</td><td>165</td><td>106</td><td class="green">40</td><td>1,88%</td><td>R$ 1,74</td><td class="green">R$ 7,19</td><td>64,2%</td><td class="green">37,7%</td><td>—</td><td><a href="https://www.instagram.com/p/DWzxOZ_jMYG/" target="_blank">Ver</a></td><td><span class="badge escalar">ESCALAR</span></td></tr>
+        <tr><td>2</td><td class="left">PRES-ADE03</td><td>R$ 97,99</td><td>2.250</td><td>46</td><td>32</td><td class="orange">8</td><td>2,04%</td><td>R$ 2,13</td><td class="orange">R$ 12,25</td><td>69,6%</td><td>25,0%</td><td>0,13%</td><td><a href="https://www.instagram.com/p/DWzwq5aDGPH/" target="_blank">Ver</a></td><td><span class="badge manter">MANTER</span></td></tr>
+        <tr><td>3</td><td class="left">PRES-STE02</td><td>R$ 62,50</td><td>1.622</td><td>27</td><td>18</td><td class="orange">6</td><td>1,66%</td><td>R$ 2,31</td><td class="orange">R$ 10,42</td><td>66,7%</td><td>33,3%</td><td>1,36%</td><td><a href="https://www.instagram.com/p/DWzwkRKjVjN/" target="_blank">Ver</a></td><td><span class="badge escalar">ESCALAR</span></td></tr>
+        <tr><td>4</td><td class="left">PRES-STE08</td><td>R$ 63,81</td><td>1.672</td><td>32</td><td>21</td><td>4</td><td>1,91%</td><td>R$ 1,99</td><td>R$ 15,95</td><td>65,6%</td><td>19,0%</td><td>0,30%</td><td><a href="https://www.instagram.com/p/DWzwkavjFnY/" target="_blank">Ver</a></td><td><span class="badge manter">MANTER</span></td></tr>
+        <tr><td>5</td><td class="left">PRES-STE03</td><td>R$ 46,50</td><td>1.193</td><td>23</td><td>16</td><td>3</td><td>1,93%</td><td>R$ 2,02</td><td>R$ 15,50</td><td>69,6%</td><td>18,8%</td><td>1,93%</td><td><a href="https://www.instagram.com/p/DWzwkQrDLwA/" target="_blank">Ver</a></td><td><span class="badge manter">MANTER</span></td></tr>
+        <tr><td>6</td><td class="left">PRES-ADE01</td><td>R$ 22,33</td><td>538</td><td>9</td><td>6</td><td>2</td><td>1,67%</td><td>R$ 2,48</td><td>R$ 11,17</td><td>66,7%</td><td>33,3%</td><td>—</td><td><a href="https://www.instagram.com/p/DWzwseijH4A/" target="_blank">Ver</a></td><td><span class="badge avaliar">AVALIAR</span></td></tr>
+        <tr><td>7</td><td class="left">PRES-STE04</td><td>R$ 33,40</td><td>852</td><td>20</td><td>15</td><td>2</td><td>2,35%</td><td>R$ 1,67</td><td>R$ 16,70</td><td>75,0%</td><td>13,3%</td><td>2,00%</td><td><a href="https://www.instagram.com/p/DWzwkQ3DDLn/" target="_blank">Ver</a></td><td><span class="badge avaliar">AVALIAR</span></td></tr>
+        <tr><td>8</td><td class="left">PRES-STE05</td><td>R$ 24,20</td><td>632</td><td>15</td><td>12</td><td>2</td><td>2,37%</td><td>R$ 1,61</td><td>R$ 12,10</td><td>80,0%</td><td>16,7%</td><td>0,47%</td><td><a href="https://www.instagram.com/p/DWzwkafjCSt/" target="_blank">Ver</a></td><td><span class="badge avaliar">AVALIAR</span></td></tr>
+        <tr><td>9</td><td class="left">PRES-STE06</td><td>R$ 30,50</td><td>793</td><td>14</td><td>11</td><td>2</td><td>1,76%</td><td>R$ 2,18</td><td>R$ 15,25</td><td>78,6%</td><td>18,2%</td><td>1,13%</td><td><a href="https://www.instagram.com/p/DWzwkUoDO04/" target="_blank">Ver</a></td><td><span class="badge avaliar">AVALIAR</span></td></tr>
+        <tr><td>10</td><td class="left">PRES-STE01</td><td>R$ 35,88</td><td>888</td><td>20</td><td>12</td><td class="yellow">1</td><td>2,25%</td><td>R$ 1,79</td><td class="yellow">R$ 35,88</td><td>60,0%</td><td class="yellow">8,3%</td><td>—</td><td><a href="https://www.instagram.com/p/DWzwkQcjFmI/" target="_blank">Ver</a></td><td><span class="badge avaliar">AVALIAR</span></td></tr>
+        <tr><td>11</td><td class="left">PRES-STE07</td><td>R$ 25,84</td><td>660</td><td>14</td><td>10</td><td class="red">0</td><td>2,12%</td><td>R$ 1,85</td><td class="red">—</td><td>71,4%</td><td class="red">0%</td><td>0,45%</td><td><a href="https://www.instagram.com/p/DWzwkbNjO_i/" target="_blank">Ver</a></td><td><span class="badge pausar">PAUSAR</span></td></tr>
+        <tr><td>12</td><td class="left">PRES-ADE04</td><td>R$ 11,62</td><td>209</td><td>2</td><td>0</td><td class="red">0</td><td>0,96%</td><td>R$ 5,81</td><td class="red">—</td><td>0%</td><td class="red">0%</td><td>—</td><td><a href="https://www.instagram.com/p/DWzxO9UDFtf/" target="_blank">Ver</a></td><td><span class="badge pausar">PAUSAR</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section-title">INSIGHTS CRIATIVOS</div>
+  <div class="insight-list">
+    <div class="insight-item good">✅ <strong>PRES-ADE02 é o CAMPEÃO absoluto:</strong> 40 leads, CPL R$ 7,19, TX Cadastro 37,7% — escalar orçamento imediatamente</div>
+    <div class="insight-item good">✅ <strong>PRES-STE02 melhor story:</strong> 6 leads, CPL R$ 10,42, Hook Rate 1,36% — escalar em stories</div>
+    <div class="insight-item good">✅ <strong>PRES-ADE03 segundo feed:</strong> 8 leads, CTR 2,04%, CPL R$ 12,25 — manter e monitorar</div>
+    <div class="insight-item warn">⚠ <strong>PRES-STE01:</strong> CTR 2,25% mas apenas 1 lead (CPL R$ 35,88) — alto CTR, baixa conversão. Problema de promessa vs. página</div>
+    <div class="insight-item bad">🔴 <strong>PRES-STE07:</strong> R$ 25,84 gastos, 0 leads — PAUSAR imediatamente</div>
+    <div class="insight-item bad">🔴 <strong>PRES-ADE04:</strong> R$ 11,62 gastos, 0 leads, CTR 0,96% — criativo não gera interesse e não converte. PAUSAR</div>
+  </div>
+
+</div>
+
+<!-- ========================================================
+     ABA 3: PÚBLICOS
+======================================================== -->
+<div id="tab-publicos" class="tab-content">
+
+  <div class="section-title">ANÁLISE POR CONJUNTO / PÚBLICO</div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>PÚBLICO</th><th>TIPO</th><th>INVEST.</th><th>IMP.</th><th>CLIQUES</th><th>PV</th><th>LEADS</th>
+        <th>CTR</th><th>CPC</th><th>CPL</th><th>TX ENTRADA</th><th>TX CADASTRO</th><th>HOOK RATE</th><th>AÇÃO</th>
+      </tr></thead>
+      <tbody>
+        <tr><td class="left">ENGAJAMENTO 365D</td><td>Feed</td><td>R$ 249,29</td><td>7.717</td><td>136</td><td>86</td><td class="green">30</td><td>1,76%</td><td>R$ 1,83</td><td class="green">R$ 8,31</td><td>63,2%</td><td class="green">34,9%</td><td>0,03%</td><td><span class="badge escalar">ESCALAR</span></td></tr>
+        <tr><td class="left">LAK 1%</td><td>Feed</td><td>R$ 83,52</td><td>1.781</td><td>49</td><td>29</td><td class="green">10</td><td>2,75%</td><td>R$ 1,70</td><td class="green">R$ 8,35</td><td>59,2%</td><td class="green">34,5%</td><td>0,06%</td><td><span class="badge escalar">ESCALAR</span></td></tr>
+        <tr><td class="left">PARENTAL SP</td><td>Feed</td><td>R$ 86,78</td><td>2.253</td><td>37</td><td>29</td><td class="green">10</td><td>1,64%</td><td>R$ 2,35</td><td class="orange">R$ 8,68</td><td>78,4%</td><td>34,5%</td><td>—</td><td><span class="badge escalar">ESCALAR</span></td></tr>
+        <tr><td class="left">LAK 1% — STORIES</td><td>Stories</td><td>R$ 81,41</td><td>2.160</td><td>27</td><td>21</td><td>7</td><td>1,25%</td><td>R$ 3,01</td><td class="yellow">R$ 11,63</td><td>77,8%</td><td>33,3%</td><td>0,56%</td><td><span class="badge testar">TESTAR</span></td></tr>
+        <tr><td class="left">ENGAJAMENTO 365D — STORIES</td><td>Stories</td><td>R$ 252,45</td><td>6.822</td><td>118</td><td>79</td><td>10</td><td>1,73%</td><td>R$ 2,14</td><td class="red">R$ 25,25</td><td>66,9%</td><td>12,7%</td><td>0,73%</td><td><span class="badge pausar">PAUSAR</span></td></tr>
+        <tr><td class="left">PARENTAL SP — STORIES</td><td>Stories</td><td>R$ 83,95</td><td>2.101</td><td>30</td><td>20</td><td class="red">3</td><td>1,43%</td><td>R$ 2,80</td><td class="red">R$ 27,98</td><td>66,7%</td><td class="red">15,0%</td><td>0,95%</td><td><span class="badge pausar">PAUSAR</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- FEED VS STORIES -->
+  <div class="section-title">CONSOLIDADO: FEED vs STORIES</div>
+  <div class="kpi-row">
+    <div class="kpi-card" style="border-color:#00c853;">
+      <div class="label">FEED — Investimento</div><div class="value green">R$ 419,59</div>
+    </div>
+    <div class="kpi-card" style="border-color:#00c853;">
+      <div class="label">FEED — Leads</div><div class="value green">50</div>
+    </div>
+    <div class="kpi-card" style="border-color:#00c853;">
+      <div class="label">FEED — CPL</div><div class="value green">R$ 8,39</div>
+    </div>
+    <div class="kpi-card" style="border-color:#ff1744;">
+      <div class="label">STORIES — Investimento</div><div class="value red">R$ 417,81</div>
+    </div>
+    <div class="kpi-card" style="border-color:#ff1744;">
+      <div class="label">STORIES — Leads</div><div class="value red">20</div>
+    </div>
+    <div class="kpi-card" style="border-color:#ff1744;">
+      <div class="label">STORIES — CPL</div><div class="value red">R$ 20,89</div>
+    </div>
+  </div>
+
+  <div class="section-title">INSIGHTS PÚBLICOS</div>
+  <div class="insight-list">
+    <div class="insight-item good">✅ <strong>Os 3 públicos de Feed têm CPL excelente</strong> (R$ 8,31 – R$ 8,68) — todos devem ser escalados com foco em criativos feed</div>
+    <div class="insight-item warn">⚠ <strong>LAK 1% Stories:</strong> 7 leads, CPL R$ 11,63 — tem potencial, mas precisa de novos criativos com hooks mais fortes</div>
+    <div class="insight-item bad">🔴 <strong>ENGAJAMENTO Stories:</strong> R$ 252,45 investidos para apenas 10 leads — CPL 3x mais caro que Feed. Redirecionar budget para Feed</div>
+    <div class="insight-item bad">🔴 <strong>Parental SP Stories:</strong> CPL R$ 27,98, TX Cadastro apenas 15% — PAUSAR imediatamente</div>
+    <div class="insight-item info">📊 <strong>Feed CPL R$ 8,39 vs Stories CPL R$ 20,89</strong> — Feed converte 2,5x mais barato. Concentrar orçamento em Feed</div>
+  </div>
+
+</div>
+
+<!-- ========================================================
+     ABA 4: ANÁLISE DIÁRIA
+======================================================== -->
+<div id="tab-diaria" class="tab-content">
+
+  <div class="section-title">MÉTRICAS DIÁRIAS COMPLETAS</div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>DIA</th><th>INVEST.</th><th>IMP.</th><th>CLIQUES</th><th>PV</th><th>LEADS</th>
+        <th>CTR</th><th>CPC</th><th>CPL</th><th>TX ENTRADA</th><th>TX CADASTRO</th>
+      </tr></thead>
+      <tbody>
+        <tr><td>07/04</td><td>R$ 311,05</td><td>8.637</td><td>137</td><td>92</td><td class="green">27</td><td>1,59%</td><td>R$ 2,27</td><td class="green">R$ 11,52</td><td>67,2%</td><td class="green">29,3%</td></tr>
+        <tr><td>08/04</td><td>R$ 269,45</td><td>7.394</td><td>132</td><td>83</td><td>22</td><td>1,79%</td><td>R$ 2,04</td><td>R$ 12,25</td><td>62,9%</td><td>26,5%</td></tr>
+        <tr><td>09/04</td><td>R$ 235,83</td><td>6.412</td><td>116</td><td>81</td><td class="yellow">19</td><td>1,81%</td><td>R$ 2,03</td><td class="yellow">R$ 12,41</td><td>69,8%</td><td class="yellow">23,5%</td></tr>
+        <tr><td>10/04 *</td><td>R$ 21,07</td><td>391</td><td>12</td><td>8</td><td>2</td><td>3,07%</td><td>R$ 1,76</td><td>R$ 10,54</td><td>66,7%</td><td>25,0%</td></tr>
+        <tr>
+          <td class="total">TOTAL</td><td class="total">R$ 837,40</td><td class="total">22.834</td><td class="total">397</td><td class="total">264</td><td class="total">70</td>
+          <td class="total">1,74%</td><td class="total">R$ 2,11</td><td class="total">R$ 11,96</td><td class="total">66,5%</td><td class="total">26,5%</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="note">* 10/04 dia parcial</p>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="section-title">GRÁFICOS DE TENDÊNCIA</div>
+  <div class="chart-row">
+    <div class="chart-box">
+      <h4>Leads por dia</h4>
+      <canvas id="chartLeads" height="200"></canvas>
+    </div>
+    <div class="chart-box">
+      <h4>CPL por dia (R$)</h4>
+      <canvas id="chartCPL" height="200"></canvas>
+    </div>
+    <div class="chart-box">
+      <h4>Investimento por dia (R$)</h4>
+      <canvas id="chartInvest" height="200"></canvas>
+    </div>
+  </div>
+
+  <!-- VARIAÇÃO -->
+  <div class="section-title">VARIAÇÃO D1 → D3 (dias completos)</div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>MÉTRICA</th><th>07/04</th><th>09/04</th><th>VARIAÇÃO</th><th>TENDÊNCIA</th></tr></thead>
+      <tbody>
+        <tr><td class="left orange">Investimento</td><td>R$ 311,05</td><td>R$ 235,83</td><td class="red">-24,2%</td><td class="red">↓ QUEDA</td></tr>
+        <tr><td class="left orange">Impressões</td><td>8.637</td><td>6.412</td><td class="red">-25,8%</td><td class="red">↓ QUEDA</td></tr>
+        <tr><td class="left orange">Leads</td><td>27</td><td>19</td><td class="red">-29,6%</td><td class="red">↓ QUEDA</td></tr>
+        <tr><td class="left orange">CPC</td><td>R$ 2,27</td><td>R$ 2,03</td><td class="green">-10,6%</td><td class="green">↓ MELHORA</td></tr>
+        <tr><td class="left orange">CPL</td><td>R$ 11,52</td><td>R$ 12,41</td><td class="red">+7,7%</td><td class="red">↑ PIORA</td></tr>
+        <tr><td class="left orange">TX Cadastro</td><td>29,3%</td><td>23,5%</td><td class="red">-5,8pp</td><td class="red">↓ PIORA</td></tr>
+        <tr><td class="left orange">TX Entrada</td><td>67,2%</td><td>69,8%</td><td class="green">+2,6pp</td><td class="green">↑ MELHORA</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section-title">INSIGHTS DIÁRIOS</div>
+  <div class="insight-list">
+    <div class="insight-item bad">📉 Volume em queda: Leads caíram 29,6% do D1 para D3, junto com redução de investimento</div>
+    <div class="insight-item bad">📉 CPL subindo: de R$ 11,52 para R$ 12,41 (+7,7%) — eficiência piorando</div>
+    <div class="insight-item bad">📉 TX Cadastro caindo: 29,3% → 23,5% — possível fadiga da oferta ou página</div>
+    <div class="insight-item good">📈 CPC melhorou -10,6% — criativos ainda geram cliques eficientes</div>
+    <div class="insight-item good">📈 TX Entrada estável/crescente — problema NÃO está no redirecionamento LP</div>
+    <div class="insight-item warn">⚠ Dia 07/04 foi o mais eficiente: menor CPL (R$ 11,52) e maior TX Cadastro (29,3%)</div>
+    <div class="insight-item info">ℹ 10/04 ainda parcial: 2 leads com CPL R$ 10,54 — aguardar dados completos</div>
+  </div>
+
+</div>
+
+<!-- ========================================================
+     ABA 5: DIAGNÓSTICO E AÇÃO
+======================================================== -->
+<div id="tab-diagnostico" class="tab-content">
+
+  <div style="background:#1e1e35; border:1px solid #ff6b35; border-radius:10px; padding:16px 20px; margin-bottom:20px;">
+    <div style="font-size:13px; color:#aaa;">Investimento total: <strong style="color:#ff6b35;">R$ 837,40</strong> &nbsp;|&nbsp;
+    Leads: <strong style="color:#00c853;">70</strong> &nbsp;|&nbsp;
+    CPL médio: <strong style="color:#00c853;">R$ 11,96</strong> &nbsp;|&nbsp;
+    Período: 07/04 a 10/04/2026</div>
+  </div>
+
+  <!-- DIAGNÓSTICO DO FUNIL -->
+  <div class="section-title">1. DIAGNÓSTICO DO FUNIL</div>
+  <table class="diag-table">
+    <tr>
+      <td>Impressão → Clique (CTR 1,74%)</td>
+      <td>CTR <span class="green">adequado</span> para captação. Criativos chamam atenção. CPC médio R$ 2,11 — eficiente.</td>
+    </tr>
+    <tr>
+      <td>Clique → Page View (TX Entrada 66,5%)</td>
+      <td><span class="yellow">⚠ ATENÇÃO:</span> 33,5% dos cliques NÃO chegam na página. Perda estimada de <span class="red">~R$ 280</span>. Verificar velocidade da LP e redirecionamento mobile.</td>
+    </tr>
+    <tr>
+      <td>Page View → Lead (TX Cadastro 26,5%)</td>
+      <td><span class="green">BOM</span> para evento presencial. Porém caiu de 29,3% (D1) para 23,5% (D3) — sinal de fadiga.</td>
+    </tr>
+    <tr>
+      <td>Hook Rate Stories (0,37%)</td>
+      <td><span class="red">MUITO BAIXO.</span> Os primeiros 3 segundos não prendem. Necessário reformular hooks dos criativos de stories.</td>
+    </tr>
+    <tr>
+      <td>CPL Geral (R$ 11,96)</td>
+      <td><span class="green">EXCELENTE</span> para evento presencial. Feed entrega R$ 8,39, Stories R$ 20,89. Redistribuir verba para Feed.</td>
+    </tr>
+  </table>
+
+  <!-- ONDE PERDE DINHEIRO -->
+  <div class="section-title">2. ONDE ESTÁ SENDO PERDIDO DINHEIRO</div>
+  <div class="insight-list">
+    <div class="insight-item bad">🔴 33,5% dos cliques não viram page view → ~<strong>R$ 280 perdidos</strong> na transição clique→página</div>
+    <div class="insight-item bad">🔴 PRES-ADE04 + PRES-STE07: <strong>R$ 37,46</strong> gastos com 0 leads — orçamento desperdiçado</div>
+    <div class="insight-item bad">🔴 ENGAJAMENTO Stories CPL R$ 25,25 vs Feed CPL R$ 8,31 — <strong>R$ 168 extras</strong> para 10 leads que poderiam ser obtidos mais barato no Feed</div>
+    <div class="insight-item bad">🔴 Parental SP Stories CPL R$ 27,98 — <strong>R$ 56</strong> desperdiçados em 2 leads que poderiam ser Feed</div>
+    <div class="insight-item warn">⚠ CPL subindo 7,7% em 3 dias → fadiga de criativos se não agir agora</div>
+  </div>
+
+  <!-- AÇÕES IMEDIATAS -->
+  <div class="section-title">3. AÇÕES IMEDIATAS</div>
+  <div class="action-grid">
+
+    <div class="action-box pausar-box">
+      <h4>🔴 PAUSAR AGORA</h4>
+      <ul>
+        <li><strong>PRES-ADE04</strong> — 0 leads, R$ 11,62 gastos, CTR 0,96%</li>
+        <li><strong>PRES-STE07</strong> — 0 leads, R$ 25,84 gastos</li>
+        <li><strong>Parental SP Stories</strong> — 3 leads, CPL R$ 27,98 insustentável</li>
+        <li><strong>ENGAJAMENTO Stories</strong> — CPL R$ 25,25, 3x mais caro que Feed</li>
+      </ul>
+    </div>
+
+    <div class="action-box escalar-box">
+      <h4>✅ ESCALAR JÁ</h4>
+      <ul>
+        <li><strong>PRES-ADE02</strong> — 40 leads, CPL R$ 7,19. Campeão absoluto</li>
+        <li><strong>ENGAJAMENTO 365D Feed</strong> — 30 leads, CPL R$ 8,31</li>
+        <li><strong>LAK 1% Feed</strong> — 10 leads, CPL R$ 8,35</li>
+        <li><strong>Parental SP Feed</strong> — 10 leads, CPL R$ 8,68</li>
+      </ul>
+    </div>
+
+    <div class="action-box testar-box">
+      <h4>🟡 TESTAR EM SEGUIDA</h4>
+      <ul>
+        <li>Novos hooks para stories (atual 0,37% — muito baixo)</li>
+        <li><strong>PRES-STE02</strong> em novos públicos — melhor story, CPL R$ 10,42</li>
+        <li>Duplicar variações do PRES-ADE02 para evitar fadiga</li>
+        <li><strong>LAK 1% Stories</strong> com novos criativos — tem potencial (7 leads, CPL R$ 11,63)</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <!-- HIPÓTESE PRINCIPAL -->
+  <div class="section-title">4. PRINCIPAL HIPÓTESE DE MELHORIA</div>
+  <div class="hyp-box">
+    <h4>🎯 Gargalo crítico: Clique → Page View (33,5% de perda)</h4>
+    <p><strong>Hipótese:</strong> A página de destino pode estar lenta ou o redirecionamento está quebrando em dispositivos mobile, causando abandono antes do carregamento.</p>
+    <p><strong>Ação prioritária:</strong> Testar velocidade da LP no PageSpeed Insights e verificar o fluxo de redirecionamento no mobile. Cada 1% de melhoria nessa taxa representa ~4 leads adicionais e economia de ~R$ 48.</p>
+    <p><strong>Segundo foco:</strong> Criar novos hooks para stories. Com Hook Rate de apenas 0,37%, os primeiros 3 segundos não estão prendendo. Testar ganchos com dor, urgência e curiosidade.</p>
+    <p><strong>Terceiro foco:</strong> Duplicar variações do PRES-ADE02 imediatamente. A queda de 29,6% em leads em 3 dias indica saturação. Novos ângulos do mesmo criativo campeão podem reverter a tendência.</p>
+    <p><strong>Meta de eficiência:</strong> Manter CPL abaixo de R$ 12,00 (atual R$ 11,96) com aumento de volume. Feed já entrega R$ 8,39 — concentrar budget aqui e cortar stories ineficientes.</p>
+  </div>
+
+</div>
+
+<!-- ========================================================
+     SCRIPTS
+======================================================== -->
+<script>
+function showTab(id) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  event.target.classList.add('active');
+  if (id === 'diaria') buildDiariaCharts();
+  if (id === 'geral')  buildGeralChart();
+}
+
+const chartDefaults = {
+  plugins: { legend: { labels: { color: '#aaa', font: { size: 11 } } } },
+  scales: {
+    x: { ticks: { color: '#888' }, grid: { color: '#262640' } },
+    y: { ticks: { color: '#888' }, grid: { color: '#262640' } },
+  }
+};
+
+// Chart Geral — Leads + CPL diário
+let geralBuilt = false;
+function buildGeralChart() {
+  if (geralBuilt) return; geralBuilt = true;
+  const ctx = document.getElementById('chartDiario').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['07/04', '08/04', '09/04', '10/04*'],
+      datasets: [
+        { label: 'Leads', data: [27, 22, 19, 2], backgroundColor: '#00c853', yAxisID: 'y' },
+        { label: 'CPL (R$)', data: [11.52, 12.25, 12.41, 10.54], type: 'line',
+          borderColor: '#ff6b35', backgroundColor: 'transparent',
+          pointBackgroundColor: '#ff6b35', tension: 0.3, yAxisID: 'y1' }
+      ]
+    },
+    options: {
+      ...chartDefaults,
+      scales: {
+        x: { ticks: { color: '#888' }, grid: { color: '#262640' } },
+        y: { ticks: { color: '#888' }, grid: { color: '#262640' }, title: { display: true, text: 'Leads', color: '#888' } },
+        y1: { position: 'right', ticks: { color: '#ff6b35' }, grid: { drawOnChartArea: false },
+               title: { display: true, text: 'CPL (R$)', color: '#ff6b35' } },
+      }
+    }
+  });
+}
+
+// Charts Análise Diária
+let diariaBuilt = false;
+function buildDiariaCharts() {
+  if (diariaBuilt) return; diariaBuilt = true;
+  const dias = ['07/04', '08/04', '09/04', '10/04*'];
+
+  new Chart(document.getElementById('chartLeads').getContext('2d'), {
+    type: 'bar',
+    data: { labels: dias, datasets: [{ label: 'Leads', data: [27, 22, 19, 2],
+      backgroundColor: ['#00c853','#4caf50','#ffd600','#ff6b35'] }] },
+    options: { ...chartDefaults, plugins: { legend: { display: false } } }
+  });
+
+  new Chart(document.getElementById('chartCPL').getContext('2d'), {
+    type: 'line',
+    data: { labels: dias, datasets: [{ label: 'CPL (R$)', data: [11.52, 12.25, 12.41, 10.54],
+      borderColor: '#ff6b35', backgroundColor: 'rgba(255,107,53,0.1)',
+      pointBackgroundColor: '#ff6b35', tension: 0.3, fill: true }] },
+    options: chartDefaults
+  });
+
+  new Chart(document.getElementById('chartInvest').getContext('2d'), {
+    type: 'bar',
+    data: { labels: dias, datasets: [{ label: 'Investimento (R$)', data: [311.05, 269.45, 235.83, 21.07],
+      backgroundColor: '#42a5f5' }] },
+    options: { ...chartDefaults, plugins: { legend: { display: false } } }
+  });
+}
+
+// Build geral chart on load
+window.addEventListener('load', buildGeralChart);
+</script>
+
+</body>
+</html>
