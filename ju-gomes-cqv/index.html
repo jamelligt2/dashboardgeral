@@ -198,7 +198,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
   <div class="pub-grid" id="pub-cards"></div>
   <div class="sec-title">Tabela de Públicos</div>
   <div class="tbl-wrap"><table><thead><tr>
-    <th>Público (Adset)</th><th>Invest.</th><th>Cliques</th><th>Imp.</th><th>PV</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Status</th>
+    <th>Público (Adset)</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Ticket</th><th>Cliques</th><th>Imp.</th><th>PV</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Status</th>
   </tr></thead><tbody id="tbody-publicos"></tbody></table></div>
 </div>
 
@@ -410,14 +410,27 @@ function processData(gRows, wRows) {
     r[wCol.source] && r[wCol.source].toLowerCase().replace(/[\s_\-]/g, '') === META_SOURCE_FILTER
   );
 
-  // === Build webhook sales by day ===
+  // === Determine Gerenciador date range ===
+  const gDates = gRows.slice(1).map(r => (r[gCol.date] || '').trim().slice(0, 10)).filter(d => d.length >= 8).sort();
+  const gMinDate = gDates.length ? gDates[0] : '0000-00-00';
+  const gMaxDate = gDates.length ? gDates[gDates.length - 1] : '9999-12-31';
+
+  // === Find webhook publico column ===
+  const wColPublico = wHeader.findIndex(h => h.includes('publico'));
+
+  // === Build webhook sales by day (filtered by Gerenciador date range) ===
   const salesByDay = {};
   const salesByCriativo = {};
+  const salesByPublico = {};
   wData.forEach(r => {
     const rawDate = (r[wCol.data] || '').trim();
     const iso = rawDate.slice(0, 10); // YYYY-MM-DD
     const val = parseNum(r[wCol.valor]) / 100; // centavos -> reais
     const cri = (r[wCol.criativo] || '').trim();
+    const pub = wColPublico >= 0 ? (r[wColPublico] || '').trim() : '';
+
+    // Only count sales within Gerenciador date range
+    if (iso < gMinDate || iso > gMaxDate) return;
 
     if (!salesByDay[iso]) salesByDay[iso] = { fat: 0, compras: 0 };
     salesByDay[iso].fat += val;
@@ -427,6 +440,12 @@ function processData(gRows, wRows) {
       if (!salesByCriativo[cri]) salesByCriativo[cri] = { fat: 0, compras: 0 };
       salesByCriativo[cri].fat += val;
       salesByCriativo[cri].compras += 1;
+    }
+
+    if (pub) {
+      if (!salesByPublico[pub]) salesByPublico[pub] = { fat: 0, compras: 0 };
+      salesByPublico[pub].fat += val;
+      salesByPublico[pub].compras += 1;
     }
   });
 
@@ -524,20 +543,40 @@ function processData(gRows, wRows) {
     };
   });
 
-  // === Build PUBLICOS ===
-  PUBLICOS = Object.values(pubMap).map(p => ({
-    nome: p.nome,
-    inv: Math.round(p.inv * 100) / 100,
-    cliques: p.cliques,
-    imp: p.imp,
-    pv: p.pv,
-    ck: p.ck,
-    cpc: p.cliques > 0 ? Math.round(p.inv / p.cliques * 100) / 100 : 0,
-    cpm: p.imp > 0 ? Math.round(p.inv / p.imp * 1000 * 100) / 100 : 0,
-    ctr: p.imp > 0 ? Math.round(p.cliques / p.imp * 100 * 100) / 100 : 0,
-    connectRate: p.cliques > 0 ? Math.round(p.pv / p.cliques * 100 * 100) / 100 : 0,
-    ativo: p.lastDate >= d7ago
-  }));
+  // === Build PUBLICOS (with webhook sales matched by adset name) ===
+  PUBLICOS = Object.values(pubMap).map(p => {
+    // Try to match webhook publico to adset name (exact or partial)
+    let sp = salesByPublico[p.nome] || { fat: 0, compras: 0 };
+    // Also try matching by checking if any salesByPublico key is contained in adset name or vice versa
+    if (sp.fat === 0 && sp.compras === 0) {
+      for (const [key, val] of Object.entries(salesByPublico)) {
+        if (p.nome.toLowerCase().includes(key.toLowerCase()) || key.toLowerCase().includes(p.nome.toLowerCase())) {
+          sp = { fat: sp.fat + val.fat, compras: sp.compras + val.compras };
+        }
+      }
+    }
+    const inv = Math.round(p.inv * 100) / 100;
+    const fat = Math.round(sp.fat * 100) / 100;
+    const compras = sp.compras;
+    return {
+      nome: p.nome,
+      inv,
+      cliques: p.cliques,
+      imp: p.imp,
+      pv: p.pv,
+      ck: p.ck,
+      compras,
+      fat,
+      cpc: p.cliques > 0 ? Math.round(p.inv / p.cliques * 100) / 100 : 0,
+      cpm: p.imp > 0 ? Math.round(p.inv / p.imp * 1000 * 100) / 100 : 0,
+      ctr: p.imp > 0 ? Math.round(p.cliques / p.imp * 100 * 100) / 100 : 0,
+      connectRate: p.cliques > 0 ? Math.round(p.pv / p.cliques * 100 * 100) / 100 : 0,
+      roas: inv > 0 ? Math.round(fat / inv * 100) / 100 : 0,
+      ticket: compras > 0 ? Math.round(fat / compras * 100) / 100 : 0,
+      cac: compras > 0 ? Math.round(inv / compras * 100) / 100 : 0,
+      ativo: p.lastDate >= d7ago
+    };
+  });
 
   // === Build SEMANAL ===
   const weekMap = {};
@@ -741,6 +780,7 @@ function renderCriativos() {
         <div class="cri-metric"><div class="cri-metric-label">CPC</div><div class="cri-metric-val">${brl(c.cpc)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">CPM</div><div class="cri-metric-val">${brl(c.cpm)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">CAC</div><div class="cri-metric-val">${brl(c.cac)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">Ticket Médio</div><div class="cri-metric-val">${brl(c.ticket)}</div></div>
       </div>
       ${c.link ? `<a class="cri-link" href="${c.link}" target="_blank">${c.link}</a>` : ''}
     </div>`).join('');
@@ -778,10 +818,14 @@ function renderPublicos() {
       <div class="pub-card-header"><div class="pub-name">${p.nome}</div><div class="cri-badge ${p.ativo ? 'ativo' : 'inativo'}">${p.ativo ? 'Ativo' : 'Inativo'}</div></div>
       <div class="pub-metrics">
         <div class="pub-metric"><div class="pub-metric-val">${brl(p.inv)}</div><div class="pub-metric-lbl">Invest.</div></div>
-        <div class="pub-metric"><div class="pub-metric-val neutral">${pct(p.ctr)}</div><div class="pub-metric-lbl">CTR</div></div>
-        <div class="pub-metric"><div class="pub-metric-val neutral">${pct(p.connectRate)}</div><div class="pub-metric-lbl">Connect Rate</div></div>
+        <div class="pub-metric"><div class="pub-metric-val neutral">${br(p.roas)}x</div><div class="pub-metric-lbl">ROAS</div></div>
+        <div class="pub-metric"><div class="pub-metric-val neutral">${brl(p.ticket)}</div><div class="pub-metric-lbl">Ticket Médio</div></div>
       </div>
       <div class="cri-metrics">
+        <div class="cri-metric"><div class="cri-metric-label">Fat.</div><div class="cri-metric-val">${brl(p.fat)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">Compras</div><div class="cri-metric-val">${br(p.compras, 0)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">CTR</div><div class="cri-metric-val">${pct(p.ctr)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">Connect Rate</div><div class="cri-metric-val">${pct(p.connectRate)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">CPC</div><div class="cri-metric-val">${brl(p.cpc)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">CPM</div><div class="cri-metric-val">${brl(p.cpm)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">Cliques</div><div class="cri-metric-val">${br(p.cliques, 0)}</div></div>
@@ -795,7 +839,8 @@ function renderPublicos() {
   }).join('');
 
   document.getElementById('tbody-publicos').innerHTML = pubs.map(p => `
-    <tr><td>${p.nome}</td><td>${brl(p.inv)}</td><td>${br(p.cliques, 0)}</td><td>${br(p.imp, 0)}</td>
+    <tr><td>${p.nome}</td><td>${brl(p.inv)}</td><td>${brl(p.fat)}</td><td>${br(p.roas)}x</td><td>${br(p.compras, 0)}</td>
+    <td>${brl(p.ticket)}</td><td>${br(p.cliques, 0)}</td><td>${br(p.imp, 0)}</td>
     <td>${br(p.pv || 0, 0)}</td><td>${pct(p.ctr)}</td><td>${brl(p.cpc)}</td><td>${brl(p.cpm)}</td>
     <td>${pct(p.connectRate)}</td>
     <td><span class="cri-badge ${p.ativo ? 'ativo' : 'inativo'}">${p.ativo ? 'Ativo' : 'Inativo'}</span></td></tr>`).join('');
