@@ -1211,6 +1211,11 @@
 
         function parseDate(str) {
             if (!str) return null;
+            // Parse YYYY-MM-DD as LOCAL date to avoid UTC offset shifting the day
+            const match = String(str).match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (match) {
+                return new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
+            }
             const date = new Date(str);
             return isNaN(date) ? null : date;
         }
@@ -1349,12 +1354,25 @@
                 if (form.faturamento >= CONFIG.qualThreshold) {
                     FORMS_QUAL[form.ad_name] = (FORMS_QUAL[form.ad_name] || 0) + 1;
                     if (form.date) {
-                        const d = new Date(form.date);
-                        const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                        const mk = formatDateISO(form.date).slice(0, 7); // 'YYYY-MM'
                         FORMS_QUAL_MONTHLY[mk] = (FORMS_QUAL_MONTHLY[mk] || 0) + 1;
                     }
                 }
             });
+        }
+
+        // Returns qualified leads filtered by date range {total, byAd}
+        function getQualFiltered(startStr, endStr) {
+            const byAd = {};
+            let total = 0;
+            GLOBAL_DATA.formsProcessed.forEach(form => {
+                if (form.faturamento < CONFIG.qualThreshold) return;
+                const dateStr = form.date ? formatDateISO(form.date) : '';
+                if (!dateStr || dateStr < startStr || dateStr > endStr) return;
+                byAd[form.ad_name] = (byAd[form.ad_name] || 0) + 1;
+                total++;
+            });
+            return { byAd, total };
         }
 
         function applyFilter() {
@@ -1420,8 +1438,11 @@
             const totalVideo3s = data.reduce((s, r) => s + r.video3s, 0);
             const totalVideo95 = data.reduce((s, r) => s + r.video95, 0);
 
-            // Calculate qualified leads (sum from FORMS_QUAL directly, not per Gerenciador row)
-            let totalQual = Object.values(FORMS_QUAL).reduce((s, v) => s + v, 0);
+            // Calculate qualified leads filtered by current date range
+            const startStr = document.getElementById('filterStartDate').value;
+            const endStr = document.getElementById('filterEndDate').value;
+            const qualFiltered = getQualFiltered(startStr, endStr);
+            let totalQual = qualFiltered.total;
 
             const qualRate = totalLeads > 0 ? totalQual / totalLeads : 0;
             const cpl = totalLeads > 0 ? totalSpend / totalLeads : 0;
@@ -1771,12 +1792,16 @@
                 if (row.date > byAd[row.ad].lastDate) byAd[row.ad].lastDate = row.date;
             });
 
+            const startStr1 = document.getElementById('filterStartDate').value;
+            const endStr1 = document.getElementById('filterEndDate').value;
+            const qualFiltered1 = getQualFiltered(startStr1, endStr1);
+
             const ads = Object.values(byAd)
                 .map(ad => ({
                     ...ad,
-                    qual: FORMS_QUAL[ad.ad] || 0,
+                    qual: qualFiltered1.byAd[ad.ad] || 0,
                     cpl: ad.leads > 0 ? ad.spend / ad.leads : 0,
-                    cplQual: (FORMS_QUAL[ad.ad] || 0) > 0 ? ad.spend / (FORMS_QUAL[ad.ad] || 1) : 0,
+                    cplQual: (qualFiltered1.byAd[ad.ad] || 0) > 0 ? ad.spend / (qualFiltered1.byAd[ad.ad] || 1) : 0,
                     cpc: ad.clicks > 0 ? ad.spend / ad.clicks : 0,
                     ctr: ad.impressions > 0 ? ad.clicks / ad.impressions : 0,
                     hookRate: ad.impressions > 0 ? ad.video3s / ad.impressions : 0,
