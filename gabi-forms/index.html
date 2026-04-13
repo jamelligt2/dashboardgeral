@@ -1220,6 +1220,14 @@
             return isNaN(date) ? null : date;
         }
 
+        // Parse any YYYY-MM-DD string as local date (avoids UTC offset in chart labels)
+        function localDate(str) {
+            if (!str) return new Date();
+            const match = String(str).match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (match) return new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
+            return new Date(str);
+        }
+
         function formatDate(date) {
             if (!date) return '--';
             return date.toLocaleDateString('pt-BR');
@@ -1646,7 +1654,7 @@
             CHARTS['cpl-daily'] = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: dates.map(d => new Date(d).toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit' })),
+                    labels: dates.map(d => localDate(d).toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit' })),
                     datasets: [
                         {
                             label: 'CPL',
@@ -1712,7 +1720,7 @@
             CHARTS['invest-leads'] = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: dates.map(d => new Date(d).toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit' })),
+                    labels: dates.map(d => localDate(d).toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit' })),
                     datasets: [
                         {
                             label: 'Investimento (R$)',
@@ -2131,7 +2139,7 @@
                 const trendData = trends[idx] || { trend: '-', change: 0 };
                 html += `
                     <tr>
-                        <td>${new Date(w.week).toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit' })}</td>
+                        <td>${localDate(w.week).toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit' })}</td>
                         <td>${formatMoney(w.spend)}</td>
                         <td>${w.clicks}</td>
                         <td>${w.leads}</td>
@@ -2161,8 +2169,8 @@
             const best = weekList.reduce((a, b) => a.cpl < b.cpl ? a : b);
             const worst = weekList.reduce((a, b) => a.cpl > b.cpl ? a : b);
             html += `<div class="insights-container"><div class="insights-title">Insights</div>`;
-            html += `<div class="insight-item"><div class="insight-label">Melhor Semana</div><div class="insight-value">${new Date(best.week).toLocaleDateString('pt-BR')} - CPL: ${formatMoney(best.cpl)}</div></div>`;
-            html += `<div class="insight-item"><div class="insight-label">Pior Semana</div><div class="insight-value">${new Date(worst.week).toLocaleDateString('pt-BR')} - CPL: ${formatMoney(worst.cpl)}</div></div>`;
+            html += `<div class="insight-item"><div class="insight-label">Melhor Semana</div><div class="insight-value">${localDate(best.week).toLocaleDateString('pt-BR')} - CPL: ${formatMoney(best.cpl)}</div></div>`;
+            html += `<div class="insight-item"><div class="insight-label">Pior Semana</div><div class="insight-value">${localDate(worst.week).toLocaleDateString('pt-BR')} - CPL: ${formatMoney(worst.cpl)}</div></div>`;
             html += `</div>`;
 
             container.innerHTML = html;
@@ -2185,7 +2193,7 @@
             CHARTS['weekly-cpl'] = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: weeks.map(w => new Date(w.week).toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit' })),
+                    labels: weeks.map(w => localDate(w.week).toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit' })),
                     datasets: [
                         {
                             label: 'CPL',
@@ -2245,7 +2253,7 @@
             CHARTS['weekly-cpc-cpl'] = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: weeks.map(w => new Date(w.week).toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit' })),
+                    labels: weeks.map(w => localDate(w.week).toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit' })),
                     datasets: [
                         {
                             label: 'CPC',
@@ -2293,7 +2301,7 @@
             CHARTS['weekly-cpl-qual'] = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: weeks.map(w => new Date(w.week).toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit' })),
+                    labels: weeks.map(w => localDate(w.week).toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit' })),
                     datasets: [
                         {
                             label: 'CPL',
@@ -2378,7 +2386,7 @@
             html += `<div class="kpi-grid">`;
             const colors = ['var(--orange)', 'var(--blue)', 'var(--green)'];
             monthList.forEach((m, idx) => {
-                const monthName = new Date(m.month + '-01').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+                const monthName = localDate(m.month + '-01').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
                 html += `
                     <div class="kpi-card" style="border-color: ${colors[idx % 3]};">
                         <span class="kpi-label">${monthName}</span>
@@ -2402,7 +2410,7 @@
                             <thead>
                                 <tr>
                                     <th>Métrica</th>
-                                    ${monthList.map(m => `<th>${new Date(m.month + '-01').toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })}</th>`).join('')}
+                                    ${monthList.map(m => `<th>${localDate(m.month + '-01').toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })}</th>`).join('')}
                                     <th>Variação (%)</th>
                                 </tr>
                             </thead>
@@ -2493,7 +2501,7 @@
             CHARTS['monthly-invest'] = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: months.map(m => new Date(m.month + '-01').toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })),
+                    labels: months.map(m => localDate(m.month + '-01').toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })),
                     datasets: [{
                         label: 'Investimento',
                         data: months.map(m => m.spend),
@@ -2530,7 +2538,7 @@
             CHARTS['monthly-cpl-leads'] = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: months.map(m => new Date(m.month + '-01').toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })),
+                    labels: months.map(m => localDate(m.month + '-01').toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })),
                     datasets: [
                         {
                             label: 'CPL',
