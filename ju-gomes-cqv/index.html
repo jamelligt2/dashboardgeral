@@ -920,9 +920,24 @@ async function loadData() {
       fetchSheetCSV(WEBHOOK_SHEET)
     ]);
 
+    // Validate CSV content
+    if (!gCSV || gCSV.trim().length === 0) {
+      throw new Error('Planilha Gerenciador retornou vazia. Verifique se a planilha está publicada na web (Arquivo → Compartilhar → Publicar na Web → CSV).');
+    }
+    if (!wCSV || wCSV.trim().length === 0) {
+      throw new Error('Planilha Webhook retornou vazia. Verifique se a planilha está publicada na web (Arquivo → Compartilhar → Publicar na Web → CSV).');
+    }
+
     document.getElementById('loading-msg').textContent = 'Processando dados...';
     const gRows = parseCSV(gCSV);
     const wRows = parseCSV(wCSV);
+
+    if (!gRows || gRows.length < 2 || !gRows[0]) {
+      throw new Error('Gerenciador sem dados suficientes. Encontradas ' + (gRows ? gRows.length : 0) + ' linhas.');
+    }
+    if (!wRows || wRows.length < 2 || !wRows[0]) {
+      throw new Error('Webhook sem dados suficientes. Encontradas ' + (wRows ? wRows.length : 0) + ' linhas.');
+    }
 
     processData(gRows, wRows);
     initDatePickers();
@@ -930,8 +945,12 @@ async function loadData() {
 
     document.getElementById('loading-overlay').style.display = 'none';
   } catch (err) {
-    document.getElementById('loading-msg').textContent = 'Erro: ' + err.message;
-    document.getElementById('loading-msg').style.color = '#e74c3c';
+    const msgEl = document.getElementById('loading-msg');
+    msgEl.textContent = err.message;
+    msgEl.style.color = '#e74c3c';
+    msgEl.style.maxWidth = '500px';
+    msgEl.style.textAlign = 'center';
+    msgEl.style.lineHeight = '1.6';
     console.error(err);
   }
 }
