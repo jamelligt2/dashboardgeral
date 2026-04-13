@@ -1375,16 +1375,19 @@ function calcDesafioData(){
         comprasTotal+=(d.compras||0);
       }
     });
-    // Compute compras ads from SALE_LOG (source M = meta_ads)
-    var comp=0, fatAds=0;
+    // Compute compras/fat from SALE_LOG
+    var comp=0, fatAds=0, fatIngresso=0;
     SALE_LOG.forEach(function(s){
-      if(s.d>=range.de && s.d<=range.ate && s.s==='M'){ comp++; fatAds+=s.pr; }
+      if(s.d>=range.de && s.d<=range.ate){
+        fatIngresso+=s.pr; // ALL ingressos (ads + orgânico + tudo)
+        if(s.s==='M'){ comp++; fatAds+=s.pr; } // só ads
+      }
     });
     // OBs from live Vendas data
     var obData=OB_LIVE[range.nome]||{qtd:0,fat:0};
     var obComp=obData.qtd;
     var obFat=obData.fat;
-    var fatTotal=fatAds+obFat;
+    var fatTotal=fatIngresso+obFat; // faturamento total = ingressos (todos) + OBs
     var ctr=imps>0?(cliq/imps*100):0;
     var cpc=cliq>0?(inv/cliq):0;
     var cpm=imps>0?(inv/imps*1000):0;
@@ -1400,7 +1403,7 @@ function calcDesafioData(){
     var fatGeral=fatTotal+upsellFat;
     var roasGeral=inv>0?(fatGeral/inv):0;
     return {nome:range.nome, cor:range.cor, de:range.de, ate:range.ate, dias:dias,
-      inv:inv, fatAds:fatAds, obCompras:obComp, obFat:obFat, fatTotal:fatTotal,
+      inv:inv, fatIngresso:fatIngresso, fatAds:fatAds, obCompras:obComp, obFat:obFat, fatTotal:fatTotal,
       compras:comp, comprasTotal:comprasTotal, cliques:cliq, imp:imps, pv:pvs, ck:cks,
       ctr:ctr, cpc:cpc, cpm:cpm, taxaEntrada:taxaEntrada, taxaCompra:taxaCompra,
       cac:cac, cacAds:cacAds, ticket:ticket, roas:roas,
@@ -1573,7 +1576,8 @@ function renderDebriefing(){
   row('Investimento', function(d){return brl(d.inv)}, {bold:true});
   row('Vendas Ingressos (Total)', function(d){return num(d.comprasTotal)}, {bold:true});
   row('  └ Via Ads', function(d){return num(d.compras)});
-  row('Faturamento Ingressos', function(d){return brl(d.fatAds)}, {bold:true});
+  row('Faturamento Ingressos (Total)', function(d){return brl(d.fatIngresso)}, {bold:true});
+  row('  └ Via Ads', function(d){return brl(d.fatAds)});
 
   // SEÇÃO: Order Bumps
   sep('Order Bumps');
