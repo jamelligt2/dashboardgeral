@@ -487,7 +487,7 @@ const PAGE_DAILY = [
   {d:"2026-03-15",p:"C",i:82.30,c:108,m:5037,v:78,k:7},
 ];
 
-const SALE_LOG = [
+var SALE_LOG = [
   {d:"2026-02-20",p:"B",cr:"DES-ADE02",pr:35,s:"ads"},
   {d:"2026-02-20",p:"",cr:"",pr:35,s:"outros"},
   {d:"2026-02-20",p:"",cr:"",pr:35,s:"outros"},
@@ -1357,11 +1357,12 @@ function renderPaginas(){
 // B: 65 vendas R$2275 + 15 OB R$266.58 = R$2541.58
 // C: 30 vendas R$1131 + 12 OB R$260 = R$1391
 var DESAFIOS_RANGES = [
-  {nome:"Desafio A", de:"2026-02-17", ate:"2026-03-01", cor:"#ff6b2b", comprasAds:66, fatAds:2310, obCompras:27, obFat:890.61, upsellQtd:14, upsellTicket:997},
-  {nome:"Desafio B", de:"2026-03-02", ate:"2026-03-15", cor:"#3b82f6", comprasAds:65, fatAds:2275, obCompras:15, obFat:266.58, upsellQtd:3, upsellTicket:997},
-  {nome:"Desafio C", de:"2026-03-16", ate:"2026-04-05", cor:"#2ecc71", comprasAds:0, fatAds:0, obCompras:18, obFat:480.60, useLive:true, upsellQtd:0, upsellTicket:997},
-  {nome:"Desafio D", de:"2026-04-06", ate:"2026-04-20", cor:"#e74c3c", comprasAds:0, fatAds:0, obCompras:0, obFat:0, useLive:true, upsellQtd:0, upsellTicket:997}
+  {nome:"Desafio A", de:"2026-02-17", ate:"2026-03-01", cor:"#ff6b2b", useLive:true, upsellQtd:14, upsellTicket:997},
+  {nome:"Desafio B", de:"2026-03-02", ate:"2026-03-15", cor:"#3b82f6", useLive:true, upsellQtd:3, upsellTicket:997},
+  {nome:"Desafio C", de:"2026-03-16", ate:"2026-04-05", cor:"#2ecc71", useLive:true, upsellQtd:0, upsellTicket:997},
+  {nome:"Desafio D", de:"2026-04-06", ate:"2026-04-26", cor:"#e74c3c", useLive:true, upsellQtd:0, upsellTicket:997}
 ];
+var OB_LIVE={}; // populated by Vendas fetch: {desafioNome: {qtd, fat}}
 
 function calcDesafioData(){
   var fd=filteredDias();
@@ -1374,18 +1375,15 @@ function calcDesafioData(){
         comprasTotal+=(d.compras||0);
       }
     });
-    // Compute compras/fat from SALE_LOG (has all sales: pre-CUTOFF hardcoded + post-CUTOFF from webhook)
+    // Compute compras ads from SALE_LOG (source M = meta_ads)
     var comp=0, fatAds=0;
-    if(range.useLive){
-      SALE_LOG.forEach(function(s){
-        if(s.d>=range.de && s.d<=range.ate){ comp++; fatAds+=s.pr; }
-      });
-    } else {
-      comp=range.comprasAds;
-      fatAds=range.fatAds;
-    }
-    var obComp=range.obCompras||0;
-    var obFat=range.obFat||0;
+    SALE_LOG.forEach(function(s){
+      if(s.d>=range.de && s.d<=range.ate && s.s==='M'){ comp++; fatAds+=s.pr; }
+    });
+    // OBs from live Vendas data
+    var obData=OB_LIVE[range.nome]||{qtd:0,fat:0};
+    var obComp=obData.qtd;
+    var obFat=obData.fat;
     var fatTotal=fatAds+obFat;
     var ctr=imps>0?(cliq/imps*100):0;
     var cpc=cliq>0?(inv/cliq):0;
@@ -1630,9 +1628,14 @@ function fetchLiveData(){
 
   Promise.all([
     fetch(GVIZ+'PP258').then(function(r){return r.text()}).catch(function(){return ''}),
-    fetch(GVIZ+'Webhook').then(function(r){return r.text()}).catch(function(){return ''})
+    fetch(GVIZ+'Vendas&range=A:A').then(function(r){return r.text()}).catch(function(){return ''}),
+    fetch(GVIZ+'Vendas&range=H:H').then(function(r){return r.text()}).catch(function(){return ''}),
+    fetch(GVIZ+'Vendas&range=K:K').then(function(r){return r.text()}).catch(function(){return ''}),
+    fetch(GVIZ+'Vendas&range=R:R').then(function(r){return r.text()}).catch(function(){return ''}),
+    fetch(GVIZ+'Vendas&range=AK:AK').then(function(r){return r.text()}).catch(function(){return ''}),
+    fetch(GVIZ+'Vendas&range=AP:AP').then(function(r){return r.text()}).catch(function(){return ''})
   ]).then(function(results){
-    var adsCSV=results[0], whCSV=results[1];
+    var adsCSV=results[0];
     var newDaysAdded=0;
 
     // ===== PARSE ADS (PP258) =====
@@ -1783,92 +1786,96 @@ function fetchLiveData(){
       });
     }
 
-    // ===== PARSE WEBHOOK (vendas) =====
-    if(whCSV){
-      var whLines=whCSV.split('\n').filter(function(l){return l.trim()});
-      var whHeaders=parseCSVLine(whLines[0]);
-      // Find cols
-      var wColSck=-1,wColApproved=-1,wColPrice=-1,wColStatus=-1;
-      whHeaders.forEach(function(h,i){
-        if(h.indexOf('purchase.origin.sck')>=0)wColSck=i;
-        if(h.indexOf('approved_date')>=0)wColApproved=i;
-        if(h==='data.purchase.price.value'||h.indexOf('price.value')>=0&&h.indexOf('original')<0&&wColPrice<0)wColPrice=i;
-        if(h.indexOf('status')>=0&&h.indexOf('subscription')<0)wColStatus=i;
-      });
+    // ===== PARSE VENDAS (Hotmart export — colunas individuais) =====
+    function parseColCSV(csv){
+      return csv.split('\n').slice(1).map(function(l){return l.replace(/^"|"$/g,'').trim()}).filter(function(l){return l!==''});
+    }
+    var vNome=parseColCSV(results[1]);
+    var vMoeda=parseColCSV(results[2]);
+    var vPrecoOferta=parseColCSV(results[3]);
+    var vDataConf=parseColCSV(results[4]);
+    var vSCK=parseColCSV(results[5]);
+    var vPrecoTotal=parseColCSV(results[6]);
+    var vN=vNome.length;
 
-      // Parse webhook sales
-      var whDaySales={};
-      var whCriSales={};
-      for(var i=1;i<whLines.length;i++){
-        var vals=parseCSVLine(whLines[i]);
-        // PIX data inserts extra cols at position 26+, shifting only status (col 33→36).
-        // Cols 0-25 (sck, approved_date, price) are ALWAYS at expected positions.
-        // So: use fixed cols for sck/ts/price, search for APPROVED anywhere.
-        var hasApproved=false;
-        for(var si=0;si<vals.length;si++){if(vals[si]==='APPROVED'){hasApproved=true;break;}}
-        if(!hasApproved)continue;
+    if(vN>0){
+      // Zero out DIAS compras/fat (will rebuild from Vendas)
+      DIAS.forEach(function(d){d.compras=0;d.fat=0});
+      // Reset PAGE_TOTALS compras/fat (keep inv/cliques from PP258)
+      Object.keys(PAGE_TOTALS).forEach(function(k){PAGE_TOTALS[k].compras=0;PAGE_TOTALS[k].fat=0});
+      // Reset SALE_LOG and OB_LIVE
+      SALE_LOG=[];
+      OB_LIVE={};
+      DESAFIOS_RANGES.forEach(function(r){OB_LIVE[r.nome]={qtd:0,fat:0}});
+      // Reset CRIATIVOS sales
+      CRIATIVOS.forEach(function(c){c.compras=0;c.fat=0;c.roas=0;c.cac=0;c.ticket=0});
 
-        // Cols 0-25 are normally fixed. For rare edge cases (USD transactions),
-        // cols shift early. Use fixed col first, fallback to nearby search.
-        var ts=parseInt(vals[wColApproved]); // col 20
-        if(isNaN(ts)||ts<1700000000000||ts>1900000000000){
-          // Fallback: search nearby for timestamp
-          for(var ti=15;ti<=30&&!ts;ti++){var tc=parseInt(vals[ti]);if(!isNaN(tc)&&tc>1700000000000&&tc<1900000000000)ts=tc;}
-        }
-        if(!ts||isNaN(ts))continue;
-        var dtObj=new Date(ts - 3*3600000);
-        var ymd=dtObj.getUTCFullYear()+'-'+String(dtObj.getUTCMonth()+1).padStart(2,'0')+'-'+String(dtObj.getUTCDate()).padStart(2,'0');
-        if(ymd<CUTOFF)continue;
+      var vDaySales={};
+      var vCriSales={};
 
-        var price=parseFloat((vals[wColPrice]||'0').replace(',','.'))||0; // col 25
-        if(price>0&&price<=50){
-          // Normal BRL price in expected range, keep it
-        } else {
-          // Price missing or suspicious (foreign currency?). Search all cols for best candidate.
-          // Prefer values in normal product range (30-50), which are BRL converted prices.
-          var bestNormal=0, bestAny=0;
-          for(var pi=10;pi<=45;pi++){
-            var pc=parseFloat((vals[pi]||'').replace(',','.'));
-            if(!isNaN(pc)&&pc>=30&&pc<10000){
-              if(pc>=30&&pc<=50&&!bestNormal) bestNormal=pc;
-              if(!bestAny) bestAny=pc;
-            }
-          }
-          price=bestNormal||bestAny||0;
-        }
+      for(var vi=0;vi<vN;vi++){
+        var nm=vNome[vi]||'';
+        var dt=vDataConf[vi]||'';
+        var po=parseFloat((vPrecoOferta[vi]||'0').replace(',','.'))||0;
+        var pt=parseFloat((vPrecoTotal[vi]||'0').replace(',','.'))||0;
+        var sk=vSCK[vi]||'';
+        var mo=vMoeda[vi]||'BRL';
+
+        // Parse date DD/MM/YYYY HH:MM:SS → YYYY-MM-DD + DD/MM/YYYY
+        var dtParts=dt.split(' ')[0].split('/');
+        if(dtParts.length!==3)continue;
+        var ymd=dtParts[2]+'-'+dtParts[1].padStart(2,'0')+'-'+dtParts[0].padStart(2,'0');
+        var ddmmyyyy=dtParts[0].padStart(2,'0')+'/'+dtParts[1].padStart(2,'0')+'/'+dtParts[2];
+
+        // Price: precoTotal for BRL, precoOferta for foreign if reasonable
+        var price=pt;
+        if(mo!=='BRL'&&po>0&&po<=50)price=po;
+        else if(price>100&&po>0&&po<=50)price=po;
         if(price<=0)continue;
 
-        var ddmmyyyy=String(dtObj.getUTCDate()).padStart(2,'0')+'/'+String(dtObj.getUTCMonth()+1).padStart(2,'0')+'/'+dtObj.getUTCFullYear();
-        if(!whDaySales[ddmmyyyy])whDaySales[ddmmyyyy]={compras:0,fat:0};
-        whDaySales[ddmmyyyy].compras++;
-        whDaySales[ddmmyyyy].fat+=price;
+        // Classify product
+        var nmLow=nm.toLowerCase();
+        var isIngresso=nmLow.indexOf('desafio corrimento')>=0&&nmLow.indexOf('gravação')<0;
+        var isOB=nmLow.indexOf('guia')>=0||nmLow.indexOf('skincare')>=0||nmLow.indexOf('elixir')>=0;
 
-        var sck=vals[wColSck]||''; // col 18
-        if(!sck||sck==='FALSE'||sck==='TRUE'){
-          // Fallback: search nearby for sck value
-          for(var sci=15;sci<=25;sci++){var sv=vals[sci]||'';if(sv.indexOf('meta_ads')>=0||sv.indexOf('bio')>=0||sv.indexOf('grupovip')>=0||sv.indexOf('PAGINA')>=0||sv.indexOf('HOTMART')>=0){sck=sv;break;}}
+        // Extract page + source from SCK
+        var skLow=sk.toLowerCase();
+        var isAds=skLow.indexOf('meta_ads')>=0;
+        var pgMatch=sk.match(/PAGINA\s+([A-Z])/i);
+        var pgLetter=pgMatch?pgMatch[1].toUpperCase():null;
+        var criMatch=sk.match(/DES-\w+/);
+
+        var _source='C';
+        if(isAds)_source='M';
+        else if(skLow.indexOf('bio')>=0)_source='B';
+        else if(skLow.indexOf('grupovip')>=0)_source='G';
+
+        // Find desafio for OB tracking
+        var desNome='';
+        for(var di=0;di<DESAFIOS_RANGES.length;di++){
+          var dr=DESAFIOS_RANGES[di];
+          if(ymd>=dr.de&&ymd<=dr.ate){desNome=dr.nome;break;}
         }
-        var criMatch=sck.match(/DES-\w+/);
-        if(criMatch){
-          var criName=criMatch[0];
-          if(!whCriSales[criName])whCriSales[criName]={compras:0,fat:0};
-          whCriSales[criName].compras++;
-          whCriSales[criName].fat+=price;
-        }
 
-        // Page from sck + SALE_LOG entry
-        var _pgLetter='O'; // default: organic
-        var _source='C'; // default: other
-        var _pgFound=false;
-        if(sck.indexOf('meta_ads')>=0) _source='M';
-        else if(sck.indexOf('bio_link')>=0||sck.indexOf('biolink')>=0) _source='B';
-        else if(sck.indexOf('grupovip')>=0) _source='G';
+        if(isIngresso){
+          // Day sales
+          if(!vDaySales[ddmmyyyy])vDaySales[ddmmyyyy]={compras:0,fat:0};
+          vDaySales[ddmmyyyy].compras++;
+          vDaySales[ddmmyyyy].fat+=price;
 
-        ['A','B','C','D','E','F','G','H','I','J'].forEach(function(letter){
-          if(!_pgFound && sck.indexOf('PAGINA '+letter)>=0){
+          // Criativo sales
+          if(criMatch){
+            var criName=criMatch[0];
+            if(!vCriSales[criName])vCriSales[criName]={compras:0,fat:0};
+            vCriSales[criName].compras++;
+            vCriSales[criName].fat+=price;
+          }
+
+          // Page totals
+          var _pgFound=false;
+          if(pgLetter){
             _pgFound=true;
-            _pgLetter=letter;
-            var pgKey='Página '+letter;
+            var pgKey='Página '+pgLetter;
             if(!PAGE_TOTALS[pgKey])PAGE_TOTALS[pgKey]={compras:0,fat:0,inv:0,cliques:0,pv:0,ck:0,imp:0};
             PAGE_TOTALS[pgKey].compras++;PAGE_TOTALS[pgKey].fat+=price;
             if(criMatch){
@@ -1878,39 +1885,42 @@ function fetchLiveData(){
               PAGE_CRI[pgKey][pn].compras++;PAGE_CRI[pgKey][pn].fat+=price;
             }
           }
-        });
-        if(!_pgFound && sck.indexOf('meta_ads')>=0){
-          PAGE_TOTALS["Ads (sem tag)"].compras++;PAGE_TOTALS["Ads (sem tag)"].fat+=price;
-        } else if(!_pgFound && (sck.indexOf('bio')>=0||sck.indexOf('grupovip')>=0)){
-          PAGE_TOTALS["Orgânico"].compras++;PAGE_TOTALS["Orgânico"].fat+=price;
-        } else if(!_pgFound && sck){
-          PAGE_TOTALS["Outros"].compras++;PAGE_TOTALS["Outros"].fat+=price;
-        } else if(!_pgFound){
-          PAGE_TOTALS["Outros"].compras++;PAGE_TOTALS["Outros"].fat+=price;
-        }
+          if(!_pgFound&&isAds){
+            PAGE_TOTALS["Ads (sem tag)"].compras++;PAGE_TOTALS["Ads (sem tag)"].fat+=price;
+          }else if(!_pgFound&&(skLow.indexOf('bio')>=0||skLow.indexOf('grupovip')>=0)){
+            PAGE_TOTALS["Orgânico"].compras++;PAGE_TOTALS["Orgânico"].fat+=price;
+          }else if(!_pgFound){
+            PAGE_TOTALS["Outros"].compras++;PAGE_TOTALS["Outros"].fat+=price;
+          }
 
-        // Add to SALE_LOG for date filtering
-        SALE_LOG.push({d:ymd,p:_pgLetter,cr:criMatch?criMatch[0]:'',pr:price,s:_source});
+          // SALE_LOG
+          SALE_LOG.push({d:ymd,p:pgLetter||'O',cr:criMatch?criMatch[0]:'',pr:price,s:_source});
+
+        }else if(isOB&&desNome){
+          // Track OB per desafio
+          OB_LIVE[desNome].qtd++;
+          OB_LIVE[desNome].fat+=price;
+        }
       }
 
-      // Merge webhook sales into DIAS
+      // Merge Vendas sales into DIAS
       var diasMap={};
       DIAS.forEach(function(d,idx){diasMap[d.data]=idx});
-      Object.keys(whDaySales).forEach(function(dt){
-        var ws=whDaySales[dt];
+      Object.keys(vDaySales).forEach(function(dt){
+        var ws=vDaySales[dt];
         if(diasMap[dt]!==undefined){
-          DIAS[diasMap[dt]].fat=Math.round((DIAS[diasMap[dt]].fat+ws.fat)*100)/100;
-          DIAS[diasMap[dt]].compras+=ws.compras;
-        } else {
+          DIAS[diasMap[dt]].fat=Math.round(ws.fat*100)/100;
+          DIAS[diasMap[dt]].compras=ws.compras;
+        }else{
           DIAS.push({data:dt,inv:0,fat:Math.round(ws.fat*100)/100,compras:ws.compras,cliques:0,pv:0,ck:0,imp:0});
         }
       });
 
-      // Update CRIATIVOS with webhook sales
+      // Update CRIATIVOS with Vendas sales
       CRIATIVOS.forEach(function(c){
-        if(whCriSales[c.nome]){
-          c.compras+=whCriSales[c.nome].compras;
-          c.fat=Math.round((c.fat+whCriSales[c.nome].fat)*100)/100;
+        if(vCriSales[c.nome]){
+          c.compras=vCriSales[c.nome].compras;
+          c.fat=Math.round(vCriSales[c.nome].fat*100)/100;
           c.roas=c.inv>0?Math.round(c.fat/c.inv*100)/100:0;
           c.cac=c.compras>0?Math.round(c.inv/c.compras*100)/100:0;
           c.ticket=c.compras>0?Math.round(c.fat/c.compras*100)/100:0;
