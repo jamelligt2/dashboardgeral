@@ -335,9 +335,11 @@ function processGerenciador({ headers, rows }) {
   const byAdset = {};
   const byAd    = {};
   const byPage  = { vsl:{inv:0,cliques:0,pv:0,ck:0,imp:0,compras:0,fat:0}, normal:{inv:0,cliques:0,pv:0,ck:0,imp:0,compras:0,fat:0} };
+  const byPageDays = {};
 
   for (const row of rows) {
-    const data   = fv(row, iData);
+    let data = fv(row, iData);
+    if(/^\d{4}-\d{2}-\d{2}/.test(data)){const[y,m,d]=data.substring(0,10).split('-');data=`${d}/${m}/${y}`;}
     const camp   = fv(row, iCamp).toLowerCase();
     const adset  = fv(row, iAdset) || 'Sem conjunto';
     const adname = fv(row, iAd) || 'Sem nome';
@@ -395,6 +397,9 @@ function processGerenciador({ headers, rows }) {
     byPage[tipo].pv      += pv;
     byPage[tipo].ck      += ck;
     byPage[tipo].imp     += imp;
+    if(!byPageDays[data])byPageDays[data]={vsl:{inv:0,cliques:0,pv:0,ck:0,imp:0,compras:0,fat:0},normal:{inv:0,cliques:0,pv:0,ck:0,imp:0,compras:0,fat:0}};
+    byPageDays[data][tipo].inv+=inv;byPageDays[data][tipo].cliques+=cliques;
+    byPageDays[data][tipo].pv+=pv;byPageDays[data][tipo].ck+=ck;byPageDays[data][tipo].imp+=imp;
   }
 
   // Ordenar datas
@@ -420,7 +425,7 @@ function processGerenciador({ headers, rows }) {
     connectRate: c.cliques > 0 ? safe(c.pv/c.cliques*100) : 0
   })).sort((a,b) => b.inv - a.inv);
 
-  return { DIAS, PUBLICOS, CRIATIVOS, byPage };
+  return { DIAS, PUBLICOS, CRIATIVOS, byPage, byPageDays };
 }
 
 function processWebhook({ headers, rows }, DIAS, byPage, CRIATIVOS) {
@@ -555,6 +560,22 @@ function applyDateFilter(){
   renderAll();
 }
 
+function getFilteredByPage(){
+  const bp={vsl:{inv:0,cliques:0,pv:0,ck:0,imp:0,compras:0,fat:0},normal:{inv:0,cliques:0,pv:0,ck:0,imp:0,compras:0,fat:0}};
+  const dias=getFilteredDias();
+  const dset=new Set(dias.map(d=>d.data));
+  for(const[date,pg] of Object.entries(DATA.byPageDays||{})){
+    if(!dset.has(date))continue;
+    for(const tipo of['vsl','normal']){
+      bp[tipo].inv+=pg[tipo].inv;bp[tipo].cliques+=pg[tipo].cliques;
+      bp[tipo].pv+=pg[tipo].pv;bp[tipo].ck+=pg[tipo].ck;bp[tipo].imp+=pg[tipo].imp;
+    }
+  }
+  // Adicionar compras/fat do webhook proporcional via DIAS filtrados
+  for(const d of dias){bp.normal.compras+=(d.compras||0);bp.normal.fat+=(d.fat||0);}
+  return bp;
+}
+
 // ═══════════════════════════════════════
 // TAB
 // ═══════════════════════════════════════
@@ -674,7 +695,7 @@ function renderCharts() {
 // FUNNELS
 // ═══════════════════════════════════════
 function renderFunnels() {
-  const {byPage} = DATA;
+  const byPage = getFilteredByPage();
   const funilHTML = (tipo, dados, cor) => {
     const maxVal = dados.cliques || 1;
     const crPct      = dados.cliques>0 ? (dados.pv/dados.cliques*100).toFixed(2) : '0.00';
@@ -867,7 +888,7 @@ async function loadData() {
     const ger = parseCSV(csvGer);
     if (!ger.rows.length) throw new Error('A aba Gerenciador está vazia ou sem dados.');
 
-    const { DIAS, PUBLICOS, CRIATIVOS, byPage } = processGerenciador(ger);
+    const { DIAS, PUBLICOS, CRIATIVOS, byPage, byPageDays } = processGerenciador(ger);
 
     // Carrega aba "vendas" (dados históricos manuais)
     if (csvVendas) {
@@ -883,7 +904,7 @@ async function loadData() {
 
     const { SEMANAL, MENSAL } = buildPeriodicos(DIAS);
 
-    DATA = { DIAS, PUBLICOS, CRIATIVOS, byPage, SEMANAL, MENSAL, labels: [] };
+    DATA = { DIAS, PUBLICOS, CRIATIVOS, byPage, byPageDays, SEMANAL, MENSAL, labels: [] };
 
     document.getElementById('loading').style.display = 'none';
     document.getElementById('app').style.display = 'block';
