@@ -254,6 +254,11 @@ const SHEET_ID = '1GvkAzmEHMob7R2PdAym_RZYnBj8wdcB1NJaM1CmuABQ';
 const GERENCIADOR_SHEET = 'Gerenciador';
 const WEBHOOK_SHEET = 'Webhook';
 
+const PAGE_LINKS = {
+  1: 'https://gabibergo.com.br/uniao-em-missao/',
+  2: 'https://gabibergo.com.br/uniao-em-missao-2'
+};
+
 // Column mapping for Gerenciador (headers are repurposed Kiwify names)
 const G_COL = { date:0, inv:1, cliques:2, pv:3, ck:4, comprasG:5, campaign:6, adset:7, ad:8, imp:9, link:10 };
 // Column mapping for Webhook (Kiwify API format)
@@ -947,9 +952,26 @@ function renderPaginas(){
   });
 
   // Cards
-  document.getElementById('page-cards').innerHTML=pags.map(p=>`
-    <div class="page-card">
-      <h3><span class="page-num">Pag ${p.pageNum}</span> ${p.nome}</h3>
+  document.getElementById('page-cards').innerHTML=pags.map(p=>{
+    const pageUrl=PAGE_LINKS[p.pageNum]||null;
+    return`<div class="page-card">
+      <h3>
+        <span class="page-num">Pag ${p.pageNum}</span> ${p.nome}
+        ${pageUrl?`<a href="${pageUrl}" target="_blank" style="margin-left:auto;font-size:10px;color:rgba(255,107,43,.7);text-decoration:none;font-weight:400;white-space:nowrap;">🔗 Ver página ↗</a>`:''}
+      </h3>
+      ${pageUrl?`<div style="margin-bottom:12px"><a href="${pageUrl}" target="_blank" style="font-size:11px;color:rgba(255,107,43,.6);text-decoration:none;font-family:'DM Mono',monospace;word-break:break-all;">${pageUrl}</a></div>`:''}
+      <div style="background:rgba(255,107,43,.08);border:1px solid rgba(255,107,43,.25);border-radius:8px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:9px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">Taxa de Conversão da Página</div>
+          <div style="font-family:'DM Mono',monospace;font-size:28px;font-weight:700;color:#ff6b2b">${pct(p.taxaCompra)}${winners.taxaCompra===p.nome?'<span class="winner-tag" style="font-size:9px;margin-left:8px">MELHOR</span>':''}</div>
+          <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:3px">Compras ÷ Pageviews</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:9px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">Taxa Checkout</div>
+          <div style="font-family:'DM Mono',monospace;font-size:20px;font-weight:700;color:rgba(255,183,55,.9)">${pct(p.taxaCk)}${winners.taxaCk===p.nome?'<span class="winner-tag" style="font-size:9px;margin-left:6px">MELHOR</span>':''}</div>
+          <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:3px">CK ÷ Pageviews</div>
+        </div>
+      </div>
       <div class="page-kpis">
         <div class="page-kpi"><div class="page-kpi-label">Investimento</div><div class="page-kpi-val orange">${brl(p.inv)}</div></div>
         <div class="page-kpi"><div class="page-kpi-label">Cliques</div><div class="page-kpi-val orange">${br(p.cliques,0)}</div></div>
@@ -962,15 +984,20 @@ function renderPaginas(){
         <div class="page-kpi"><div class="page-kpi-label">Compras</div><div class="page-kpi-val orange">${br(p.compras,0)}</div></div>
         <div class="page-kpi"><div class="page-kpi-label">CAC</div><div class="page-kpi-val orange">${p.compras>0?brl(p.cac):'—'}</div></div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   // Table
-  document.getElementById('tbody-paginas').innerHTML=pags.map(p=>`
-    <tr><td>${p.nome}</td><td>${brl(p.inv)}</td><td>${br(p.cliques,0)}</td><td>${br(p.pv,0)}</td>
+  document.getElementById('tbody-paginas').innerHTML=pags.map(p=>{
+    const pageUrl=PAGE_LINKS[p.pageNum]||null;
+    return`<tr>
+    <td>${p.nome}${pageUrl?` <a href="${pageUrl}" target="_blank" style="color:rgba(255,107,43,.6);font-size:10px;text-decoration:none;">↗</a>`:''}</td>
+    <td>${brl(p.inv)}</td><td>${br(p.cliques,0)}</td><td>${br(p.pv,0)}</td>
     <td>${br(p.ck,0)}</td><td>${br(p.imp,0)}</td><td>${br(p.compras,0)}</td><td>${brl(p.fat)}</td>
     <td>${brl(p.cpc)}</td><td>${brl(p.cpm)}</td><td>${pct(p.ctr)}</td><td>${pct(p.connectRate)}</td>
-    <td>${pct(p.taxaCk)}</td><td>${pct(p.taxaCompra)}</td><td>${p.compras>0?brl(p.cac):'—'}</td>
-    <td>${br(p.roas)}x</td></tr>`).join('');
+    <td>${pct(p.taxaCk)}</td><td style="font-weight:700;color:#ff6b2b">${pct(p.taxaCompra)}</td>
+    <td>${p.compras>0?brl(p.cac):'—'}</td><td>${br(p.roas)}x</td></tr>`;
+  }).join('');
 
   // Charts
   const labels=pags.map(p=>p.nome);
