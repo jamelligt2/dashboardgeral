@@ -130,11 +130,6 @@ tr:hover td{background:rgba(255,255,255,.025)}
 #error-msg{display:none;padding:40px 28px;color:#e74c3c;font-size:14px}
 .update-badge{font-size:10px;color:rgba(255,255,255,.3);font-family:'DM Mono',monospace}
 
-.date-filterbar{display:flex;align-items:center;gap:8px;padding:10px 28px;background:#12121f;border-bottom:1px solid rgba(255,255,255,.07);flex-wrap:wrap}
-.df-label{font-size:12px;color:rgba(255,255,255,.45);font-family:'DM Mono',monospace}
-.df-sep{font-size:12px;color:rgba(255,255,255,.25)}
-.df-input{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#e8e6f0;padding:4px 10px;border-radius:5px;font-size:12px;cursor:pointer;font-family:'DM Mono',monospace;width:132px}
-.df-input::-webkit-calendar-picker-indicator{filter:invert(.5)}
 </style>
 </head>
 <body>
@@ -176,18 +171,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
     <div class="tab" onclick="showTab('mensal',this)">Mês a Mês</div>
   </div>
 
-  <!-- DATE FILTER BAR -->
-  <div class="date-filterbar" id="date-filterbar">
-    <span class="df-label">De</span>
-    <input type="date" id="df-from" class="df-input" onchange="applyDateFilter()">
-    <span class="df-sep">→</span>
-    <input type="date" id="df-to" class="df-input" onchange="applyDateFilter()">
-    <button class="filter-btn" onclick="setQuick(2,this)">2d</button>
-    <button class="filter-btn" onclick="setQuick(7,this)">7d</button>
-    <button class="filter-btn" onclick="setQuick(14,this)">14d</button>
-    <button class="filter-btn" onclick="setQuick(30,this)">30d</button>
-    <button class="filter-btn active" id="btn-tudo" onclick="setQuick(0,this)">Tudo</button>
-  </div>
+
 
   <!-- VISÃO GERAL -->
   <div class="content active" id="tab-visao">
@@ -523,16 +507,15 @@ function inRange(dateStr){
   if(dateTo&&dt>dateTo)return false;
   return true;
 }
-function getFilteredDias(){return(DATA.DIAS||[]).filter(d=>inRange(d.data));}
+const DATA_INICIO = new Date(2026,3,14);
+function getFilteredDias(){return(DATA.DIAS||[]).filter(d=>{const dt=parseDMY(d.data);return dt>=DATA_INICIO&&inRange(d.data);});}
 function reaggCri(c){
-  if(!dateFrom&&!dateTo)return c;
-  const days=Object.entries(c.days||{}).filter(([d])=>inRange(d));
+  const days=Object.entries(c.days||{}).filter(([d])=>{const dt=parseDMY(d);return dt>=DATA_INICIO&&inRange(d);});
   const agg=days.reduce((a,[,v])=>({inv:a.inv+v.inv,cliques:a.cliques+v.cliques,pv:a.pv+v.pv,ck:a.ck+v.ck,imp:a.imp+v.imp,compras:a.compras+v.compras,fat:a.fat+v.fat}),{inv:0,cliques:0,pv:0,ck:0,imp:0,compras:0,fat:0});
   return{...c,...agg,ctr:agg.imp>0?safe(agg.cliques/agg.imp*100):0,cpc:agg.cliques>0?safe(agg.inv/agg.cliques):0,connectRate:agg.cliques>0?safe(agg.pv/agg.cliques*100):0};
 }
 function reaggPub(p){
-  if(!dateFrom&&!dateTo)return p;
-  const days=Object.entries(p.days||{}).filter(([d])=>inRange(d));
+  const days=Object.entries(p.days||{}).filter(([d])=>{const dt=parseDMY(d);return dt>=DATA_INICIO&&inRange(d);});
   const agg=days.reduce((a,[,v])=>({inv:a.inv+v.inv,cliques:a.cliques+v.cliques,pv:a.pv+v.pv,ck:a.ck+v.ck,imp:a.imp+v.imp}),{inv:0,cliques:0,pv:0,ck:0,imp:0});
   return{...p,...agg,ctr:agg.imp>0?safe(agg.cliques/agg.imp*100):0,cpc:agg.cliques>0?safe(agg.inv/agg.cliques):0,connectRate:agg.cliques>0?safe(agg.pv/agg.cliques*100):0};
 }
@@ -890,13 +873,6 @@ async function loadData() {
     const now = new Date();
     document.getElementById('update-info').textContent =
       `Atualizado às ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-
-    // Filtro padrão: a partir de 14/04/2026
-    dateFrom = new Date(2026, 3, 14, 0, 0, 0);
-    dateTo = null;
-    document.getElementById('df-from').value = '2026-04-14';
-    document.getElementById('df-to').value = '';
-    document.getElementById('btn-tudo').classList.remove('active');
 
     renderAll();
 
