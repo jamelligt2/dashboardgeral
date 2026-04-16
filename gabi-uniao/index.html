@@ -610,13 +610,20 @@ async function init(){
     }
 
     // Distribute webhook sales to days and pages
+    // Cria o dia no mapa mesmo se não tiver investimento (venda orgânica ou dia sem ads ainda)
     sales.forEach(s=>{
-      if(diaMap[s.data]){diaMap[s.data].fat+=s.valor;diaMap[s.data].compras+=1;}
+      if(!s.data) return;
+      if(!diaMap[s.data]){
+        diaMap[s.data]={data:s.data,inv:0,fat:0,compras:0,cliques:0,pv:0,ck:0,imp:0};
+      }
+      diaMap[s.data].fat+=s.valor;
+      diaMap[s.data].compras+=1;
       // Try matching to page via campaign UTM
       const pg=extractPage(s.campaign);
       if(pg>0){
         const pk='Página '+pg;
-        if(pageMap[pk]){pageMap[pk].fat+=s.valor;pageMap[pk].compras+=1;}
+        if(!pageMap[pk])pageMap[pk]={nome:pk,pageNum:pg,inv:0,cliques:0,imp:0,pv:0,ck:0,compras:0,fat:0};
+        pageMap[pk].fat+=s.valor;pageMap[pk].compras+=1;
       }
     });
 
@@ -942,7 +949,6 @@ function renderPaginas(){
     if(!map[pk])map[pk]={nome:pk,pageNum:r.pageNum,inv:0,cliques:0,imp:0,pv:0,ck:0,compras:0,fat:0};
     const p=map[pk];p.inv+=r.inv;p.cliques+=r.cliques;p.imp+=r.imp;p.pv+=r.pv;p.ck+=r.ck;
   });
-  // TODO: also add webhook sales per page in filtered range
   const pags=Object.values(map).sort((a,b)=>a.pageNum-b.pageNum);
   pags.forEach(p=>{
     p.cpc=p.cliques>0?p.inv/p.cliques:0;p.cpm=p.imp>0?p.inv/p.imp*1000:0;
