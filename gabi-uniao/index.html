@@ -261,8 +261,9 @@ const PAGE_LINKS = {
 
 // Column mapping for Gerenciador (headers are repurposed Kiwify names)
 const G_COL = { date:0, inv:1, cliques:2, pv:3, ck:4, comprasG:5, campaign:6, adset:7, ad:8, imp:9, link:10 };
-// Column mapping for Webhook (Kiwify API format)
-const W_COL = { status:3, buyerName:5, utmSource:23, utmCampaign:24, createdAt:28, priceValue:31, paidValue:33 };
+// Column mapping for Webhook (Kiwify OLD format)
+// trans_status: "3" = pago, "1" = pendente, "2" = cancelado
+const W_COL = { status:12, buyerName:42, utmSource:73, trackerUtmSource:69, utmCampaign:76, createdAt:15, priceValue:10, paidValue:11 };
 
 let DIAS=[], SEMANAL=[], MENSAL=[], CRIATIVOS=[], PUBLICOS=[], PAGINAS=[];
 let dateFrom=null, dateTo=null;
@@ -352,23 +353,35 @@ async function loadData(){
     const gRows=parseCSV(gCSV);
     const wRows=parseCSV(wCSV);
 
-    // ---- WEBHOOK: filter paid + meta_ads ----
+    // ---- WEBHOOK: filter paid (trans_status = "3") ----
+    // UTM source pode estar vazio dependendo do pixel/rastreio, então não filtramos por source
+    // para não perder vendas com UTM não rastreado.
     const sales=[];
     for(let i=1;i<wRows.length;i++){
       const r=wRows[i];
       if(!r||!r[W_COL.status])continue;
-      const st=(r[W_COL.status]||'').toLowerCase();
-      const src=(r[W_COL.utmSource]||'').toLowerCase().replace(/[\s_-]/g,'');
-      if(st==='paid'&&src==='metaads'){
-        const rawDate=r[W_COL.createdAt]||'';
-        let iso='';
-        if(rawDate.includes('T'))iso=rawDate.slice(0,10);
-        else if(rawDate.includes('/'))iso=toISO(rawDate);
-        else iso=rawDate.slice(0,10);
-        const val=pNum(r[W_COL.paidValue])||pNum(r[W_COL.priceValue]);
-        // Kiwify value in centavos
-        sales.push({data:iso, valor:val/100, nome:r[W_COL.buyerName]||'', campaign:r[W_COL.utmCampaign]||''});
+      const st=String(r[W_COL.status]||'').trim();
+      // Status 3 = pago no formato antigo do Kiwify
+      const isPaid = st==='3' || st.toLowerCase()==='paid';
+      if(!isPaid) continue;
+
+      // Data: formato YYYYMMDD (ex: "20260416") ou ISO (ex: "2026-04-16") ou DD/MM/YYYY
+      const rawDate=r[W_COL.createdAt]||'';
+      let iso='';
+      if(rawDate.match(/^\d{8}$/)){ // YYYYMMDD
+        iso=rawDate.slice(0,4)+'-'+rawDate.slice(4,6)+'-'+rawDate.slice(6,8);
+      } else if(rawDate.includes('T')){
+        iso=rawDate.slice(0,10);
+      } else if(rawDate.includes('/')){
+        iso=toISO(rawDate);
+      } else {
+        iso=rawDate.slice(0,10);
       }
+
+      // Valor já em reais (não centavos) no formato antigo
+      const val=pNum(r[W_COL.paidValue])||pNum(r[W_COL.priceValue]);
+      const utmCampaign=r[W_COL.utmCampaign]||r[W_COL.trackerUtmSource]||'';
+      sales.push({data:iso, valor:val, nome:r[W_COL.buyerName]||'', campaign:utmCampaign});
     }
 
     // ---- GERENCIADOR: aggregate by ad (creative) ----
