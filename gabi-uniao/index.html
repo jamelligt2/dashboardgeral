@@ -186,7 +186,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
   <div class="cri-grid" id="cri-cards"></div>
   <div class="sec-title">Tabela de Criativos</div>
   <div class="tbl-wrap"><table><thead><tr>
-    <th>Criativo</th><th>Invest.</th><th>Cliques</th><th>Imp.</th><th>PV</th><th>CK</th><th>Compras</th><th>Fat.</th><th>CTR</th><th>CPC</th><th>CPM</th><th>CAC</th><th>ROAS</th><th>Status</th>
+    <th>Criativo</th><th>Invest.</th><th>Cliques</th><th>Imp.</th><th>PV</th><th>CK</th><th>Compras</th><th>Fat.</th><th>CTR</th><th>CPC</th><th>CPM</th><th>CAC</th><th>ROAS</th><th title="Views 3s ÷ Impressões">🎣 Hook</th><th title="ThruPlay ÷ Views 3s">🔒 Hold</th><th>Status</th>
   </tr></thead><tbody id="tbody-criativos"></tbody></table></div>
 </div>
 
@@ -259,8 +259,11 @@ const PAGE_LINKS = {
   2: 'https://gabibergo.com.br/uniao-em-missao-2'
 };
 
-// Column mapping for Gerenciador (headers are repurposed Kiwify names)
-const G_COL = { date:0, inv:1, cliques:2, pv:3, ck:4, comprasG:5, campaign:6, adset:7, ad:8, imp:9, link:10 };
+// Column mapping for Gerenciador (real names descobertos)
+// 0:Date | 1:Spend | 2:Link Clicks | 3:Landing Page Views | 4:Initiated Checkout
+// 5:Omni Purchase | 6:Campaign | 7:Adset | 8:Ad | 9:Reach | 10:IG Link | 11:Impressions
+// 12:Video 3s Views (hook) | 13:ThruPlay / Video at 50% (hold) — se existirem
+const G_COL = { date:0, inv:1, cliques:2, pv:3, ck:4, comprasG:5, campaign:6, adset:7, ad:8, reach:9, link:10, imp:11, hook3s:12, holdPlay:13 };
 // Column mapping for Webhook (Kiwify OLD format)
 // trans_status: "3" = pago, "1" = pendente, "2" = cancelado
 const W_COL = { status:12, buyerName:42, utmSource:73, trackerUtmSource:69, utmCampaign:76, createdAt:15, priceValue:10, paidValue:11 };
@@ -584,13 +587,16 @@ async function init(){
       const pv=pNum(r[G_COL.pv]);
       const ck=pNum(r[G_COL.ck]);
       const imp=pNum(r[G_COL.imp]);
+      const reach=pNum(r[G_COL.reach]);
+      const hook3s=pNum(r[G_COL.hook3s]);   // Video 3-Second Views
+      const holdPlay=pNum(r[G_COL.holdPlay]); // ThruPlay ou Video 50%
       const campaign=r[G_COL.campaign]||'';
       const adset=r[G_COL.adset]||'';
       const ad=r[G_COL.ad]||'';
       const link=r[G_COL.link]||'';
       const pageNum=extractPage(campaign);
 
-      RAW_ROWS.push({data:dt,inv,cliques:cliq,pv,ck,imp,campaign,adset,ad,link,pageNum});
+      RAW_ROWS.push({data:dt,inv,cliques:cliq,pv,ck,imp,reach,hook3s,holdPlay,campaign,adset,ad,link,pageNum});
 
       // DIA
       if(!diaMap[dt])diaMap[dt]={data:dt,inv:0,fat:0,compras:0,cliques:0,pv:0,ck:0,imp:0};
@@ -598,8 +604,8 @@ async function init(){
 
       // CRIATIVO
       if(ad){
-        if(!criMap[ad])criMap[ad]={nome:ad,inv:0,cliques:0,imp:0,pv:0,ck:0,compras:0,fat:0,link:'',lastDate:'',ativo:false};
-        const c=criMap[ad];c.inv+=inv;c.cliques+=cliq;c.imp+=imp;c.pv+=pv;c.ck+=ck;
+        if(!criMap[ad])criMap[ad]={nome:ad,inv:0,cliques:0,imp:0,pv:0,ck:0,compras:0,fat:0,hook3s:0,holdPlay:0,link:'',lastDate:'',ativo:false};
+        const c=criMap[ad];c.inv+=inv;c.cliques+=cliq;c.imp+=imp;c.pv+=pv;c.ck+=ck;c.hook3s+=hook3s;c.holdPlay+=holdPlay;
         if(link)c.link=link;if(dt>c.lastDate)c.lastDate=dt;
       }
 
@@ -648,6 +654,10 @@ async function init(){
       c.cac=c.compras>0?c.inv/c.compras:0;
       c.ticket=c.compras>0?c.fat/c.compras:0;
       c.roas=c.inv>0?c.fat/c.inv:0;
+      // Hook Rate = Views 3s / Impressões × 100
+      c.hookRate=c.imp>0&&c.hook3s>0?c.hook3s/c.imp*100:null;
+      // Hold Rate = ThruPlay / Views 3s × 100
+      c.holdRate=c.hook3s>0&&c.holdPlay>0?c.holdPlay/c.hook3s*100:null;
     });
 
     PUBLICOS=Object.values(pubMap);
@@ -845,8 +855,9 @@ function renderCriativos(){
   const map={};
   rows.forEach(r=>{
     if(!r.ad)return;
-    if(!map[r.ad])map[r.ad]={nome:r.ad,inv:0,cliques:0,imp:0,pv:0,ck:0,compras:0,fat:0,link:'',lastDate:'',ativo:false};
+    if(!map[r.ad])map[r.ad]={nome:r.ad,inv:0,cliques:0,imp:0,pv:0,ck:0,compras:0,fat:0,hook3s:0,holdPlay:0,link:'',lastDate:'',ativo:false};
     const c=map[r.ad];c.inv+=r.inv;c.cliques+=r.cliques;c.imp+=r.imp;c.pv+=r.pv;c.ck+=r.ck;
+    c.hook3s+=(r.hook3s||0);c.holdPlay+=(r.holdPlay||0);
     if(r.link)c.link=r.link;if(r.data>c.lastDate)c.lastDate=r.data;
   });
   let cris=Object.values(map);
@@ -856,6 +867,8 @@ function renderCriativos(){
     c.cpc=c.cliques>0?c.inv/c.cliques:0;c.cpm=c.imp>0?c.inv/c.imp*1000:0;
     c.ctr=c.imp>0?c.cliques/c.imp*100:0;c.cac=c.compras>0?c.inv/c.compras:0;
     c.roas=c.inv>0?c.fat/c.inv:0;
+    c.hookRate=c.imp>0&&c.hook3s>0?c.hook3s/c.imp*100:null;
+    c.holdRate=c.hook3s>0&&c.holdPlay>0?c.holdPlay/c.hook3s*100:null;
   });
   if(criFilter==='ativos')cris=cris.filter(c=>c.ativo);
   if(criFilter==='inativos')cris=cris.filter(c=>!c.ativo);
@@ -875,6 +888,14 @@ function renderCriativos(){
         <div class="cri-metric"><div class="cri-metric-label">CTR</div><div class="cri-metric-val">${pct(c.ctr)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">Cliques</div><div class="cri-metric-val">${br(c.cliques,0)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">Imp.</div><div class="cri-metric-val">${br(c.imp,0)}</div></div>
+        <div class="cri-metric">
+          <div class="cri-metric-label" title="Views 3s ÷ Impressões">🎣 Hook Rate</div>
+          <div class="cri-metric-val ${c.hookRate!==null&&c.hookRate>=3?'hl':''}">${c.hookRate!==null?pct(c.hookRate):'<span style="color:rgba(255,255,255,.2);font-size:10px">sem dados</span>'}</div>
+        </div>
+        <div class="cri-metric">
+          <div class="cri-metric-label" title="ThruPlay ÷ Views 3s">🔒 Hold Rate</div>
+          <div class="cri-metric-val ${c.holdRate!==null&&c.holdRate>=25?'hl':''}">${c.holdRate!==null?pct(c.holdRate):'<span style="color:rgba(255,255,255,.2);font-size:10px">sem dados</span>'}</div>
+        </div>
       </div>
       ${c.link?`<a class="cri-link" href="${c.link}" target="_blank">${c.link}</a>`:''}
     </div>`).join('');
@@ -884,6 +905,8 @@ function renderCriativos(){
     <td>${br(c.pv,0)}</td><td>${br(c.ck,0)}</td><td>${br(c.compras,0)}</td><td>${brl(c.fat)}</td>
     <td>${pct(c.ctr)}</td><td>${brl(c.cpc)}</td><td>${brl(c.cpm)}</td>
     <td>${c.compras>0?brl(c.cac):'—'}</td><td>${br(c.roas)}x</td>
+    <td>${c.hookRate!==null?pct(c.hookRate):'—'}</td>
+    <td>${c.holdRate!==null?pct(c.holdRate):'—'}</td>
     <td>${statusBadge(c.inv,c.fat)}</td></tr>`).join('');
 }
 
