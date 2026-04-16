@@ -542,22 +542,31 @@ async function init(){
     const gRows=parseCSV(gCSV);
     const wRows=parseCSV(wCSV);
 
-    // ---- WEBHOOK: filter paid + meta_ads ----
+    // ---- WEBHOOK: status "3" = pago (formato antigo Kiwify) ----
     const sales=[];
     for(let i=1;i<wRows.length;i++){
       const r=wRows[i];
       if(!r||!r[W_COL.status])continue;
-      const st=(r[W_COL.status]||'').toLowerCase();
-      const src=(r[W_COL.utmSource]||'').toLowerCase().replace(/[\s_-]/g,'');
-      if(st==='paid'&&src==='metaads'){
-        const rawDate=r[W_COL.createdAt]||'';
-        let iso='';
-        if(rawDate.includes('T'))iso=rawDate.slice(0,10);
-        else if(rawDate.includes('/'))iso=toISO(rawDate);
-        else iso=rawDate.slice(0,10);
-        const val=pNum(r[W_COL.paidValue])||pNum(r[W_COL.priceValue]);
-        sales.push({data:iso, valor:val/100, nome:r[W_COL.buyerName]||'', campaign:r[W_COL.utmCampaign]||''});
+      const st=String(r[W_COL.status]||'').trim();
+      const isPaid = st==='3' || st.toLowerCase()==='paid';
+      if(!isPaid) continue;
+
+      const rawDate=r[W_COL.createdAt]||'';
+      let iso='';
+      if(rawDate.match(/^\d{8}$/)){ // YYYYMMDD
+        iso=rawDate.slice(0,4)+'-'+rawDate.slice(4,6)+'-'+rawDate.slice(6,8);
+      } else if(rawDate.includes('T')){
+        iso=rawDate.slice(0,10);
+      } else if(rawDate.includes('/')){
+        iso=toISO(rawDate);
+      } else {
+        iso=rawDate.slice(0,10);
       }
+
+      // Valor já em reais no formato antigo Kiwify (não centavos)
+      const val=pNum(r[W_COL.paidValue])||pNum(r[W_COL.priceValue]);
+      const utmCampaign=r[W_COL.utmCampaign]||r[W_COL.trackerUtmSource]||'';
+      sales.push({data:iso, valor:val, nome:r[W_COL.buyerName]||'', campaign:utmCampaign});
     }
 
     // ---- GERENCIADOR ----
