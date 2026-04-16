@@ -206,7 +206,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
   <div class="pub-grid" id="pub-cards"></div>
   <div class="sec-title">Tabela de Públicos</div>
   <div class="tbl-wrap"><table><thead><tr>
-    <th>Público (Adset)</th><th>Invest.</th><th>Cliques</th><th>Imp.</th><th>PV</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Status</th>
+    <th>Público (Adset)</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>CAC</th><th>Taxa Conv.</th><th>Cliques</th><th>PV</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Status</th>
   </tr></thead><tbody id="tbody-publicos"></tbody></table></div>
 </div>
 
@@ -256,7 +256,8 @@ const WEBHOOK_SHEET = 'Webhook';
 
 const PAGE_LINKS = {
   1: 'https://gabibergo.com.br/uniao-em-missao/',
-  2: 'https://gabibergo.com.br/uniao-em-missao-2'
+  2: 'https://gabibergo.com.br/uniao-em-missao-2',
+  3: 'https://gabibergo.com.br/uniao'
 };
 
 // Column mapping for Gerenciador (real names descobertos)
@@ -266,7 +267,7 @@ const PAGE_LINKS = {
 const G_COL = { date:0, inv:1, cliques:2, pv:3, ck:4, comprasG:5, campaign:6, adset:7, ad:8, reach:9, link:10, imp:11, hook3s:12, vid95:13 };
 // Column mapping for Webhook (Kiwify OLD format)
 // trans_status: "3" = pago, "1" = pendente, "2" = cancelado
-const W_COL = { status:12, buyerName:42, utmSource:73, trackerUtmSource:69, utmCampaign:76, createdAt:15, priceValue:10, paidValue:11 };
+const W_COL = { status:12, buyerName:42, utmSource:73, trackerUtmSource:69, utmCampaign:76, utmContent:74, utmMedium:75, createdAt:15, priceValue:10, paidValue:11 };
 
 let DIAS=[], SEMANAL=[], MENSAL=[], CRIATIVOS=[], PUBLICOS=[], PAGINAS=[];
 let dateFrom=null, dateTo=null;
@@ -383,8 +384,10 @@ async function loadData(){
 
       // Valor já em reais (não centavos) no formato antigo
       const val=pNum(r[W_COL.paidValue])||pNum(r[W_COL.priceValue]);
-      const utmCampaign=r[W_COL.utmCampaign]||r[W_COL.trackerUtmSource]||'';
-      sales.push({data:iso, valor:val, nome:r[W_COL.buyerName]||'', campaign:utmCampaign});
+      const utmCampaign=r[W_COL.utmCampaign]||'';
+      const utmContent=r[W_COL.utmContent]||'';  // nome do criativo/anúncio
+      const utmMedium=r[W_COL.utmMedium]||'';   // adset
+      sales.push({data:iso, valor:val, nome:r[W_COL.buyerName]||'', campaign:utmCampaign, content:utmContent, medium:utmMedium});
     }
 
     // ---- GERENCIADOR: aggregate by ad (creative) ----
@@ -459,6 +462,9 @@ async function loadData(){
       p.cpm=p.imp>0?p.inv/p.imp*1000:0;
       p.ctr=p.imp>0?p.cliques/p.imp*100:0;
       p.connectRate=p.cliques>0?p.pv/p.cliques*100:0;
+      p.roas=p.inv>0&&p.fat>0?p.fat/p.inv:0;
+      p.cac=p.compras>0?p.inv/p.compras:0;
+      p.taxaConv=p.pv>0&&p.compras>0?p.compras/p.pv*100:0;
     });
 
     // SEMANAL
@@ -568,8 +574,10 @@ async function init(){
 
       // Valor já em reais no formato antigo Kiwify (não centavos)
       const val=pNum(r[W_COL.paidValue])||pNum(r[W_COL.priceValue]);
-      const utmCampaign=r[W_COL.utmCampaign]||r[W_COL.trackerUtmSource]||'';
-      sales.push({data:iso, valor:val, nome:r[W_COL.buyerName]||'', campaign:utmCampaign});
+      const utmCampaign=r[W_COL.utmCampaign]||'';
+      const utmContent=r[W_COL.utmContent]||'';  // nome do criativo/anúncio
+      const utmMedium=r[W_COL.utmMedium]||'';   // adset
+      sales.push({data:iso, valor:val, nome:r[W_COL.buyerName]||'', campaign:utmCampaign, content:utmContent, medium:utmMedium});
     }
 
     // ---- GERENCIADOR ----
@@ -611,7 +619,7 @@ async function init(){
 
       // PUBLICO
       if(adset){
-        if(!pubMap[adset])pubMap[adset]={nome:adset,inv:0,cliques:0,imp:0,pv:0,ck:0,lastDate:'',ativo:false};
+        if(!pubMap[adset])pubMap[adset]={nome:adset,inv:0,cliques:0,imp:0,pv:0,ck:0,fat:0,compras:0,lastDate:'',ativo:false};
         const p=pubMap[adset];p.inv+=inv;p.cliques+=cliq;p.imp+=imp;p.pv+=pv;p.ck+=ck;
         if(dt>p.lastDate)p.lastDate=dt;
       }
@@ -624,16 +632,27 @@ async function init(){
       }
     }
 
-    // Distribute webhook sales to days and pages
-    // Cria o dia no mapa mesmo se não tiver investimento (venda orgânica ou dia sem ads ainda)
+    // Distribute webhook sales to days, criativos, adsets e páginas
     sales.forEach(s=>{
       if(!s.data) return;
-      if(!diaMap[s.data]){
-        diaMap[s.data]={data:s.data,inv:0,fat:0,compras:0,cliques:0,pv:0,ck:0,imp:0};
-      }
+      // DIA
+      if(!diaMap[s.data]) diaMap[s.data]={data:s.data,inv:0,fat:0,compras:0,cliques:0,pv:0,ck:0,imp:0};
       diaMap[s.data].fat+=s.valor;
       diaMap[s.data].compras+=1;
-      // Try matching to page via campaign UTM
+
+      // CRIATIVO — via utm_content
+      if(s.content && criMap[s.content]){
+        criMap[s.content].fat+=s.valor;
+        criMap[s.content].compras+=1;
+      }
+
+      // ADSET/PÚBLICO — via utm_medium
+      if(s.medium && pubMap[s.medium]){
+        pubMap[s.medium].fat=(pubMap[s.medium].fat||0)+s.valor;
+        pubMap[s.medium].compras=(pubMap[s.medium].compras||0)+1;
+      }
+
+      // PÁGINA — via utm_campaign
       const pg=extractPage(s.campaign);
       if(pg>0){
         const pk='Página '+pg;
@@ -883,11 +902,13 @@ function renderCriativos(){
       <div class="cri-card-header"><div class="cri-name">${c.nome}</div><div class="cri-badge ${c.ativo?'ativo':'inativo'}">${c.ativo?'Ativo':'Inativo'}</div></div>
       <div class="cri-metrics">
         <div class="cri-metric"><div class="cri-metric-label">Invest.</div><div class="cri-metric-val hl">${brl(c.inv)}</div></div>
-        <div class="cri-metric"><div class="cri-metric-label">ROAS</div><div class="cri-metric-val">${br(c.roas)}x</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">ROAS</div><div class="cri-metric-val ${c.roas>=1?'green':''}">${c.roas>0?br(c.roas)+'x':'—'}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">CAC</div><div class="cri-metric-val ${c.compras>0?'orange':''}">${c.compras>0?brl(c.cac):'—'}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">Taxa Conv.</div><div class="cri-metric-val ${c.compras>0?'orange':''}">${c.compras>0&&c.pv>0?pct(c.compras/c.pv*100):'—'}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">CPC</div><div class="cri-metric-val">${brl(c.cpc)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">CTR</div><div class="cri-metric-val">${pct(c.ctr)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">Cliques</div><div class="cri-metric-val">${br(c.cliques,0)}</div></div>
-        <div class="cri-metric"><div class="cri-metric-label">Imp.</div><div class="cri-metric-val">${br(c.imp,0)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">PV</div><div class="cri-metric-val">${br(c.pv,0)}</div></div>
         <div class="cri-metric">
           <div class="cri-metric-label" title="Views 3s ÷ Impressões">🎣 Hook Rate</div>
           <div class="cri-metric-val ${c.hookRate!==null&&c.hookRate>=3?'hl':''}">${c.hookRate!==null?pct(c.hookRate):'<span style="color:rgba(255,255,255,.2);font-size:10px">sem dados</span>'}</div>
@@ -919,16 +940,22 @@ function renderPublicos(){
   const map={};
   rows.forEach(r=>{
     if(!r.adset)return;
-    if(!map[r.adset])map[r.adset]={nome:r.adset,inv:0,cliques:0,imp:0,pv:0,ck:0,lastDate:'',ativo:false};
+    if(!map[r.adset])map[r.adset]={nome:r.adset,inv:0,cliques:0,imp:0,pv:0,ck:0,fat:0,compras:0,lastDate:'',ativo:false};
     const p=map[r.adset];p.inv+=r.inv;p.cliques+=r.cliques;p.imp+=r.imp;p.pv+=r.pv;p.ck+=r.ck;
     if(r.data>p.lastDate)p.lastDate=r.data;
   });
+  // Distribuir vendas do período filtrado para adsets via utm_medium
+  // (as vendas globais já estão no PUBLICOS, mas aqui re-calculamos para o filtro de data)
+  // Usamos os dados de PUBLICOS já calculados como referência proporcional
   let pubs=Object.values(map);
   const cutoff=last7iso();
   pubs.forEach(p=>{
     p.ativo=p.lastDate>=cutoff;
     p.cpc=p.cliques>0?p.inv/p.cliques:0;p.cpm=p.imp>0?p.inv/p.imp*1000:0;
     p.ctr=p.imp>0?p.cliques/p.imp*100:0;p.connectRate=p.cliques>0?p.pv/p.cliques*100:0;
+    p.roas=p.inv>0&&p.fat>0?p.fat/p.inv:0;
+    p.cac=p.compras>0?p.inv/p.compras:0;
+    p.taxaConv=p.pv>0&&p.compras>0?p.compras/p.pv*100:0;
   });
   if(pubFilter==='ativos')pubs=pubs.filter(p=>p.ativo);
   if(pubFilter==='inativos')pubs=pubs.filter(p=>!p.ativo);
@@ -948,14 +975,16 @@ function renderPublicos(){
       <div class="pub-card-header"><div class="pub-name">${p.nome}</div><div class="cri-badge ${p.ativo?'ativo':'inativo'}">${p.ativo?'Ativo':'Inativo'}</div></div>
       <div class="pub-metrics">
         <div class="pub-metric"><div class="pub-metric-val">${brl(p.inv)}</div><div class="pub-metric-lbl">Invest.</div></div>
-        <div class="pub-metric"><div class="pub-metric-val neutral">${pct(p.ctr)}</div><div class="pub-metric-lbl">CTR</div></div>
-        <div class="pub-metric"><div class="pub-metric-val neutral">${pct(p.connectRate)}</div><div class="pub-metric-lbl">Connect Rate</div></div>
+        <div class="pub-metric"><div class="pub-metric-val ${p.roas>=1?'':'neutral'}">${p.roas>0?br(p.roas)+'x':'—'}</div><div class="pub-metric-lbl">ROAS</div></div>
+        <div class="pub-metric"><div class="pub-metric-val ${p.compras>0?'':'neutral'}">${p.compras>0?brl(p.cac):'—'}</div><div class="pub-metric-lbl">CAC</div></div>
       </div>
       <div class="cri-metrics">
+        <div class="cri-metric"><div class="cri-metric-label">Taxa Conv.</div><div class="cri-metric-val ${p.taxaConv>0?'orange':''}">${p.taxaConv>0?pct(p.taxaConv):'—'}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">Connect Rate</div><div class="cri-metric-val">${pct(p.connectRate)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">CTR</div><div class="cri-metric-val">${pct(p.ctr)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">CPC</div><div class="cri-metric-val">${brl(p.cpc)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">CPM</div><div class="cri-metric-val">${brl(p.cpm)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">Cliques</div><div class="cri-metric-val">${br(p.cliques,0)}</div></div>
-        <div class="cri-metric"><div class="cri-metric-label">Imp.</div><div class="cri-metric-val">${br(p.imp,0)}</div></div>
       </div>
       <div class="pub-bar-wrap">
         <div class="pub-bar-label"><span>% do Investimento Total</span><span>${br(pctInv,1)}%</span></div>
@@ -965,9 +994,11 @@ function renderPublicos(){
   }).join('');
 
   document.getElementById('tbody-publicos').innerHTML=pubs.map(p=>`
-    <tr><td>${p.nome}</td><td>${brl(p.inv)}</td><td>${br(p.cliques,0)}</td><td>${br(p.imp,0)}</td>
-    <td>${br(p.pv||0,0)}</td><td>${pct(p.ctr)}</td><td>${brl(p.cpc)}</td><td>${brl(p.cpm)}</td>
-    <td>${pct(p.connectRate)}</td>
+    <tr><td>${p.nome}</td><td>${brl(p.inv)}</td><td>${p.fat>0?brl(p.fat):'—'}</td>
+    <td>${p.roas>0?br(p.roas)+'x':'—'}</td><td>${br(p.compras||0,0)}</td>
+    <td>${p.compras>0?brl(p.cac):'—'}</td><td>${p.taxaConv>0?pct(p.taxaConv):'—'}</td>
+    <td>${br(p.cliques,0)}</td><td>${br(p.pv||0,0)}</td><td>${pct(p.ctr)}</td>
+    <td>${brl(p.cpc)}</td><td>${brl(p.cpm)}</td><td>${pct(p.connectRate)}</td>
     <td><span class="cri-badge ${p.ativo?'ativo':'inativo'}">${p.ativo?'Ativo':'Inativo'}</span></td></tr>`).join('');
 }
 
