@@ -401,7 +401,6 @@ const CONFIG = {
   sheetId: '1ynIwaKmrGMyHIzyeDBfHemydKSHc6A0Sl7p1AXqbr2g',
   capSheet: 'Gerenciador',
   formsSheet: 'Forms',
-  qualMinAge: 25,   // Idade minima para qualificacao (Dog Urbano nao tem faturamento)
 };
 
 // ============ STATE ============
@@ -486,16 +485,19 @@ async function loadAll() {
   }
 }
 
-// ============ QUALIFICACAO (Dog Urbano: por idade + profissao valida) ============
+// ============ QUALIFICACAO (Dog Urbano: ja passou por adestrador/consultoria/curso) ============
 function isQualifiedLead(row) {
-  const ageKey = findCol(row, ['idade']);
-  const profKey = findCol(row, ['profiss']);
-  const age = toInt(row[ageKey]);
-  const prof = String(row[profKey] || '').trim();
-  // idade valida (>= 25, < 100) e profissao com mais de 2 chars e nao trivial
-  const trivials = ['xx','sim','nao','não','-','.','x','?'];
-  const profOk = prof.length > 2 && !trivials.includes(prof.toLowerCase());
-  return age >= CONFIG.qualMinAge && age < 100 && profOk;
+  const key = findCol(row, ['adestradores', 'passou']);
+  if (!key) return false;
+  const raw = String(row[key] || '').trim();
+  if (raw.length < 3) return false;
+  // Normaliza: lower + remove acentos
+  const norm = raw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  // NAO qualificado se comeca com negacao
+  if (/^(nao|ainda\s*nao|nunca|jamais|nenhum)\b/.test(norm)) return false;
+  // Qualificado se tem marcadores de experiencia previa
+  const positive = /\b(ja\s*(tive|teve|levei|levou|foi|fiz|passou|passei|fez|fizemos|fizeram)|tive|teve|passou|experiencia|adestrad|consultori|sessao|sessoes|pacote|curso|mentoria|assinatura|internato|treinamento|treinador)\b/;
+  return positive.test(norm);
 }
 
 function processForms() {
@@ -588,7 +590,7 @@ function renderKPIs() {
   const kpis = [
     { l:'Investimento Total', v:BR(t.spend) },
     { l:'Leads (Gerenciador)', v:NF(t.leads), c:'orange' },
-    { l:'Leads Qualificados', v:NF(TOTAL_FORMS_QUAL)+' / '+NF(TOTAL_FORMS), c:'green', sub:`idade ≥ ${CONFIG.qualMinAge} + profissão válida` },
+    { l:'Leads Qualificados', v:NF(TOTAL_FORMS_QUAL)+' / '+NF(TOTAL_FORMS), c:'green', sub:'já passou por adestrador / curso / consultoria' },
     { l:'Taxa de Qualificação', v:PF(qualRate) },
     { l:'CPL Médio', v:BR(t.cpl) },
     { l:'CPL Qualificado', v:BR(cplQ), c:'green' },
@@ -605,46 +607,32 @@ function renderKPIs() {
 // ============ FUNIL ============
 function renderFunnel() {
   const t = calcTotals(DATA);
-  const qualRate = TOTAL_FORMS>0 ? (TOTAL_FORMS_QUAL/TOTAL_FORMS*100) : 0;
   const cplQ = TOTAL_FORMS_QUAL>0 ? t.spend/TOTAL_FORMS_QUAL : 0;
   const rates = {
-    imprClicks: t.impr>0 ? t.clicks/t.impr*100 : 0,
     clicksLeads: t.clicks>0 ? t.leads/t.clicks*100 : 0,
     leadsQual: t.leads>0 ? TOTAL_FORMS_QUAL/t.leads*100 : 0,
   };
   const stages = [
-    { lbl:'Impressões', val:NF(t.impr), raw:t.impr, w:100, bg:'linear-gradient(90deg,#ff6b00,#ff8533)' },
-    { lbl:'Cliques', val:NF(t.clicks), raw:t.clicks, w:Math.max(18, t.impr>0?(t.clicks/t.impr)*100:0), bg:'linear-gradient(90deg,#ff8533,#ff6b00)' },
-    { lbl:'Leads', val:NF(t.leads), raw:t.leads, w:Math.max(14, t.impr>0?Math.max(8,(t.leads/t.impr)*500):0), bg:'linear-gradient(90deg,#cc5500,#ff6b00)' },
-    { lbl:'Qualificados', val:NF(TOTAL_FORMS_QUAL), raw:TOTAL_FORMS_QUAL, w:Math.max(10, t.impr>0?Math.max(6,(TOTAL_FORMS_QUAL/t.impr)*1500):0), bg:'linear-gradient(90deg,#009960,#00d68f)' },
+    { lbl:'Cliques', val:NF(t.clicks), raw:t.clicks, w:100, bg:'linear-gradient(90deg,#ff8533,#ff6b00)' },
+    { lbl:'Leads', val:NF(t.leads), raw:t.leads, w:Math.max(28, t.clicks>0?(t.leads/t.clicks)*100:0), bg:'linear-gradient(90deg,#cc5500,#ff6b00)' },
+    { lbl:'Qualificados', val:NF(TOTAL_FORMS_QUAL), raw:TOTAL_FORMS_QUAL, w:Math.max(16, t.clicks>0?Math.max(10,(TOTAL_FORMS_QUAL/t.clicks)*100):0), bg:'linear-gradient(90deg,#009960,#00d68f)' },
   ];
   let html = '';
   stages.forEach((s,i) => {
     html += `<div class="funnel-step"><div class="funnel-label"><span class="name">${s.lbl}</span><span class="val">${s.val}</span></div><div class="funnel-bar" style="width:${Math.min(100,s.w)}%;background:${s.bg};">${s.val}</div></div>`;
-    if (i === 0) html += `<div class="funnel-arrow">▼ CTR: ${PF(rates.imprClicks)}</div>`;
-    else if (i === 1) html += `<div class="funnel-arrow">▼ Conv: ${PF(rates.clicksLeads)}</div>`;
-    else if (i === 2) html += `<div class="funnel-arrow">▼ Qualif: ${PF(rates.leadsQual)}</div>`;
+    if (i === 0) html += `<div class="funnel-arrow">▼ Conv: ${PF(rates.clicksLeads)}</div>`;
+    else if (i === 1) html += `<div class="funnel-arrow">▼ Qualif: ${PF(rates.leadsQual)}</div>`;
   });
   document.getElementById('funnelVisual').innerHTML = html;
 
-  // biggest loss
-  const losses = [
-    { stage:'Impressões → Cliques', loss:100-rates.imprClicks, rate:rates.imprClicks },
-    { stage:'Cliques → Leads', loss:100-rates.clicksLeads, rate:rates.clicksLeads },
-    { stage:'Leads → Qualificados', loss:100-rates.leadsQual, rate:rates.leadsQual },
-  ];
-  const biggest = losses.sort((a,b)=>b.loss-a.loss)[0];
-
   document.getElementById('funnelAnalysis').innerHTML = `
-    <div class="step-card"><div class="step-head"><span class="step-title">Step 1 — Impressões → Cliques</span><span class="step-val">${PF(rates.imprClicks)}</span></div><div class="step-desc">CTR: ${NF(t.clicks)} de ${NF(t.impr)} impressões</div></div>
-    <div class="step-card"><div class="step-head"><span class="step-title">Step 2 — Cliques → Leads</span><span class="step-val">${PF(rates.clicksLeads)}</span></div><div class="step-desc">Conv.: ${NF(t.leads)} leads de ${NF(t.clicks)} cliques</div></div>
-    <div class="step-card"><div class="step-head"><span class="step-title">Step 3 — Leads → Qualificados</span><span class="step-val">${PF(rates.leadsQual)}</span></div><div class="step-desc">Qualif.: ${NF(TOTAL_FORMS_QUAL)} qualif. de ${NF(t.leads)} leads</div></div>
+    <div class="step-card"><div class="step-head"><span class="step-title">Step 1 — Cliques → Leads</span><span class="step-val">${PF(rates.clicksLeads)}</span></div><div class="step-desc">Conv.: ${NF(t.leads)} leads de ${NF(t.clicks)} cliques</div></div>
+    <div class="step-card"><div class="step-head"><span class="step-title">Step 2 — Leads → Qualificados</span><span class="step-val">${PF(rates.leadsQual)}</span></div><div class="step-desc">Qualif.: ${NF(TOTAL_FORMS_QUAL)} qualif. de ${NF(t.leads)} leads</div></div>
     <div class="cost-grid">
       <div class="cost-cell"><div class="cl">CPC</div><div class="cv">${BR(t.cpc)}</div></div>
       <div class="cost-cell"><div class="cl">CPL</div><div class="cv">${BR(t.cpl)}</div></div>
       <div class="cost-cell"><div class="cl">CPL Qual.</div><div class="cv">${BR(cplQ)}</div></div>
     </div>
-    <div class="highlight-box red"><span class="badge">Maior perda</span><p><strong>${biggest.stage}</strong> — taxa de passagem de apenas <strong>${PF(biggest.rate)}</strong>. Foco para otimização.</p></div>
   `;
 }
 
@@ -811,7 +799,7 @@ function renderInsightsCriativos() {
   const top = list.filter(c => c.qualif > 0).slice(0, 3);
   const container = document.getElementById('insightsCriativos');
   if (!top.length) {
-    container.innerHTML = `<div class="insight-card red"><h4>Nenhum criativo qualificado ainda</h4><p>Não há criativos com leads qualificados no período. Total de ${NF(TOTAL_FORMS)} leads no Forms, ${NF(TOTAL_FORMS_QUAL)} qualificados (idade ≥ ${CONFIG.qualMinAge} + profissão válida).</p></div>`;
+    container.innerHTML = `<div class="insight-card red"><h4>Nenhum criativo qualificado ainda</h4><p>Não há criativos com leads qualificados no período. Total de ${NF(TOTAL_FORMS)} leads no Forms, ${NF(TOTAL_FORMS_QUAL)} qualificados (já passou por adestrador/curso/consultoria).</p></div>`;
     return;
   }
   container.innerHTML = top.map((c,i) => `
