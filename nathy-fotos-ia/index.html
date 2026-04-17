@@ -372,6 +372,11 @@ async function loadData(){
 
     RAW_W=[];
 
+    // Corte: últimos 7 dias — aplica filtro FOT em ambas as abas
+    const hoje7 = new Date(); hoje7.setHours(0,0,0,0);
+    const corte7 = new Date(hoje7.getTime() - 7*24*60*60*1000);
+    const isFOTRequired = iso => { const dt = new Date(iso); return dt >= corte7; };
+
     // --- Aba Webhook (dados via webhook, com filtro de source) ---
     if(wCSV){
       const wRows=parseCSV(wCSV);
@@ -385,6 +390,7 @@ async function loadData(){
       wRows.slice(1).forEach(r=>{
         const status=r[wColStatus]?r[wColStatus].toLowerCase().trim():'';
         const source=r[wColSource]?r[wColSource].toLowerCase().replace(/[\s_\-]/g,''):'';
+        const adContent=(wColContent>=0?(r[wColContent]||''):'').trim();
         if(!(status.match(/paid|pag[ao]/)&&source===META_SOURCE_FILTER))return;
         const rawDate=r[wColData]||'';
         // Suporta ISO datetime: 2026-04-10T10:54:32.000Z — converte UTC → Brasília (UTC-3)
@@ -397,7 +403,10 @@ async function loadData(){
           dateBR=`${d}/${m}/${y}`;
         } else { dateBR=parseDateBR(rawDate); }
         if(!dateBR)return;
-        RAW_W.push({dateISO:toISO(dateBR),dateBR,valor:parseNum(r[wColValor]),adName:(wColContent>=0?(r[wColContent]||''):'').trim(),adsetName:(wColCampaign>=0?(r[wColCampaign]||''):'').trim()});
+        const iso=toISO(dateBR);
+        // Últimos 7 dias: exige FOT no criativo
+        if(isFOTRequired(iso)&&!adContent.toUpperCase().startsWith('FOT'))return;
+        RAW_W.push({dateISO:iso,dateBR,valor:parseNum(r[wColValor]),adName:adContent,adsetName:(wColCampaign>=0?(r[wColCampaign]||''):'').trim()});
       });
     }
 
@@ -416,7 +425,11 @@ async function loadData(){
         const rawDate=r[vColData]||'';
         const dateBR=parseDateBR(rawDate);
         if(!dateBR)return;
-        RAW_W.push({dateISO:toISO(dateBR),dateBR,valor:parseNum(r[vColValor]),adName:(vColContent>=0?(r[vColContent]||''):'').trim(),adsetName:(vColCampaign>=0?(r[vColCampaign]||''):'').trim()});
+        const iso=toISO(dateBR);
+        const vAdContent=(vColContent>=0?(r[vColContent]||''):'').trim();
+        // Últimos 7 dias: exige FOT no criativo
+        if(isFOTRequired(iso)&&!vAdContent.toUpperCase().startsWith('FOT'))return;
+        RAW_W.push({dateISO:iso,dateBR,valor:parseNum(r[vColValor]),adName:vAdContent,adsetName:(vColCampaign>=0?(r[vColCampaign]||''):'').trim()});
       });
     }
 
