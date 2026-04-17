@@ -1037,59 +1037,82 @@ function renderAll(data) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  FETCH VIA JSONP (bypassa CORS mesmo em file://)
+//  HELPERS DE PARSE PARA GVIZ JSON
 // ═══════════════════════════════════════════════════════════════
-function fetchGSheet() {
+function parseGvizText(text) {
+  // gviz retorna: /*O_o*/\ngoogle.visualization.Query.setResponse({...});
+  // Extrai o JSON dentro dos parênteses
+  const match = text.match(/setResponse\((\{[\s\S]*\})\)/);
+  if (!match) throw new Error('Formato gviz inválido');
+  const json = JSON.parse(match[1]);
+  if (!json.table) throw new Error('Sem tabela na resposta gviz');
+  return gvizTableToRows(json.table);
+}
+
+function gvizTableToRows(table) {
+  const norm = s => (s||'').toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const cols = table.cols.map(c => norm(c.label || c.id || ''));
+  console.log('[GSheet] colunas:', cols);
+  const rows = (table.rows || []).filter(r => r && r.c).map(r => {
+    const obj = {};
+    cols.forEach((col, i) => {
+      const cell = r.c[i];
+      obj[col] = (cell && cell.v !== null && cell.v !== undefined) ? cell.v : '';
+    });
+    return obj;
+  });
+  console.log('[GSheet] linhas:', rows.length, rows[0]);
+  return rows;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  FETCH — 3 estratégias em cascata
+// ═══════════════════════════════════════════════════════════════
+async function fetchGSheet() {
+
+  // ── Estratégia 1: fetch() + CSV (HTTPS, sem CORS issue)
+  try {
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`;
+    const res = await fetch(url, { cache: 'no-cache' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    const rows = parseCSV(text);
+    if (rows.length) { console.log('[fetch-csv] ok, linhas:', rows.length); return rows; }
+    throw new Error('CSV vazio');
+  } catch(e) { console.warn('[fetch-csv] falhou:', e.message); }
+
+  // ── Estratégia 2: fetch() + gviz JSON
+  try {
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`;
+    const res = await fetch(url, { cache: 'no-cache' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    const rows = parseGvizText(text);
+    if (rows.length) { console.log('[fetch-gviz] ok, linhas:', rows.length); return rows; }
+    throw new Error('gviz vazio');
+  } catch(e) { console.warn('[fetch-gviz] falhou:', e.message); }
+
+  // ── Estratégia 3: JSONP (funciona em file://, bypassa CORS)
+  console.log('[jsonp] tentando JSONP...');
   return new Promise((resolve, reject) => {
-    const cb  = 'gsc_' + Date.now();
-    const s   = document.createElement('script');
-    let done  = false;
-
-    // Timeout de 12 segundos
+    const cb = 'gsc_' + Date.now();
+    const s  = document.createElement('script');
+    let done = false;
     const timer = setTimeout(() => {
-      if (done) return;
-      done = true;
-      delete window[cb];
-      if (s.parentNode) s.parentNode.removeChild(s);
-      reject(new Error('Timeout — verifique se a planilha está pública'));
-    }, 12000);
-
-    const cleanup = () => {
-      done = true;
-      clearTimeout(timer);
-      delete window[cb];
-      if (s.parentNode) s.parentNode.removeChild(s);
-    };
-
-    s.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&callback=${cb}`;
-    s.onerror = (ev) => {
-      cleanup();
-      reject(new Error('Script bloqueado — abra no Chrome e verifique o console (F12)'));
-    };
-
+      if (done) return; done = true;
+      delete window[cb]; if (s.parentNode) s.parentNode.removeChild(s);
+      reject(new Error('Timeout 15s — planilha pública?'));
+    }, 15000);
+    const cleanup = () => { done = true; clearTimeout(timer); delete window[cb]; if (s.parentNode) s.parentNode.removeChild(s); };
+    s.onerror = () => { cleanup(); reject(new Error('Script JSONP bloqueado (CSP?)')) };
     window[cb] = data => {
       cleanup();
       try {
-        if (!data || !data.table) throw new Error('Resposta inválida do Google Sheets');
-        // Normaliza: minúsculo + sem acento (igual ao parseCSV)
-        const normCol = str => str.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-        const cols = data.table.cols.map(c => normCol(c.label || c.id || ''));
-        console.log('[GSheet] colunas encontradas:', cols);
-        const rows = data.table.rows
-          .filter(r => r && r.c)
-          .map(r => {
-            const obj = {};
-            cols.forEach((col, i) => {
-              const cell = r.c ? r.c[i] : null;
-              obj[col] = (cell && cell.v !== null && cell.v !== undefined) ? cell.v : '';
-            });
-            return obj;
-          });
-        console.log('[GSheet] linhas lidas:', rows.length, '| 1ª linha:', rows[0]);
-        resolve(rows);
+        if (!data || !data.table) throw new Error('gviz sem tabela');
+        resolve(gvizTableToRows(data.table));
       } catch(e) { reject(e); }
     };
-
+    s.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&callback=${cb}`;
     document.head.appendChild(s);
   });
 }
@@ -1103,14 +1126,14 @@ async function loadAndRender(btn) {
   try {
     const rawRows = await fetchGSheet();
     const rows    = processRows(rawRows);
-    if (!rows.length) throw new Error('Sem linhas com dados');
+    if (!rows.length) throw new Error('Nenhuma linha válida — verifique os nomes das colunas');
     const data    = aggregate(rows);
-    try { renderAll(data); } catch(renderErr) { console.warn('[Render] erro parcial:', renderErr); }
+    try { renderAll(data); } catch(renderErr) { console.warn('[Render]', renderErr); }
     const now = new Date();
     setStatus(`Atualizado às ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`, 'ok');
   } catch(e) {
-    console.warn('[Fetch] falhou:', e);
-    setStatus('Planilha inacessível — verifique se está pública (' + e.message + ')', 'err');
+    console.error('[loadAndRender] erro final:', e);
+    setStatus('Erro: ' + e.message, 'err');
   }
   if (btn) btn.disabled = false;
 }
