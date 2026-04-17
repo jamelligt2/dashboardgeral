@@ -270,7 +270,9 @@ const WEBHOOK_SHEET = 'Webhook';
 const PAGE_LINKS = {
   1: 'https://gabibergo.com.br/uniao-em-missao/',
   2: 'https://gabibergo.com.br/uniao-em-missao-2',
-  3: 'https://gabibergo.com.br/uniao'
+  3: 'https://gabibergo.com.br/uniao-em-missao-3',
+  4: 'https://gabibergo.com.br/uniao',
+  6: 'https://gabibergo.com.br/uniao-em-missao-6'
 };
 
 // Column mapping for Gerenciador (real names descobertos)
@@ -1042,7 +1044,9 @@ function renderCriativos(){
     c.ativo=c.lastDate>=cutoff;
     c.cpc=c.cliques>0?c.inv/c.cliques:0;c.cpm=c.imp>0?c.inv/c.imp*1000:0;
     c.ctr=c.imp>0?c.cliques/c.imp*100:0;c.cac=c.compras>0?c.inv/c.compras:0;
+    c.ticket=c.compras>0?c.fat/c.compras:0;
     c.roas=c.inv>0?c.fat/c.inv:0;
+    c.taxaConv=c.compras>0&&c.pv>0?c.compras/c.pv*100:0;
     c.hookRate=c.imp>0&&c.hook3s>0?c.hook3s/c.imp*100:null;
     c.holdRate=c.hook3s>0&&c.vid95>0?c.vid95/c.hook3s*100:null;
   });
@@ -1057,22 +1061,44 @@ function renderCriativos(){
   document.getElementById('cri-cards').innerHTML=cris.map(c=>`
     <div class="cri-card ${c.ativo?'ativo':''}">
       <div class="cri-card-header"><div class="cri-name">${c.nome}</div><div class="cri-badge ${c.ativo?'ativo':'inativo'}">${c.ativo?'Ativo':'Inativo'}</div></div>
+      <!-- Destaque laranja: Invest · ROAS · Ticket · Vendas · Taxa Conv -->
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-bottom:10px;background:rgba(255,107,43,.06);border:1px solid rgba(255,107,43,.15);border-radius:8px;padding:8px 6px">
+        <div class="cri-metric" style="text-align:center">
+          <div class="cri-metric-label" style="font-size:8px">Invest.</div>
+          <div class="cri-metric-val hl" style="font-size:11px">${brl(c.inv)}</div>
+        </div>
+        <div class="cri-metric" style="text-align:center">
+          <div class="cri-metric-label" style="font-size:8px">ROAS</div>
+          <div class="cri-metric-val hl" style="font-size:11px">${c.roas>0?br(c.roas)+'x':'—'}</div>
+        </div>
+        <div class="cri-metric" style="text-align:center">
+          <div class="cri-metric-label" style="font-size:8px">Ticket</div>
+          <div class="cri-metric-val hl" style="font-size:11px">${c.compras>0?brl(c.ticket):'—'}</div>
+        </div>
+        <div class="cri-metric" style="text-align:center">
+          <div class="cri-metric-label" style="font-size:8px">Vendas</div>
+          <div class="cri-metric-val hl" style="font-size:13px;font-weight:800">${br(c.compras,0)}</div>
+        </div>
+        <div class="cri-metric" style="text-align:center">
+          <div class="cri-metric-label" style="font-size:8px">Taxa Conv.</div>
+          <div class="cri-metric-val hl" style="font-size:11px">${c.taxaConv>0?pct(c.taxaConv):'—'}</div>
+        </div>
+      </div>
+      <!-- Métricas secundárias -->
       <div class="cri-metrics">
-        <div class="cri-metric"><div class="cri-metric-label">Invest.</div><div class="cri-metric-val hl">${brl(c.inv)}</div></div>
-        <div class="cri-metric"><div class="cri-metric-label">ROAS</div><div class="cri-metric-val ${c.roas>=1?'green':''}">${c.roas>0?br(c.roas)+'x':'—'}</div></div>
-        <div class="cri-metric"><div class="cri-metric-label">CAC</div><div class="cri-metric-val ${c.compras>0?'orange':''}">${c.compras>0?brl(c.cac):'—'}</div></div>
-        <div class="cri-metric"><div class="cri-metric-label">Taxa Conv.</div><div class="cri-metric-val ${c.compras>0?'orange':''}">${c.compras>0&&c.pv>0?pct(c.compras/c.pv*100):'—'}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">CAC</div><div class="cri-metric-val">${c.compras>0?brl(c.cac):'—'}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">CPC</div><div class="cri-metric-val">${brl(c.cpc)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">CTR</div><div class="cri-metric-val">${pct(c.ctr)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">Cliques</div><div class="cri-metric-val">${br(c.cliques,0)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">PV</div><div class="cri-metric-val">${br(c.pv,0)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">CPM</div><div class="cri-metric-val">${brl(c.cpm)}</div></div>
         <div class="cri-metric">
-          <div class="cri-metric-label" title="Views 3s ÷ Impressões">🎣 Hook Rate</div>
-          <div class="cri-metric-val ${c.hookRate!==null&&c.hookRate>=3?'hl':''}">${c.hookRate!==null?pct(c.hookRate):'<span style="color:rgba(255,255,255,.2);font-size:10px">sem dados</span>'}</div>
+          <div class="cri-metric-label" title="Views 3s ÷ Impressões">🎣 Hook</div>
+          <div class="cri-metric-val ${c.hookRate!==null&&c.hookRate>=3?'hl':''}">${c.hookRate!==null?pct(c.hookRate):'<span style="color:rgba(255,255,255,.2);font-size:10px">—</span>'}</div>
         </div>
         <div class="cri-metric">
-          <div class="cri-metric-label" title="Views 95% ÷ Views 3s">🔒 Hold Rate</div>
-          <div class="cri-metric-val ${c.holdRate!==null&&c.holdRate>=25?'hl':''}">${c.holdRate!==null?pct(c.holdRate):'<span style="color:rgba(255,255,255,.2);font-size:10px">sem dados</span>'}</div>
+          <div class="cri-metric-label" title="Views 95% ÷ Views 3s">🔒 Hold</div>
+          <div class="cri-metric-val ${c.holdRate!==null&&c.holdRate>=25?'hl':''}">${c.holdRate!==null?pct(c.holdRate):'<span style="color:rgba(255,255,255,.2);font-size:10px">—</span>'}</div>
         </div>
       </div>
       ${c.link?`<a class="cri-link" href="${c.link}" target="_blank">${c.link}</a>`:''}
@@ -1119,6 +1145,7 @@ function renderPublicos(){
     p.ctr=p.imp>0?p.cliques/p.imp*100:0;p.connectRate=p.cliques>0?p.pv/p.cliques*100:0;
     p.roas=p.inv>0&&p.fat>0?p.fat/p.inv:0;
     p.cac=p.compras>0?p.inv/p.compras:0;
+    p.ticket=p.compras>0?p.fat/p.compras:0;
     p.taxaConv=p.pv>0&&p.compras>0?p.compras/p.pv*100:0;
   });
   if(pubFilter==='ativos')pubs=pubs.filter(p=>p.ativo);
@@ -1137,18 +1164,34 @@ function renderPublicos(){
     const pctInv=totalInv>0?p.inv/totalInv*100:0;
     return`<div class="pub-card ${p.ativo?'ativo':''}">
       <div class="pub-card-header"><div class="pub-name">${p.nome}</div><div class="cri-badge ${p.ativo?'ativo':'inativo'}">${p.ativo?'Ativo':'Inativo'}</div></div>
-      <div class="pub-metrics">
-        <div class="pub-metric"><div class="pub-metric-val">${brl(p.inv)}</div><div class="pub-metric-lbl">Invest.</div></div>
+      <!-- Destaque laranja: Invest · Ticket · Vendas -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;background:rgba(255,107,43,.06);border:1px solid rgba(255,107,43,.15);border-radius:8px;padding:10px 8px">
+        <div style="text-align:center">
+          <div style="font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:#ff6b2b">${brl(p.inv)}</div>
+          <div style="font-size:9px;color:rgba(255,255,255,.4);margin-top:2px;text-transform:uppercase;letter-spacing:.4px">Invest.</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:#ff6b2b">${p.compras>0?brl(p.ticket):'—'}</div>
+          <div style="font-size:9px;color:rgba(255,255,255,.4);margin-top:2px;text-transform:uppercase;letter-spacing:.4px">Ticket Médio</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-family:'DM Mono',monospace;font-size:20px;font-weight:800;color:#ff6b2b">${br(p.compras,0)}</div>
+          <div style="font-size:9px;color:rgba(255,255,255,.4);margin-top:2px;text-transform:uppercase;letter-spacing:.4px">Vendas</div>
+        </div>
+      </div>
+      <!-- Métricas secundárias -->
+      <div class="pub-metrics" style="margin-bottom:8px">
         <div class="pub-metric"><div class="pub-metric-val ${p.roas>=1?'':'neutral'}">${p.roas>0?br(p.roas)+'x':'—'}</div><div class="pub-metric-lbl">ROAS</div></div>
         <div class="pub-metric"><div class="pub-metric-val ${p.compras>0?'':'neutral'}">${p.compras>0?brl(p.cac):'—'}</div><div class="pub-metric-lbl">CAC</div></div>
+        <div class="pub-metric"><div class="pub-metric-val ${p.taxaConv>0?'':'neutral'}">${p.taxaConv>0?pct(p.taxaConv):'—'}</div><div class="pub-metric-lbl">Taxa Conv.</div></div>
       </div>
       <div class="cri-metrics">
-        <div class="cri-metric"><div class="cri-metric-label">Taxa Conv.</div><div class="cri-metric-val ${p.taxaConv>0?'orange':''}">${p.taxaConv>0?pct(p.taxaConv):'—'}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">Connect Rate</div><div class="cri-metric-val">${pct(p.connectRate)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">CTR</div><div class="cri-metric-val">${pct(p.ctr)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">CPC</div><div class="cri-metric-val">${brl(p.cpc)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">CPM</div><div class="cri-metric-val">${brl(p.cpm)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">Cliques</div><div class="cri-metric-val">${br(p.cliques,0)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">PV</div><div class="cri-metric-val">${br(p.pv,0)}</div></div>
       </div>
       <div class="pub-bar-wrap">
         <div class="pub-bar-label"><span>% do Investimento Total</span><span>${br(pctInv,1)}%</span></div>
