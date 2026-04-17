@@ -725,16 +725,28 @@ function setStatus(msg, state) {
 // ═══════════════════════════════════════════════════════════════
 //  CSV PARSER
 // ═══════════════════════════════════════════════════════════════
+function parseCSVLine(line) {
+  const result = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { if (inQ && line[i+1]==='"') { cur+='"'; i++; } else inQ=!inQ; }
+    else if (c === ',' && !inQ) { result.push(cur.trim()); cur=''; }
+    else cur += c;
+  }
+  result.push(cur.trim());
+  return result;
+}
+
 function parseCSV(text) {
   const lines = text.trim().split('\n');
   if (lines.length < 2) return [];
-  const norm = s => s.replace(/^"|"$/g,'').toLowerCase().trim()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  const header = lines[0].split(',').map(norm);
+  const norm = s => s.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  // Usa parseCSVLine no header para tratar campos com vírgula entre aspas
+  const header = parseCSVLine(lines[0]).map(norm);
   const rows = [];
   for (let i = 1; i < lines.length; i++) {
-    const vals = (lines[i].match(/("(?:[^"]|"")*"|[^,]*)/g) || [])
-      .map(v => v.replace(/^"|"$/g,'').replace(/""/g,'"').trim());
+    const vals = parseCSVLine(lines[i]);
     if (vals.every(v => !v)) continue;
     const row = {};
     header.forEach((h, idx) => row[h] = vals[idx] || '');
@@ -758,11 +770,11 @@ function processRows(rows) {
     criativo:  col(r, ['ad name','criativo','anuncio','nome do anuncio','ad']),
     spend:     parseBR(col(r, ['spend (cost, amount spent)','spend','investimento','valor usado','quantia gasta (brl)','amount spent','amount spent (brl)','valor','gasto'])) * TAX,
     imp:       parseBR(col(r, ['impressions','impressoes','impr','impressao'])),
-    clicks:    parseBR(col(r, ['action link click','cliques','clicks','cliques no link','link clicks','clique'])),
-    pv:        parseBR(col(r, ['action landing page view','page views','pv','visualizacoes da pagina de destino','lp views','landing page views'])),
-    leads:     parseBR(col(r, ['action leads','leads','resultados','results','lead','conversoes'])),
-    hookViews: parseBR(col(r, ['action 3s video','visualizacoes de 3 segundos','3-second video plays','hook','views 3s'])),
-    link:      col(r, ['instagram permalink','link do anuncio','link','url','permalink'])
+    clicks:    parseBR(col(r, ['action link clicks','action link click','cliques','clicks','cliques no link','link clicks'])),
+    pv:        parseBR(col(r, ['action landing page view','page views','pv','visualizacoes da pagina de destino','landing page views'])),
+    leads:     parseBR(col(r, ['action leads','leads','resultados','results','conversoes'])),
+    hookViews: parseBR(col(r, ['action 3s video views','action 3s video','visualizacoes de 3 segundos','3-second video plays'])),
+    link:      col(r, ['instagram permalink url','instagram permalink','link do anuncio','link','url','permalink'])
   })).filter(r => r.spend > 0 || r.leads > 0 || r.imp > 0);
 }
 
