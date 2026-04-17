@@ -703,7 +703,13 @@ const COLD_KW = ['lak','lookalike','parental','frio','interesse'];
 // ═══════════════════════════════════════════════════════════════
 //  UTILS
 // ═══════════════════════════════════════════════════════════════
-const parseBR = v => parseFloat(String(v||0).replace(/\./g,'').replace(',','.')) || 0;
+// Suporta tanto formato BR ("1.234,56") quanto número JS (36.41) ou string "36.41"
+const parseBR = v => {
+  if (typeof v === 'number') return v;
+  const s = String(v || 0).trim();
+  if (s.includes(',')) return parseFloat(s.replace(/\./g,'').replace(',','.')) || 0;
+  return parseFloat(s) || 0;
+};
 const fmtBRL  = v => 'R$ ' + v.toFixed(2).replace('.',',');
 const fmtN    = v => Math.round(v).toLocaleString('pt-BR');
 const fmtPct  = v => v.toFixed(2).replace('.',',') + '%';
@@ -1031,24 +1037,60 @@ function renderAll(data) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  FETCH & LOAD
+//  FETCH VIA JSONP (bypassa CORS mesmo em file://)
+// ═══════════════════════════════════════════════════════════════
+function fetchGSheet() {
+  return new Promise((resolve, reject) => {
+    const cb = 'gsc_' + Date.now();
+    const s  = document.createElement('script');
+    s.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&callback=${cb}`;
+    s.onerror = () => {
+      delete window[cb];
+      document.head.removeChild(s);
+      reject(new Error('Script load falhou'));
+    };
+    window[cb] = data => {
+      delete window[cb];
+      document.head.removeChild(s);
+      try {
+        // Normaliza: minúsculo + sem acento (igual ao parseCSV)
+        const normCol = s => s.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+        const cols = data.table.cols.map(c => normCol(c.label || c.id || ''));
+        const rows = data.table.rows
+          .filter(r => r && r.c)
+          .map(r => {
+            const obj = {};
+            cols.forEach((col, i) => {
+              const cell = r.c[i];
+              obj[col] = cell && cell.v !== null && cell.v !== undefined
+                ? String(cell.v) : '';
+            });
+            return obj;
+          });
+        resolve(rows);
+      } catch(e) { reject(e); }
+    };
+    document.head.appendChild(s);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  LOAD & RENDER
 // ═══════════════════════════════════════════════════════════════
 async function loadAndRender(btn) {
   setStatus('Atualizando...', 'loading');
   if (btn) btn.disabled = true;
   try {
-    const resp = await fetch(SHEET_URL);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const text = await resp.text();
-    const rows = processRows(parseCSV(text));
-    if (!rows.length) throw new Error('Sem dados');
-    const data = aggregate(rows);
+    const rawRows = await fetchGSheet();
+    const rows    = processRows(rawRows);
+    if (!rows.length) throw new Error('Sem linhas com dados');
+    const data    = aggregate(rows);
     renderAll(data);
     const now = new Date();
     setStatus(`Atualizado às ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`, 'ok');
   } catch(e) {
     console.warn('Fetch falhou:', e.message);
-    setStatus('Planilha não acessível — verifique se está pública', 'err');
+    setStatus('Erro ao carregar — planilha pública? (' + e.message + ')', 'err');
   }
   if (btn) btn.disabled = false;
 }
