@@ -703,10 +703,10 @@ const COLD_KW = ['lak','lookalike','parental','frio','interesse'];
 // ═══════════════════════════════════════════════════════════════
 //  UTILS
 // ═══════════════════════════════════════════════════════════════
-// Suporta tanto formato BR ("1.234,56") quanto número JS (36.41) ou string "36.41"
+// Suporta BR ("1.234,56"), JS number (36.41), string "36.41", e prefixo "R$ "
 const parseBR = v => {
   if (typeof v === 'number') return v;
-  const s = String(v || 0).trim();
+  const s = String(v || 0).trim().replace(/^R\$\s*/,'').replace(/\s/g,'');
   if (s.includes(',')) return parseFloat(s.replace(/\./g,'').replace(',','.')) || 0;
   return parseFloat(s) || 0;
 };
@@ -753,16 +753,16 @@ function col(row, aliases) {
 // ═══════════════════════════════════════════════════════════════
 function processRows(rows) {
   return rows.map(r => ({
-    date:      col(r, ['data','dia','date']),
-    adset:     col(r, ['conjunto','adset','publico','conjunto de anuncios']),
-    criativo:  col(r, ['criativo','anuncio','ad name','nome do anuncio']),
-    spend:     parseBR(col(r, ['investimento','valor usado','quantia gasta (brl)','spend'])) * TAX,
-    imp:       parseBR(col(r, ['impressoes','impressions','impr'])),
-    clicks:    parseBR(col(r, ['cliques','clicks','cliques no link','link clicks'])),
-    pv:        parseBR(col(r, ['page views','visualizacoes da pagina de destino','lp views'])),
-    leads:     parseBR(col(r, ['leads','resultados','results'])),
-    hookViews: parseBR(col(r, ['visualizacoes de 3 segundos','3-second video plays','hook'])),
-    link:      col(r, ['link do anuncio','link','url','permalink'])
+    date:      col(r, ['data','dia','date','day']),
+    adset:     col(r, ['conjunto','adset','publico','conjunto de anuncios','nome do conjunto de anuncios','ad set name']),
+    criativo:  col(r, ['criativo','anuncio','ad name','nome do anuncio','ad']),
+    spend:     parseBR(col(r, ['investimento','valor usado','quantia gasta (brl)','spend','amount spent','amount spent (brl)','valor','gasto'])) * TAX,
+    imp:       parseBR(col(r, ['impressoes','impressions','impr','impressao'])),
+    clicks:    parseBR(col(r, ['cliques','clicks','cliques no link','link clicks','clique'])),
+    pv:        parseBR(col(r, ['page views','pv','visualizacoes da pagina de destino','lp views','visualizacoes de pagina de destino','landing page views'])),
+    leads:     parseBR(col(r, ['leads','resultados','results','lead','conversoes'])),
+    hookViews: parseBR(col(r, ['visualizacoes de 3 segundos','3-second video plays','hook','views 3s'])),
+    link:      col(r, ['link do anuncio','link','url','permalink','link do anuncio'])
   })).filter(r => r.spend > 0 || r.leads > 0 || r.imp > 0);
 }
 
@@ -1126,7 +1126,10 @@ async function loadAndRender(btn) {
   try {
     const rawRows = await fetchGSheet();
     const rows    = processRows(rawRows);
-    if (!rows.length) throw new Error('Nenhuma linha válida — verifique os nomes das colunas');
+    if (!rows.length) {
+      const foundCols = rawRows.length ? Object.keys(rawRows[0]).join(', ') : 'nenhuma';
+      throw new Error('Nenhuma linha válida. Colunas encontradas: [' + foundCols + ']');
+    }
     const data    = aggregate(rows);
     try { renderAll(data); } catch(renderErr) { console.warn('[Render]', renderErr); }
     const now = new Date();
