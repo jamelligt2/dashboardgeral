@@ -387,9 +387,12 @@ async function loadData(){
         const source=r[wColSource]?r[wColSource].toLowerCase().replace(/[\s_\-]/g,''):'';
         if(!(status.match(/paid|pag[ao]/)&&source===META_SOURCE_FILTER))return;
         const rawDate=r[wColData]||'';
-        // Suporta ISO datetime: 2026-04-10T10:54:32.000Z
+        // Suporta ISO datetime: 2026-04-10T10:54:32.000Z — converte UTC → Brasília (UTC-3)
         let dateBR=null;
-        if(/^\d{4}-\d{2}-\d{2}/.test(rawDate)){
+        if(/^\d{4}-\d{2}-\d{2}T/.test(rawDate)){
+          const dtBR=new Date(new Date(rawDate).getTime()-3*60*60*1000);
+          dateBR=`${String(dtBR.getUTCDate()).padStart(2,'0')}/${String(dtBR.getUTCMonth()+1).padStart(2,'0')}/${dtBR.getUTCFullYear()}`;
+        } else if(/^\d{4}-\d{2}-\d{2}/.test(rawDate)){
           const [y,m,d]=rawDate.substring(0,10).split('-');
           dateBR=`${d}/${m}/${y}`;
         } else { dateBR=parseDateBR(rawDate); }
