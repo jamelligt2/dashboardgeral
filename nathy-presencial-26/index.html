@@ -906,7 +906,7 @@ function renderDiariaTable(byDate) {
     <td>${fmtN(tot.clicks)}</td><td>${fmtN(tot.pv)}</td><td>${fmtN(tot.leads)}</td>
     <td>${fmtPct(tm.ctr)}</td><td>${fmtBRL(tm.cpc)}</td><td>${fmtBRL(tm.cpl)}</td><td>${fmtPct(tm.txC)}</td></tr>`);
   tbody.innerHTML = rows.join('');
-  updateCharts(byDate, dates);
+  try { updateCharts(byDate, dates); } catch(chartErr) { console.warn('[Chart] erro:', chartErr); }
 }
 
 function renderCriativos(byCriativo, medCpl) {
@@ -1041,35 +1041,55 @@ function renderAll(data) {
 // ═══════════════════════════════════════════════════════════════
 function fetchGSheet() {
   return new Promise((resolve, reject) => {
-    const cb = 'gsc_' + Date.now();
-    const s  = document.createElement('script');
-    s.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&callback=${cb}`;
-    s.onerror = () => {
+    const cb  = 'gsc_' + Date.now();
+    const s   = document.createElement('script');
+    let done  = false;
+
+    // Timeout de 12 segundos
+    const timer = setTimeout(() => {
+      if (done) return;
+      done = true;
       delete window[cb];
-      document.head.removeChild(s);
-      reject(new Error('Script load falhou'));
+      if (s.parentNode) s.parentNode.removeChild(s);
+      reject(new Error('Timeout — verifique se a planilha está pública'));
+    }, 12000);
+
+    const cleanup = () => {
+      done = true;
+      clearTimeout(timer);
+      delete window[cb];
+      if (s.parentNode) s.parentNode.removeChild(s);
     };
+
+    s.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&callback=${cb}`;
+    s.onerror = (ev) => {
+      cleanup();
+      reject(new Error('Script bloqueado — abra no Chrome e verifique o console (F12)'));
+    };
+
     window[cb] = data => {
-      delete window[cb];
-      document.head.removeChild(s);
+      cleanup();
       try {
+        if (!data || !data.table) throw new Error('Resposta inválida do Google Sheets');
         // Normaliza: minúsculo + sem acento (igual ao parseCSV)
-        const normCol = s => s.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+        const normCol = str => str.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
         const cols = data.table.cols.map(c => normCol(c.label || c.id || ''));
+        console.log('[GSheet] colunas encontradas:', cols);
         const rows = data.table.rows
           .filter(r => r && r.c)
           .map(r => {
             const obj = {};
             cols.forEach((col, i) => {
-              const cell = r.c[i];
-              obj[col] = cell && cell.v !== null && cell.v !== undefined
-                ? String(cell.v) : '';
+              const cell = r.c ? r.c[i] : null;
+              obj[col] = (cell && cell.v !== null && cell.v !== undefined) ? cell.v : '';
             });
             return obj;
           });
+        console.log('[GSheet] linhas lidas:', rows.length, '| 1ª linha:', rows[0]);
         resolve(rows);
       } catch(e) { reject(e); }
     };
+
     document.head.appendChild(s);
   });
 }
@@ -1085,12 +1105,12 @@ async function loadAndRender(btn) {
     const rows    = processRows(rawRows);
     if (!rows.length) throw new Error('Sem linhas com dados');
     const data    = aggregate(rows);
-    renderAll(data);
+    try { renderAll(data); } catch(renderErr) { console.warn('[Render] erro parcial:', renderErr); }
     const now = new Date();
     setStatus(`Atualizado às ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`, 'ok');
   } catch(e) {
-    console.warn('Fetch falhou:', e.message);
-    setStatus('Erro ao carregar — planilha pública? (' + e.message + ')', 'err');
+    console.warn('[Fetch] falhou:', e);
+    setStatus('Planilha inacessível — verifique se está pública (' + e.message + ')', 'err');
   }
   if (btn) btn.disabled = false;
 }
