@@ -163,6 +163,19 @@
   .kpi-split .kpi-card { min-width: 120px; }
 
   .note { font-size: 11px; color: #555; margin-top: 8px; font-style: italic; }
+
+  /* ── SYNC BAR ── */
+  .sync-bar {
+    margin-left: auto; display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+  }
+  #sync-status { font-size: 11px; color: #555; }
+  .btn-refresh {
+    background: #ff6b35; border: none; border-radius: 6px;
+    color: #fff; font-size: 11px; font-weight: 700; padding: 5px 12px;
+    cursor: pointer; letter-spacing: .5px; transition: opacity .2s;
+  }
+  .btn-refresh:hover { opacity: .8; }
+  .btn-refresh:disabled { opacity: .4; cursor: default; }
 </style>
 </head>
 <body>
@@ -174,6 +187,10 @@
   <div class="header-text">
     <h1>DASHBOARD CAPTAÇÃO — NATHY PRESENCIAL 26</h1>
     <p>[JGT] [PRESENCIAL26] [AGO.26] CAP060426 &nbsp;·&nbsp; 07/04 a 10/04/2026</p>
+  </div>
+  <div class="sync-bar">
+    <span id="sync-status">Carregando...</span>
+    <button class="btn-refresh" onclick="refresh(this)">↻ Atualizar</button>
   </div>
 </div>
 
@@ -195,22 +212,22 @@
   <div class="kpi-row">
     <div class="kpi-card">
       <div class="label">Investimento</div>
-      <div class="value orange">R$ 837,40</div>
+      <div class="value orange" id="kpi-invest-val">R$ 837,40</div>
     </div>
     <div class="kpi-card">
       <div class="label">CTR</div>
-      <div class="value">1,74%</div>
+      <div class="value" id="kpi-ctr-val">1,74%</div>
       <div class="sub">Cliques / Impressões</div>
     </div>
     <div class="kpi-card">
       <div class="label">CPM</div>
-      <div class="value">R$ 36,67</div>
+      <div class="value" id="kpi-cpm-val">R$ 36,67</div>
       <div class="sub">Custo por 1000 imp.</div>
     </div>
     <div class="kpi-card">
       <div class="label">CPL</div>
-      <div class="value green">R$ 11,96</div>
-      <div class="sub">70 leads gerados</div>
+      <div class="value green" id="kpi-cpl-val">R$ 11,96</div>
+      <div class="sub" id="kpi-cpl-sub">70 leads gerados</div>
     </div>
   </div>
 
@@ -221,11 +238,11 @@
     <div class="audience-card hot">
       <div class="aud-title">🔥 PÚBLICO QUENTE — ENGAJAMENTO 365D</div>
       <div class="aud-metrics">
-        <div class="aud-metric"><div class="lbl">Investimento</div><div class="val">R$ 501,74</div></div>
-        <div class="aud-metric"><div class="lbl">CPL</div><div class="val">R$ 12,54</div></div>
-        <div class="aud-metric"><div class="lbl">Leads</div><div class="val">40</div></div>
+        <div class="aud-metric"><div class="lbl">Investimento</div><div class="val" id="hot-invest-val">R$ 501,74</div></div>
+        <div class="aud-metric"><div class="lbl">CPL</div><div class="val" id="hot-cpl-val">R$ 12,54</div></div>
+        <div class="aud-metric"><div class="lbl">Leads</div><div class="val" id="hot-leads-val">40</div></div>
       </div>
-      <div class="aud-detail">
+      <div class="aud-detail" id="hot-detail">
         Feed: 30 leads · CPL R$ 8,31 &nbsp;|&nbsp; Stories: 10 leads · CPL R$ 25,25
       </div>
     </div>
@@ -233,9 +250,9 @@
     <div class="audience-card cold">
       <div class="aud-title">❄ PÚBLICO FRIO — LAK 1% + PARENTAL SP</div>
       <div class="aud-metrics">
-        <div class="aud-metric"><div class="lbl">Investimento</div><div class="val">R$ 335,66</div></div>
-        <div class="aud-metric"><div class="lbl">CPL</div><div class="val">R$ 11,19</div></div>
-        <div class="aud-metric"><div class="lbl">Leads</div><div class="val">30</div></div>
+        <div class="aud-metric"><div class="lbl">Investimento</div><div class="val" id="cold-invest-val">R$ 335,66</div></div>
+        <div class="aud-metric"><div class="lbl">CPL</div><div class="val" id="cold-cpl-val">R$ 11,19</div></div>
+        <div class="aud-metric"><div class="lbl">Leads</div><div class="val" id="cold-leads-val">30</div></div>
       </div>
       <div class="aud-detail">
         LAK 1%: 17 leads · CPL R$ 9,70 &nbsp;|&nbsp; Parental SP: 13 leads · CPL R$ 13,13
@@ -244,10 +261,10 @@
 
     <div class="audience-compare">
       <div class="comp-title">Comparativo</div>
-      <div class="comp-item">Quente: <span class="hot-val">57% dos leads</span></div>
-      <div class="comp-item">Frio: <span class="cold-val">43% dos leads</span></div>
+      <div class="comp-item">Quente: <span class="hot-val" id="comp-hot-pct">57% dos leads</span></div>
+      <div class="comp-item">Frio: <span class="cold-val" id="comp-cold-pct">43% dos leads</span></div>
       <div class="comp-item" style="margin-top:4px; border-top:1px solid #333; padding-top:8px;">
-        CPL Quente vs Frio:<br><span class="hot-val">+12% mais caro</span>
+        CPL Quente vs Frio:<br><span class="hot-val" id="comp-cpl-diff">+12% mais caro</span>
       </div>
     </div>
 
@@ -317,11 +334,11 @@
         <!-- Label -->
         <text x="600" y="40" text-anchor="middle" fill="#5a90d8" font-size="16" font-weight="700" font-family="Arial" letter-spacing="4">IMPRESSÕES</text>
         <!-- Big number -->
-        <text x="600" y="95" text-anchor="middle" fill="#ffffff" font-size="56" font-weight="900" font-family="Arial">22.834</text>
+        <text id="svg-imp" x="600" y="95" text-anchor="middle" fill="#ffffff" font-size="56" font-weight="900" font-family="Arial">22.834</text>
 
         <!-- CONNECTOR 1 — CTR -->
         <polygon points="100,112 1100,112 1070,134 130,134" fill="url(#cg1)" opacity="0.92"/>
-        <text x="600" y="127" text-anchor="middle" fill="#fff" font-size="15" font-weight="700" font-family="Arial" letter-spacing="1">▼  CTR  1,74%</text>
+        <text id="svg-ctr" x="600" y="127" text-anchor="middle" fill="#fff" font-size="15" font-weight="700" font-family="Arial" letter-spacing="1">▼  CTR  1,74%</text>
 
         <!-- ═══════════════════════════════════════════
              STAGE 2 — CLIQUES
@@ -330,11 +347,11 @@
         <polygon points="130,138 1070,138 960,238 240,238" fill="url(#g2)" filter="url(#stageShadow)"/>
         <polygon points="130,138 1070,138 960,238 240,238" fill="none" stroke="#2a4a9a" stroke-width="1.5" opacity="0.7"/>
         <text x="600" y="168" text-anchor="middle" fill="#6ab0ff" font-size="16" font-weight="700" font-family="Arial" letter-spacing="4">CLIQUES</text>
-        <text x="600" y="228" text-anchor="middle" fill="#ffffff" font-size="56" font-weight="900" font-family="Arial">397</text>
+        <text id="svg-clicks" x="600" y="228" text-anchor="middle" fill="#ffffff" font-size="56" font-weight="900" font-family="Arial">397</text>
 
         <!-- CONNECTOR 2 — TX ENTRADA (gargalo) -->
         <polygon points="240,242 960,242 926,264 274,264" fill="url(#cg2)" opacity="0.95"/>
-        <text x="600" y="257" text-anchor="middle" fill="#fff" font-size="15" font-weight="700" font-family="Arial" letter-spacing="1">▼  TX ENTRADA  66,5%  ⚠</text>
+        <text id="svg-txentrada" x="600" y="257" text-anchor="middle" fill="#fff" font-size="15" font-weight="700" font-family="Arial" letter-spacing="1">▼  TX ENTRADA  66,5%  ⚠</text>
 
         <!-- ═══════════════════════════════════════════
              STAGE 3 — PAGE VIEWS
@@ -343,11 +360,11 @@
         <polygon points="274,268 926,268 800,368 400,368" fill="url(#g3)" filter="url(#stageShadow)"/>
         <polygon points="274,268 926,268 800,368 400,368" fill="none" stroke="#cc5500" stroke-width="1.5" opacity="0.7"/>
         <text x="600" y="299" text-anchor="middle" fill="#ffab66" font-size="16" font-weight="700" font-family="Arial" letter-spacing="4">PAGE VIEWS</text>
-        <text x="600" y="358" text-anchor="middle" fill="#ffffff" font-size="56" font-weight="900" font-family="Arial">264</text>
+        <text id="svg-pv" x="600" y="358" text-anchor="middle" fill="#ffffff" font-size="56" font-weight="900" font-family="Arial">264</text>
 
         <!-- CONNECTOR 3 — TX CADASTRO -->
         <polygon points="400,372 800,372 774,394 426,394" fill="url(#cg3)" opacity="0.92"/>
-        <text x="600" y="387" text-anchor="middle" fill="#fff" font-size="15" font-weight="700" font-family="Arial" letter-spacing="1">▼  TX CADASTRO  26,5%</text>
+        <text id="svg-txcadastro" x="600" y="387" text-anchor="middle" fill="#fff" font-size="15" font-weight="700" font-family="Arial" letter-spacing="1">▼  TX CADASTRO  26,5%</text>
 
         <!-- ═══════════════════════════════════════════
              STAGE 4 — LEADS (the prize)
@@ -356,7 +373,7 @@
         <polygon points="426,398 774,398 694,498 506,498" fill="url(#g4)" filter="url(#glow)"/>
         <polygon points="426,398 774,398 694,498 506,498" fill="none" stroke="#00c853" stroke-width="2" opacity="1"/>
         <text x="600" y="428" text-anchor="middle" fill="#5dff9a" font-size="16" font-weight="700" font-family="Arial" letter-spacing="4">LEADS</text>
-        <text x="600" y="490" text-anchor="middle" fill="#00e65c" font-size="68" font-weight="900" font-family="Arial" filter="url(#glow)">70</text>
+        <text id="svg-leads" x="600" y="490" text-anchor="middle" fill="#00e65c" font-size="68" font-weight="900" font-family="Arial" filter="url(#glow)">70</text>
 
       </svg>
     </div>
@@ -365,18 +382,18 @@
     <div class="funnel-metrics-row">
       <div class="funnel-metric-card fc-orange">
         <div class="fmc-label">CPC — Custo por Clique</div>
-        <div class="fmc-value">R$ 2,11</div>
-        <div class="fmc-sub">R$ 837,40 ÷ 397 cliques</div>
+        <div class="fmc-value" id="fmc-cpc-val">R$ 2,11</div>
+        <div class="fmc-sub" id="fmc-cpc-sub">R$ 837,40 ÷ 397 cliques</div>
       </div>
       <div class="funnel-metric-card fc-yellow">
         <div class="fmc-label">TX Entrada</div>
-        <div class="fmc-value" style="color:#ffd600;">66,50%</div>
-        <div class="fmc-sub">⚠ 33,5% dos cliques abandonam antes da página</div>
+        <div class="fmc-value" id="fmc-txe-val" style="color:#ffd600;">66,50%</div>
+        <div class="fmc-sub" id="fmc-txe-sub">⚠ 33,5% dos cliques abandonam antes da página</div>
       </div>
       <div class="funnel-metric-card fc-green">
         <div class="fmc-label">TX Cadastro</div>
-        <div class="fmc-value" style="color:#00c853;">26,52%</div>
-        <div class="fmc-sub">70 leads ÷ 264 page views</div>
+        <div class="fmc-value" id="fmc-txc-val" style="color:#00c853;">26,52%</div>
+        <div class="fmc-sub" id="fmc-txc-sub">70 leads ÷ 264 page views</div>
       </div>
     </div>
 
@@ -390,7 +407,7 @@
         <th>DIA</th><th>INVEST.</th><th>IMPRESSÕES</th><th>CLIQUES</th><th>PV</th>
         <th>LEADS</th><th>CTR</th><th>CPC</th><th>CPL</th><th>TX CADASTRO</th>
       </tr></thead>
-      <tbody>
+      <tbody id="tbody-diario">
         <tr>
           <td>07/04</td><td>R$ 311,05</td><td>8.637</td><td>137</td><td>92</td>
           <td class="green">27</td><td>1,59%</td><td>R$ 2,27</td><td class="green">R$ 11,52</td><td class="green">29,3%</td>
@@ -435,7 +452,7 @@
         <th>#</th><th>CRIATIVO</th><th>INVEST.</th><th>IMP.</th><th>CLIQUES</th><th>PV</th><th>LEADS</th>
         <th>CTR</th><th>CPC</th><th>CPL</th><th>TX ENTRADA</th><th>TX CADASTRO</th><th>HOOK RATE</th><th>LINK</th><th>STATUS</th>
       </tr></thead>
-      <tbody>
+      <tbody id="tbody-criativos">
         <tr>
           <td>1</td><td class="left">PRES-ADE02</td><td>R$ 287,65</td><td>8.754</td><td>165</td><td>106</td>
           <td class="green">40</td><td>1,88%</td><td>R$ 1,74</td><td class="green">R$ 7,19</td>
@@ -536,9 +553,9 @@
     <table>
       <thead><tr>
         <th>PÚBLICO</th><th>TIPO</th><th>INVEST.</th><th>IMP.</th><th>CLIQUES</th><th>PV</th><th>LEADS</th>
-        <th>CTR</th><th>CPC</th><th>CPL</th><th>TX ENTRADA</th><th>TX CADASTRO</th><th>HOOK RATE</th><th>AÇÃO</th>
+        <th>CTR</th><th>CPC</th><th>CPL</th><th>TX ENTRADA</th><th>TX CADASTRO</th><th>AÇÃO</th>
       </tr></thead>
-      <tbody>
+      <tbody id="tbody-publicos">
         <tr>
           <td class="left">ENGAJAMENTO 365D</td><td>Feed</td><td>R$ 249,29</td><td>7.717</td><td>136</td><td>86</td>
           <td class="green">30</td><td>1,76%</td><td>R$ 1,83</td><td class="green">R$ 8,31</td>
@@ -672,75 +689,385 @@
      SCRIPTS
 ================================================================ -->
 <script>
+// ═══════════════════════════════════════════════════════════════
+//  CONFIG — troque o SHEET_ID se a planilha mudar
+// ═══════════════════════════════════════════════════════════════
+const SHEET_ID  = '1nxieojDJjmVRMGwRHHCakH6F-yTV_u7rHDRCL-XnFx4';
+const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`;
+
+// Palavras-chave para classificar temperatura de público
+const HOT_KW  = ['engajamento','engagement','retargeting','remarketing'];
+const COLD_KW = ['lak','lookalike','parental','frio','interesse'];
+
+// ═══════════════════════════════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════════════════════════════
+const parseBR = v => parseFloat(String(v||0).replace(/\./g,'').replace(',','.')) || 0;
+const fmtBRL  = v => 'R$ ' + v.toFixed(2).replace('.',',');
+const fmtN    = v => Math.round(v).toLocaleString('pt-BR');
+const fmtPct  = v => v.toFixed(2).replace('.',',') + '%';
+const setText = (id, t) => { const e = document.getElementById(id); if (e) e.textContent = t; };
+
+function setStatus(msg, state) {
+  const e = document.getElementById('sync-status');
+  if (!e) return;
+  e.textContent = msg;
+  e.style.color = state === 'ok' ? '#00c853' : state === 'err' ? '#ff6b35' : '#666';
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CSV PARSER
+// ═══════════════════════════════════════════════════════════════
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) return [];
+  const norm = s => s.replace(/^"|"$/g,'').toLowerCase().trim()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const header = lines[0].split(',').map(norm);
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const vals = (lines[i].match(/("(?:[^"]|"")*"|[^,]*)/g) || [])
+      .map(v => v.replace(/^"|"$/g,'').replace(/""/g,'"').trim());
+    if (vals.every(v => !v)) continue;
+    const row = {};
+    header.forEach((h, idx) => row[h] = vals[idx] || '');
+    rows.push(row);
+  }
+  return rows;
+}
+
+function col(row, aliases) {
+  for (const a of aliases) if (row[a] !== undefined) return row[a];
+  return '';
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PROCESS ROWS → structured data
+// ═══════════════════════════════════════════════════════════════
+function processRows(rows) {
+  return rows.map(r => ({
+    date:      col(r, ['data','dia','date']),
+    adset:     col(r, ['conjunto','adset','publico','conjunto de anuncios']),
+    criativo:  col(r, ['criativo','anuncio','ad name','nome do anuncio']),
+    spend:     parseBR(col(r, ['investimento','valor usado','quantia gasta (brl)','spend'])),
+    imp:       parseBR(col(r, ['impressoes','impressions','impr'])),
+    clicks:    parseBR(col(r, ['cliques','clicks','cliques no link','link clicks'])),
+    pv:        parseBR(col(r, ['page views','visualizacoes da pagina de destino','lp views'])),
+    leads:     parseBR(col(r, ['leads','resultados','results'])),
+    hookViews: parseBR(col(r, ['visualizacoes de 3 segundos','3-second video plays','hook'])),
+    link:      col(r, ['link do anuncio','link','url','permalink'])
+  })).filter(r => r.spend > 0 || r.leads > 0 || r.imp > 0);
+}
+
+function aggregate(rows) {
+  const sum = (arr, key) => arr.reduce((s, r) => s + (r[key] || 0), 0);
+  const totals = { spend: sum(rows,'spend'), imp: sum(rows,'imp'), clicks: sum(rows,'clicks'),
+                   pv: sum(rows,'pv'), leads: sum(rows,'leads') };
+
+  // By date
+  const byDate = {};
+  rows.forEach(r => {
+    if (!r.date) return;
+    if (!byDate[r.date]) byDate[r.date] = {spend:0,imp:0,clicks:0,pv:0,leads:0};
+    ['spend','imp','clicks','pv','leads'].forEach(k => byDate[r.date][k] += r[k]);
+  });
+
+  // By criativo
+  const byCriativo = {};
+  rows.forEach(r => {
+    const k = r.criativo || '?';
+    if (!byCriativo[k]) byCriativo[k] = {spend:0,imp:0,clicks:0,pv:0,leads:0,hookViews:0,link:r.link,adset:r.adset};
+    ['spend','imp','clicks','pv','leads','hookViews'].forEach(f => byCriativo[k][f] += r[f]);
+    if (r.link) byCriativo[k].link = r.link;
+  });
+
+  // By adset
+  const byAdset = {};
+  rows.forEach(r => {
+    const k = r.adset || '?';
+    if (!byAdset[k]) byAdset[k] = {spend:0,imp:0,clicks:0,pv:0,leads:0};
+    ['spend','imp','clicks','pv','leads'].forEach(f => byAdset[k][f] += r[f]);
+  });
+
+  // Hot / Cold
+  const isHot  = n => HOT_KW.some(w  => n.toLowerCase().includes(w));
+  const isFeed = n => n.toLowerCase().includes('feed') || !n.toLowerCase().includes('stories');
+  const hot  = {spend:0,leads:0,feedLeads:0,feedSpend:0,storiesLeads:0,storiesSpend:0};
+  const cold = {spend:0,leads:0};
+
+  rows.forEach(r => {
+    const n = r.adset || '';
+    if (isHot(n)) {
+      hot.spend += r.spend; hot.leads += r.leads;
+      if (isFeed(n)) { hot.feedLeads += r.leads; hot.feedSpend += r.spend; }
+      else           { hot.storiesLeads += r.leads; hot.storiesSpend += r.spend; }
+    } else {
+      cold.spend += r.spend; cold.leads += r.leads;
+    }
+  });
+
+  return { totals, byDate, byCriativo, byAdset, hot, cold };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  METRICS HELPERS
+// ═══════════════════════════════════════════════════════════════
+const calc = d => ({
+  ctr: d.imp    ? d.clicks/d.imp*100    : 0,
+  cpc: d.clicks ? d.spend/d.clicks      : 0,
+  cpm: d.imp    ? d.spend/d.imp*1000    : 0,
+  cpl: d.leads  ? d.spend/d.leads       : 0,
+  txE: d.clicks ? d.pv/d.clicks*100     : 0,
+  txC: d.pv     ? d.leads/d.pv*100      : 0
+});
+
+function badgeCls(cpl, med) {
+  if (!cpl) return 'avaliar';
+  if (cpl < med * 0.85) return 'escalar';
+  if (cpl < med * 1.10) return 'manter';
+  if (cpl < med * 1.35) return 'avaliar';
+  return 'pausar';
+}
+const badgeLbl = c => ({escalar:'ESCALAR',manter:'MANTER',avaliar:'AVALIAR',pausar:'PAUSAR'})[c]||c;
+
+// ═══════════════════════════════════════════════════════════════
+//  RENDERERS
+// ═══════════════════════════════════════════════════════════════
+function renderKPIs(t) {
+  const m = calc(t);
+  setText('kpi-invest-val', fmtBRL(t.spend));
+  setText('kpi-ctr-val',    fmtPct(m.ctr));
+  setText('kpi-cpm-val',    fmtBRL(m.cpm));
+  setText('kpi-cpl-val',    fmtBRL(m.cpl));
+  setText('kpi-cpl-sub',    t.leads + ' leads gerados');
+}
+
+function renderAudience(hot, cold, t) {
+  const hCPL = hot.leads  ? hot.spend/hot.leads   : 0;
+  const cCPL = cold.leads ? cold.spend/cold.leads  : 0;
+  const fCPL = hot.feedLeads    ? hot.feedSpend/hot.feedLeads       : 0;
+  const sCPL = hot.storiesLeads ? hot.storiesSpend/hot.storiesLeads : 0;
+  const hPct = t.leads ? Math.round(hot.leads/t.leads*100)  : 0;
+  const cPct = 100 - hPct;
+  const diff = cCPL ? Math.round((hCPL-cCPL)/cCPL*100) : 0;
+
+  setText('hot-invest-val', fmtBRL(hot.spend));
+  setText('hot-cpl-val',    fmtBRL(hCPL));
+  setText('hot-leads-val',  hot.leads);
+  setText('hot-detail',     `Feed: ${hot.feedLeads} leads · CPL ${fmtBRL(fCPL)} | Stories: ${hot.storiesLeads} leads · CPL ${fmtBRL(sCPL)}`);
+  setText('cold-invest-val',fmtBRL(cold.spend));
+  setText('cold-cpl-val',   fmtBRL(cCPL));
+  setText('cold-leads-val', cold.leads);
+  setText('comp-hot-pct',   hPct + '% dos leads');
+  setText('comp-cold-pct',  cPct + '% dos leads');
+  setText('comp-cpl-diff',  (diff>=0?'+':'')+diff+'% '+(diff>=0?'mais caro':'mais barato'));
+}
+
+function renderFunnel(t) {
+  const m = calc(t);
+  setText('svg-imp',       fmtN(t.imp));
+  setText('svg-ctr',       `▼  CTR  ${fmtPct(m.ctr)}`);
+  setText('svg-clicks',    fmtN(t.clicks));
+  setText('svg-txentrada', `▼  TX ENTRADA  ${fmtPct(m.txE)}${m.txE < 70 ? '  ⚠' : ''}`);
+  setText('svg-pv',        fmtN(t.pv));
+  setText('svg-txcadastro',`▼  TX CADASTRO  ${fmtPct(m.txC)}`);
+  setText('svg-leads',     fmtN(t.leads));
+  setText('fmc-cpc-val',   fmtBRL(m.cpc));
+  setText('fmc-cpc-sub',   `${fmtBRL(t.spend)} ÷ ${fmtN(t.clicks)} cliques`);
+  setText('fmc-txe-val',   fmtPct(m.txE));
+  setText('fmc-txe-sub',   `⚠ ${(100-m.txE).toFixed(1).replace('.',',')}% dos cliques abandonam antes da página`);
+  setText('fmc-txc-val',   fmtPct(m.txC));
+  setText('fmc-txc-sub',   `${fmtN(t.leads)} leads ÷ ${fmtN(t.pv)} page views`);
+}
+
+function renderDiariaTable(byDate) {
+  const tbody = document.getElementById('tbody-diario');
+  if (!tbody) return;
+  const dates = Object.keys(byDate).sort();
+  const tot = dates.reduce((a,d)=>{
+    ['spend','imp','clicks','pv','leads'].forEach(k=>a[k]+=byDate[d][k]); return a;
+  },{spend:0,imp:0,clicks:0,pv:0,leads:0});
+
+  const rows = dates.map(d => {
+    const r = byDate[d], m = calc(r);
+    return `<tr><td>${d}</td><td>${fmtBRL(r.spend)}</td><td>${fmtN(r.imp)}</td>
+      <td>${fmtN(r.clicks)}</td><td>${fmtN(r.pv)}</td><td>${fmtN(r.leads)}</td>
+      <td>${fmtPct(m.ctr)}</td><td>${fmtBRL(m.cpc)}</td><td>${fmtBRL(m.cpl)}</td><td>${fmtPct(m.txC)}</td></tr>`;
+  });
+  const tm = calc(tot);
+  rows.push(`<tr class="total-row"><td>TOTAL</td><td>${fmtBRL(tot.spend)}</td><td>${fmtN(tot.imp)}</td>
+    <td>${fmtN(tot.clicks)}</td><td>${fmtN(tot.pv)}</td><td>${fmtN(tot.leads)}</td>
+    <td>${fmtPct(tm.ctr)}</td><td>${fmtBRL(tm.cpc)}</td><td>${fmtBRL(tm.cpl)}</td><td>${fmtPct(tm.txC)}</td></tr>`);
+  tbody.innerHTML = rows.join('');
+  updateCharts(byDate, dates);
+}
+
+function renderCriativos(byCriativo, medCpl) {
+  const tbody = document.getElementById('tbody-criativos');
+  if (!tbody) return;
+  const sorted = Object.entries(byCriativo)
+    .map(([name, d]) => ({name, ...d, ...calc(d)}))
+    .filter(r => r.leads > 0 || r.spend > 0)
+    .sort((a,b) => (a.cpl||999)-(b.cpl||999));
+  tbody.innerHTML = sorted.map((r,i) => {
+    const bc = badgeCls(r.cpl, medCpl);
+    const hr = r.imp ? fmtPct(r.hookViews/r.imp*100) : '—';
+    return `<tr><td>${i+1}</td><td class="left">${r.name}</td><td>${fmtBRL(r.spend)}</td>
+      <td>${fmtN(r.imp)}</td><td>${fmtN(r.clicks)}</td><td>${fmtN(r.pv)}</td>
+      <td class="${r.leads>5?'green':''}">${r.leads}</td><td>${fmtPct(r.ctr)}</td>
+      <td>${fmtBRL(r.cpc)}</td><td class="${bc==='escalar'?'green':bc==='pausar'?'red':''}">${fmtBRL(r.cpl)}</td>
+      <td>${fmtPct(r.txE)}</td><td>${fmtPct(r.txC)}</td><td>${hr}</td>
+      <td>${r.link?`<a href="${r.link}" target="_blank">Ver</a>`:'—'}</td>
+      <td><span class="badge ${bc}">${badgeLbl(bc)}</span></td></tr>`;
+  }).join('');
+}
+
+function renderPublicos(byAdset, medCpl) {
+  const tbody = document.getElementById('tbody-publicos');
+  if (!tbody) return;
+  const sorted = Object.entries(byAdset)
+    .map(([name, d]) => ({name, ...d, ...calc(d)}))
+    .filter(r => r.leads > 0 || r.spend > 0)
+    .sort((a,b) => (a.cpl||999)-(b.cpl||999));
+  const isFeed = n => !n.toLowerCase().includes('stories');
+  tbody.innerHTML = sorted.map((r,i) => {
+    const bc = badgeCls(r.cpl, medCpl);
+    return `<tr><td class="left">${r.name}</td><td>${isFeed(r.name)?'Feed':'Stories'}</td>
+      <td>${fmtBRL(r.spend)}</td><td>${fmtN(r.imp)}</td><td>${fmtN(r.clicks)}</td>
+      <td>${fmtN(r.pv)}</td><td class="${r.leads>5?'green':''}">${r.leads}</td>
+      <td>${fmtPct(r.ctr)}</td><td>${fmtBRL(r.cpc)}</td>
+      <td class="${bc==='escalar'?'green':bc==='pausar'?'red':''}">${fmtBRL(r.cpl)}</td>
+      <td>${fmtPct(r.txE)}</td><td>${fmtPct(r.txC)}</td>
+      <td><span class="badge ${bc}">${badgeLbl(bc)}</span></td></tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CHARTS
+// ═══════════════════════════════════════════════════════════════
+const GC = '#262640', TC = '#666';
+const baseOpts = {
+  responsive: true,
+  plugins: { legend: { labels: { color: '#aaa', font: { size: 11 } } } },
+  scales: {
+    x: { ticks:{color:TC}, grid:{color:GC} },
+    y: { ticks:{color:TC}, grid:{color:GC} }
+  }
+};
+let chartDiario = null, chartLeads = null, chartCPL = null, chartInvest = null;
+
+function buildCharts(byDate, dates) {
+  const ld  = dates.map(d => byDate[d].leads);
+  const cd  = dates.map(d => byDate[d].leads ? +(byDate[d].spend/byDate[d].leads).toFixed(2) : 0);
+  const inv = dates.map(d => +byDate[d].spend.toFixed(2));
+
+  chartDiario = new Chart(document.getElementById('chartDiario').getContext('2d'), {
+    data: { labels: dates, datasets: [
+      { type:'bar',  label:'Leads',    data:ld, backgroundColor:'#00c853', yAxisID:'y' },
+      { type:'line', label:'CPL (R$)', data:cd, borderColor:'#ff6b35',
+        backgroundColor:'rgba(255,107,53,.1)', pointBackgroundColor:'#ff6b35',
+        tension:.3, fill:true, yAxisID:'y1' }
+    ]},
+    options: { responsive:true,
+      plugins:{ legend:{ labels:{color:'#aaa',font:{size:11}} } },
+      scales:{
+        x:  {ticks:{color:TC},grid:{color:GC}},
+        y:  {ticks:{color:TC},grid:{color:GC},title:{display:true,text:'Leads',color:'#888'}},
+        y1: {position:'right',ticks:{color:'#ff6b35'},grid:{drawOnChartArea:false},
+             title:{display:true,text:'CPL (R$)',color:'#ff6b35'}}
+      }}
+  });
+
+  if (document.getElementById('chartLeads')) {
+    chartLeads = new Chart(document.getElementById('chartLeads').getContext('2d'), {
+      type:'bar', data:{ labels:dates, datasets:[{ label:'Leads', data:ld,
+        backgroundColor:['#00c853','#4caf50','#ffd600','#ff6b35','#42a5f5','#ab47bc','#ef5350'] }]},
+      options:{...baseOpts, plugins:{legend:{display:false}}}
+    });
+    chartCPL = new Chart(document.getElementById('chartCPL').getContext('2d'), {
+      type:'line', data:{ labels:dates, datasets:[{ label:'CPL (R$)', data:cd,
+        borderColor:'#ff6b35', backgroundColor:'rgba(255,107,53,.15)',
+        pointBackgroundColor:'#ff6b35', tension:.3, fill:true }]},
+      options:baseOpts
+    });
+    chartInvest = new Chart(document.getElementById('chartInvest').getContext('2d'), {
+      type:'bar', data:{ labels:dates, datasets:[{ label:'Investimento (R$)', data:inv,
+        backgroundColor:'#42a5f5' }]},
+      options:{...baseOpts, plugins:{legend:{display:false}}}
+    });
+  }
+}
+
+function updateCharts(byDate, dates) {
+  if (!chartDiario) { buildCharts(byDate, dates); return; }
+  const ld  = dates.map(d => byDate[d].leads);
+  const cd  = dates.map(d => byDate[d].leads ? +(byDate[d].spend/byDate[d].leads).toFixed(2) : 0);
+  const inv = dates.map(d => +byDate[d].spend.toFixed(2));
+  chartDiario.data.labels = dates;
+  chartDiario.data.datasets[0].data = ld;
+  chartDiario.data.datasets[1].data = cd;
+  chartDiario.update();
+  if (chartLeads) {
+    chartLeads.data.labels = chartCPL.data.labels = chartInvest.data.labels = dates;
+    chartLeads.data.datasets[0].data = ld;
+    chartCPL.data.datasets[0].data = cd;
+    chartInvest.data.datasets[0].data = inv;
+    [chartLeads,chartCPL,chartInvest].forEach(c=>c.update());
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  RENDER ALL
+// ═══════════════════════════════════════════════════════════════
+function renderAll(data) {
+  const medCpl = data.totals.leads ? data.totals.spend/data.totals.leads : 0;
+  renderKPIs(data.totals);
+  renderAudience(data.hot, data.cold, data.totals);
+  renderFunnel(data.totals);
+  renderDiariaTable(data.byDate);
+  renderCriativos(data.byCriativo, medCpl);
+  renderPublicos(data.byAdset, medCpl);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  FETCH & LOAD
+// ═══════════════════════════════════════════════════════════════
+async function loadAndRender(btn) {
+  setStatus('Atualizando...', 'loading');
+  if (btn) btn.disabled = true;
+  try {
+    const resp = await fetch(SHEET_URL);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const text = await resp.text();
+    const rows = processRows(parseCSV(text));
+    if (!rows.length) throw new Error('Sem dados');
+    const data = aggregate(rows);
+    renderAll(data);
+    const now = new Date();
+    setStatus(`Atualizado às ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`, 'ok');
+  } catch(e) {
+    console.warn('Fetch falhou:', e.message);
+    setStatus('Planilha não acessível — verifique se está pública', 'err');
+  }
+  if (btn) btn.disabled = false;
+}
+
+function refresh(btn) { loadAndRender(btn); }
+
+// ═══════════════════════════════════════════════════════════════
+//  TABS
+// ═══════════════════════════════════════════════════════════════
 function showTab(id, btn) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
   document.getElementById('tab-' + id).classList.add('active');
   btn.classList.add('active');
-  if (id === 'diaria') buildDiariaCharts();
 }
 
-const DIAS = ['07/04', '08/04', '09/04', '10/04*'];
-const gridColor = '#262640';
-const tickColor = '#666';
-const baseOptions = {
-  responsive: true,
-  plugins: { legend: { labels: { color: '#aaa', font: { size: 11 } } } },
-  scales: {
-    x: { ticks: { color: tickColor }, grid: { color: gridColor } },
-    y: { ticks: { color: tickColor }, grid: { color: gridColor } }
-  }
-};
-
-// Geral chart (always built)
-window.addEventListener('load', () => {
-  new Chart(document.getElementById('chartDiario').getContext('2d'), {
-    data: {
-      labels: DIAS,
-      datasets: [
-        { type: 'bar',  label: 'Leads', data: [27, 22, 19, 2], backgroundColor: '#00c853', yAxisID: 'y' },
-        { type: 'line', label: 'CPL (R$)', data: [11.52, 12.25, 12.41, 10.54],
-          borderColor: '#ff6b35', backgroundColor: 'rgba(255,107,53,.1)',
-          pointBackgroundColor: '#ff6b35', tension: 0.3, fill: true, yAxisID: 'y1' }
-      ]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { labels: { color: '#aaa', font: { size: 11 } } } },
-      scales: {
-        x:  { ticks: { color: tickColor }, grid: { color: gridColor } },
-        y:  { ticks: { color: tickColor }, grid: { color: gridColor }, title: { display: true, text: 'Leads', color: '#888' } },
-        y1: { position: 'right', ticks: { color: '#ff6b35' }, grid: { drawOnChartArea: false },
-              title: { display: true, text: 'CPL (R$)', color: '#ff6b35' } }
-      }
-    }
-  });
-});
-
-let diariaBuilt = false;
-function buildDiariaCharts() {
-  if (diariaBuilt) return;
-  diariaBuilt = true;
-  new Chart(document.getElementById('chartLeads').getContext('2d'), {
-    type: 'bar',
-    data: { labels: DIAS, datasets: [{ label: 'Leads', data: [27, 22, 19, 2],
-      backgroundColor: ['#00c853','#4caf50','#ffd600','#ff6b35'] }] },
-    options: { ...baseOptions, plugins: { legend: { display: false } } }
-  });
-  new Chart(document.getElementById('chartCPL').getContext('2d'), {
-    type: 'line',
-    data: { labels: DIAS, datasets: [{ label: 'CPL (R$)', data: [11.52, 12.25, 12.41, 10.54],
-      borderColor: '#ff6b35', backgroundColor: 'rgba(255,107,53,.15)',
-      pointBackgroundColor: '#ff6b35', tension: 0.3, fill: true }] },
-    options: baseOptions
-  });
-  new Chart(document.getElementById('chartInvest').getContext('2d'), {
-    type: 'bar',
-    data: { labels: DIAS, datasets: [{ label: 'Investimento (R$)', data: [311.05, 269.45, 235.83, 21.07],
-      backgroundColor: '#42a5f5' }] },
-    options: { ...baseOptions, plugins: { legend: { display: false } } }
-  });
-}
+// ═══════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════
+window.addEventListener('load', () => loadAndRender());
 </script>
 
 </body>
