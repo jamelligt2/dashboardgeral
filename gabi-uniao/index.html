@@ -145,7 +145,8 @@ tr:hover td{background:rgba(255,255,255,.025)}
 </div>
 
 <div class="tabs">
-  <div class="tab active" onclick="showTab('visao',this)">Visão Geral</div>
+  <div class="tab active" onclick="showTab('visao',this)">📊 Tráfego</div>
+  <div class="tab" onclick="showTab('geral',this)">🌐 Visão Geral</div>
   <div class="tab" onclick="showTab('criativos',this)">Criativos</div>
   <div class="tab" onclick="showTab('publicos',this)">Públicos</div>
   <div class="tab" onclick="showTab('paginas',this)">📄 Páginas</div>
@@ -180,6 +181,16 @@ tr:hover td{background:rgba(255,255,255,.025)}
   <div class="tbl-wrap"><table><thead><tr>
     <th>Data</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Cliques</th><th>PV</th><th>CK</th><th>Imp.</th><th>CPC</th><th>CPM</th><th>Status</th>
   </tr></thead><tbody id="tbody-dias"></tbody></table></div>
+</div>
+
+<!-- VISÃO GERAL (todas as vendas) -->
+<div id="tab-geral" class="content">
+  <div class="kpi-grid" id="kpi-geral"></div>
+  <div id="geral-breakdown"></div>
+  <div class="sec-title">Dia a Dia — Visão Geral</div>
+  <div class="tbl-wrap"><table><thead><tr>
+    <th>Data</th><th>Invest.</th><th>Fat. Total</th><th>ROAS</th><th>Compras Total</th><th>Vendas Rastr.</th><th>Vendas Org.</th><th>Ticket Médio</th><th>CAC</th>
+  </tr></thead><tbody id="tbody-geral"></tbody></table></div>
 </div>
 
 <!-- CRIATIVOS -->
@@ -829,6 +840,7 @@ function renderAll(){
   renderKpiVisao(dias);renderFunil(dias);renderTaxaGrid(dias);renderTbodyDias(dias);
   renderChartsDia(dias);
   renderWebhookSalesPanel();
+  renderKpiGeral(dias);
   renderCriativos();renderPublicos();renderPaginas();renderSemanal();renderMensal();
 }
 
@@ -937,13 +949,22 @@ function openDebugModal(){
   modal.style.display='block';
 }
 
-// ============ VISÃO GERAL ============
+// ============ TRÁFEGO (só vendas rastreadas com UTM) ============
+function isTrackedSale(s){ return !!((s.content||'').trim()||(s.adset||'').trim()||(s.campaign||'').trim()); }
+function filteredSalesInRange(trackedOnly){
+  return SALES.filter(s=>{
+    const inRange=!s.data||(!dateFrom||s.data>=dateFrom)&&(!dateTo||s.data<=dateTo);
+    return inRange&&(!trackedOnly||isTrackedSale(s));
+  });
+}
 function renderKpiVisao(dias){
   const inv=dias.reduce((s,d)=>s+d.inv,0);
-  const fat=dias.reduce((s,d)=>s+d.fat,0);
-  const comp=dias.reduce((s,d)=>s+d.compras,0);
   const cliq=dias.reduce((s,d)=>s+d.cliques,0);
   const imp=dias.reduce((s,d)=>s+d.imp,0);
+  // Só vendas rastreadas (com UTM) no período
+  const trackedSales=filteredSalesInRange(true);
+  const fat=trackedSales.reduce((s,v)=>s+v.valor,0);
+  const comp=trackedSales.length;
   const roas=inv>0?fat/inv:0;
   const cac=comp>0?inv/comp:0;
   const ticket=comp>0?fat/comp:0;
@@ -951,15 +972,77 @@ function renderKpiVisao(dias){
   const cpm=imp>0?inv/imp*1000:0;
   document.getElementById('kpi-visao').innerHTML=`
     <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${brl(inv)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Faturamento</div><div class="kpi-value green">${brl(fat)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">ROAS</div><div class="kpi-value ${roas>=1?'green':'red'}">${br(roas)}x</div></div>
-    <div class="kpi-card"><div class="kpi-label">Compras</div><div class="kpi-value orange">${br(comp,0)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Fat. (rastreado)</div><div class="kpi-value green">${fat>0?brl(fat):'—'}</div></div>
+    <div class="kpi-card"><div class="kpi-label">ROAS</div><div class="kpi-value ${fat>0?roas>=1?'green':'red':'orange'}">${fat>0?br(roas)+'x':'—'}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Vendas Rastr.</div><div class="kpi-value orange">${br(comp,0)}</div></div>
     <div class="kpi-card"><div class="kpi-label">CAC</div><div class="kpi-value yellow">${comp>0?brl(cac):'—'}</div></div>
     <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value yellow">${comp>0?brl(ticket):'—'}</div></div>
     <div class="kpi-card"><div class="kpi-label">Cliques</div><div class="kpi-value orange">${br(cliq,0)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Impressões</div><div class="kpi-value orange">${br(imp,0)}</div></div>
     <div class="kpi-card"><div class="kpi-label">CPC</div><div class="kpi-value orange">${brl(cpc)}</div></div>
     <div class="kpi-card"><div class="kpi-label">CPM</div><div class="kpi-value orange">${brl(cpm)}</div></div>`;
+}
+
+// ============ VISÃO GERAL (todas as vendas: rastreadas + orgânicas) ============
+function renderKpiGeral(dias){
+  const inv=dias.reduce((s,d)=>s+d.inv,0);
+  const cliq=dias.reduce((s,d)=>s+d.cliques,0);
+  const imp=dias.reduce((s,d)=>s+d.imp,0);
+  const allSales=filteredSalesInRange(false);
+  const trackedSales=filteredSalesInRange(true);
+  const untracked=allSales.filter(s=>!isTrackedSale(s));
+  const fat=allSales.reduce((s,v)=>s+v.valor,0);
+  const fatT=trackedSales.reduce((s,v)=>s+v.valor,0);
+  const fatO=untracked.reduce((s,v)=>s+v.valor,0);
+  const comp=allSales.length;
+  const compT=trackedSales.length;
+  const compO=untracked.length;
+  const roas=inv>0&&fat>0?fat/inv:0;
+  const cac=comp>0?inv/comp:0;
+  const ticket=comp>0?fat/comp:0;
+  document.getElementById('kpi-geral').innerHTML=`
+    <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${brl(inv)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Fat. Total</div><div class="kpi-value green">${fat>0?brl(fat):'—'}</div></div>
+    <div class="kpi-card"><div class="kpi-label">ROAS Total</div><div class="kpi-value ${fat>0?roas>=1?'green':'red':'orange'}">${fat>0?br(roas)+'x':'—'}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Vendas Totais</div><div class="kpi-value orange">${br(comp,0)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CAC Total</div><div class="kpi-value yellow">${comp>0?brl(cac):'—'}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value yellow">${comp>0?brl(ticket):'—'}</div></div>`;
+  // Breakdown rastreado vs orgânico
+  document.getElementById('geral-breakdown').innerHTML=`
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+    <div style="background:#12121f;border:1px solid rgba(46,204,113,.2);border-radius:10px;padding:16px">
+      <div style="font-size:11px;color:rgba(46,204,113,.7);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">✅ Tráfego Pago (com UTM)</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        <div style="text-align:center"><div style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:#2ecc71">${br(compT,0)}</div><div style="font-size:9px;color:rgba(255,255,255,.4);margin-top:2px">Vendas</div></div>
+        <div style="text-align:center"><div style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:#2ecc71">${fatT>0?brl(fatT):'—'}</div><div style="font-size:9px;color:rgba(255,255,255,.4);margin-top:2px">Faturamento</div></div>
+        <div style="text-align:center"><div style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:#2ecc71">${compT>0?brl(fatT/compT):'—'}</div><div style="font-size:9px;color:rgba(255,255,255,.4);margin-top:2px">Ticket</div></div>
+      </div>
+    </div>
+    <div style="background:#12121f;border:1px solid rgba(241,196,15,.2);border-radius:10px;padding:16px">
+      <div style="font-size:11px;color:rgba(241,196,15,.7);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">⭐ Orgânico / Sem UTM</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        <div style="text-align:center"><div style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:#f1c40f">${br(compO,0)}</div><div style="font-size:9px;color:rgba(255,255,255,.4);margin-top:2px">Vendas</div></div>
+        <div style="text-align:center"><div style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:#f1c40f">${fatO>0?brl(fatO):'—'}</div><div style="font-size:9px;color:rgba(255,255,255,.4);margin-top:2px">Faturamento</div></div>
+        <div style="text-align:center"><div style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:#f1c40f">${compO>0?brl(fatO/compO):'—'}</div><div style="font-size:9px;color:rgba(255,255,255,.4);margin-top:2px">Ticket</div></div>
+      </div>
+    </div>
+  </div>`;
+  // Tabela dia a dia geral
+  const diasGeral=dias.map(d=>{
+    const dSales=allSales.filter(s=>s.data===d.data);
+    const dTracked=dSales.filter(s=>isTrackedSale(s));
+    const dOrg=dSales.filter(s=>!isTrackedSale(s));
+    const dFat=dSales.reduce((s,v)=>s+v.valor,0);
+    const dComp=dSales.length;
+    const dRoas=d.inv>0&&dFat>0?dFat/d.inv:0;
+    return{data:d.data,inv:d.inv,fat:dFat,comp:dComp,compT:dTracked.length,compO:dOrg.length,roas:dRoas,ticket:dComp>0?dFat/dComp:0,cac:dComp>0?d.inv/dComp:0};
+  });
+  document.getElementById('tbody-geral').innerHTML=diasGeral.map(d=>`
+    <tr><td>${d.data}</td><td>${brl(d.inv)}</td><td>${d.fat>0?brl(d.fat):'—'}</td>
+    <td>${d.fat>0?br(d.roas)+'x':'—'}</td><td>${br(d.comp,0)}</td>
+    <td style="color:#2ecc71">${d.compT>0?br(d.compT,0):'—'}</td>
+    <td style="color:#f1c40f">${d.compO>0?br(d.compO,0):'—'}</td>
+    <td>${d.comp>0?brl(d.ticket):'—'}</td><td>${d.comp>0?brl(d.cac):'—'}</td></tr>`).join('');
 }
 
 function renderFunil(dias){
