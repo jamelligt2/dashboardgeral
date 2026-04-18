@@ -674,8 +674,10 @@ async function init(){
 
     // Distribute webhook sales to days, criativos, adsets e páginas
     sales.forEach(s=>{
-      // DIA — cria entrada se não existir (venda sem dia no gerenciador)
-      if(s.data){
+      const tracked=!!((s.content||'').trim()||(s.adset||'').trim()||(s.campaign||'').trim());
+      // DIA — só vendas rastreadas entram no diaMap (Visão Tráfego)
+      // Vendas sem UTM ficam apenas em SALES para a Visão Geral
+      if(s.data && tracked){
         if(!diaMap[s.data]) diaMap[s.data]={data:s.data,inv:0,fat:0,compras:0,cliques:0,pv:0,ck:0,imp:0};
         diaMap[s.data].fat+=s.valor;
         diaMap[s.data].compras+=1;
@@ -1115,8 +1117,8 @@ function renderCriativos(){
     c.hook3s+=(r.hook3s||0);c.vid95+=(r.vid95||0);
     if(r.link)c.link=r.link;if(r.data>c.lastDate)c.lastDate=r.data;
   });
-  // Re-aplicar vendas do webhook filtradas por data (inclui sem data = manual)
-  const fSales=SALES.filter(s=>!s.data||(!dateFrom||s.data>=dateFrom)&&(!dateTo||s.data<=dateTo));
+  // Criativos: só vendas rastreadas (com pelo menos 1 UTM)
+  const fSales=SALES.filter(s=>(!s.data||(!dateFrom||s.data>=dateFrom)&&(!dateTo||s.data<=dateTo))&&!!((s.content||'').trim()||(s.adset||'').trim()||(s.campaign||'').trim()));
   fSales.forEach(s=>{
     const key=(s.content||'').trim();
     if(key && map[key]){
@@ -1214,8 +1216,8 @@ function renderPublicos(){
     const p=map[r.adset];p.inv+=r.inv;p.cliques+=r.cliques;p.imp+=r.imp;p.pv+=r.pv;p.ck+=r.ck;
     if(r.data>p.lastDate)p.lastDate=r.data;
   });
-  // Re-aplicar vendas do webhook filtradas por data (inclui sem data = manual)
-  const fSalesPub=SALES.filter(s=>!s.data||(!dateFrom||s.data>=dateFrom)&&(!dateTo||s.data<=dateTo));
+  // Públicos: só vendas rastreadas (com pelo menos 1 UTM)
+  const fSalesPub=SALES.filter(s=>(!s.data||(!dateFrom||s.data>=dateFrom)&&(!dateTo||s.data<=dateTo))&&!!((s.content||'').trim()||(s.adset||'').trim()||(s.campaign||'').trim()));
   fSalesPub.forEach(s=>{
     const key=(s.adset||'').trim();
     if(key && map[key]){
@@ -1307,7 +1309,8 @@ function renderPaginas(){
     const p=map[pk];p.inv+=r.inv;p.cliques+=r.cliques;p.imp+=r.imp;p.pv+=r.pv;p.ck+=r.ck;
   });
   // Re-aplicar vendas do webhook filtradas por data (inclui sem data = manual)
-  const fSalesPag=SALES.filter(s=>!s.data||(!dateFrom||s.data>=dateFrom)&&(!dateTo||s.data<=dateTo));
+  // Páginas: só vendas rastreadas (com pelo menos 1 UTM)
+  const fSalesPag=SALES.filter(s=>(!s.data||(!dateFrom||s.data>=dateFrom)&&(!dateTo||s.data<=dateTo))&&!!((s.content||'').trim()||(s.adset||'').trim()||(s.campaign||'').trim()));
   fSalesPag.forEach(s=>{
     const pg=extractPage((s.campaign||'').trim());
     if(pg>0){
