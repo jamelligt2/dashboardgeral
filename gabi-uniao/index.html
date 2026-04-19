@@ -216,6 +216,11 @@ tr:hover td{background:rgba(255,255,255,.025)}
 
 <!-- PÚBLICOS -->
 <div id="tab-publicos" class="content">
+  <!-- Filtro por página (gerado dinamicamente) -->
+  <div class="cri-filterbar" id="pub-page-filterbar" style="margin-bottom:6px">
+    <span style="font-size:11px;color:rgba(255,255,255,.4);white-space:nowrap">📄 Página:</span>
+    <button class="pub-page-btn cri-filter-btn active" onclick="setPubPage(0,this)">Todas</button>
+  </div>
   <div class="cri-filterbar">
     <button class="pub-filter-btn cri-filter-btn active" onclick="setPubFiltro('todos',this)">Todos</button>
     <button class="pub-filter-btn cri-filter-btn" onclick="setPubFiltro('ativos',this)">&#9679; Ativos</button>
@@ -815,6 +820,7 @@ function setPreset(days,btn){
 function onDateChange(){
   document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
   dateFrom=document.getElementById('dateFrom').value;dateTo=document.getElementById('dateTo').value;
+  pubPageFilter=0; // reset filtro de página ao mudar período
   updateRangeInfo();renderAll();
 }
 function updateRangeInfo(){
@@ -1204,11 +1210,23 @@ function renderCriativos(){
 }
 
 // ============ PÚBLICOS ============
-let pubFilter='todos',pubSort='inv';
+let pubFilter='todos',pubSort='inv',pubPageFilter=0;
 function setPubFiltro(f,btn){pubFilter=f;document.querySelectorAll('.pub-filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderPublicos();}
 function setPubSort(s,btn){pubSort=s;document.querySelectorAll('.pub-sort-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderPublicos();}
-function renderPublicos(){
+function setPubPage(pg,btn){pubPageFilter=pg;document.querySelectorAll('.pub-page-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderPublicos();}
+function buildPubPageButtons(){
   const rows=filteredRawRows();
+  const pages=[...new Set(rows.filter(r=>r.pageNum>0).map(r=>r.pageNum))].sort((a,b)=>a-b);
+  const bar=document.getElementById('pub-page-filterbar');
+  if(!bar)return;
+  // Mantém o botão "Todas" + gera os de cada página
+  bar.innerHTML=`<span style="font-size:11px;color:rgba(255,255,255,.4);white-space:nowrap">📄 Página:</span>
+    <button class="pub-page-btn cri-filter-btn ${pubPageFilter===0?'active':''}" onclick="setPubPage(0,this)">Todas</button>
+    ${pages.map(pg=>`<button class="pub-page-btn cri-filter-btn ${pubPageFilter===pg?'active':''}" onclick="setPubPage(${pg},this)">Pág ${pg}</button>`).join('')}`;
+}
+function renderPublicos(){
+  buildPubPageButtons();
+  const rows=filteredRawRows().filter(r=>pubPageFilter===0||r.pageNum===pubPageFilter);
   const map={};
   rows.forEach(r=>{
     if(!r.adset)return;
@@ -1216,8 +1234,13 @@ function renderPublicos(){
     const p=map[r.adset];p.inv+=r.inv;p.cliques+=r.cliques;p.imp+=r.imp;p.pv+=r.pv;p.ck+=r.ck;
     if(r.data>p.lastDate)p.lastDate=r.data;
   });
-  // Públicos: só vendas rastreadas (com pelo menos 1 UTM)
-  const fSalesPub=SALES.filter(s=>(!s.data||(!dateFrom||s.data>=dateFrom)&&(!dateTo||s.data<=dateTo))&&!!((s.content||'').trim()||(s.adset||'').trim()||(s.campaign||'').trim()));
+  // Públicos: só vendas rastreadas + filtro de página se ativo
+  const fSalesPub=SALES.filter(s=>{
+    const inRange=!s.data||(!dateFrom||s.data>=dateFrom)&&(!dateTo||s.data<=dateTo);
+    const tracked=!!((s.content||'').trim()||(s.adset||'').trim()||(s.campaign||'').trim());
+    const pgMatch=pubPageFilter===0||extractPage((s.campaign||'').trim())===pubPageFilter;
+    return inRange&&tracked&&pgMatch;
+  });
   fSalesPub.forEach(s=>{
     const key=(s.adset||'').trim();
     if(key && map[key]){
@@ -1325,6 +1348,7 @@ function renderPaginas(){
     p.ctr=p.imp>0?p.cliques/p.imp*100:0;p.connectRate=p.cliques>0?p.pv/p.cliques*100:0;
     p.taxaCk=p.pv>0?p.ck/p.pv*100:0;p.taxaCompra=p.pv>0?p.compras/p.pv*100:0;
     p.cac=p.compras>0?p.inv/p.compras:0;p.roas=p.inv>0?p.fat/p.inv:0;
+    p.ticket=p.compras>0?p.fat/p.compras:0;
   });
 
   // Find winners per metric
@@ -1343,35 +1367,54 @@ function renderPaginas(){
   // Cards
   document.getElementById('page-cards').innerHTML=pags.map(p=>{
     const pageUrl=PAGE_LINKS[p.pageNum]||null;
-    return`<div class="page-card">
-      <h3>
-        <span class="page-num">Pag ${p.pageNum}</span> ${p.nome}
-        ${pageUrl?`<a href="${pageUrl}" target="_blank" style="margin-left:auto;font-size:10px;color:rgba(255,107,43,.7);text-decoration:none;font-weight:400;white-space:nowrap;">🔗 Ver página ↗</a>`:''}
-      </h3>
-      ${pageUrl?`<div style="margin-bottom:12px"><a href="${pageUrl}" target="_blank" style="font-size:11px;color:rgba(255,107,43,.6);text-decoration:none;font-family:'DM Mono',monospace;word-break:break-all;">${pageUrl}</a></div>`:''}
-      <div style="background:rgba(255,107,43,.08);border:1px solid rgba(255,107,43,.25);border-radius:8px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between">
-        <div>
-          <div style="font-size:9px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">Taxa de Conversão da Página</div>
-          <div style="font-family:'DM Mono',monospace;font-size:28px;font-weight:700;color:#ff6b2b">${pct(p.taxaCompra)}${winners.taxaCompra===p.nome?'<span class="winner-tag" style="font-size:9px;margin-left:8px">MELHOR</span>':''}</div>
-          <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:3px">Compras ÷ Pageviews</div>
+    const win=(m)=>winners[m]===p.nome?'<span style="background:#ff6b2b;color:#fff;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:4px;vertical-align:middle">TOP</span>':'';
+    return`<div class="page-card" style="padding:16px">
+      <!-- Header -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="background:#ff6b2b;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;white-space:nowrap">Pag ${p.pageNum}</span>
+        <span style="font-size:13px;font-weight:600;color:#e8e6f0;flex:1">${p.nome}</span>
+        ${pageUrl?`<a href="${pageUrl}" target="_blank" style="font-size:11px;color:rgba(255,107,43,.7);text-decoration:none;white-space:nowrap">🔗 Ver ↗</a>`:''}
+      </div>
+      ${pageUrl?`<div style="margin-bottom:10px"><a href="${pageUrl}" target="_blank" style="font-size:10px;color:rgba(255,107,43,.5);text-decoration:none;font-family:'DM Mono',monospace;word-break:break-all">${pageUrl}</a></div>`:''}
+
+      <!-- Faixa destaque: 4 métricas em linha, labels brancos -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;background:rgba(255,107,43,.07);border:1px solid rgba(255,107,43,.2);border-radius:8px;padding:10px 8px;margin-bottom:10px">
+        <div style="text-align:center;border-right:1px solid rgba(255,255,255,.06);padding-right:4px">
+          <div style="font-size:8px;color:#e8e6f0;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Taxa Conv.</div>
+          <div style="font-family:'DM Mono',monospace;font-size:17px;font-weight:800;color:#ff6b2b;line-height:1">${pct(p.taxaCompra)}</div>
+          ${win('taxaCompra')}
         </div>
-        <div style="text-align:right">
-          <div style="font-size:9px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">Taxa Checkout</div>
-          <div style="font-family:'DM Mono',monospace;font-size:20px;font-weight:700;color:rgba(255,183,55,.9)">${pct(p.taxaCk)}${winners.taxaCk===p.nome?'<span class="winner-tag" style="font-size:9px;margin-left:6px">MELHOR</span>':''}</div>
-          <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:3px">CK ÷ Pageviews</div>
+        <div style="text-align:center;border-right:1px solid rgba(255,255,255,.06);padding-right:4px">
+          <div style="font-size:8px;color:#e8e6f0;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">ROAS</div>
+          <div style="font-family:'DM Mono',monospace;font-size:17px;font-weight:800;color:${p.roas>=1?'#2ecc71':'#e74c3c'};line-height:1">${br(p.roas)}x</div>
+          ${win('roas')}
+        </div>
+        <div style="text-align:center;border-right:1px solid rgba(255,255,255,.06);padding-right:4px">
+          <div style="font-size:8px;color:#e8e6f0;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">CAC</div>
+          <div style="font-family:'DM Mono',monospace;font-size:15px;font-weight:800;color:#ff6b2b;line-height:1">${p.compras>0?brl(p.cac):'—'}</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:8px;color:#e8e6f0;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Ticket</div>
+          <div style="font-family:'DM Mono',monospace;font-size:15px;font-weight:800;color:#ff6b2b;line-height:1">${p.compras>0?brl(p.ticket):'—'}</div>
         </div>
       </div>
-      <div class="page-kpis">
-        <div class="page-kpi"><div class="page-kpi-label">Investimento</div><div class="page-kpi-val orange">${brl(p.inv)}</div></div>
-        <div class="page-kpi"><div class="page-kpi-label">Cliques</div><div class="page-kpi-val orange">${br(p.cliques,0)}</div></div>
-        <div class="page-kpi"><div class="page-kpi-label">PV</div><div class="page-kpi-val orange">${br(p.pv,0)}</div></div>
-        <div class="page-kpi"><div class="page-kpi-label">CPC</div><div class="page-kpi-val orange">${brl(p.cpc)}${winners.cpc===p.nome?'<span class="winner-tag">MELHOR</span>':''}</div></div>
-        <div class="page-kpi"><div class="page-kpi-label">CPM</div><div class="page-kpi-val orange">${brl(p.cpm)}${winners.cpm===p.nome?'<span class="winner-tag">MELHOR</span>':''}</div></div>
-        <div class="page-kpi"><div class="page-kpi-label">CTR</div><div class="page-kpi-val orange">${pct(p.ctr)}${winners.ctr===p.nome?'<span class="winner-tag">MELHOR</span>':''}</div></div>
-        <div class="page-kpi"><div class="page-kpi-label">Connect Rate</div><div class="page-kpi-val orange">${pct(p.connectRate)}${winners.connectRate===p.nome?'<span class="winner-tag">MELHOR</span>':''}</div></div>
-        <div class="page-kpi"><div class="page-kpi-label">ROAS</div><div class="page-kpi-val ${p.roas>=1?'green':'red'}">${br(p.roas)}x${winners.roas===p.nome?'<span class="winner-tag">MELHOR</span>':''}</div></div>
-        <div class="page-kpi"><div class="page-kpi-label">Compras</div><div class="page-kpi-val orange">${br(p.compras,0)}</div></div>
-        <div class="page-kpi"><div class="page-kpi-label">CAC</div><div class="page-kpi-val orange">${p.compras>0?brl(p.cac):'—'}</div></div>
+
+      <!-- Grid secundário uniforme 3x3 -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
+        ${[
+          ['Invest.',brl(p.inv),''],
+          ['Compras',br(p.compras,0),''],
+          ['Faturamento',p.fat>0?brl(p.fat):'—',''],
+          ['Cliques',br(p.cliques,0),win('ctr')],
+          ['PV',br(p.pv,0),''],
+          ['CPC',brl(p.cpc),win('cpc')],
+          ['CTR',pct(p.ctr),win('ctr')],
+          ['Connect Rate',pct(p.connectRate),win('connectRate')],
+          ['Taxa CK',pct(p.taxaCk),win('taxaCk')],
+        ].map(([lbl,val,badge])=>`<div style="background:rgba(255,255,255,.03);border-radius:6px;padding:7px 8px">
+          <div style="font-size:8px;color:#e8e6f0;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">${lbl}</div>
+          <div style="font-family:'DM Mono',monospace;font-size:12px;font-weight:600;color:#e8e6f0">${val}${badge}</div>
+        </div>`).join('')}
       </div>
     </div>`;
   }).join('');
