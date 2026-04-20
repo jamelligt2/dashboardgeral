@@ -141,6 +141,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
     <button class="preset-btn active" id="btn-all" onclick="setPreset('all',this)">Tudo</button>
     <span class="range-info" id="range-info"></span>
     <button id="btn-debug-webhook" onclick="openDebugModal()" style="background:rgba(255,107,43,.12);border:1px solid rgba(255,107,43,.3);color:#ff9a3c;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:11px;font-family:'DM Sans',sans-serif;white-space:nowrap;transition:all .2s" title="Ver vendas do webhook">💸 <span id="debug-sales-count">0 vendas</span></button>
+    <button onclick="reloadDash()" id="btn-refresh" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:11px;font-family:'DM Sans',sans-serif;white-space:nowrap;transition:all .2s" title="Recarregar dados da planilha">🔄 Atualizar</button>
   </div>
 </div>
 
@@ -232,6 +233,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
     <button class="pub-sort-btn cri-filter-btn" onclick="setPubSort('cpc',this)">CPC</button>
     <button class="pub-sort-btn cri-filter-btn" onclick="setPubSort('cr',this)">Connect Rate</button>
   </div>
+  <div id="pub-sales-summary" style="margin-bottom:10px"></div>
   <div class="pub-grid" id="pub-cards"></div>
   <div class="sec-title">Tabela de Públicos</div>
   <div class="tbl-wrap"><table><thead><tr>
@@ -871,37 +873,44 @@ function renderWebhookSalesPanel(){
   if(btn) btn.textContent=SALES.length+' venda'+(SALES.length!==1?'s':'');
   if(!SALES.length){panel.innerHTML='';return;}
   const totalFat=SALES.reduce((s,v)=>s+v.valor,0);
+  // Sort most-recent first, organic after tracked within same date
+  const sortedSales=[...fSales].sort((a,b)=>{
+    const da=a.data||'0000-00-00', db=b.data||'0000-00-00';
+    if(db!==da) return db>da?1:-1;
+    return isTrackedSale(b)?1:-1;
+  });
   panel.innerHTML=`
   <div style="background:#12121f;border:1px solid rgba(255,107,43,.25);border-radius:10px;padding:16px;margin-bottom:20px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
       <div style="display:flex;align-items:center;gap:10px">
         <span style="font-size:18px">💸</span>
         <div>
-          <div style="font-size:13px;font-weight:600;color:#ff9a3c">Vendas Rastreadas (Webhook)</div>
-          <div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px">${SALES.length} venda${SALES.length!==1?'s':', '} · ${brl(totalFat)} total · ${fSales.length} no período selecionado</div>
+          <div style="font-size:13px;font-weight:600;color:#ff9a3c">Vendas no Período (${fSales.length})</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px">${SALES.length} total · ${brl(totalFat)} faturamento total · ← arraste para ver mais</div>
         </div>
       </div>
       <button onclick="openDebugModal()" style="background:rgba(255,107,43,.12);border:1px solid rgba(255,107,43,.3);color:#ff9a3c;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:11px;font-family:'DM Sans',sans-serif">Ver detalhes →</button>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px">
-    ${SALES.map(s=>{
+    <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:6px">
+    ${sortedSales.map(s=>{
       const st=getSalesStatus(s);
-      const inPeriod=!s.data||(!dateFrom||s.data>=dateFrom)&&(!dateTo||s.data<=dateTo);
-      const allGood=st.criMatch&&st.pubMatch;
-      const color=allGood?'rgba(46,204,113,.2)':inPeriod?'rgba(241,196,15,.12)':'rgba(255,255,255,.05)';
-      const border=allGood?'rgba(46,204,113,.4)':inPeriod?'rgba(241,196,15,.3)':'rgba(255,255,255,.1)';
-      const icon=allGood?'✅':inPeriod?'⚠️':'⏸️';
-      return`<div style="background:${color};border:1px solid ${border};border-radius:8px;padding:10px 12px">
+      const tracked=isTrackedSale(s);
+      const color=!tracked?'rgba(241,196,15,.1)':'rgba(46,204,113,.2)';
+      const border=!tracked?'rgba(241,196,15,.3)':'rgba(46,204,113,.4)';
+      const icon=!tracked?'⭐':'✅';
+      return`<div style="flex-shrink:0;width:210px;background:${color};border:1px solid ${border};border-radius:8px;padding:10px 12px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
-          <div style="font-size:11px;font-weight:600;color:#e8e6f0">${icon} ${s.nome||'Sem nome'}</div>
-          <div style="font-size:13px;font-weight:700;color:#2ecc71;font-family:'DM Mono',monospace">${brl(s.valor)}</div>
+          <div style="font-size:11px;font-weight:600;color:#e8e6f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px">${icon} ${s.nome||'Sem nome'}</div>
+          <div style="font-size:13px;font-weight:700;color:#2ecc71;font-family:'DM Mono',monospace;flex-shrink:0">${brl(s.valor)}</div>
         </div>
-        <div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:3px">📅 ${s.data||'<span style="color:#e74c3c">sem data</span>'}</div>
-        <div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:2px">🎨 ${s.content?'<span style="color:'+(st.criMatch?'#2ecc71':'#e74c3c')+'">'+s.content+'</span>':'<span style="color:rgba(255,255,255,.25)">sem utm_content</span>'}</div>
-        <div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:2px">👥 ${s.adset?'<span style="color:'+(st.pubMatch?'#2ecc71':'#f1c40f')+'">'+s.adset.slice(0,35)+(s.adset.length>35?'…':'')+'</span>':'<span style="color:rgba(255,255,255,.25)">sem utm_campaign</span>'}</div>
-        <div style="font-size:10px;color:rgba(255,255,255,.45)">📄 ${st.pagMatch?'<span style="color:#2ecc71">Pág '+extractPage(s.campaign||'')+'</span>':'<span style="color:rgba(255,255,255,.25)">'+(s.campaign?s.campaign.slice(0,25):' sem utm_medium')+'</span>'}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:4px">📅 ${s.data||'<span style="color:#e74c3c">sem data</span>'}</div>
+        ${tracked?`
+        <div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:2px">🎨 ${s.content?'<span style="color:'+(st.criMatch?'#2ecc71':'#e74c3c')+'">'+s.content+'</span>':'<span style="color:rgba(255,255,255,.25)">sem criativo</span>'}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.45)">📄 ${st.pagMatch?'<span style="color:#2ecc71">Pág '+extractPage(s.campaign||'')+'</span>':'<span style="color:rgba(255,255,255,.25)">sem página</span>'}</div>
+        `:`<div style="font-size:10px;color:rgba(241,196,15,.7);margin-top:2px">⭐ Venda orgânica</div>`}
       </div>`;
     }).join('')}
+    ${sortedSales.length===0?'<div style="color:rgba(255,255,255,.3);font-size:12px;padding:10px">Nenhuma venda no período</div>':''}
     </div>
   </div>`;
 }
@@ -1242,13 +1251,21 @@ function renderPublicos(){
     const pgMatch=pubPageFilter===0||extractPage((s.campaign||'').trim())===pubPageFilter;
     return inRange&&tracked&&pgMatch;
   });
+  let unmatchedSales=0, unmatchedFat=0;
   fSalesPub.forEach(s=>{
     const key=(s.adset||'').trim();
     if(key && map[key]){
       map[key].fat=(map[key].fat||0)+s.valor;
       map[key].compras=(map[key].compras||0)+1;
+    } else {
+      // Tracked but no matching adset in Gerenciador — count as unmatched
+      unmatchedSales+=1; unmatchedFat+=s.valor;
     }
   });
+  // Add virtual "Sem Público" card if there are unmatched tracked sales
+  if(unmatchedSales>0){
+    map['⚠️ Sem Público Identificado']={nome:'⚠️ Sem Público Identificado',inv:0,cliques:0,imp:0,pv:0,ck:0,fat:unmatchedFat,compras:unmatchedSales,lastDate:'',ativo:false,semPub:true};
+  }
 
   let pubs=Object.values(map);
   const cutoff=last7iso();
@@ -1268,6 +1285,17 @@ function renderPublicos(){
   else if(pubSort==='cpc')pubs.sort((a,b)=>(a.cpc||999)-(b.cpc||999));
   else if(pubSort==='cr')pubs.sort((a,b)=>b.connectRate-a.connectRate);
 
+  // Summary: total tracked sales vs attributed
+  const totalTrackedInPeriod=fSalesPub.length;
+  const totalAttributed=pubs.filter(p=>!p.semPub).reduce((s,p)=>s+(p.compras||0),0);
+  const summaryEl=document.getElementById('pub-sales-summary');
+  if(summaryEl && totalTrackedInPeriod>0){
+    const match=totalAttributed===totalTrackedInPeriod;
+    summaryEl.innerHTML=`<div style="background:${match?'rgba(46,204,113,.08)':'rgba(241,196,15,.08)'};border:1px solid ${match?'rgba(46,204,113,.2)':'rgba(241,196,15,.2)'};border-radius:8px;padding:10px 14px;font-size:12px;color:rgba(255,255,255,.7)">
+      ${match?'✅':'⚠️'} <strong>${totalTrackedInPeriod}</strong> vendas rastreadas no período · <strong style="color:${match?'#2ecc71':'#f1c40f'}">${totalAttributed} atribuídas</strong> a públicos${!match?' · <span style="color:#f1c40f">'+(totalTrackedInPeriod-totalAttributed)+' sem público (nomes não coincidem com o Gerenciador)</span>':''}
+    </div>`;
+  } else if(summaryEl){ summaryEl.innerHTML=''; }
+
   if(!pubs.length){
     document.getElementById('pub-cards').innerHTML='<div style="color:rgba(255,255,255,.3);font-size:13px;padding:20px 0">Nenhum público disponível.</div>';
     document.getElementById('tbody-publicos').innerHTML='';return;
@@ -1275,6 +1303,14 @@ function renderPublicos(){
   const totalInv=pubs.reduce((s,p)=>s+p.inv,0);
   document.getElementById('pub-cards').innerHTML=pubs.map(p=>{
     const pctInv=totalInv>0?p.inv/totalInv*100:0;
+    if(p.semPub) return`<div class="pub-card" style="border-color:rgba(241,196,15,.3);background:rgba(241,196,15,.05)">
+      <div class="pub-card-header"><div class="pub-name" style="color:#f1c40f">${p.nome}</div><div class="cri-badge inativo">Sem match</div></div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;background:rgba(241,196,15,.06);border:1px solid rgba(241,196,15,.15);border-radius:8px;padding:10px 8px;margin-bottom:8px">
+        <div style="text-align:center"><div style="font-family:'DM Mono',monospace;font-size:20px;font-weight:800;color:#f1c40f">${br(p.compras,0)}</div><div style="font-size:9px;color:rgba(255,255,255,.4);margin-top:2px;text-transform:uppercase">Vendas</div></div>
+        <div style="text-align:center"><div style="font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:#f1c40f">${brl(p.fat)}</div><div style="font-size:9px;color:rgba(255,255,255,.4);margin-top:2px;text-transform:uppercase">Fat.</div></div>
+      </div>
+      <div style="font-size:10px;color:rgba(255,255,255,.35);line-height:1.5">Nome do adset no webhook não bate com nenhum adset do Gerenciador. Verifique o utm_campaign das vendas.</div>
+    </div>`;
     return`<div class="pub-card ${p.ativo?'ativo':''}">
       <div class="pub-card-header"><div class="pub-name">${p.nome}</div><div class="cri-badge ${p.ativo?'ativo':'inativo'}">${p.ativo?'Ativo':'Inativo'}</div></div>
       <!-- Destaque laranja: Invest · Ticket · Vendas -->
@@ -1537,6 +1573,15 @@ function createChart(id,type,labels,datasets){
 }
 
 // ============ INIT ============
+function reloadDash(){
+  const btn=document.getElementById('btn-refresh');
+  if(btn){btn.textContent='🔄 Carregando...';btn.disabled=true;}
+  // Reset globals
+  DIAS=[];SEMANAL=[];MENSAL=[];CRIATIVOS=[];PUBLICOS=[];PAGINAS=[];SALES=[];RAW_ROWS=[];
+  init().finally(()=>{
+    if(btn){btn.textContent='🔄 Atualizar';btn.disabled=false;}
+  });
+}
 document.addEventListener('DOMContentLoaded',()=>{init();});
 </script>
 </body>
