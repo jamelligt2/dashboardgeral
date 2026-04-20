@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>União em Chama · Gabi Bergo — Jamelli GT</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%231a1a2e'/><text y='72' x='50' text-anchor='middle' font-size='62'>🔥</text></svg>">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -873,12 +874,14 @@ function renderWebhookSalesPanel(){
   if(btn) btn.textContent=SALES.length+' venda'+(SALES.length!==1?'s':'');
   if(!SALES.length){panel.innerHTML='';return;}
   const totalFat=SALES.reduce((s,v)=>s+v.valor,0);
-  // Sort most-recent first, organic after tracked within same date
-  const sortedSales=[...fSales].sort((a,b)=>{
-    const da=a.data||'0000-00-00', db=b.data||'0000-00-00';
+  // Sort most-recent first; same-date preserves original webhook order (last row = most recent)
+  const salesWithIdx=fSales.map((s,i)=>({s,i}));
+  salesWithIdx.sort((a,b)=>{
+    const da=a.s.data||'0000-00-00', db=b.s.data||'0000-00-00';
     if(db!==da) return db>da?1:-1;
-    return isTrackedSale(b)?1:-1;
+    return b.i-a.i; // higher index = added later = more recent
   });
+  const sortedSales=salesWithIdx.map(x=>x.s);
   panel.innerHTML=`
   <div style="background:#12121f;border:1px solid rgba(255,107,43,.25);border-radius:10px;padding:16px;margin-bottom:20px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
@@ -905,9 +908,10 @@ function renderWebhookSalesPanel(){
         </div>
         <div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:4px">📅 ${s.data||'<span style="color:#e74c3c">sem data</span>'}</div>
         ${tracked?`
-        <div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:2px">🎨 ${s.content?'<span style="color:'+(st.criMatch?'#2ecc71':'#e74c3c')+'">'+s.content+'</span>':'<span style="color:rgba(255,255,255,.25)">sem criativo</span>'}</div>
-        <div style="font-size:10px;color:rgba(255,255,255,.45)">📄 ${st.pagMatch?'<span style="color:#2ecc71">Pág '+extractPage(s.campaign||'')+'</span>':'<span style="color:rgba(255,255,255,.25)">sem página</span>'}</div>
-        `:`<div style="font-size:10px;color:rgba(241,196,15,.7);margin-top:2px">⭐ Venda orgânica</div>`}
+        <div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:2px">🎨 <span style="color:#2ecc71">${s.content||'—'}</span></div>
+        <div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:2px">👥 <span style="color:#2ecc71">${s.adset?s.adset.slice(0,30)+(s.adset.length>30?'…':''):'—'}</span></div>
+        <div style="font-size:10px;color:rgba(255,255,255,.45)">📄 <span style="color:#2ecc71">${st.pagMatch?'Pág '+extractPage(s.campaign||''):s.campaign?s.campaign.slice(0,20):'—'}</span></div>
+        `:`<div style="font-size:10px;color:rgba(241,196,15,.7);margin-top:4px">⭐ Venda orgânica</div>`}
       </div>`;
     }).join('')}
     ${sortedSales.length===0?'<div style="color:rgba(255,255,255,.3);font-size:12px;padding:10px">Nenhuma venda no período</div>':''}
@@ -1267,9 +1271,21 @@ function renderPublicos(){
     map['⚠️ Sem Público Identificado']={nome:'⚠️ Sem Público Identificado',inv:0,cliques:0,imp:0,pv:0,ck:0,fat:unmatchedFat,compras:unmatchedSales,lastDate:'',ativo:false,semPub:true};
   }
 
+  // Compute summary BEFORE any filter (uses all pubs including semPub)
+  const totalTrackedInPeriod=fSalesPub.length;
+  const totalAttributed=Object.values(map).filter(p=>!p.semPub).reduce((s,p)=>s+(p.compras||0),0);
+  const summaryEl=document.getElementById('pub-sales-summary');
+  if(summaryEl && totalTrackedInPeriod>0){
+    const match=totalAttributed===totalTrackedInPeriod;
+    summaryEl.innerHTML=`<div style="background:${match?'rgba(46,204,113,.08)':'rgba(241,196,15,.08)'};border:1px solid ${match?'rgba(46,204,113,.2)':'rgba(241,196,15,.2)'};border-radius:8px;padding:10px 14px;font-size:12px;color:rgba(255,255,255,.7)">
+      ${match?'✅':'⚠️'} <strong>${totalTrackedInPeriod}</strong> rastreadas · <strong style="color:${match?'#2ecc71':'#f1c40f'}">${totalAttributed} atribuídas a públicos</strong>${!match?` · <span style="color:#f1c40f">${totalTrackedInPeriod-totalAttributed} sem público identificado</span>`:''}
+    </div>`;
+  } else if(summaryEl){ summaryEl.innerHTML=''; }
+
   let pubs=Object.values(map);
   const cutoff=last7iso();
   pubs.forEach(p=>{
+    if(p.semPub){p.ativo=false;p.cpc=0;p.cpm=0;p.ctr=0;p.connectRate=0;p.roas=0;p.cac=0;p.ticket=p.compras>0?p.fat/p.compras:0;p.taxaConv=0;return;}
     p.ativo=p.lastDate>=cutoff;
     p.cpc=p.cliques>0?p.inv/p.cliques:0;p.cpm=p.imp>0?p.inv/p.imp*1000:0;
     p.ctr=p.imp>0?p.cliques/p.imp*100:0;p.connectRate=p.cliques>0?p.pv/p.cliques*100:0;
@@ -1278,23 +1294,14 @@ function renderPublicos(){
     p.ticket=p.compras>0?p.fat/p.compras:0;
     p.taxaConv=p.pv>0&&p.compras>0?p.compras/p.pv*100:0;
   });
-  if(pubFilter==='ativos')pubs=pubs.filter(p=>p.ativo);
-  if(pubFilter==='inativos')pubs=pubs.filter(p=>!p.ativo);
-  if(pubSort==='inv')pubs.sort((a,b)=>b.inv-a.inv);
-  else if(pubSort==='ctr')pubs.sort((a,b)=>b.ctr-a.ctr);
-  else if(pubSort==='cpc')pubs.sort((a,b)=>(a.cpc||999)-(b.cpc||999));
-  else if(pubSort==='cr')pubs.sort((a,b)=>b.connectRate-a.connectRate);
-
-  // Summary: total tracked sales vs attributed
-  const totalTrackedInPeriod=fSalesPub.length;
-  const totalAttributed=pubs.filter(p=>!p.semPub).reduce((s,p)=>s+(p.compras||0),0);
-  const summaryEl=document.getElementById('pub-sales-summary');
-  if(summaryEl && totalTrackedInPeriod>0){
-    const match=totalAttributed===totalTrackedInPeriod;
-    summaryEl.innerHTML=`<div style="background:${match?'rgba(46,204,113,.08)':'rgba(241,196,15,.08)'};border:1px solid ${match?'rgba(46,204,113,.2)':'rgba(241,196,15,.2)'};border-radius:8px;padding:10px 14px;font-size:12px;color:rgba(255,255,255,.7)">
-      ${match?'✅':'⚠️'} <strong>${totalTrackedInPeriod}</strong> vendas rastreadas no período · <strong style="color:${match?'#2ecc71':'#f1c40f'}">${totalAttributed} atribuídas</strong> a públicos${!match?' · <span style="color:#f1c40f">'+(totalTrackedInPeriod-totalAttributed)+' sem público (nomes não coincidem com o Gerenciador)</span>':''}
-    </div>`;
-  } else if(summaryEl){ summaryEl.innerHTML=''; }
+  // semPub always visible regardless of ativos/inativos filter
+  const semPubCard=pubs.find(p=>p.semPub);
+  if(pubFilter==='ativos')pubs=pubs.filter(p=>p.ativo||p.semPub);
+  if(pubFilter==='inativos')pubs=pubs.filter(p=>!p.ativo||p.semPub);
+  if(pubSort==='inv')pubs.sort((a,b)=>a.semPub?1:b.semPub?-1:b.inv-a.inv);
+  else if(pubSort==='ctr')pubs.sort((a,b)=>a.semPub?1:b.semPub?-1:b.ctr-a.ctr);
+  else if(pubSort==='cpc')pubs.sort((a,b)=>a.semPub?1:b.semPub?-1:(a.cpc||999)-(b.cpc||999));
+  else if(pubSort==='cr')pubs.sort((a,b)=>a.semPub?1:b.semPub?-1:b.connectRate-a.connectRate);
 
   if(!pubs.length){
     document.getElementById('pub-cards').innerHTML='<div style="color:rgba(255,255,255,.3);font-size:13px;padding:20px 0">Nenhum público disponível.</div>';
