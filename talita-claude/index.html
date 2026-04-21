@@ -99,6 +99,25 @@ tr:hover td{background:rgba(255,255,255,.025)}
 .pub-bar-fill{height:100%;background:linear-gradient(90deg,#ff6b2b,#ff9a3c);border-radius:3px;transition:width .5s}
 .empty-state{padding:40px 20px;text-align:center;color:rgba(255,255,255,.35);font-size:13px;border:1px dashed rgba(255,255,255,.1);border-radius:10px;background:rgba(255,255,255,.02)}
 .empty-state strong{display:block;color:#ff6b2b;margin-bottom:6px;font-size:14px}
+.vendas-section{background:linear-gradient(135deg,rgba(46,204,113,.06),rgba(46,204,113,.02));border:1px solid rgba(46,204,113,.18);border-radius:12px;padding:18px 20px;margin:18px 0 24px}
+.vendas-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:12px}
+.vendas-title{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;color:#2ecc71}
+.vendas-title .em{font-size:18px}
+.vendas-sub{font-size:11px;color:rgba(255,255,255,.45);margin-top:3px;font-weight:400}
+.vendas-cards{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x proximity}
+.vendas-cards::-webkit-scrollbar{height:8px}
+.vendas-cards::-webkit-scrollbar-thumb{background:rgba(46,204,113,.4);border-radius:4px}
+.venda-card{flex:0 0 235px;background:rgba(46,204,113,.08);border:1px solid rgba(46,204,113,.22);border-radius:10px;padding:12px 13px;scroll-snap-align:start;transition:transform .15s, border-color .15s}
+.venda-card:hover{border-color:rgba(46,204,113,.55);transform:translateY(-2px)}
+.venda-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px}
+.venda-name{font-size:11px;font-weight:600;color:#e8e6f0;line-height:1.3;flex:1;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical}
+.venda-name::before{content:"✅ ";color:#2ecc71}
+.venda-price{font-family:'DM Mono',monospace;font-size:12px;font-weight:700;color:#2ecc71;white-space:nowrap}
+.venda-meta{display:flex;flex-direction:column;gap:3px;font-size:10px;color:rgba(255,255,255,.5);font-family:'DM Mono',monospace}
+.venda-meta .row{display:flex;align-items:center;gap:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.venda-meta .ico{opacity:.5;flex-shrink:0}
+.vendas-progress{margin-top:10px;height:3px;background:rgba(255,255,255,.05);border-radius:2px;overflow:hidden}
+.vendas-progress-bar{height:100%;background:linear-gradient(90deg,#2ecc71,#27ae60);border-radius:2px;width:8%;transition:width .3s}
 </style>
 </head>
 <body>
@@ -148,6 +167,18 @@ tr:hover td{background:rgba(255,255,255,.025)}
 <!-- VISÃO GERAL -->
 <div id="tab-visao" class="content active">
   <div class="kpi-grid" id="kpi-visao"></div>
+
+  <div class="vendas-section" id="vendas-section" style="display:none">
+    <div class="vendas-header">
+      <div>
+        <div class="vendas-title"><span class="em">💸</span><span id="vendas-titulo">Vendas no Período</span></div>
+        <div class="vendas-sub" id="vendas-sub"></div>
+      </div>
+    </div>
+    <div class="vendas-cards" id="vendas-cards"></div>
+    <div class="vendas-progress"><div class="vendas-progress-bar" id="vendas-progress-bar"></div></div>
+  </div>
+
   <div class="funil-section">
     <div>
       <div class="sec-title">Funil de Conversão</div>
@@ -257,11 +288,14 @@ tr:hover td{background:rgba(255,255,255,.025)}
 const SHEET_ID = '1C2Xvdg3ORGIeRobxluq7vEZVEqjsW-uNHbIYhr8g02w';
 const GERENCIADOR_SHEET = 'Gerenciador';
 const WEBHOOK_SHEET = 'Webhook';
+const VENDAS_SHEET = 'vendas';        // export histórico Kiwify (UTMs deslocadas)
 const META_SOURCE_FILTER = 'metaads'; // normalizado sem espaço/underline
-const CAMPAIGN_FILTER = 'claude';      // webhook: só vendas cujo utm_campaign contém "claude"
+const CAMPAIGN_FILTER = 'claude';     // utm_medium OU utm_campaign deve conter "claude"
 
 // Estado global
 let DIAS = [], SEMANAL = [], MENSAL = [], CRIATIVOS = [], CRIATIVOS_PERIODOS = [], PUBLICOS = [];
+let VENDAS_RASTREADAS = [];           // detalhe de cada venda individual (cards)
+let SEEN_ORDER_IDS = new Set();       // dedupe entre vendas e webhook
 let dateFrom = null, dateTo = null;
 let criFilter = 'todos', criSort = 'inv';
 let pubFilter = 'todos', pubSort = 'inv';
@@ -316,14 +350,18 @@ function normKey(s) { return String(s||'').toLowerCase().replace(/[\s_-]/g,''); 
 // =================== DATA LOADER ===================
 async function loadData() {
   try {
-    document.getElementById('loading-msg').textContent = 'Carregando Gerenciador e Webhook...';
-    const [gCSV, wCSV] = await Promise.all([
+    document.getElementById('loading-msg').textContent = 'Carregando Gerenciador, vendas e Webhook...';
+    const [gCSV, vCSV, wCSV] = await Promise.all([
       fetchSheetCSV(GERENCIADOR_SHEET),
+      fetchSheetCSV(VENDAS_SHEET).catch(_ => ''),
       fetchSheetCSV(WEBHOOK_SHEET).catch(_ => '')
     ]);
 
     processGerenciador(gCSV);
-    processWebhook(wCSV);
+    processVendas(vCSV);     // 1º: histórico Kiwify (registra Order_IDs)
+    processWebhook(wCSV);    // 2º: novas vendas via webhook (deduplica)
+    finalizeCriativos();
+    rebuildPeriodBuckets();  // refaz SEMANAL/MENSAL caso vendas tenham adicionado datas novas
     fixFatFromDias();
 
     initDatePickers();
@@ -439,8 +477,69 @@ function processGerenciador(csv) {
   }));
 }
 
-// Webhook columns:
-// A Data | B Status | C Source | D Campaign | E Valor | F Nome | G Email | H Produto | I Payment_Method | J Order_ID | K Medium | L Content | M Term | N SCK | O SRC | P Created_At | Q Approved_Date
+// =================== VENDAS (export Kiwify histórico) ===================
+// Atenção: as UTMs da Kiwify estão deslocadas:
+//   utm_source = "meta_ads"
+//   utm_medium = nome da CAMPANHA   ← onde checamos "claude"
+//   utm_campaign = nome do ADSET
+//   utm_content = nome do CRIATIVO (prefixo antes de "::")
+function processVendas(csv) {
+  if (!csv || !csv.trim()) return;
+  const rows = parseCSV(csv);
+  if (rows.length < 2) return;
+  const header = rows[0].map(h => h.replace(/"/g,'').trim());
+  const I = (n) => header.indexOf(n);
+  const idx = {
+    id:      I('ID da venda'),
+    status:  I('Status'),
+    produto: I('Produto'),
+    total:   I('Total com acréscimo'),
+    data:    I('Data de Criação'),
+    src:     I('Tracking utm_source'),
+    medium:  I('Tracking utm_medium'),
+    camp:    I('Tracking utm_campaign'),
+    content: I('Tracking utm_content')
+  };
+
+  const idxCli = header.indexOf('Cliente');
+  const sales = rows.slice(1)
+    .filter(r => r.length > 5)
+    .filter(r => r[idx.status] && r[idx.status].toLowerCase().trim() === 'paid')
+    .filter(r => r[idx.src] && normKey(r[idx.src]) === META_SOURCE_FILTER)
+    .filter(r => {
+      const med = (r[idx.medium]||'').toLowerCase();
+      const cam = (r[idx.camp]||'').toLowerCase();
+      return med.includes(CAMPAIGN_FILTER) || cam.includes(CAMPAIGN_FILTER);
+    });
+
+  sales.forEach(r => {
+    const orderId = (r[idx.id]||'').trim();
+    if (orderId) SEEN_ORDER_IDS.add(orderId);
+    // Valor já em REAIS na export Kiwify (NÃO dividir por 100)
+    const valor = parseFloat(String(r[idx.total]||'0').replace(',', '.')) || 0;
+    const dataRaw = r[idx.data] || '';
+    const dataBR = normalizeDateBR(dataRaw);
+    if (!dataBR) return;
+    const isoFull = saleIsoFromBR(dataBR, dataRaw);
+    addSaleToDay(dataBR, valor);
+    const criativo = String(r[idx.content]||'').split('::')[0].trim();
+    addSaleToCriativo(criativo, valor);
+    VENDAS_RASTREADAS.push({
+      cliente: r[idxCli] || 'Cliente',
+      valor,
+      dataBR,
+      iso: isoFull,
+      produto: r[idx.produto] || '',
+      criativo,
+      campanha: r[idx.medium] || '',
+      adset: r[idx.camp] || '',
+      origem: 'vendas'
+    });
+  });
+}
+
+// =================== WEBHOOK (Make → Sheets, futuro) ===================
+// Colunas: A Data | B Status | C Source | D Campaign | E Valor (centavos) | F Nome | G Email | H Produto | I Payment_Method | J Order_ID | K Medium | L Content | M Term | N SCK | O SRC | P Created_At | Q Approved_Date
 function processWebhook(csv) {
   if (!csv || !csv.trim()) return;
   const rows = parseCSV(csv);
@@ -453,44 +552,106 @@ function processWebhook(csv) {
     campaign:    header.indexOf('campaign'),
     valor:       header.indexOf('valor'),
     content:     header.indexOf('content'),
+    medium:      header.indexOf('medium'),
+    orderid:     header.indexOf('order_id'),
     approved:    header.indexOf('approved_date')
   };
-  // Filtra: Status=paid, Source=meta_ads, Campaign contém "claude"
+  // Filtra: Status=paid, Source=meta_ads, (Medium OU Campaign) contém "claude"
   const sales = rows.slice(1)
     .filter(r => r.length > 2)
     .filter(r => r[idx.status] && r[idx.status].toLowerCase().replace(/"/g,'').trim() === 'paid')
     .filter(r => r[idx.source] && normKey(r[idx.source]) === META_SOURCE_FILTER)
-    .filter(r => r[idx.campaign] && r[idx.campaign].toLowerCase().includes(CAMPAIGN_FILTER));
+    .filter(r => {
+      const med = (r[idx.medium]||'').toLowerCase();
+      const cam = (r[idx.campaign]||'').toLowerCase();
+      return med.includes(CAMPAIGN_FILTER) || cam.includes(CAMPAIGN_FILTER);
+    });
 
+  const idxNome    = header.indexOf('nome');
+  const idxProduto = header.indexOf('produto');
   sales.forEach(r => {
-    // Valor em centavos → dividir por 100
+    const orderId = (r[idx.orderid]||'').trim();
+    // Dedupe contra a aba vendas
+    if (orderId && SEEN_ORDER_IDS.has(orderId)) return;
+    if (orderId) SEEN_ORDER_IDS.add(orderId);
+    // Webhook Kiwify envia em CENTAVOS → dividir por 100
     const valorRaw = parseBRNum(r[idx.valor]);
     const valor = valorRaw / 100;
-    const dataBR = normalizeDateBR(r[idx.data] || r[idx.approved]);
+    const dataRaw = r[idx.data] || r[idx.approved];
+    const dataBR = normalizeDateBR(dataRaw);
     if (!dataBR) return;
-    const dia = DIAS.find(d => d.data === dataBR);
-    if (dia) {
-      dia.fat     += valor;
-      dia.compras += 1;
-    }
-    // Match criativo: utm_content geralmente carrega Ad Name — compara case-insensitive
-    const content = r[idx.content] || '';
-    if (content) {
-      const match = CRIATIVOS.find(c => content.toLowerCase().includes(c.nome.toLowerCase()) ||
-                                         c.nome.toLowerCase().includes(content.toLowerCase()));
-      if (match) {
-        match.fat     += valor;
-        match.compras += 1;
-      }
-    }
+    const isoFull = saleIsoFromBR(dataBR, dataRaw);
+    addSaleToDay(dataBR, valor);
+    const criativo = String(r[idx.content]||'').split('::')[0].trim();
+    addSaleToCriativo(criativo, valor);
+    VENDAS_RASTREADAS.push({
+      cliente: r[idxNome] || 'Cliente',
+      valor,
+      dataBR,
+      iso: isoFull,
+      produto: r[idxProduto] || '',
+      criativo,
+      campanha: r[idx.medium] || '',
+      adset: r[idx.campaign] || '',
+      origem: 'webhook'
+    });
   });
+}
 
-  // Recalcular CRIATIVOS.roas/ticket/cac
+// Helpers compartilhados
+function addSaleToDay(dataBR, valor){
+  const dia = DIAS.find(d => d.data === dataBR);
+  if (dia) {
+    dia.fat += valor;
+    dia.compras += 1;
+  } else {
+    // Cria dia novo se a venda for de uma data sem investimento ainda
+    const iso = toISO(dataBR);
+    DIAS.push({data: dataBR, iso, inv:0, cliques:0, pv:0, ck:0, imp:0, fat:valor, compras:1});
+    DIAS.sort((a,b)=>a.iso.localeCompare(b.iso));
+  }
+}
+function addSaleToCriativo(content, valor){
+  if (!content) return;
+  // content já vem como prefixo (ex: "ICM-ADV01")
+  const c0 = String(content).trim();
+  if (!c0) return;
+  const match = CRIATIVOS.find(c =>
+    c.nome.toLowerCase() === c0.toLowerCase() ||
+    c0.toLowerCase().includes(c.nome.toLowerCase()) ||
+    c.nome.toLowerCase().includes(c0.toLowerCase())
+  );
+  if (match) {
+    match.fat += valor;
+    match.compras += 1;
+  }
+}
+// Tenta produzir um ISO completo (com horário se disponível) para ordenação
+function saleIsoFromBR(dataBR, raw){
+  const isoDate = toISO(dataBR);
+  const t = String(raw||'').match(/(\d{2}):(\d{2})(?::(\d{2}))?/);
+  return isoDate + (t ? `T${t[1]}:${t[2]}:${t[3]||'00'}` : 'T00:00:00');
+}
+function finalizeCriativos(){
   CRIATIVOS.forEach(c => {
     c.roas = c.inv > 0 ? c.fat / c.inv : 0;
     c.ticket = c.compras > 0 ? c.fat / c.compras : 0;
     c.cac = c.compras > 0 ? c.inv / c.compras : 0;
   });
+}
+
+function rebuildPeriodBuckets(){
+  const semSet = new Set(), mesSet = new Set();
+  DIAS.forEach(d => { semSet.add(dateToWeekKey(d.data)); mesSet.add(dateToMonthKey(d.data)); });
+  SEMANAL = [...semSet].sort().map(k => ({
+    semana: k, inv:0, fat:0, compras:0, cliques:0, pv:0, ck:0, imp:0,
+    roas:0, ticket:0, taxaCompra:0, cpc:0, cpm:0, retorno:0, connectRate:0, ctr:0
+  }));
+  const ptMonFull2 = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  MENSAL = [...mesSet].sort((a,b)=>ptMonFull2.indexOf(a)-ptMonFull2.indexOf(b)).map(k => ({
+    mes: k, inv:0, fat:0, compras:0, cliques:0, pv:0, ck:0, imp:0,
+    roas:0, ticket:0, taxaCompra:0, cpc:0, cpm:0, retorno:0, connectRate:0, ctr:0
+  }));
 }
 
 function normalizeDateBR(s) {
@@ -622,11 +783,15 @@ function renderKpiVisao(dias){
   const roas = agg.inv>0? agg.fat/agg.inv : 0;
   const cpc = agg.cliques>0? agg.inv/agg.cliques : 0;
   const cpm = agg.imp>0? agg.inv/agg.imp*1000 : 0;
+  const ticket = agg.compras>0? agg.fat/agg.compras : 0;
+  const cac = agg.compras>0? agg.inv/agg.compras : 0;
   const items = [
     {lbl:'Investimento', val: brl(agg.inv), cls:'orange'},
-    {lbl:'Faturamento (rastreado)', val: brl(agg.fat), cls:'green'},
+    {lbl:'Fat. (Rastreado)', val: brl(agg.fat), cls:'green'},
     {lbl:'ROAS', val: br(roas)+'x', cls: roas>=1.7?'green':roas>=1?'yellow':'red'},
-    {lbl:'Compras', val: br(agg.compras,0), cls:'green'},
+    {lbl:'Vendas Rastr.', val: br(agg.compras,0), cls:'green'},
+    {lbl:'CAC', val: brl(cac), cls:'yellow'},
+    {lbl:'Ticket Médio', val: brl(ticket), cls:''},
     {lbl:'Cliques', val: br(agg.cliques,0), cls:''},
     {lbl:'Impressões', val: br(agg.imp,0), cls:''},
     {lbl:'CPC', val: brl(cpc), cls:''},
@@ -635,6 +800,42 @@ function renderKpiVisao(dias){
   document.getElementById('kpi-visao').innerHTML = items.map(i =>
     `<div class="kpi-card"><div class="kpi-label">${i.lbl}</div><div class="kpi-value ${i.cls}">${i.val}</div></div>`
   ).join('');
+}
+
+function filteredVendas(){
+  return VENDAS_RASTREADAS.filter(v => {
+    const iso = (v.iso||'').slice(0,10);
+    return (!dateFrom || iso >= dateFrom) && (!dateTo || iso <= dateTo);
+  }).sort((a,b) => (b.iso||'').localeCompare(a.iso||''));
+}
+
+function renderVendasRastreadas(){
+  const vendas = filteredVendas();
+  const sec = document.getElementById('vendas-section');
+  if (!vendas.length) { sec.style.display = 'none'; return; }
+  sec.style.display = 'block';
+  const total = vendas.reduce((s,v)=>s+v.valor, 0);
+  document.getElementById('vendas-titulo').textContent = `Vendas no Período (${vendas.length})`;
+  document.getElementById('vendas-sub').textContent =
+    `${vendas.length} venda${vendas.length>1?'s':''} · ${brl(total)} faturamento total · ← arraste para ver mais`;
+  document.getElementById('vendas-cards').innerHTML = vendas.map(v => {
+    const dateOnly = (v.iso||'').slice(0,10);
+    return `<div class="venda-card" title="${v.produto||''}">
+      <div class="venda-top">
+        <div class="venda-name">${v.cliente}</div>
+        <div class="venda-price">${brl(v.valor)}</div>
+      </div>
+      <div class="venda-meta">
+        <div class="row"><span class="ico">📅</span><span>${dateOnly}</span></div>
+        ${v.criativo ? `<div class="row"><span class="ico">🎬</span><span>${v.criativo}</span></div>`:''}
+        ${v.campanha ? `<div class="row"><span class="ico">📢</span><span>${v.campanha}</span></div>`:''}
+        ${v.adset ? `<div class="row"><span class="ico">🎯</span><span>${v.adset}</span></div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+  // Barra de progresso visual proporcional ao número de vendas (até 50)
+  const w = Math.min(100, vendas.length / 50 * 100);
+  document.getElementById('vendas-progress-bar').style.width = w + '%';
 }
 
 function renderFunil(dias){
@@ -878,6 +1079,7 @@ function renderMensal(){
 function renderAll(){
   const dias = filteredDias();
   renderKpiVisao(dias);
+  renderVendasRastreadas();
   renderFunil(dias);
   renderTaxaGrid(dias);
   renderTbodyDias(dias);
