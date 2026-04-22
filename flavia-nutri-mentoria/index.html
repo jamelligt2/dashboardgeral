@@ -196,7 +196,7 @@ td a:hover{text-decoration:underline;color:var(--orange)}
   <div class="section-title">Ranking de criativos · ordenado do melhor ao pior custo por conversa</div>
   <div class="table-wrap">
     <table id="tbl-criativos">
-      <thead><tr><th>#</th><th class="left">Criativo</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>Conversas</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Custo/Conv</th><th>Clq→Conv</th><th>Hook Rate</th><th class="left">Link</th><th>Status</th></tr></thead>
+      <thead><tr><th>#</th><th class="left">Criativo</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>Conversas</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Custo/Conv</th><th>Clq→Conv</th><th>Hook Rate</th><th>Hold Rate</th><th class="left">Link</th><th>Status</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -206,7 +206,7 @@ td a:hover{text-decoration:underline;color:var(--orange)}
   <div class="section-title">Performance por conjunto (adset)</div>
   <div class="table-wrap">
     <table id="tbl-publicos">
-      <thead><tr><th>#</th><th class="left">Conjunto</th><th class="left">Tipo</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>Conversas</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Custo/Conv</th><th>Clq→Conv</th><th>Hook Rate</th><th>Status</th></tr></thead>
+      <thead><tr><th>#</th><th class="left">Conjunto</th><th class="left">Tipo</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>Conversas</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Custo/Conv</th><th>Clq→Conv</th><th>Hook Rate</th><th>Hold Rate</th><th>Status</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -222,7 +222,7 @@ td a:hover{text-decoration:underline;color:var(--orange)}
   <div class="section-title">Detalhamento dia a dia · por conjunto e criativo</div>
   <div class="table-wrap">
     <table id="tbl-diaria">
-      <thead><tr><th class="left">Dia</th><th class="left">Conjunto</th><th class="left">Criativo</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>Conversas</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Custo/Conv</th><th>Hook Rate</th></tr></thead>
+      <thead><tr><th class="left">Dia</th><th class="left">Conjunto</th><th class="left">Criativo</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>Conversas</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Custo/Conv</th><th>Hook Rate</th><th>Hold Rate</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -376,6 +376,7 @@ function agg(rows) {
   o.cpl = o.conv ? o.spend/o.conv : 0;
   o.tx_conv = o.clk ? o.conv/o.clk*100 : 0;
   o.hook = o.imp ? o.v3s/o.imp*100 : 0;
+  o.hold = o.v3s ? o.v95/o.v3s*100 : 0;
   return o;
 }
 
@@ -415,7 +416,7 @@ function renderAll() {
   document.getElementById('kpi-ctr').textContent = PCT(TOT.ctr);
   document.getElementById('kpi-ctr-sub').textContent = `${INT(TOT.clk)} cliques no link`;
   document.getElementById('kpi-cpm').textContent = BRL(TOT.cpm);
-  document.getElementById('kpi-cpm-sub').textContent = `Hook rate ${PCT(TOT.hook)}`;
+  document.getElementById('kpi-cpm-sub').textContent = `Hook rate ${PCT(TOT.hook)} · Hold rate ${PCT(TOT.hold)}`;
 
   // Audiences
   const adsetMap = groupBy(DATA, 'adset');
@@ -604,7 +605,7 @@ function renderAll() {
       <td><b>${INT(c.conv)}</b></td><td>${PCT(c.ctr)}</td>
       <td>${c.clk?BRL(c.cpc):'—'}</td><td>${BRL(c.cpm)}</td>
       <td>${c.conv?BRL(c.cpl):'—'}</td><td>${c.clk?PCT(c.tx_conv):'—'}</td>
-      <td>${PCT(c.hook)}</td>
+      <td>${PCT(c.hook)}</td><td>${c.v3s?PCT(c.hold):'—'}</td>
       <td class="left">${c.link?`<a href="${c.link}" target="_blank">Ver anúncio</a>`:'—'}</td>
       <td><span class="badge ${st.cls}">${st.txt}</span></td></tr>
     `);
@@ -613,7 +614,7 @@ function renderAll() {
     <tr class="total"><td></td><td class="left">TOTAL</td>
     <td>${BRL(TOT.spend)}</td><td>${INT(TOT.imp)}</td><td>${INT(TOT.clk)}</td><td>${INT(TOT.conv)}</td>
     <td>${PCT(TOT.ctr)}</td><td>${BRL(TOT.cpc)}</td><td>${BRL(TOT.cpm)}</td>
-    <td>${TOT.conv?BRL(TOT.cpl):'—'}</td><td>${PCT(TOT.tx_conv)}</td><td>${PCT(TOT.hook)}</td><td></td><td></td></tr>
+    <td>${TOT.conv?BRL(TOT.cpl):'—'}</td><td>${PCT(TOT.tx_conv)}</td><td>${PCT(TOT.hook)}</td><td>${PCT(TOT.hold)}</td><td></td><td></td></tr>
   `);
 
   // Publicos
@@ -639,7 +640,7 @@ function renderAll() {
       <td><b>${INT(c.conv)}</b></td><td>${PCT(c.ctr)}</td>
       <td>${c.clk?BRL(c.cpc):'—'}</td><td>${BRL(c.cpm)}</td>
       <td>${c.conv?BRL(c.cpl):'—'}</td><td>${c.clk?PCT(c.tx_conv):'—'}</td>
-      <td>${PCT(c.hook)}</td>
+      <td>${PCT(c.hook)}</td><td>${c.v3s?PCT(c.hold):'—'}</td>
       <td><span class="badge ${st.cls}">${st.txt}</span></td></tr>
     `);
   });
@@ -647,7 +648,7 @@ function renderAll() {
     <tr class="total"><td></td><td class="left">TOTAL</td><td></td>
     <td>${BRL(TOT.spend)}</td><td>${INT(TOT.imp)}</td><td>${INT(TOT.clk)}</td><td>${INT(TOT.conv)}</td>
     <td>${PCT(TOT.ctr)}</td><td>${BRL(TOT.cpc)}</td><td>${BRL(TOT.cpm)}</td>
-    <td>${TOT.conv?BRL(TOT.cpl):'—'}</td><td>${PCT(TOT.tx_conv)}</td><td>${PCT(TOT.hook)}</td><td></td></tr>
+    <td>${TOT.conv?BRL(TOT.cpl):'—'}</td><td>${PCT(TOT.tx_conv)}</td><td>${PCT(TOT.hook)}</td><td>${PCT(TOT.hold)}</td><td></td></tr>
   `);
 
   const palette = ['#ff6b35','#c44a1a','#ff9500','#ff8c42','#8b2a0a','#ffb38a'];
@@ -674,6 +675,7 @@ function renderAll() {
     const cpm = r.imp ? r.spend/r.imp*1000 : 0;
     const cpl = r.conv ? r.spend/r.conv : 0;
     const hook = r.imp ? r.v3s/r.imp*100 : 0;
+    const hold = r.v3s ? r.v95/r.v3s*100 : 0;
     const cls = classify(r.adset);
     const adsetShort = r.adset.replace(/^\[.*?\]\s*\[.*?\]\s*.*?-\s*/, '').replace(/^\[.*?\]\s*\[.*?\]\s*/, '').slice(0,25) || r.adset.slice(0,25);
     const adsetColor = cls.t.includes('Engaj')?'#ff6b35': cls.t.includes('Video')?'#ff9500':'#ffb38a';
@@ -684,7 +686,7 @@ function renderAll() {
       <td>${BRL(r.spend)}</td><td>${INT(r.imp)}</td><td>${INT(r.clicks)}</td>
       <td>${r.conv?'<b style="color:#ff6b35">'+INT(r.conv)+'</b>':'0'}</td>
       <td>${PCT(ctr)}</td><td>${r.clicks?BRL(cpc):'—'}</td><td>${BRL(cpm)}</td>
-      <td>${r.conv?BRL(cpl):'—'}</td><td>${PCT(hook)}</td></tr>
+      <td>${r.conv?BRL(cpl):'—'}</td><td>${PCT(hook)}</td><td>${r.v3s?PCT(hold):'—'}</td></tr>
     `);
   });
 }
