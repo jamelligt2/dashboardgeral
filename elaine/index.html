@@ -183,6 +183,8 @@ tr:hover td{background:rgba(255,255,255,.025)}
     <div class="chart-card"><h4>Compras por Dia</h4><canvas id="chartCompras"></canvas></div>
     <div class="chart-card"><h4>CPC Diário</h4><canvas id="chartCpc"></canvas></div>
   </div>
+  <div class="sec-title">CAC por Tráfego (diário)</div>
+  <div class="chart-card" style="max-width:100%;height:280px"><canvas id="chartCacTrafego"></canvas></div>
   <div class="sec-title">Dia a Dia</div>
   <div class="tbl-wrap"><table id="tbl-dias"></table></div>
 </div>
@@ -792,7 +794,7 @@ function fixFatFromDias(){
 fixFatFromDias();
 
 // ========== RENDER ==========
-var chartInvFat,chartRoas,chartCompras,chartCpc,chartSemInvFat,chartSemRoas;
+var chartInvFat,chartRoas,chartCompras,chartCpc,chartCacTrafego,chartSemInvFat,chartSemRoas;
 var chartDefaults={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'rgba(255,255,255,.35)',font:{size:9}},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'rgba(255,255,255,.35)',font:{size:9}},grid:{color:'rgba(255,255,255,.06)'}}}};
 
 function renderKPIs(){
@@ -864,6 +866,24 @@ function renderCharts(){
   chartCpc=new Chart(document.getElementById('chartCpc').getContext('2d'),{type:'line',data:{labels:labels,datasets:[
     {data:cpcData,borderColor:'#ff9a3c',backgroundColor:'rgba(255,154,60,.1)',fill:true,borderWidth:2,pointRadius:2,tension:.3}
   ]},options:chartDefaults});
+
+  // CAC por Tráfego (inv / vendas ads do dia)
+  var cacTrafData=[];
+  var adsSalesPerDay={};
+  SALE_LOG.forEach(function(s){
+    if(s.s==='M'){
+      var ddmm=s.d.substring(8,10)+'/'+s.d.substring(5,7)+'/'+s.d.substring(0,4);
+      adsSalesPerDay[ddmm]=(adsSalesPerDay[ddmm]||0)+1;
+    }
+  });
+  fd.forEach(function(d){
+    var adsComp=adsSalesPerDay[d.data]||0;
+    cacTrafData.push(adsComp>0?+(d.inv/adsComp).toFixed(2):0);
+  });
+  if(chartCacTrafego)chartCacTrafego.destroy();
+  chartCacTrafego=new Chart(document.getElementById('chartCacTrafego').getContext('2d'),{type:'line',data:{labels:labels,datasets:[
+    {data:cacTrafData,borderColor:'#e74c3c',backgroundColor:'rgba(231,76,60,.1)',fill:true,borderWidth:2,pointRadius:2,tension:.3}
+  ]},options:Object.assign({},chartDefaults,{plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return 'CAC: R$ '+Number(ctx.raw).toFixed(2)}}}}})});
 }
 
 function renderTblDias(){
@@ -1264,7 +1284,7 @@ function renderPaginas(){
 
   var adPages=["Página A","Página B","Página C","Página D","Página E","Página F","Página G","Página H","Página I","Página J","Página W","Página X","Página Y"];
   var pageColors={'Página A':'#ff6b2b','Página B':'#3b82f6','Página C':'#2ecc71','Página D':'#f1c40f','Página E':'#e74c3c','Página F':'#9b59b6','Página G':'#1abc9c','Página H':'#e67e22','Página I':'#3498db','Página J':'#e91e63','Página W':'#f472b6','Página X':'#8b5cf6','Página Y':'#06b6d4'};
-  var pageLinks={'Página A':'https://lp2.elainedluhosch2.com.br/desafio-a','Página B':'https://lp2.elainedluhosch2.com.br/desafio-b','Página C':'https://lp2.elainedluhosch2.com.br/desafio-c','Página D':'https://lp2.elainedluhosch2.com.br/desafio-d','Página E':'https://lp2.elainedluhosch2.com.br/desafio-e','Página F':'https://lp2.elainedluhosch2.com.br/desafio-f','Página G':'https://lp2.elainedluhosch2.com.br/desafio-g','Página H':'https://lp2.elainedluhosch2.com.br/desafio-h','Página I':'https://lp2.elainedluhosch2.com.br/desafio-i','Página J':'https://lp2.elainedluhosch2.com.br/desafio-j'};
+  var pageLinks={'Página A':'https://lp2.elainedluhosch2.com.br/desafio-a','Página B':'https://lp2.elainedluhosch2.com.br/desafio-b','Página C':'https://lp2.elainedluhosch2.com.br/desafio-c','Página D':'https://lp2.elainedluhosch2.com.br/desafio-d','Página E':'https://lp2.elainedluhosch2.com.br/desafio-e','Página F':'https://lp2.elainedluhosch2.com.br/desafio-f','Página G':'https://lp2.elainedluhosch2.com.br/desafio-g','Página H':'https://lp2.elainedluhosch2.com.br/desafio-h','Página I':'https://lp2.elainedluhosch2.com.br/desafio-i','Página J':'https://lp2.elainedluhosch2.com.br/desafio-j','Página W':'http://elainedluhosch2.com.br/desafio-w','Página X':'http://elainedluhosch2.com.br/desafio-x','Página Y':'http://elainedluhosch2.com.br/desafio-y'};
 
   var cardsHtml='';
   adPages.forEach(function(pName){
