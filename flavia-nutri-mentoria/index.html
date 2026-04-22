@@ -7,31 +7,34 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
 :root{
-  --bg:#0a0a0a;
-  --card:#151515;
-  --card-2:#1c1c1c;
-  --header:#111;
-  --border:#2a2a2a;
-  --border-strong:#3a3a3a;
-  --orange:#ff6b35;
-  --orange-dark:#c44a1a;
-  --orange-deep:#8b2a0a;
-  --orange-bright:#ff8c42;
-  --orange-pale:#ffb38a;
-  --amber:#ff9500;
-  --text:#fff;
-  --muted:#999;
-  --muted-2:#b8b8b8;
+  --bg:#0a0a0a; --card:#151515; --card-2:#1c1c1c; --header:#111;
+  --border:#2a2a2a; --border-strong:#3a3a3a;
+  --orange:#ff6b35; --orange-dark:#c44a1a; --orange-deep:#8b2a0a;
+  --orange-bright:#ff8c42; --orange-pale:#ffb38a; --amber:#ff9500;
+  --text:#fff; --muted:#999; --muted-2:#b8b8b8;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:'Segoe UI',Roboto,Arial,sans-serif;min-height:100vh}
 .header{background:var(--header);border-bottom:2px solid var(--orange);padding:18px 28px;display:flex;align-items:center;gap:18px}
 .logo-badge{background:linear-gradient(135deg,#ff6b35,#c44a1a);border-radius:10px;width:58px;height:58px;display:flex;align-items:center;justify-content:center;font-weight:900;color:#fff;font-size:17px;letter-spacing:1px;box-shadow:0 4px 14px rgba(255,107,53,.35)}
 .header-divider{width:2px;height:44px;background:var(--orange);opacity:.4}
+.header-text{flex:1}
 .header-text h1{font-size:20px;font-weight:800;letter-spacing:.5px}
 .header-text p{font-size:12.5px;color:var(--muted-2);margin-top:4px;letter-spacing:.3px}
 .header-text .tag{display:inline-block;background:var(--orange);color:#0a0a0a;padding:2px 8px;border-radius:4px;font-size:10.5px;font-weight:800;margin-right:6px;letter-spacing:.5px}
 .header-text .tag.alt{background:var(--orange-dark);color:#fff}
+.refresh-box{display:flex;flex-direction:column;align-items:flex-end;gap:6px;min-width:210px}
+.live-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:14px;font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase}
+.live-badge.live{background:rgba(255,107,53,.18);color:var(--orange);border:1px solid rgba(255,107,53,.5)}
+.live-badge.cached{background:rgba(196,74,26,.15);color:var(--orange-pale);border:1px solid rgba(196,74,26,.5)}
+.live-badge.loading{background:rgba(184,184,184,.12);color:var(--muted-2);border:1px solid var(--border)}
+.live-badge .dot{width:7px;height:7px;border-radius:50%;background:currentColor;animation:pulse 2s infinite}
+.live-badge.cached .dot{animation:none;opacity:.6}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.refresh-meta{font-size:10.5px;color:var(--muted);letter-spacing:.4px;display:flex;gap:8px;align-items:center}
+.refresh-btn{background:transparent;border:1px solid var(--border-strong);color:var(--orange);padding:3px 10px;border-radius:6px;font-size:10.5px;font-weight:700;cursor:pointer;letter-spacing:.4px;transition:all .2s}
+.refresh-btn:hover{background:rgba(255,107,53,.1);border-color:var(--orange)}
+.refresh-btn:disabled{opacity:.5;cursor:wait}
 .tabs{background:var(--header);border-bottom:1px solid var(--border);display:flex;gap:4px;padding:0 22px;overflow-x:auto}
 .tab{padding:14px 22px;cursor:pointer;color:var(--muted);font-weight:600;font-size:13px;border-bottom:3px solid transparent;transition:all .2s;white-space:nowrap}
 .tab:hover{color:#fff;background:rgba(255,107,53,.08)}
@@ -120,7 +123,10 @@ td a:hover{text-decoration:underline;color:var(--orange)}
 
 .info-banner{background:linear-gradient(90deg,rgba(255,107,53,.18),rgba(255,107,53,.02));border:1px solid rgba(255,107,53,.3);border-left:4px solid var(--orange);border-radius:8px;padding:12px 18px;font-size:12.5px;color:#e8e8e8;margin-top:8px;line-height:1.5}
 .info-banner b{color:var(--orange)}
-@media(max-width:1200px){.audience-row{grid-template-columns:1fr}.chart-grid{grid-template-columns:1fr}.funnel-wrap{flex-direction:column}.funnel-svg-wrap{max-width:100%;flex:none}.kpis{grid-template-columns:repeat(2,1fr)}}
+.err-banner{background:linear-gradient(90deg,rgba(196,74,26,.25),rgba(196,74,26,.05));border:1px solid rgba(196,74,26,.5);border-left:4px solid var(--orange-dark);border-radius:8px;padding:10px 16px;font-size:12px;color:var(--orange-pale);margin-bottom:12px;line-height:1.5;display:none}
+.err-banner.show{display:block}
+.err-banner b{color:#fff}
+@media(max-width:1200px){.audience-row{grid-template-columns:1fr}.chart-grid{grid-template-columns:1fr}.funnel-wrap{flex-direction:column}.funnel-svg-wrap{max-width:100%;flex:none}.kpis{grid-template-columns:repeat(2,1fr)}.header{flex-wrap:wrap}.refresh-box{align-items:flex-start;margin-top:10px}}
 </style>
 </head>
 <body>
@@ -129,7 +135,14 @@ td a:hover{text-decoration:underline;color:var(--orange)}
   <div class="header-divider"></div>
   <div class="header-text">
     <h1>DASHBOARD CONVERSA — FLAVIA NUTRI · MENTORIA</h1>
-    <p><span class="tag">CAMPANHA DE MENSAGEM</span><span class="tag alt">100% RETARGETING</span>CL39 — Flavia · Mensagem · 07/04 a 17/04/2026</p>
+    <p><span class="tag">CAMPANHA DE MENSAGEM</span><span class="tag alt">100% RETARGETING</span><span id="hdr-period">CL39 — Flavia · Mensagem</span></p>
+  </div>
+  <div class="refresh-box">
+    <div class="live-badge loading" id="liveBadge"><span class="dot"></span><span id="liveBadgeText">CARREGANDO…</span></div>
+    <div class="refresh-meta">
+      <span id="updatedAt">—</span>
+      <button class="refresh-btn" id="refreshBtn" onclick="loadAndRender(true)">↻ Atualizar</button>
+    </div>
   </div>
 </div>
 <div class="tabs">
@@ -140,6 +153,7 @@ td a:hover{text-decoration:underline;color:var(--orange)}
 </div>
 
 <div class="wrap">
+<div class="err-banner" id="errBanner"></div>
 
 <div class="panel active" id="panel-geral">
   <div class="info-banner">Campanha de <b>mensagem no WhatsApp</b> — fluxo direto Clique → Conversa. Ambos os conjuntos rodam em <b>público quente (retargeting)</b>: VV Reels de Abril e Engajamento 60 dias. Sem público frio ativo no período.</div>
@@ -217,7 +231,134 @@ td a:hover{text-decoration:underline;color:var(--orange)}
 </div>
 
 <script>
-const DATA = [{"date": "2026-04-07", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV03", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hQEwjFS-/", "imp": 5, "reach": 1, "v3s": 3, "v95": 1, "spend": 0.17}, {"date": "2026-04-07", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV04", "clicks": 1, "conv": 0, "link": "https://www.instagram.com/p/DW1hPeeDOfT/", "imp": 26, "reach": 4, "v3s": 5, "v95": 0, "spend": 0.48}, {"date": "2026-04-07", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV05", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hQNqDJ7y/", "imp": 4, "reach": 2, "v3s": 1, "v95": 0, "spend": 0.01}, {"date": "2026-04-07", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV01", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izi5DIA6/", "imp": 90, "reach": 53, "v3s": 26, "v95": 0, "spend": 1.17}, {"date": "2026-04-07", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV02", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izfXjJV_/", "imp": 21, "reach": 14, "v3s": 6, "v95": 0, "spend": 0.53}, {"date": "2026-04-07", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV03", "clicks": 3, "conv": 0, "link": "https://www.instagram.com/p/DW1iziojLmS/", "imp": 185, "reach": 103, "v3s": 79, "v95": 5, "spend": 5.93}, {"date": "2026-04-07", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV04", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izcSDFFR/", "imp": 92, "reach": 62, "v3s": 36, "v95": 1, "spend": 0.92}, {"date": "2026-04-07", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV05", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izqBjG_L/", "imp": 14, "reach": 8, "v3s": 7, "v95": 0, "spend": 0.21}, {"date": "2026-04-08", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV03", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hQEwjFS-/", "imp": 3, "reach": 1, "v3s": 0, "v95": 0, "spend": 0.27}, {"date": "2026-04-08", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV04", "clicks": 2, "conv": 0, "link": "https://www.instagram.com/p/DW1hPeeDOfT/", "imp": 20, "reach": 5, "v3s": 5, "v95": 0, "spend": 0.42}, {"date": "2026-04-08", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV05", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hQNqDJ7y/", "imp": 11, "reach": 2, "v3s": 0, "v95": 0, "spend": 0.08}, {"date": "2026-04-08", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV01", "clicks": 1, "conv": 0, "link": "https://www.instagram.com/p/DW1izi5DIA6/", "imp": 51, "reach": 32, "v3s": 14, "v95": 0, "spend": 0.85}, {"date": "2026-04-08", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV02", "clicks": 1, "conv": 0, "link": "https://www.instagram.com/p/DW1izfXjJV_/", "imp": 78, "reach": 53, "v3s": 27, "v95": 0, "spend": 1.95}, {"date": "2026-04-08", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV03", "clicks": 7, "conv": 0, "link": "https://www.instagram.com/p/DW1iziojLmS/", "imp": 583, "reach": 315, "v3s": 236, "v95": 18, "spend": 9.23}, {"date": "2026-04-08", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV04", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izcSDFFR/", "imp": 96, "reach": 58, "v3s": 25, "v95": 0, "spend": 0.99}, {"date": "2026-04-08", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV05", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izqBjG_L/", "imp": 17, "reach": 15, "v3s": 10, "v95": 0, "spend": 0.3}, {"date": "2026-04-09", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV04", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hPeeDOfT/", "imp": 35, "reach": 5, "v3s": 9, "v95": 0, "spend": 1.03}, {"date": "2026-04-09", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV05", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hQNqDJ7y/", "imp": 5, "reach": 1, "v3s": 0, "v95": 0, "spend": 0.09}, {"date": "2026-04-09", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV01", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izi5DIA6/", "imp": 29, "reach": 18, "v3s": 9, "v95": 0, "spend": 0.37}, {"date": "2026-04-09", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV02", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izfXjJV_/", "imp": 52, "reach": 39, "v3s": 16, "v95": 4, "spend": 1.85}, {"date": "2026-04-09", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV03", "clicks": 4, "conv": 0, "link": "https://www.instagram.com/p/DW1iziojLmS/", "imp": 346, "reach": 200, "v3s": 140, "v95": 13, "spend": 4.31}, {"date": "2026-04-09", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV04", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izcSDFFR/", "imp": 57, "reach": 40, "v3s": 21, "v95": 0, "spend": 0.57}, {"date": "2026-04-09", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV05", "clicks": 2, "conv": 2, "link": "https://www.instagram.com/p/DW1izqBjG_L/", "imp": 113, "reach": 63, "v3s": 52, "v95": 3, "spend": 2.49}, {"date": "2026-04-10", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV04", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hPeeDOfT/", "imp": 22, "reach": 4, "v3s": 2, "v95": 0, "spend": 0.62}, {"date": "2026-04-10", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV02", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izfXjJV_/", "imp": 5, "reach": 4, "v3s": 1, "v95": 0, "spend": 0.04}, {"date": "2026-04-10", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV03", "clicks": 3, "conv": 1, "link": "https://www.instagram.com/p/DW1iziojLmS/", "imp": 264, "reach": 162, "v3s": 91, "v95": 11, "spend": 2.94}, {"date": "2026-04-10", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV04", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izcSDFFR/", "imp": 13, "reach": 10, "v3s": 5, "v95": 0, "spend": 0.05}, {"date": "2026-04-10", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV05", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izqBjG_L/", "imp": 39, "reach": 24, "v3s": 11, "v95": 1, "spend": 0.58}, {"date": "2026-04-11", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV04", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hPeeDOfT/", "imp": 41, "reach": 8, "v3s": 6, "v95": 0, "spend": 1.59}, {"date": "2026-04-11", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV01", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izi5DIA6/", "imp": 2, "reach": 2, "v3s": 1, "v95": 0, "spend": 0.04}, {"date": "2026-04-11", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV03", "clicks": 2, "conv": 0, "link": "https://www.instagram.com/p/DW1iziojLmS/", "imp": 745, "reach": 420, "v3s": 269, "v95": 22, "spend": 6.97}, {"date": "2026-04-12", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV02", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hRFPDBcd/", "imp": 2, "reach": 1, "v3s": 0, "v95": 0, "spend": 0.2}, {"date": "2026-04-12", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV04", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hPeeDOfT/", "imp": 34, "reach": 9, "v3s": 6, "v95": 1, "spend": 0.86}, {"date": "2026-04-12", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV01", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izi5DIA6/", "imp": 1, "reach": 1, "v3s": 0, "v95": 0, "spend": 0.0}, {"date": "2026-04-12", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV02", "clicks": 1, "conv": 0, "link": "https://www.instagram.com/p/DW1izfXjJV_/", "imp": 22, "reach": 17, "v3s": 5, "v95": 0, "spend": 0.14}, {"date": "2026-04-12", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV03", "clicks": 5, "conv": 0, "link": "https://www.instagram.com/p/DW1iziojLmS/", "imp": 779, "reach": 461, "v3s": 263, "v95": 31, "spend": 7.69}, {"date": "2026-04-12", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV04", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izcSDFFR/", "imp": 1, "reach": 1, "v3s": 1, "v95": 1, "spend": 0.02}, {"date": "2026-04-12", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV05", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izqBjG_L/", "imp": 2, "reach": 2, "v3s": 0, "v95": 0, "spend": 0.01}, {"date": "2026-04-13", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV01", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hQUSDGS4/", "imp": 2, "reach": 1, "v3s": 0, "v95": 0, "spend": 0.02}, {"date": "2026-04-13", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV03", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hQEwjFS-/", "imp": 4, "reach": 1, "v3s": 0, "v95": 0, "spend": 0.15}, {"date": "2026-04-13", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV04", "clicks": 1, "conv": 0, "link": "https://www.instagram.com/p/DW1hPeeDOfT/", "imp": 62, "reach": 9, "v3s": 4, "v95": 0, "spend": 1.48}, {"date": "2026-04-13", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV01", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izi5DIA6/", "imp": 2, "reach": 2, "v3s": 0, "v95": 0, "spend": 0.04}, {"date": "2026-04-13", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV02", "clicks": 1, "conv": 0, "link": "https://www.instagram.com/p/DW1izfXjJV_/", "imp": 3, "reach": 3, "v3s": 1, "v95": 0, "spend": 0.07}, {"date": "2026-04-13", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV03", "clicks": 9, "conv": 1, "link": "https://www.instagram.com/p/DW1iziojLmS/", "imp": 1097, "reach": 667, "v3s": 427, "v95": 45, "spend": 15.91}, {"date": "2026-04-13", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV04", "clicks": 1, "conv": 0, "link": "https://www.instagram.com/p/DW1izcSDFFR/", "imp": 35, "reach": 29, "v3s": 10, "v95": 2, "spend": 0.22}, {"date": "2026-04-13", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV05", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izqBjG_L/", "imp": 38, "reach": 26, "v3s": 15, "v95": 0, "spend": 0.72}, {"date": "2026-04-14", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV04", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hPeeDOfT/", "imp": 63, "reach": 9, "v3s": 9, "v95": 0, "spend": 1.59}, {"date": "2026-04-14", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV01", "clicks": 1, "conv": 0, "link": "https://www.instagram.com/p/DW1izi5DIA6/", "imp": 6, "reach": 5, "v3s": 2, "v95": 0, "spend": 0.07}, {"date": "2026-04-14", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV02", "clicks": 1, "conv": 0, "link": "https://www.instagram.com/p/DW1izfXjJV_/", "imp": 6, "reach": 6, "v3s": 3, "v95": 0, "spend": 0.16}, {"date": "2026-04-14", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV03", "clicks": 9, "conv": 2, "link": "https://www.instagram.com/p/DW1iziojLmS/", "imp": 1292, "reach": 878, "v3s": 495, "v95": 39, "spend": 14.84}, {"date": "2026-04-14", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV05", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izqBjG_L/", "imp": 3, "reach": 3, "v3s": 2, "v95": 0, "spend": 0.17}, {"date": "2026-04-15", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV04", "clicks": 2, "conv": 0, "link": "https://www.instagram.com/p/DW1hPeeDOfT/", "imp": 72, "reach": 10, "v3s": 5, "v95": 0, "spend": 1.76}, {"date": "2026-04-15", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV02", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izfXjJV_/", "imp": 6, "reach": 5, "v3s": 4, "v95": 0, "spend": 0.13}, {"date": "2026-04-15", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV03", "clicks": 6, "conv": 2, "link": "https://www.instagram.com/p/DW1iziojLmS/", "imp": 935, "reach": 661, "v3s": 346, "v95": 30, "spend": 10.73}, {"date": "2026-04-15", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV04", "clicks": 1, "conv": 0, "link": "https://www.instagram.com/p/DW1izcSDFFR/", "imp": 16, "reach": 12, "v3s": 6, "v95": 0, "spend": 0.17}, {"date": "2026-04-15", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV05", "clicks": 1, "conv": 1, "link": "https://www.instagram.com/p/DW1izqBjG_L/", "imp": 22, "reach": 17, "v3s": 12, "v95": 1, "spend": 1.11}, {"date": "2026-04-16", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV01", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hQUSDGS4/", "imp": 16, "reach": 6, "v3s": 3, "v95": 0, "spend": 0.66}, {"date": "2026-04-16", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV03", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hQEwjFS-/", "imp": 2, "reach": 2, "v3s": 0, "v95": 0, "spend": 0.08}, {"date": "2026-04-16", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV04", "clicks": 1, "conv": 0, "link": "https://www.instagram.com/p/DW1hPeeDOfT/", "imp": 39, "reach": 8, "v3s": 5, "v95": 0, "spend": 1.16}, {"date": "2026-04-16", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV01", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izi5DIA6/", "imp": 6, "reach": 6, "v3s": 2, "v95": 0, "spend": 0.1}, {"date": "2026-04-16", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV03", "clicks": 6, "conv": 1, "link": "https://www.instagram.com/p/DW1iziojLmS/", "imp": 718, "reach": 520, "v3s": 276, "v95": 21, "spend": 8.74}, {"date": "2026-04-16", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV04", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izcSDFFR/", "imp": 1, "reach": 1, "v3s": 0, "v95": 0, "spend": 0.01}, {"date": "2026-04-17", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV02", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hRFPDBcd/", "imp": 2, "reach": 2, "v3s": 0, "v95": 0, "spend": 0.01}, {"date": "2026-04-17", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV03", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hQEwjFS-/", "imp": 1, "reach": 1, "v3s": 0, "v95": 0, "spend": 0.01}, {"date": "2026-04-17", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV04", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hPeeDOfT/", "imp": 42, "reach": 9, "v3s": 2, "v95": 0, "spend": 1.72}, {"date": "2026-04-17", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV05", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hQNqDJ7y/", "imp": 16, "reach": 3, "v3s": 1, "v95": 0, "spend": 0.39}, {"date": "2026-04-17", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV02", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izfXjJV_/", "imp": 59, "reach": 49, "v3s": 20, "v95": 0, "spend": 0.68}, {"date": "2026-04-17", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV03", "clicks": 3, "conv": 1, "link": "https://www.instagram.com/p/DW1iziojLmS/", "imp": 377, "reach": 296, "v3s": 155, "v95": 11, "spend": 2.61}, {"date": "2026-04-17", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV04", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izcSDFFR/", "imp": 28, "reach": 24, "v3s": 11, "v95": 0, "spend": 0.53}, {"date": "2026-04-17", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV05", "clicks": 1, "conv": 0, "link": "https://www.instagram.com/p/DW1izqBjG_L/", "imp": 93, "reach": 81, "v3s": 32, "v95": 1, "spend": 0.83}];
+/* ============================================================
+   AUTO-REFRESH do Google Sheets
+   — Abre a planilha (gviz) via sessão autenticada do Chrome
+   — Cai para snapshot embutido se offline / sem sessão
+============================================================ */
+const SHEET_ID = '1GOF7LEMo7HsfY4kyfqbgJrjRsKKnAQaEByEvZdm3SPk';
+const GID = '0';
+const FALLBACK_DATA = [{"date": "2026-04-07", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV03", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hQEwjFS-/", "imp": 5, "reach": 1, "v3s": 3, "v95": 1, "spend": 0.17}, {"date": "2026-04-07", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV04", "clicks": 1, "conv": 0, "link": "https://www.instagram.com/p/DW1hPeeDOfT/", "imp": 26, "reach": 4, "v3s": 5, "v95": 0, "spend": 0.48}, {"date": "2026-04-07", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV05", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hQNqDJ7y/", "imp": 4, "reach": 2, "v3s": 1, "v95": 0, "spend": 0.01}, {"date": "2026-04-07", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV01", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izi5DIA6/", "imp": 90, "reach": 53, "v3s": 26, "v95": 0, "spend": 1.17}, {"date": "2026-04-07", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV02", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izfXjJV_/", "imp": 21, "reach": 14, "v3s": 6, "v95": 0, "spend": 0.53}, {"date": "2026-04-07", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV03", "clicks": 3, "conv": 0, "link": "https://www.instagram.com/p/DW1iziojLmS/", "imp": 185, "reach": 103, "v3s": 79, "v95": 5, "spend": 5.93}, {"date": "2026-04-07", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV04", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izcSDFFR/", "imp": 92, "reach": 62, "v3s": 36, "v95": 1, "spend": 0.92}, {"date": "2026-04-07", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV05", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izqBjG_L/", "imp": 14, "reach": 8, "v3s": 7, "v95": 0, "spend": 0.21}, {"date": "2026-04-08", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV03", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hQEwjFS-/", "imp": 3, "reach": 1, "v3s": 0, "v95": 0, "spend": 0.27}, {"date": "2026-04-08", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV04", "clicks": 2, "conv": 0, "link": "https://www.instagram.com/p/DW1hPeeDOfT/", "imp": 20, "reach": 5, "v3s": 5, "v95": 0, "spend": 0.42}, {"date": "2026-04-08", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV05", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hQNqDJ7y/", "imp": 11, "reach": 2, "v3s": 0, "v95": 0, "spend": 0.08}, {"date": "2026-04-08", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV01", "clicks": 1, "conv": 0, "link": "https://www.instagram.com/p/DW1izi5DIA6/", "imp": 51, "reach": 32, "v3s": 14, "v95": 0, "spend": 0.85}, {"date": "2026-04-08", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV02", "clicks": 1, "conv": 0, "link": "https://www.instagram.com/p/DW1izfXjJV_/", "imp": 78, "reach": 53, "v3s": 27, "v95": 0, "spend": 1.95}, {"date": "2026-04-08", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV03", "clicks": 7, "conv": 0, "link": "https://www.instagram.com/p/DW1iziojLmS/", "imp": 583, "reach": 315, "v3s": 236, "v95": 18, "spend": 9.23}, {"date": "2026-04-08", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV04", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izcSDFFR/", "imp": 96, "reach": 58, "v3s": 25, "v95": 0, "spend": 0.99}, {"date": "2026-04-08", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV05", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izqBjG_L/", "imp": 17, "reach": 15, "v3s": 10, "v95": 0, "spend": 0.3}, {"date": "2026-04-09", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV04", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hPeeDOfT/", "imp": 35, "reach": 5, "v3s": 9, "v95": 0, "spend": 1.03}, {"date": "2026-04-09", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV05", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hQNqDJ7y/", "imp": 5, "reach": 1, "v3s": 0, "v95": 0, "spend": 0.09}, {"date": "2026-04-09", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV01", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izi5DIA6/", "imp": 29, "reach": 18, "v3s": 9, "v95": 0, "spend": 0.37}, {"date": "2026-04-09", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV02", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izfXjJV_/", "imp": 52, "reach": 39, "v3s": 16, "v95": 4, "spend": 1.85}, {"date": "2026-04-09", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV03", "clicks": 4, "conv": 0, "link": "https://www.instagram.com/p/DW1iziojLmS/", "imp": 346, "reach": 200, "v3s": 140, "v95": 13, "spend": 4.31}, {"date": "2026-04-09", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV04", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izcSDFFR/", "imp": 57, "reach": 40, "v3s": 21, "v95": 0, "spend": 0.57}, {"date": "2026-04-09", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV05", "clicks": 2, "conv": 2, "link": "https://www.instagram.com/p/DW1izqBjG_L/", "imp": 113, "reach": 63, "v3s": 52, "v95": 3, "spend": 2.49}, {"date": "2026-04-10", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV04", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hPeeDOfT/", "imp": 22, "reach": 4, "v3s": 2, "v95": 0, "spend": 0.62}, {"date": "2026-04-10", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV02", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izfXjJV_/", "imp": 5, "reach": 4, "v3s": 1, "v95": 0, "spend": 0.04}, {"date": "2026-04-10", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV03", "clicks": 3, "conv": 1, "link": "https://www.instagram.com/p/DW1iziojLmS/", "imp": 264, "reach": 162, "v3s": 91, "v95": 11, "spend": 2.94}, {"date": "2026-04-10", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV04", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izcSDFFR/", "imp": 13, "reach": 10, "v3s": 5, "v95": 0, "spend": 0.05}, {"date": "2026-04-10", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV05", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izqBjG_L/", "imp": 39, "reach": 24, "v3s": 11, "v95": 1, "spend": 0.58}, {"date": "2026-04-11", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV04", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hPeeDOfT/", "imp": 41, "reach": 8, "v3s": 6, "v95": 0, "spend": 1.59}, {"date": "2026-04-11", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV01", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izi5DIA6/", "imp": 2, "reach": 2, "v3s": 1, "v95": 0, "spend": 0.04}, {"date": "2026-04-11", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV03", "clicks": 2, "conv": 0, "link": "https://www.instagram.com/p/DW1iziojLmS/", "imp": 745, "reach": 420, "v3s": 269, "v95": 22, "spend": 6.97}, {"date": "2026-04-12", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV02", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hRFPDBcd/", "imp": 2, "reach": 1, "v3s": 0, "v95": 0, "spend": 0.2}, {"date": "2026-04-12", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV04", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hPeeDOfT/", "imp": 34, "reach": 9, "v3s": 6, "v95": 1, "spend": 0.86}, {"date": "2026-04-12", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV01", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izi5DIA6/", "imp": 1, "reach": 1, "v3s": 0, "v95": 0, "spend": 0.0}, {"date": "2026-04-12", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV02", "clicks": 1, "conv": 0, "link": "https://www.instagram.com/p/DW1izfXjJV_/", "imp": 22, "reach": 17, "v3s": 5, "v95": 0, "spend": 0.14}, {"date": "2026-04-12", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV03", "clicks": 5, "conv": 0, "link": "https://www.instagram.com/p/DW1iziojLmS/", "imp": 779, "reach": 461, "v3s": 263, "v95": 31, "spend": 7.69}, {"date": "2026-04-12", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV04", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izcSDFFR/", "imp": 1, "reach": 1, "v3s": 1, "v95": 1, "spend": 0.02}, {"date": "2026-04-12", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV05", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izqBjG_L/", "imp": 2, "reach": 2, "v3s": 0, "v95": 0, "spend": 0.01}, {"date": "2026-04-13", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV01", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hQUSDGS4/", "imp": 2, "reach": 1, "v3s": 0, "v95": 0, "spend": 0.02}, {"date": "2026-04-13", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV03", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hQEwjFS-/", "imp": 4, "reach": 1, "v3s": 0, "v95": 0, "spend": 0.15}, {"date": "2026-04-13", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV04", "clicks": 1, "conv": 0, "link": "https://www.instagram.com/p/DW1hPeeDOfT/", "imp": 62, "reach": 9, "v3s": 4, "v95": 0, "spend": 1.48}, {"date": "2026-04-13", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV01", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izi5DIA6/", "imp": 2, "reach": 2, "v3s": 0, "v95": 0, "spend": 0.04}, {"date": "2026-04-13", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV02", "clicks": 1, "conv": 0, "link": "https://www.instagram.com/p/DW1izfXjJV_/", "imp": 3, "reach": 3, "v3s": 1, "v95": 0, "spend": 0.07}, {"date": "2026-04-13", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV03", "clicks": 9, "conv": 1, "link": "https://www.instagram.com/p/DW1iziojLmS/", "imp": 1097, "reach": 667, "v3s": 427, "v95": 45, "spend": 15.91}, {"date": "2026-04-13", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV04", "clicks": 1, "conv": 0, "link": "https://www.instagram.com/p/DW1izcSDFFR/", "imp": 35, "reach": 29, "v3s": 10, "v95": 2, "spend": 0.22}, {"date": "2026-04-13", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV05", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izqBjG_L/", "imp": 38, "reach": 26, "v3s": 15, "v95": 0, "spend": 0.72}, {"date": "2026-04-14", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV04", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hPeeDOfT/", "imp": 63, "reach": 9, "v3s": 9, "v95": 0, "spend": 1.59}, {"date": "2026-04-14", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV01", "clicks": 1, "conv": 0, "link": "https://www.instagram.com/p/DW1izi5DIA6/", "imp": 6, "reach": 5, "v3s": 2, "v95": 0, "spend": 0.07}, {"date": "2026-04-14", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV02", "clicks": 1, "conv": 0, "link": "https://www.instagram.com/p/DW1izfXjJV_/", "imp": 6, "reach": 6, "v3s": 3, "v95": 0, "spend": 0.16}, {"date": "2026-04-14", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV03", "clicks": 9, "conv": 2, "link": "https://www.instagram.com/p/DW1iziojLmS/", "imp": 1292, "reach": 878, "v3s": 495, "v95": 39, "spend": 14.84}, {"date": "2026-04-14", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV05", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izqBjG_L/", "imp": 3, "reach": 3, "v3s": 2, "v95": 0, "spend": 0.17}, {"date": "2026-04-15", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV04", "clicks": 2, "conv": 0, "link": "https://www.instagram.com/p/DW1hPeeDOfT/", "imp": 72, "reach": 10, "v3s": 5, "v95": 0, "spend": 1.76}, {"date": "2026-04-15", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV02", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izfXjJV_/", "imp": 6, "reach": 5, "v3s": 4, "v95": 0, "spend": 0.13}, {"date": "2026-04-15", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV03", "clicks": 6, "conv": 2, "link": "https://www.instagram.com/p/DW1iziojLmS/", "imp": 935, "reach": 661, "v3s": 346, "v95": 30, "spend": 10.73}, {"date": "2026-04-15", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV04", "clicks": 1, "conv": 0, "link": "https://www.instagram.com/p/DW1izcSDFFR/", "imp": 16, "reach": 12, "v3s": 6, "v95": 0, "spend": 0.17}, {"date": "2026-04-15", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV05", "clicks": 1, "conv": 1, "link": "https://www.instagram.com/p/DW1izqBjG_L/", "imp": 22, "reach": 17, "v3s": 12, "v95": 1, "spend": 1.11}, {"date": "2026-04-16", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV01", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hQUSDGS4/", "imp": 16, "reach": 6, "v3s": 3, "v95": 0, "spend": 0.66}, {"date": "2026-04-16", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV03", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hQEwjFS-/", "imp": 2, "reach": 2, "v3s": 0, "v95": 0, "spend": 0.08}, {"date": "2026-04-16", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV04", "clicks": 1, "conv": 0, "link": "https://www.instagram.com/p/DW1hPeeDOfT/", "imp": 39, "reach": 8, "v3s": 5, "v95": 0, "spend": 1.16}, {"date": "2026-04-16", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV01", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izi5DIA6/", "imp": 6, "reach": 6, "v3s": 2, "v95": 0, "spend": 0.1}, {"date": "2026-04-16", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV03", "clicks": 6, "conv": 1, "link": "https://www.instagram.com/p/DW1iziojLmS/", "imp": 718, "reach": 520, "v3s": 276, "v95": 21, "spend": 8.74}, {"date": "2026-04-16", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV04", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izcSDFFR/", "imp": 1, "reach": 1, "v3s": 0, "v95": 0, "spend": 0.01}, {"date": "2026-04-17", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV02", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hRFPDBcd/", "imp": 2, "reach": 2, "v3s": 0, "v95": 0, "spend": 0.01}, {"date": "2026-04-17", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV03", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hQEwjFS-/", "imp": 1, "reach": 1, "v3s": 0, "v95": 0, "spend": 0.01}, {"date": "2026-04-17", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV04", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hPeeDOfT/", "imp": 42, "reach": 9, "v3s": 2, "v95": 0, "spend": 1.72}, {"date": "2026-04-17", "campaign": "[JGT] [MSG] MSG070426", "adset": "[JGT] [MSG] MSG070426 - VV Reels Abr25", "ad": "ADV05", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1hQNqDJ7y/", "imp": 16, "reach": 3, "v3s": 1, "v95": 0, "spend": 0.39}, {"date": "2026-04-17", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV02", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izfXjJV_/", "imp": 59, "reach": 49, "v3s": 20, "v95": 0, "spend": 0.68}, {"date": "2026-04-17", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV03", "clicks": 3, "conv": 1, "link": "https://www.instagram.com/p/DW1iziojLmS/", "imp": 377, "reach": 296, "v3s": 155, "v95": 11, "spend": 2.61}, {"date": "2026-04-17", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV04", "clicks": 0, "conv": 0, "link": "https://www.instagram.com/p/DW1izcSDFFR/", "imp": 28, "reach": 24, "v3s": 11, "v95": 0, "spend": 0.53}, {"date": "2026-04-17", "campaign": "[JGT] [MSG] MSG070426", "adset": "engajamento 60D", "ad": "ADV05", "clicks": 1, "conv": 0, "link": "https://www.instagram.com/p/DW1izqBjG_L/", "imp": 93, "reach": 81, "v3s": 32, "v95": 1, "spend": 0.83}];
+const AUTO_REFRESH_MINUTES = 5;
+
+let DATA = FALLBACK_DATA;
+let charts = {};
+
+/* ---- parser CSV (aguenta vírgula dentro de aspas) ---- */
+function parseCSV(text) {
+  const rows = [];
+  let cur = [], f = '', q = false;
+  for (let i=0; i<text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"' && text[i+1] === '"') { f += '"'; i++; }
+      else if (c === '"') q = false;
+      else f += c;
+    } else {
+      if (c === '"') q = true;
+      else if (c === ',') { cur.push(f); f = ''; }
+      else if (c === '\n') { cur.push(f); rows.push(cur); cur = []; f = ''; }
+      else if (c !== '\r') f += c;
+    }
+  }
+  if (f.length || cur.length) { cur.push(f); rows.push(cur); }
+  return rows;
+}
+
+function parseBR(v) {
+  if (v == null) return 0;
+  const s = String(v).trim().replace(/\./g, '').replace(',', '.');
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+
+function csvToRows(text) {
+  const lines = parseCSV(text).filter(l => l.length > 1 && l.some(c => c !== ''));
+  if (lines.length < 2) throw new Error('sem dados');
+  const h = lines[0].map(x => x.trim());
+  const findIdx = (...needles) => {
+    for (const n of needles) {
+      const i = h.findIndex(x => new RegExp(n, 'i').test(x));
+      if (i >= 0) return i;
+    }
+    return -1;
+  };
+  const col = {
+    date: findIdx('^Date', 'Data'),
+    campaign: findIdx('Campaign Name', 'Campanha'),
+    adset: findIdx('Adset Name', 'Conjunto'),
+    ad: findIdx('Ad Name', 'Anúncio', 'Anuncio'),
+    clicks: findIdx('Action Link Click', 'Cliques no link'),
+    conv: findIdx('Messaging Conversations', 'Conversas Iniciadas', 'Conversas'),
+    link: findIdx('Permalink', 'Link'),
+    imp: findIdx('Impressions', 'Impressões', 'Impressoes'),
+    reach: findIdx('^Reach', 'Alcance'),
+    v3s: findIdx('3s Video', '3s'),
+    v95: findIdx('95 Percent', 'retencao'),
+    spend: findIdx('Spend', 'Amount Spent', 'Investimento', 'Valor usado'),
+  };
+  return lines.slice(1).filter(l => l[col.date]).map(l => ({
+    date: l[col.date] || '',
+    campaign: l[col.campaign] || '',
+    adset: l[col.adset] || '',
+    ad: l[col.ad] || '',
+    clicks: parseBR(l[col.clicks]),
+    conv: parseBR(l[col.conv]),
+    link: l[col.link] || '',
+    imp: parseBR(l[col.imp]),
+    reach: parseBR(l[col.reach]),
+    v3s: parseBR(l[col.v3s]),
+    v95: parseBR(l[col.v95]),
+    spend: parseBR(l[col.spend]),
+  }));
+}
+
+async function fetchFromSheets() {
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${GID}&_=${Date.now()}`;
+  const r = await fetch(url, {credentials: 'include', cache: 'no-store'});
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const text = await r.text();
+  if (text.includes('<!DOCTYPE html>') || text.includes('<html'))
+    throw new Error('resposta HTML (não logado no Google)');
+  return csvToRows(text);
+}
+
+async function loadAndRender(manual) {
+  const badge = document.getElementById('liveBadge');
+  const badgeTxt = document.getElementById('liveBadgeText');
+  const btn = document.getElementById('refreshBtn');
+  const err = document.getElementById('errBanner');
+  const stamp = document.getElementById('updatedAt');
+
+  badge.className = 'live-badge loading';
+  badgeTxt.textContent = manual ? 'ATUALIZANDO…' : 'CARREGANDO…';
+  btn.disabled = true;
+  err.classList.remove('show');
+
+  try {
+    const rows = await fetchFromSheets();
+    DATA = rows;
+    renderAll();
+    badge.className = 'live-badge live';
+    badgeTxt.textContent = 'AO VIVO';
+    const now = new Date();
+    stamp.textContent = `Atualizado: ${now.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})} · ${rows.length} linhas`;
+  } catch (e) {
+    DATA = FALLBACK_DATA;
+    renderAll();
+    badge.className = 'live-badge cached';
+    badgeTxt.textContent = 'SNAPSHOT';
+    stamp.textContent = `Dados salvos · ${FALLBACK_DATA.length} linhas`;
+    err.innerHTML = `<b>Usando snapshot local.</b> Não consegui puxar a planilha ao vivo (${e.message}). Abra este arquivo no Chrome logado na conta Google que tem acesso à planilha, ou clique em <b>↻ Atualizar</b>.`;
+    err.classList.add('show');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* ============================================================
+   RENDER
+============================================================ */
 const fmtBR = (v, dec=2) => (v||0).toLocaleString('pt-BR', {minimumFractionDigits:dec, maximumFractionDigits:dec});
 const BRL = v => 'R$ ' + fmtBR(v||0, 2);
 const PCT = v => fmtBR(v||0, 2).replace('.',',') + '%';
@@ -237,7 +378,6 @@ function agg(rows) {
   o.hook = o.imp ? o.v3s/o.imp*100 : 0;
   return o;
 }
-const TOT = agg(DATA);
 
 function groupBy(rows, key) {
   const m = new Map();
@@ -248,6 +388,308 @@ function groupBy(rows, key) {
   return m;
 }
 
+function destroyCharts() {
+  Object.values(charts).forEach(c => { try { c.destroy(); } catch(e){} });
+  charts = {};
+}
+
+function renderAll() {
+  destroyCharts();
+  const TOT = agg(DATA);
+
+  // Update period in header
+  if (DATA.length) {
+    const dates = DATA.map(r=>r.date).filter(Boolean).sort();
+    const d0 = dates[0], d1 = dates[dates.length-1];
+    if (d0 && d1) {
+      document.getElementById('hdr-period').textContent =
+        `${d0.split('-').reverse().join('/')} a ${d1.split('-').reverse().join('/')}`;
+    }
+  }
+
+  // KPIs
+  document.getElementById('kpi-spend').textContent = BRL(TOT.spend);
+  document.getElementById('kpi-spend-sub').textContent = `${INT(TOT.imp)} impressões · alcance estimado ${INT(TOT.reach)}`;
+  document.getElementById('kpi-cpl').textContent = TOT.conv ? BRL(TOT.cpl) : '—';
+  document.getElementById('kpi-cpl-sub').textContent = `${INT(TOT.conv)} conversas iniciadas`;
+  document.getElementById('kpi-ctr').textContent = PCT(TOT.ctr);
+  document.getElementById('kpi-ctr-sub').textContent = `${INT(TOT.clk)} cliques no link`;
+  document.getElementById('kpi-cpm').textContent = BRL(TOT.cpm);
+  document.getElementById('kpi-cpm-sub').textContent = `Hook rate ${PCT(TOT.hook)}`;
+
+  // Audiences
+  const adsetMap = groupBy(DATA, 'adset');
+  const audEl = document.getElementById('aud-row');
+  audEl.innerHTML = '';
+  const adsetNames = [...adsetMap.keys()];
+  // classify: engajamento/interação/lista = quente primario; VV/video views = quente secundario; LAK/lookalike/interesse/broad = frio
+  function classify(name) {
+    const n = name.toLowerCase();
+    if (/engajamento|interac|lista|clientes|base/.test(n)) return {t:'Quente · Engajamento', c:'main', lbl:'m', tag:'RETARGETING · ENGAJAMENTO'};
+    if (/vv|video view|reels/.test(n)) return {t:'Quente · Video Views', c:'sec', lbl:'s', tag:'RETARGETING · VIDEO VIEWERS'};
+    if (/lak|lookalike|semelha/.test(n)) return {t:'Frio · LAK', c:'sec', lbl:'s', tag:'FRIO · LOOKALIKE'};
+    if (/interesse|interest/.test(n)) return {t:'Frio · Interesses', c:'sec', lbl:'s', tag:'FRIO · INTERESSES'};
+    if (/broad|ampli|advantage/.test(n)) return {t:'Frio · Ampliação', c:'sec', lbl:'s', tag:'FRIO · AMPLIAÇÃO'};
+    return {t:'Conjunto', c:'main', lbl:'m', tag:'CONJUNTO'};
+  }
+  // sort: most conversions first, then spend
+  const audSorted = adsetNames.map(n => ({name:n, a:agg(adsetMap.get(n)), cls:classify(n)}))
+    .sort((x,y) => (y.a.conv||0) - (x.a.conv||0) || y.a.spend - x.a.spend);
+  audSorted.slice(0,2).forEach((row, i) => {
+    const c = row.cls;
+    const cls = i === 0 ? 'main' : 'sec';
+    const lblCls = i === 0 ? 'm' : 's';
+    const a = row.a;
+    const cleanName = row.name.replace(/^\[.*?\]\s*\[.*?\]\s*.*?-\s*/, '').replace(/^\[.*?\]\s*\[.*?\]\s*/, '') || row.name;
+    audEl.insertAdjacentHTML('beforeend', `
+      <div class="aud-card ${cls}">
+        <div class="aud-label ${lblCls}">${c.tag}</div>
+        <div class="aud-name">${cleanName}</div>
+        <div class="aud-grid">
+          <div class="aud-stat"><div class="n">${BRL(a.spend)}</div><div class="l">Invest.</div></div>
+          <div class="aud-stat"><div class="n">${a.conv ? BRL(a.cpl) : '—'}</div><div class="l">Custo/Conv</div></div>
+          <div class="aud-stat"><div class="n">${INT(a.conv)}</div><div class="l">Conversas</div></div>
+        </div>
+        <div class="aud-meta">${INT(a.imp)} impressões · ${INT(a.clk)} cliques · CTR ${PCT(a.ctr)} · CPC ${a.clk?BRL(a.cpc):'—'}</div>
+      </div>
+    `);
+  });
+  // comparativo
+  if (audSorted.length >= 2) {
+    const a1 = audSorted[0].a, a2 = audSorted[1].a;
+    const totalConv = a1.conv + a2.conv;
+    const p1 = totalConv ? a1.conv/totalConv*100 : 100;
+    const p2 = 100 - p1;
+    const best = audSorted[0].name.replace(/^\[.*?\]\s*\[.*?\]\s*.*?-\s*/, '').replace(/^\[.*?\]\s*\[.*?\]\s*/, '') || audSorted[0].name;
+    const l1 = audSorted[0].name.replace(/^\[.*?\]\s*\[.*?\]\s*.*?-\s*/, '').replace(/^\[.*?\]\s*\[.*?\]\s*/, '').slice(0,20);
+    const l2 = audSorted[1].name.replace(/^\[.*?\]\s*\[.*?\]\s*.*?-\s*/, '').replace(/^\[.*?\]\s*\[.*?\]\s*/, '').slice(0,20);
+    audEl.insertAdjacentHTML('beforeend', `
+      <div class="compare">
+        <div>
+          <h4>Distribuição de conversas</h4>
+          <div class="compare-bar">
+            <div class="q" style="width:${p1}%"></div>
+            <div class="q2" style="width:${p2}%"></div>
+          </div>
+          <div class="compare-legend">
+            <span><span class="dot" style="background:#ff6b35"></span>${l1} ${fmtBR(p1,0)}%</span>
+            <span><span class="dot" style="background:#c44a1a"></span>${l2} ${fmtBR(p2,0)}%</span>
+          </div>
+        </div>
+        <div class="compare-cpl">
+          <div class="lbl">Conjunto mais eficiente</div>
+          <div class="v">${best}</div>
+          <div class="s">${a1.conv ? `Gera <b>${fmtBR(p1,0)}%</b> das conversas · CPL R$ ${fmtBR(a1.cpl,2)}` : 'Sem conversas ainda'}</div>
+        </div>
+      </div>
+    `);
+  }
+
+  // Funnel SVG
+  (function(){
+    const imp = TOT.imp, clk = TOT.clk, conv = TOT.conv;
+    const ctr = TOT.ctr, tx = TOT.tx_conv;
+    const svg = `
+    <svg viewBox="0 0 1200 520" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#2a1105"/><stop offset="50%" stop-color="#8b2a0a"/><stop offset="100%" stop-color="#2a1105"/></linearGradient>
+        <linearGradient id="g2" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#5c2005"/><stop offset="50%" stop-color="#c44a1a"/><stop offset="100%" stop-color="#5c2005"/></linearGradient>
+        <linearGradient id="g3" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#8b2a0a"/><stop offset="50%" stop-color="#ff6b35"/><stop offset="100%" stop-color="#8b2a0a"/></linearGradient>
+        <filter id="glow"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      </defs>
+      <polygon points="80,20 1120,20 1020,140 180,140" fill="url(#g1)" stroke="#c44a1a" stroke-width="1.5" opacity="0.95"/>
+      <text x="600" y="80" font-family="Arial,sans-serif" font-size="13" fill="#ffb38a" text-anchor="middle" letter-spacing="2">IMPRESSÕES</text>
+      <text x="600" y="125" font-family="Arial,sans-serif" font-size="56" font-weight="800" fill="#fff" text-anchor="middle">${INT(imp)}</text>
+      <text x="600" y="185" font-family="Arial,sans-serif" font-size="11" fill="#999" text-anchor="middle" letter-spacing="1">CTR</text>
+      <text x="600" y="212" font-family="Arial,sans-serif" font-size="24" font-weight="800" fill="#ff9500" text-anchor="middle">${PCT(ctr)}</text>
+      <polygon points="210,240 990,240 880,370 320,370" fill="url(#g2)" stroke="#ff8c42" stroke-width="1.5" opacity="0.95"/>
+      <text x="600" y="300" font-family="Arial,sans-serif" font-size="13" fill="#ffb38a" text-anchor="middle" letter-spacing="2">CLIQUES NO LINK</text>
+      <text x="600" y="352" font-family="Arial,sans-serif" font-size="56" font-weight="800" fill="#fff" text-anchor="middle">${INT(clk)}</text>
+      <text x="600" y="405" font-family="Arial,sans-serif" font-size="11" fill="#999" text-anchor="middle" letter-spacing="1">TX CLIQUE → CONVERSA</text>
+      <text x="600" y="433" font-family="Arial,sans-serif" font-size="24" font-weight="800" fill="#ff6b35" text-anchor="middle">${PCT(tx)}</text>
+      <polygon points="350,455 850,455 770,515 430,515" fill="url(#g3)" stroke="#ff6b35" stroke-width="2" filter="url(#glow)"/>
+      <text x="600" y="482" font-family="Arial,sans-serif" font-size="12" fill="#ffb38a" text-anchor="middle" letter-spacing="2">CONVERSAS INICIADAS</text>
+      <text x="600" y="508" font-family="Arial,sans-serif" font-size="32" font-weight="800" fill="#fff" text-anchor="middle">${INT(conv)}</text>
+    </svg>`;
+    document.getElementById('funnel-svg').innerHTML = svg;
+  })();
+
+  document.getElementById('fm-cpc').textContent = TOT.clk ? BRL(TOT.cpc) : '—';
+  document.getElementById('fm-cpc-sub').textContent = `${INT(TOT.clk)} cliques · ${BRL(TOT.spend)} invest.`;
+  document.getElementById('fm-cpm').textContent = BRL(TOT.cpm);
+  document.getElementById('fm-cpm-sub').textContent = `Impacto de R$ ${fmtBR(TOT.cpm,2)} a cada 1.000 impressões`;
+  document.getElementById('fm-txconv').textContent = PCT(TOT.tx_conv);
+  document.getElementById('fm-txconv-sub').textContent = `${INT(TOT.conv)} de ${INT(TOT.clk)} cliques viraram conversa`;
+
+  // Daily table
+  const byDay = groupBy(DATA, 'date');
+  const days = [...byDay.keys()].sort();
+  const tbodyDaily = document.querySelector('#tbl-daily tbody');
+  tbodyDaily.innerHTML = '';
+  days.forEach(d => {
+    const a = agg(byDay.get(d));
+    tbodyDaily.insertAdjacentHTML('beforeend', `
+      <tr><td class="left">${d.split('-').reverse().join('/')}</td>
+      <td>${BRL(a.spend)}</td><td>${INT(a.imp)}</td><td>${INT(a.clk)}</td>
+      <td><b>${INT(a.conv)}</b></td><td>${PCT(a.ctr)}</td>
+      <td>${a.clk?BRL(a.cpc):'—'}</td><td>${BRL(a.cpm)}</td>
+      <td>${a.conv ? BRL(a.cpl) : '—'}</td><td>${a.clk ? PCT(a.tx_conv) : '—'}</td></tr>
+    `);
+  });
+  tbodyDaily.insertAdjacentHTML('beforeend', `
+    <tr class="total"><td class="left">TOTAL</td>
+    <td>${BRL(TOT.spend)}</td><td>${INT(TOT.imp)}</td><td>${INT(TOT.clk)}</td><td>${INT(TOT.conv)}</td>
+    <td>${PCT(TOT.ctr)}</td><td>${BRL(TOT.cpc)}</td><td>${BRL(TOT.cpm)}</td>
+    <td>${TOT.conv?BRL(TOT.cpl):'—'}</td><td>${PCT(TOT.tx_conv)}</td></tr>
+  `);
+
+  // Charts
+  const dayLabels = days.map(d => d.slice(5).split('-').join('/'));
+  const dayStats = days.map(d => agg(byDay.get(d)));
+  const chartOpts = {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:'#e8e8e8',font:{size:11}}}},
+    scales:{x:{ticks:{color:'#999',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'}},
+            y:{ticks:{color:'#999',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'},beginAtZero:true}}
+  };
+  charts.daily = new Chart(document.getElementById('chartDaily'), {
+    type:'bar',
+    data:{labels:dayLabels, datasets:[
+      {type:'bar', label:'Conversas', data:dayStats.map(s=>s.conv), backgroundColor:'rgba(255,107,53,.8)', borderColor:'#ff6b35', borderWidth:1, yAxisID:'y'},
+      {type:'line', label:'Investimento (R$)', data:dayStats.map(s=>s.spend), borderColor:'#ff9500', backgroundColor:'rgba(255,149,0,.15)', tension:.35, yAxisID:'y1', fill:true, pointRadius:3}
+    ]},
+    options:{...chartOpts, scales:{x:chartOpts.scales.x,
+      y:{...chartOpts.scales.y, position:'left', title:{display:true,text:'Conversas',color:'#999',font:{size:10}}},
+      y1:{...chartOpts.scales.y, position:'right', title:{display:true,text:'Invest. (R$)',color:'#999',font:{size:10}}, grid:{display:false}}}}
+  });
+  charts.cpl = new Chart(document.getElementById('chartCPL'), {
+    type:'line',
+    data:{labels:dayLabels, datasets:[{label:'Custo por Conversa (R$)',
+      data:dayStats.map(s=>s.conv ? s.cpl : null),
+      borderColor:'#ff6b35', backgroundColor:'rgba(255,107,53,.15)',
+      tension:.35, fill:true, pointRadius:4, pointBackgroundColor:'#ff6b35', spanGaps:true}]},
+    options:chartOpts
+  });
+
+  // Criativos
+  const byAd = groupBy(DATA, 'ad');
+  const creatives = [...byAd.entries()].map(([name, rows]) => {
+    const a = agg(rows);
+    a.name = name;
+    a.link = rows.find(r => r.link)?.link || '';
+    a.adset = rows[0].adset;
+    return a;
+  });
+  creatives.sort((x,y) => {
+    if (x.conv && y.conv) return x.cpl - y.cpl;
+    if (x.conv && !y.conv) return -1;
+    if (!x.conv && y.conv) return 1;
+    return y.spend - x.spend;
+  });
+  function status(c) {
+    if (c.conv >= 3 && c.cpl && c.cpl <= 5) return {cls:'escalar', txt:'ESCALAR'};
+    if (c.conv >= 1 && c.cpl && c.cpl <= 15) return {cls:'manter', txt:'MANTER'};
+    if (c.spend >= 5 && !c.conv) return {cls:'pausar', txt:'PAUSAR'};
+    return {cls:'avaliar', txt:'AVALIAR'};
+  }
+  const tbodyC = document.querySelector('#tbl-criativos tbody');
+  tbodyC.innerHTML = '';
+  creatives.forEach((c, i) => {
+    const r = i===0 ? '<span class="rank gold">1</span>' : i===1 ? '<span class="rank silver">2</span>' : i===2 ? '<span class="rank bronze">3</span>' : `<span class="rank">${i+1}</span>`;
+    const st = status(c);
+    tbodyC.insertAdjacentHTML('beforeend', `
+      <tr><td>${r}</td>
+      <td class="left"><b>${c.name}</b><div style="font-size:10.5px;color:#999;margin-top:2px">${(c.adset||'').replace(/^\[.*?\]\s*\[.*?\]\s*.*?-\s*/,'').replace(/^\[.*?\]\s*\[.*?\]\s*/,'')}</div></td>
+      <td>${BRL(c.spend)}</td><td>${INT(c.imp)}</td><td>${INT(c.clk)}</td>
+      <td><b>${INT(c.conv)}</b></td><td>${PCT(c.ctr)}</td>
+      <td>${c.clk?BRL(c.cpc):'—'}</td><td>${BRL(c.cpm)}</td>
+      <td>${c.conv?BRL(c.cpl):'—'}</td><td>${c.clk?PCT(c.tx_conv):'—'}</td>
+      <td>${PCT(c.hook)}</td>
+      <td class="left">${c.link?`<a href="${c.link}" target="_blank">Ver anúncio</a>`:'—'}</td>
+      <td><span class="badge ${st.cls}">${st.txt}</span></td></tr>
+    `);
+  });
+  tbodyC.insertAdjacentHTML('beforeend', `
+    <tr class="total"><td></td><td class="left">TOTAL</td>
+    <td>${BRL(TOT.spend)}</td><td>${INT(TOT.imp)}</td><td>${INT(TOT.clk)}</td><td>${INT(TOT.conv)}</td>
+    <td>${PCT(TOT.ctr)}</td><td>${BRL(TOT.cpc)}</td><td>${BRL(TOT.cpm)}</td>
+    <td>${TOT.conv?BRL(TOT.cpl):'—'}</td><td>${PCT(TOT.tx_conv)}</td><td>${PCT(TOT.hook)}</td><td></td><td></td></tr>
+  `);
+
+  // Publicos
+  const adsetStats = [...adsetMap.entries()].map(([name, rows]) => {
+    const a = agg(rows);
+    a.name = name;
+    const cls = classify(name);
+    a.tipo = cls.t;
+    return a;
+  }).sort((x,y) => (y.conv||0) - (x.conv||0) || x.cpl - y.cpl);
+  const tbodyP = document.querySelector('#tbl-publicos tbody');
+  tbodyP.innerHTML = '';
+  adsetStats.forEach((c, i) => {
+    const r = i===0 ? '<span class="rank gold">1</span>' : `<span class="rank">${i+1}</span>`;
+    const cleanName = c.name.replace(/^\[.*?\]\s*\[.*?\]\s*.*?-\s*/, '').replace(/^\[.*?\]\s*\[.*?\]\s*/, '') || c.name;
+    const st = c.conv ? {cls:'escalar', txt:'ESCALAR'} : (c.spend >= 5 ? {cls:'pausar', txt:'PAUSAR'} : {cls:'avaliar', txt:'AVALIAR'});
+    const typeColor = c.tipo.includes('Engaj')?'#ff6b35': c.tipo.includes('Video')?'#ff9500': c.tipo.includes('LAK')?'#ffb38a':'#c44a1a';
+    tbodyP.insertAdjacentHTML('beforeend', `
+      <tr><td>${r}</td>
+      <td class="left"><b>${cleanName}</b></td>
+      <td class="left" style="color:${typeColor}">${c.tipo}</td>
+      <td>${BRL(c.spend)}</td><td>${INT(c.imp)}</td><td>${INT(c.clk)}</td>
+      <td><b>${INT(c.conv)}</b></td><td>${PCT(c.ctr)}</td>
+      <td>${c.clk?BRL(c.cpc):'—'}</td><td>${BRL(c.cpm)}</td>
+      <td>${c.conv?BRL(c.cpl):'—'}</td><td>${c.clk?PCT(c.tx_conv):'—'}</td>
+      <td>${PCT(c.hook)}</td>
+      <td><span class="badge ${st.cls}">${st.txt}</span></td></tr>
+    `);
+  });
+  tbodyP.insertAdjacentHTML('beforeend', `
+    <tr class="total"><td></td><td class="left">TOTAL</td><td></td>
+    <td>${BRL(TOT.spend)}</td><td>${INT(TOT.imp)}</td><td>${INT(TOT.clk)}</td><td>${INT(TOT.conv)}</td>
+    <td>${PCT(TOT.ctr)}</td><td>${BRL(TOT.cpc)}</td><td>${BRL(TOT.cpm)}</td>
+    <td>${TOT.conv?BRL(TOT.cpl):'—'}</td><td>${PCT(TOT.tx_conv)}</td><td>${PCT(TOT.hook)}</td><td></td></tr>
+  `);
+
+  const palette = ['#ff6b35','#c44a1a','#ff9500','#ff8c42','#8b2a0a','#ffb38a'];
+  charts.adsetSpend = new Chart(document.getElementById('chartAdsetSpend'), {
+    type:'doughnut',
+    data:{labels:adsetStats.map(a => (a.name.replace(/^\[.*?\]\s*\[.*?\]\s*.*?-\s*/, '').replace(/^\[.*?\]\s*\[.*?\]\s*/, '') || a.name).slice(0,30)),
+      datasets:[{data:adsetStats.map(a=>a.spend), backgroundColor:palette, borderColor:'#0a0a0a', borderWidth:3}]},
+    options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{color:'#e8e8e8',font:{size:11}}}}}
+  });
+  charts.adsetConv = new Chart(document.getElementById('chartAdsetConv'), {
+    type:'doughnut',
+    data:{labels:adsetStats.map(a => (a.name.replace(/^\[.*?\]\s*\[.*?\]\s*.*?-\s*/, '').replace(/^\[.*?\]\s*\[.*?\]\s*/, '') || a.name).slice(0,30)),
+      datasets:[{data:adsetStats.map(a=>a.conv), backgroundColor:palette, borderColor:'#0a0a0a', borderWidth:3}]},
+    options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{color:'#e8e8e8',font:{size:11}}}}}
+  });
+
+  // Diaria detalhada
+  const tbodyD = document.querySelector('#tbl-diaria tbody');
+  tbodyD.innerHTML = '';
+  const sortedRows = [...DATA].sort((x,y) => x.date.localeCompare(y.date) || x.adset.localeCompare(y.adset) || x.ad.localeCompare(y.ad));
+  sortedRows.forEach(r => {
+    const ctr = r.imp ? r.clicks/r.imp*100 : 0;
+    const cpc = r.clicks ? r.spend/r.clicks : 0;
+    const cpm = r.imp ? r.spend/r.imp*1000 : 0;
+    const cpl = r.conv ? r.spend/r.conv : 0;
+    const hook = r.imp ? r.v3s/r.imp*100 : 0;
+    const cls = classify(r.adset);
+    const adsetShort = r.adset.replace(/^\[.*?\]\s*\[.*?\]\s*.*?-\s*/, '').replace(/^\[.*?\]\s*\[.*?\]\s*/, '').slice(0,25) || r.adset.slice(0,25);
+    const adsetColor = cls.t.includes('Engaj')?'#ff6b35': cls.t.includes('Video')?'#ff9500':'#ffb38a';
+    tbodyD.insertAdjacentHTML('beforeend', `
+      <tr><td class="left">${r.date.split('-').reverse().join('/')}</td>
+      <td class="left" style="color:${adsetColor}">${adsetShort}</td>
+      <td class="left"><b>${r.ad}</b></td>
+      <td>${BRL(r.spend)}</td><td>${INT(r.imp)}</td><td>${INT(r.clicks)}</td>
+      <td>${r.conv?'<b style="color:#ff6b35">'+INT(r.conv)+'</b>':'0'}</td>
+      <td>${PCT(ctr)}</td><td>${r.clicks?BRL(cpc):'—'}</td><td>${BRL(cpm)}</td>
+      <td>${r.conv?BRL(cpl):'—'}</td><td>${PCT(hook)}</td></tr>
+    `);
+  });
+}
+
+/* ---- tabs ---- */
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
   document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(x => x.classList.remove('active'));
@@ -255,277 +697,9 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () =>
   document.getElementById('panel-'+t.dataset.tab).classList.add('active');
 }));
 
-document.getElementById('kpi-spend').textContent = BRL(TOT.spend);
-document.getElementById('kpi-spend-sub').textContent = `${INT(TOT.imp)} impressões · alcance estimado ${INT(TOT.reach)}`;
-document.getElementById('kpi-cpl').textContent = BRL(TOT.cpl);
-document.getElementById('kpi-cpl-sub').textContent = `${INT(TOT.conv)} conversas iniciadas`;
-document.getElementById('kpi-ctr').textContent = PCT(TOT.ctr);
-document.getElementById('kpi-ctr-sub').textContent = `${INT(TOT.clk)} cliques no link`;
-document.getElementById('kpi-cpm').textContent = BRL(TOT.cpm);
-document.getElementById('kpi-cpm-sub').textContent = `Hook rate ${PCT(TOT.hook)}`;
-
-const adsetMap = groupBy(DATA, 'adset');
-const audEl = document.getElementById('aud-row');
-const audCards = [
-  {key:'engajamento 60D', cls:'main', lblCls:'m', label:'RETARGETING · ENGAJAMENTO 60 DIAS', name:'Engajamento 60D', subtitle:'Pessoas que engajaram com o perfil nos últimos 60 dias'},
-  {key:'[JGT] [MSG] MSG070426 - VV Reels Abr25', cls:'sec', lblCls:'s', label:'RETARGETING · VIDEO VIEWERS', name:'VV Reels Abril/25', subtitle:'Viewers dos reels publicados em abril de 2025'}
-];
-audCards.forEach(c => {
-  const a = agg(adsetMap.get(c.key) || []);
-  audEl.insertAdjacentHTML('beforeend', `
-    <div class="aud-card ${c.cls}">
-      <div class="aud-label ${c.lblCls}">${c.label}</div>
-      <div class="aud-name">${c.name}</div>
-      <div class="aud-grid">
-        <div class="aud-stat"><div class="n">${BRL(a.spend)}</div><div class="l">Invest.</div></div>
-        <div class="aud-stat"><div class="n">${a.conv ? BRL(a.cpl) : '—'}</div><div class="l">Custo/Conv</div></div>
-        <div class="aud-stat"><div class="n">${INT(a.conv)}</div><div class="l">Conversas</div></div>
-      </div>
-      <div class="aud-meta"><b>${c.subtitle}</b> · ${INT(a.imp)} impressões · ${INT(a.clk)} cliques · CTR ${PCT(a.ctr)} · CPC ${BRL(a.cpc)}</div>
-    </div>
-  `);
-});
-const a1 = agg(adsetMap.get('engajamento 60D') || []);
-const a2 = agg(adsetMap.get('[JGT] [MSG] MSG070426 - VV Reels Abr25') || []);
-const totalConv = a1.conv + a2.conv;
-const p1 = totalConv ? a1.conv/totalConv*100 : 100;
-const p2 = 100 - p1;
-audEl.insertAdjacentHTML('beforeend', `
-  <div class="compare">
-    <div>
-      <h4>Distribuição de conversas</h4>
-      <div class="compare-bar">
-        <div class="q" style="width:${p1}%"></div>
-        <div class="q2" style="width:${p2}%"></div>
-      </div>
-      <div class="compare-legend">
-        <span><span class="dot" style="background:#ff6b35"></span>Engaj 60D ${fmtBR(p1,0)}%</span>
-        <span><span class="dot" style="background:#c44a1a"></span>VV Reels ${fmtBR(p2,0)}%</span>
-      </div>
-    </div>
-    <div class="compare-cpl">
-      <div class="lbl">Conjunto mais eficiente</div>
-      <div class="v">Engajamento 60D</div>
-      <div class="s">Gera <b>100%</b> das conversas · CPL R$ ${fmtBR(a1.cpl,2)}</div>
-    </div>
-  </div>
-`);
-
-(function(){
-  const imp = TOT.imp, clk = TOT.clk, conv = TOT.conv;
-  const ctr = TOT.ctr, tx = TOT.tx_conv;
-  const svg = `
-  <svg viewBox="0 0 1200 520" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" stop-color="#2a1105"/><stop offset="50%" stop-color="#8b2a0a"/><stop offset="100%" stop-color="#2a1105"/>
-      </linearGradient>
-      <linearGradient id="g2" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" stop-color="#5c2005"/><stop offset="50%" stop-color="#c44a1a"/><stop offset="100%" stop-color="#5c2005"/>
-      </linearGradient>
-      <linearGradient id="g3" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" stop-color="#8b2a0a"/><stop offset="50%" stop-color="#ff6b35"/><stop offset="100%" stop-color="#8b2a0a"/>
-      </linearGradient>
-      <filter id="glow"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    </defs>
-    <polygon points="80,20 1120,20 1020,140 180,140" fill="url(#g1)" stroke="#c44a1a" stroke-width="1.5" opacity="0.95"/>
-    <text x="600" y="80" font-family="Arial,sans-serif" font-size="13" fill="#ffb38a" text-anchor="middle" letter-spacing="2">IMPRESSÕES</text>
-    <text x="600" y="125" font-family="Arial,sans-serif" font-size="56" font-weight="800" fill="#fff" text-anchor="middle">${INT(imp)}</text>
-    <text x="600" y="185" font-family="Arial,sans-serif" font-size="11" fill="#999" text-anchor="middle" letter-spacing="1">CTR</text>
-    <text x="600" y="212" font-family="Arial,sans-serif" font-size="24" font-weight="800" fill="#ff9500" text-anchor="middle">${PCT(ctr)}</text>
-    <polygon points="210,240 990,240 880,370 320,370" fill="url(#g2)" stroke="#ff8c42" stroke-width="1.5" opacity="0.95"/>
-    <text x="600" y="300" font-family="Arial,sans-serif" font-size="13" fill="#ffb38a" text-anchor="middle" letter-spacing="2">CLIQUES NO LINK</text>
-    <text x="600" y="352" font-family="Arial,sans-serif" font-size="56" font-weight="800" fill="#fff" text-anchor="middle">${INT(clk)}</text>
-    <text x="600" y="405" font-family="Arial,sans-serif" font-size="11" fill="#999" text-anchor="middle" letter-spacing="1">TX CLIQUE → CONVERSA</text>
-    <text x="600" y="433" font-family="Arial,sans-serif" font-size="24" font-weight="800" fill="#ff6b35" text-anchor="middle">${PCT(tx)}</text>
-    <polygon points="350,455 850,455 770,515 430,515" fill="url(#g3)" stroke="#ff6b35" stroke-width="2" filter="url(#glow)"/>
-    <text x="600" y="482" font-family="Arial,sans-serif" font-size="12" fill="#ffb38a" text-anchor="middle" letter-spacing="2">CONVERSAS INICIADAS</text>
-    <text x="600" y="508" font-family="Arial,sans-serif" font-size="32" font-weight="800" fill="#fff" text-anchor="middle">${INT(conv)}</text>
-  </svg>`;
-  document.getElementById('funnel-svg').innerHTML = svg;
-})();
-
-document.getElementById('fm-cpc').textContent = BRL(TOT.cpc);
-document.getElementById('fm-cpc-sub').textContent = `${INT(TOT.clk)} cliques · ${BRL(TOT.spend)} invest.`;
-document.getElementById('fm-cpm').textContent = BRL(TOT.cpm);
-document.getElementById('fm-cpm-sub').textContent = `Impacto de R$ ${fmtBR(TOT.cpm,2)} a cada 1.000 impressões`;
-document.getElementById('fm-txconv').textContent = PCT(TOT.tx_conv);
-document.getElementById('fm-txconv-sub').textContent = `${INT(TOT.conv)} de ${INT(TOT.clk)} cliques viraram conversa`;
-
-const byDay = groupBy(DATA, 'date');
-const days = [...byDay.keys()].sort();
-const tbodyDaily = document.querySelector('#tbl-daily tbody');
-days.forEach(d => {
-  const a = agg(byDay.get(d));
-  tbodyDaily.insertAdjacentHTML('beforeend', `
-    <tr>
-      <td class="left">${d.split('-').reverse().join('/')}</td>
-      <td>${BRL(a.spend)}</td><td>${INT(a.imp)}</td><td>${INT(a.clk)}</td>
-      <td><b>${INT(a.conv)}</b></td>
-      <td>${PCT(a.ctr)}</td><td>${BRL(a.cpc)}</td><td>${BRL(a.cpm)}</td>
-      <td>${a.conv ? BRL(a.cpl) : '—'}</td>
-      <td>${a.clk ? PCT(a.tx_conv) : '—'}</td>
-    </tr>
-  `);
-});
-tbodyDaily.insertAdjacentHTML('beforeend', `
-  <tr class="total">
-    <td class="left">TOTAL</td>
-    <td>${BRL(TOT.spend)}</td><td>${INT(TOT.imp)}</td><td>${INT(TOT.clk)}</td><td>${INT(TOT.conv)}</td>
-    <td>${PCT(TOT.ctr)}</td><td>${BRL(TOT.cpc)}</td><td>${BRL(TOT.cpm)}</td>
-    <td>${BRL(TOT.cpl)}</td><td>${PCT(TOT.tx_conv)}</td>
-  </tr>
-`);
-
-const dayLabels = days.map(d => d.slice(5).split('-').join('/'));
-const dayStats = days.map(d => agg(byDay.get(d)));
-const chartOpts = {
-  responsive:true, maintainAspectRatio:false,
-  plugins:{legend:{labels:{color:'#e8e8e8',font:{size:11}}}},
-  scales:{x:{ticks:{color:'#999',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'}},
-          y:{ticks:{color:'#999',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'},beginAtZero:true}}
-};
-new Chart(document.getElementById('chartDaily'), {
-  type:'bar',
-  data:{labels:dayLabels, datasets:[
-    {type:'bar', label:'Conversas', data:dayStats.map(s=>s.conv), backgroundColor:'rgba(255,107,53,.8)', borderColor:'#ff6b35', borderWidth:1, yAxisID:'y'},
-    {type:'line', label:'Investimento (R$)', data:dayStats.map(s=>s.spend), borderColor:'#ff9500', backgroundColor:'rgba(255,149,0,.15)', tension:.35, yAxisID:'y1', fill:true, pointRadius:3}
-  ]},
-  options:{...chartOpts, scales:{
-    x:chartOpts.scales.x,
-    y:{...chartOpts.scales.y, position:'left', title:{display:true,text:'Conversas',color:'#999',font:{size:10}}},
-    y1:{...chartOpts.scales.y, position:'right', title:{display:true,text:'Invest. (R$)',color:'#999',font:{size:10}}, grid:{display:false}}
-  }}
-});
-new Chart(document.getElementById('chartCPL'), {
-  type:'line',
-  data:{labels:dayLabels, datasets:[{
-    label:'Custo por Conversa (R$)',
-    data:dayStats.map(s=>s.conv ? s.cpl : null),
-    borderColor:'#ff6b35', backgroundColor:'rgba(255,107,53,.15)',
-    tension:.35, fill:true, pointRadius:4, pointBackgroundColor:'#ff6b35', spanGaps:true
-  }]},
-  options:chartOpts
-});
-
-const byAd = groupBy(DATA, 'ad');
-const creatives = [...byAd.entries()].map(([name, rows]) => {
-  const a = agg(rows);
-  a.name = name;
-  a.link = rows.find(r => r.link)?.link || '';
-  a.adset = rows[0].adset;
-  return a;
-});
-creatives.sort((x,y) => {
-  if (x.conv && y.conv) return x.cpl - y.cpl;
-  if (x.conv && !y.conv) return -1;
-  if (!x.conv && y.conv) return 1;
-  return y.spend - x.spend;
-});
-function status(c) {
-  if (c.conv >= 3 && c.cpl && c.cpl <= 5) return {cls:'escalar', txt:'ESCALAR'};
-  if (c.conv >= 1 && c.cpl && c.cpl <= 15) return {cls:'manter', txt:'MANTER'};
-  if (c.spend >= 5 && !c.conv) return {cls:'pausar', txt:'PAUSAR'};
-  if (c.spend < 5 && !c.conv) return {cls:'avaliar', txt:'AVALIAR'};
-  return {cls:'avaliar', txt:'AVALIAR'};
-}
-const tbodyC = document.querySelector('#tbl-criativos tbody');
-creatives.forEach((c, i) => {
-  const r = i===0 ? '<span class="rank gold">1</span>' : i===1 ? '<span class="rank silver">2</span>' : i===2 ? '<span class="rank bronze">3</span>' : `<span class="rank">${i+1}</span>`;
-  const st = status(c);
-  tbodyC.insertAdjacentHTML('beforeend', `
-    <tr>
-      <td>${r}</td>
-      <td class="left"><b>${c.name}</b><div style="font-size:10.5px;color:#999;margin-top:2px">${c.adset.replace('[JGT] [MSG] MSG070426 - ','').replace('[JGT] [MSG] ','')}</div></td>
-      <td>${BRL(c.spend)}</td><td>${INT(c.imp)}</td><td>${INT(c.clk)}</td>
-      <td><b>${INT(c.conv)}</b></td>
-      <td>${PCT(c.ctr)}</td><td>${c.clk?BRL(c.cpc):'—'}</td><td>${BRL(c.cpm)}</td>
-      <td>${c.conv?BRL(c.cpl):'—'}</td><td>${c.clk?PCT(c.tx_conv):'—'}</td>
-      <td>${PCT(c.hook)}</td>
-      <td class="left">${c.link?`<a href="${c.link}" target="_blank">Ver anúncio</a>`:'—'}</td>
-      <td><span class="badge ${st.cls}">${st.txt}</span></td>
-    </tr>
-  `);
-});
-tbodyC.insertAdjacentHTML('beforeend', `
-  <tr class="total">
-    <td></td><td class="left">TOTAL</td>
-    <td>${BRL(TOT.spend)}</td><td>${INT(TOT.imp)}</td><td>${INT(TOT.clk)}</td><td>${INT(TOT.conv)}</td>
-    <td>${PCT(TOT.ctr)}</td><td>${BRL(TOT.cpc)}</td><td>${BRL(TOT.cpm)}</td>
-    <td>${BRL(TOT.cpl)}</td><td>${PCT(TOT.tx_conv)}</td><td>${PCT(TOT.hook)}</td><td></td><td></td>
-  </tr>
-`);
-
-const adsetStats = [...adsetMap.entries()].map(([name, rows]) => {
-  const a = agg(rows);
-  a.name = name;
-  a.tipo = name.includes('engajamento') ? 'Quente · Engajamento' : 'Quente · Video Views';
-  return a;
-}).sort((x,y) => (y.conv||0) - (x.conv||0) || x.cpl - y.cpl);
-const tbodyP = document.querySelector('#tbl-publicos tbody');
-adsetStats.forEach((c, i) => {
-  const r = i===0 ? '<span class="rank gold">1</span>' : `<span class="rank">${i+1}</span>`;
-  const cleanName = c.name.replace('[JGT] [MSG] MSG070426 - ','').replace(/^\[.*?\]\s*\[.*?\]\s*/,'');
-  const st = c.conv ? {cls:'escalar', txt:'ESCALAR'} : {cls:'avaliar', txt:'AVALIAR'};
-  const typeColor = c.tipo.includes('Engaj')?'#ff6b35':'#ff9500';
-  tbodyP.insertAdjacentHTML('beforeend', `
-    <tr>
-      <td>${r}</td>
-      <td class="left"><b>${cleanName || c.name}</b></td>
-      <td class="left" style="color:${typeColor}">${c.tipo}</td>
-      <td>${BRL(c.spend)}</td><td>${INT(c.imp)}</td><td>${INT(c.clk)}</td>
-      <td><b>${INT(c.conv)}</b></td>
-      <td>${PCT(c.ctr)}</td><td>${c.clk?BRL(c.cpc):'—'}</td><td>${BRL(c.cpm)}</td>
-      <td>${c.conv?BRL(c.cpl):'—'}</td><td>${c.clk?PCT(c.tx_conv):'—'}</td>
-      <td>${PCT(c.hook)}</td>
-      <td><span class="badge ${st.cls}">${st.txt}</span></td>
-    </tr>
-  `);
-});
-tbodyP.insertAdjacentHTML('beforeend', `
-  <tr class="total">
-    <td></td><td class="left">TOTAL</td><td></td>
-    <td>${BRL(TOT.spend)}</td><td>${INT(TOT.imp)}</td><td>${INT(TOT.clk)}</td><td>${INT(TOT.conv)}</td>
-    <td>${PCT(TOT.ctr)}</td><td>${BRL(TOT.cpc)}</td><td>${BRL(TOT.cpm)}</td>
-    <td>${BRL(TOT.cpl)}</td><td>${PCT(TOT.tx_conv)}</td><td>${PCT(TOT.hook)}</td><td></td>
-  </tr>
-`);
-
-new Chart(document.getElementById('chartAdsetSpend'), {
-  type:'doughnut',
-  data:{labels:adsetStats.map(a => a.name.includes('engajamento')?'Engaj 60D':'VV Reels'),
-    datasets:[{data:adsetStats.map(a=>a.spend), backgroundColor:['#ff6b35','#c44a1a'], borderColor:'#0a0a0a', borderWidth:3}]},
-  options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{color:'#e8e8e8',font:{size:11}}}}}
-});
-new Chart(document.getElementById('chartAdsetConv'), {
-  type:'doughnut',
-  data:{labels:adsetStats.map(a => a.name.includes('engajamento')?'Engaj 60D':'VV Reels'),
-    datasets:[{data:adsetStats.map(a=>a.conv), backgroundColor:['#ff8c42','#8b2a0a'], borderColor:'#0a0a0a', borderWidth:3}]},
-  options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{color:'#e8e8e8',font:{size:11}}}}}
-});
-
-const tbodyD = document.querySelector('#tbl-diaria tbody');
-const sortedRows = [...DATA].sort((x,y) => x.date.localeCompare(y.date) || x.adset.localeCompare(y.adset) || x.ad.localeCompare(y.ad));
-sortedRows.forEach(r => {
-  const ctr = r.imp ? r.clicks/r.imp*100 : 0;
-  const cpc = r.clicks ? r.spend/r.clicks : 0;
-  const cpm = r.imp ? r.spend/r.imp*1000 : 0;
-  const cpl = r.conv ? r.spend/r.conv : 0;
-  const hook = r.imp ? r.v3s/r.imp*100 : 0;
-  const adsetShort = r.adset.includes('engajamento') ? 'Engaj 60D' : 'VV Reels';
-  const adsetColor = r.adset.includes('engajamento') ? '#ff6b35' : '#ff9500';
-  tbodyD.insertAdjacentHTML('beforeend', `
-    <tr>
-      <td class="left">${r.date.split('-').reverse().join('/')}</td>
-      <td class="left" style="color:${adsetColor}">${adsetShort}</td>
-      <td class="left"><b>${r.ad}</b></td>
-      <td>${BRL(r.spend)}</td><td>${INT(r.imp)}</td><td>${INT(r.clicks)}</td>
-      <td>${r.conv?'<b style="color:#ff6b35">'+INT(r.conv)+'</b>':'0'}</td>
-      <td>${PCT(ctr)}</td><td>${r.clicks?BRL(cpc):'—'}</td><td>${BRL(cpm)}</td>
-      <td>${r.conv?BRL(cpl):'—'}</td><td>${PCT(hook)}</td>
-    </tr>
-  `);
-});
+/* ---- inicia ---- */
+loadAndRender(false);
+setInterval(() => loadAndRender(false), AUTO_REFRESH_MINUTES * 60 * 1000);
 </script>
 </body>
 </html>
