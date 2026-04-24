@@ -367,19 +367,53 @@ async function fetchCSV(sheetName) {
   return Papa.parse(text, { header: true, skipEmptyLines: true }).data;
 }
 
+/* Busca Forms via export?format=csv (resolve TODAS as fórmulas).
+ * Testa GIDs de 0 a 10 até achar a aba que tem colunas de formulário. */
+async function fetchFormsExport() {
+  for (let gid = 0; gid <= 10; gid++) {
+    try {
+      const url = `https://docs.google.com/spreadsheets/d/${CONFIG.sheetId}/export?format=csv&gid=${gid}`;
+      const resp = await fetch(url, { redirect: 'follow' });
+      if (!resp.ok) continue;
+      const text = await resp.text();
+      if (!text || text.length < 50) continue;
+      const rows = Papa.parse(text, { header: true, skipEmptyLines: true }).data;
+      if (!rows.length) continue;
+      const headers = Object.keys(rows[0]);
+      const hl = headers.map(h => h.toLowerCase());
+      /* Identifica aba Forms: tem coluna de telefone + data + alguma de faturamento ou profissão */
+      const hasPhone = hl.some(h => /telefone|phone|tel/.test(h));
+      const hasDate = hl.some(h => /data|date|created|time/.test(h));
+      const hasForm = hl.some(h => /profiss|fatura|nome|vende/.test(h));
+      if (hasPhone && hasDate && hasForm) {
+        console.log('[EXPORT] ✓ Forms encontrada no gid=' + gid, '| Colunas:', headers);
+        return rows;
+      }
+    } catch (e) { /* CORS ou outro erro, tenta próximo GID */ }
+  }
+  return null;
+}
+
 async function loadAllData() {
   const ls = document.getElementById('loadingScreen');
   const es = document.getElementById('errorScreen');
   ls.classList.remove('hidden'); es.classList.remove('show');
   try {
-    /* Captação via CSV */
+    /* Captação via gviz CSV (funciona perfeito) */
     document.getElementById('loadingStatus').textContent = 'Buscando dados de captação...';
     RAW_CAP = await fetchCSV(CONFIG.capSheet);
 
-    /* Forms via CSV */
+    /* Forms: tenta export (resolve fórmulas), fallback gviz CSV */
     document.getElementById('loadingStatus').textContent = 'Buscando dados de formulários...';
-    RAW_FORMS = await fetchCSV(CONFIG.formsSheet);
-    console.log('[FORMS] Colunas CSV:', Object.keys(RAW_FORMS[0] || {}));
+    const exportForms = await fetchFormsExport();
+    if (exportForms) {
+      RAW_FORMS = exportForms;
+      console.log('[FORMS] ✓ Via export (fórmulas resolvidas):', RAW_FORMS.length, 'rows');
+    } else {
+      RAW_FORMS = await fetchCSV(CONFIG.formsSheet);
+      console.log('[FORMS] Via gviz CSV (fallback):', RAW_FORMS.length, 'rows');
+    }
+    console.log('[FORMS] Colunas:', Object.keys(RAW_FORMS[0] || {}));
 
     document.getElementById('loadingStatus').textContent = 'Processando dados...';
     FILTERED_CAP = [...RAW_CAP];
