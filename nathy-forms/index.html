@@ -6,6 +6,7 @@
 <title>CL32FORM01 - Dashboard Captação</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23ff6b2b'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-family='Arial,Helvetica,sans-serif' font-weight='900' font-size='12' fill='%23ffffff' letter-spacing='0.5'%3EJGT%3C/text%3E%3C/svg%3E">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
@@ -240,13 +241,6 @@ td,th{padding:8px 8px;font-size:11px;}
 </div>
 
 <!-- CONTENT -->
-<div id="diagPanel" style="display:none;background:#1a1a1a;border:2px solid #ff6b00;border-radius:8px;margin:12px 24px;padding:16px;font-family:monospace;font-size:12px;max-height:400px;overflow-y:auto;">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-    <b style="color:#ff6b00;">DIAGNÓSTICO — Colunas Forms CSV</b>
-    <button onclick="this.parentElement.parentElement.style.display='none'" style="background:#333;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;">Fechar</button>
-  </div>
-  <div id="diagContent" style="color:#ccc;white-space:pre-wrap;"></div>
-</div>
 <div class="content" id="mainContent" style="display:none;">
   <div class="tab-content active" id="tab0"></div>
   <div class="tab-content" id="tab1"></div>
@@ -376,30 +370,7 @@ async function fetchCSV(sheetName) {
 
 /* Busca Forms via export?format=csv (resolve TODAS as fórmulas).
  * Testa GIDs de 0 a 10 até achar a aba que tem colunas de formulário. */
-async function fetchFormsExport() {
-  for (let gid = 0; gid <= 10; gid++) {
-    try {
-      const url = `https://docs.google.com/spreadsheets/d/${CONFIG.sheetId}/export?format=csv&gid=${gid}`;
-      const resp = await fetch(url, { redirect: 'follow' });
-      if (!resp.ok) continue;
-      const text = await resp.text();
-      if (!text || text.length < 50) continue;
-      const rows = Papa.parse(text, { header: true, skipEmptyLines: true }).data;
-      if (!rows.length) continue;
-      const headers = Object.keys(rows[0]);
-      const hl = headers.map(h => h.toLowerCase());
-      /* Identifica aba Forms: tem coluna de telefone + data + alguma de faturamento ou profissão */
-      const hasPhone = hl.some(h => /telefone|phone|tel/.test(h));
-      const hasDate = hl.some(h => /data|date|created|time/.test(h));
-      const hasForm = hl.some(h => /profiss|fatura|nome|vende/.test(h));
-      if (hasPhone && hasDate && hasForm) {
-        console.log('[EXPORT] ✓ Forms encontrada no gid=' + gid, '| Colunas:', headers);
-        return rows;
-      }
-    } catch (e) { /* CORS ou outro erro, tenta próximo GID */ }
-  }
-  return null;
-}
+
 
 async function loadAllData() {
   const ls = document.getElementById('loadingScreen');
@@ -410,33 +381,62 @@ async function loadAllData() {
     document.getElementById('loadingStatus').textContent = 'Buscando dados de captação...';
     RAW_CAP = await fetchCSV(CONFIG.capSheet);
 
-    /* Forms: tenta export (resolve fórmulas), fallback gviz CSV */
+    /* Forms: CSV via gviz (pega 23% da coluna G) */
     document.getElementById('loadingStatus').textContent = 'Buscando dados de formulários...';
-    const exportForms = await fetchFormsExport();
-    if (exportForms) {
-      RAW_FORMS = exportForms;
-      console.log('[FORMS] ✓ Via export (fórmulas resolvidas):', RAW_FORMS.length, 'rows');
-    } else {
-      RAW_FORMS = await fetchCSV(CONFIG.formsSheet);
-      console.log('[FORMS] Via gviz CSV (fallback):', RAW_FORMS.length, 'rows');
-    }
-    /* Diagnóstico visível das colunas Forms */
-    const diagEl = document.getElementById('diagContent');
-    const diagPanel = document.getElementById('diagPanel');
-    if (RAW_FORMS.length && diagEl) {
-      const headers = Object.keys(RAW_FORMS[0]);
-      let diag = `${RAW_FORMS.length} linhas | ${headers.length} colunas\n`;
-      diag += `Coluna qualificação (G): "${headers[6] || 'N/A'}"\n\n`;
-      headers.forEach((h, i) => {
-        const nonEmpty = RAW_FORMS.filter(r => r[h] && String(r[h]).trim()).length;
-        const sample = RAW_FORMS.find(r => r[h] && String(r[h]).trim());
-        const sampleVal = sample ? String(sample[h]).substring(0, 50) : '(TUDO VAZIO)';
-        const pct = Math.round(nonEmpty / RAW_FORMS.length * 100);
-        const marker = i === 6 ? ' ◄◄ FATURAMENTO' : '';
-        diag += `Col ${String.fromCharCode(65+i)} [${pct}%] "${h}" → ${sampleVal}${marker}\n`;
-      });
-      diagEl.textContent = diag;
-      diagPanel.style.display = 'block';
+    RAW_FORMS = await fetchCSV(CONFIG.formsSheet);
+    console.log('[FORMS] CSV gviz:', RAW_FORMS.length, 'rows');
+
+    /* XLSX merge: preenche coluna G vazia com valores do XLSX (resolve fórmulas) */
+    document.getElementById('loadingStatus').textContent = 'Completando dados de qualificação...';
+    try {
+      const xlsxUrl = `https://docs.google.com/spreadsheets/d/${CONFIG.sheetId}/export?format=xlsx`;
+      const xlResp = await fetch(xlsxUrl, { redirect: 'follow' });
+      if (xlResp.ok) {
+        const ab = await xlResp.arrayBuffer();
+        const wb = XLSX.read(ab, { type: 'array' });
+        /* Encontra aba Forms */
+        let formsWs = null;
+        for (const name of wb.SheetNames) {
+          if (/forms/i.test(name) || /formul/i.test(name)) { formsWs = wb.Sheets[name]; break; }
+        }
+        if (!formsWs && wb.SheetNames.length > 1) formsWs = wb.Sheets[wb.SheetNames[1]];
+        if (formsWs) {
+          const xlRows = XLSX.utils.sheet_to_json(formsWs, { header: 1, raw: true, defval: '' });
+          console.log('[XLSX] Forms sheet:', xlRows.length, 'rows');
+          if (xlRows.length > 1) {
+            /* Col C (idx 2) = Telefone, Col G (idx 6) = Faturamento no XLSX */
+            const xlPhoneIdx = 2, xlFatIdx = 6;
+            /* Build phone→faturamento lookup from XLSX */
+            const xlLookup = {};
+            for (let i = 1; i < xlRows.length; i++) {
+              const row = xlRows[i];
+              const phone = String(row[xlPhoneIdx] || '').replace(/\D/g, '');
+              const fat = row[xlFatIdx];
+              if (phone && fat !== '' && fat !== null && fat !== undefined) {
+                xlLookup[phone] = String(fat);
+              }
+            }
+            console.log('[XLSX] Lookup size:', Object.keys(xlLookup).length);
+            /* Fill empty Col G in RAW_FORMS by phone match */
+            const csvHeaders = Object.keys(RAW_FORMS[0] || {});
+            const csvFatCol = csvHeaders[6]; /* Col G by position */
+            const csvPhoneCol = csvHeaders[2]; /* Col C by position */
+            let filled = 0;
+            RAW_FORMS.forEach(r => {
+              const csvFat = r[csvFatCol];
+              if (csvFat && String(csvFat).trim()) return; /* already has value */
+              const phone = String(r[csvPhoneCol] || '').replace(/\D/g, '');
+              if (phone && xlLookup[phone]) {
+                r[csvFatCol] = xlLookup[phone];
+                filled++;
+              }
+            });
+            console.log('[XLSX] Filled', filled, 'empty Col G cells');
+          }
+        }
+      }
+    } catch (xlErr) {
+      console.warn('[XLSX] Merge falhou (CORS local esperado):', xlErr.message);
     }
 
     document.getElementById('loadingStatus').textContent = 'Processando dados...';
