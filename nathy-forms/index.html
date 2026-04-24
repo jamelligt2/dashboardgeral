@@ -240,6 +240,13 @@ td,th{padding:8px 8px;font-size:11px;}
 </div>
 
 <!-- CONTENT -->
+<div id="diagPanel" style="display:none;background:#1a1a1a;border:2px solid #ff6b00;border-radius:8px;margin:12px 24px;padding:16px;font-family:monospace;font-size:12px;max-height:400px;overflow-y:auto;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+    <b style="color:#ff6b00;">DIAGNÓSTICO — Colunas Forms CSV</b>
+    <button onclick="this.parentElement.parentElement.style.display='none'" style="background:#333;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;">Fechar</button>
+  </div>
+  <div id="diagContent" style="color:#ccc;white-space:pre-wrap;"></div>
+</div>
 <div class="content" id="mainContent" style="display:none;">
   <div class="tab-content active" id="tab0"></div>
   <div class="tab-content" id="tab1"></div>
@@ -413,7 +420,24 @@ async function loadAllData() {
       RAW_FORMS = await fetchCSV(CONFIG.formsSheet);
       console.log('[FORMS] Via gviz CSV (fallback):', RAW_FORMS.length, 'rows');
     }
-    console.log('[FORMS] Colunas:', Object.keys(RAW_FORMS[0] || {}));
+    /* Diagnóstico visível das colunas Forms */
+    const diagEl = document.getElementById('diagContent');
+    const diagPanel = document.getElementById('diagPanel');
+    if (RAW_FORMS.length && diagEl) {
+      const headers = Object.keys(RAW_FORMS[0]);
+      let diag = `${RAW_FORMS.length} linhas | ${headers.length} colunas\n`;
+      diag += `Coluna qualificação (G): "${headers[6] || 'N/A'}"\n\n`;
+      headers.forEach((h, i) => {
+        const nonEmpty = RAW_FORMS.filter(r => r[h] && String(r[h]).trim()).length;
+        const sample = RAW_FORMS.find(r => r[h] && String(r[h]).trim());
+        const sampleVal = sample ? String(sample[h]).substring(0, 50) : '(TUDO VAZIO)';
+        const pct = Math.round(nonEmpty / RAW_FORMS.length * 100);
+        const marker = i === 6 ? ' ◄◄ FATURAMENTO' : '';
+        diag += `Col ${String.fromCharCode(65+i)} [${pct}%] "${h}" → ${sampleVal}${marker}\n`;
+      });
+      diagEl.textContent = diag;
+      diagPanel.style.display = 'block';
+    }
 
     document.getElementById('loadingStatus').textContent = 'Processando dados...';
     FILTERED_CAP = [...RAW_CAP];
@@ -519,53 +543,17 @@ function processData() {
     views95: findCol(s,['95 percent','95%','video 95'])
   };
 
-  // Forms processing — qualifica por faturamento REAL >= threshold
+  // Forms: qualifica por faturamento REAL (coluna G) >= threshold
   // Respeita o filtro de datas ativo
   const fs = RAW_FORMS.length ? RAW_FORMS[0] : {};
+  const allFormsCols = Object.keys(fs);
   const FC = {
     date: findCol(fs,['data preenchimento','data','created_time']),
-    fat: null /* detectado automaticamente abaixo */
+    /* Coluna G = índice 6 (posição fixa). Fallback: busca por nome. */
+    fat: allFormsCols[6] || findCol(fs,['fatura 6','fatura 6 meses','quanto fatura 6','faturamento','média','media'])
   };
-
-  /* Detecta a coluna de faturamento REAL escaneando os dados.
-   * Diferencia da coluna "quer faturar" (aspiracional) pelo padrão dos valores:
-   * - Coluna REAL: "ate_3000", "entre_5000_a_7000", "entre_7000_a_12000", "acima_de_20000"
-   * - Coluna ASPIRACIONAL: "faturar_de_7000_a_10000", "faturar_acima_de_20000", "faturar_ate_5_000"
-   */
-  if (RAW_FORMS.length > 0) {
-    const allCols = Object.keys(fs);
-    const colScores = [];
-    for (const col of allCols) {
-      const cl = col.toLowerCase();
-      if (/data|date|time|nome|name|tel|phone|email|profiss|instagram|objetivo|ad_name|criativo|celular|whats|vende|digital/.test(cl)) continue;
-      let realScore = 0, aspirScore = 0;
-      RAW_FORMS.forEach(row => {
-        const val = String(row[col] || '').trim().toLowerCase();
-        if (!val) return;
-        /* Valores aspiracionais começam com "faturar_" */
-        if (/^faturar[_ ]/.test(val)) { aspirScore++; return; }
-        /* Valores reais: ate_X, entre_X_a_Y, acima_de_X, ou número puro */
-        if (/^ate[_ ]?\d|^entre[_ ]?\d|^acima[_ ]?\d|^mais[_ ]?de[_ ]?\d|^de[_ ]?\d|^\d{4,}$/.test(val)) realScore++;
-      });
-      if (realScore > 0 || aspirScore > 0) {
-        colScores.push({ col, realScore, aspirScore, total: realScore + aspirScore });
-        console.log('[QUAL] Coluna:', col, '| Real:', realScore, '| Aspiracional:', aspirScore);
-      }
-    }
-    /* Prioriza coluna com maior score REAL (não aspiracional) */
-    colScores.sort((a, b) => b.realScore - a.realScore || b.total - a.total);
-    if (colScores.length > 0 && colScores[0].total > 3) {
-      FC.fat = colScores[0].col;
-      console.log('[QUAL] ✓ Coluna selecionada:', FC.fat, '| Real:', colScores[0].realScore, '| Total:', colScores[0].total);
-    }
-    /* Fallback: tenta por nome */
-    if (!FC.fat) {
-      FC.fat = findCol(fs, ['fatura 6','fatura 6 meses','quanto fatura 6','faturamento','média','media']);
-      console.log('[QUAL] Fallback por nome:', FC.fat);
-    }
-    const samples = RAW_FORMS.slice(-5).map(r => r[FC.fat] || '(vazio)');
-    console.log('[QUAL] Amostra últimos 5:', samples);
-  }
+  console.log('[QUAL] Coluna G (idx 6):', allFormsCols[6], '| Todas:', allFormsCols);
+  console.log('[QUAL] Usando:', FC.fat, '| Amostra:', RAW_FORMS.slice(0,5).map(r => r[FC.fat] || '(vazio)'));
 
   const dsVal = document.getElementById('dateStart').value;
   const deVal = document.getElementById('dateEnd').value;
