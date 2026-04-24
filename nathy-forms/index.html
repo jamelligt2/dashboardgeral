@@ -6,7 +6,6 @@
 <title>CL32FORM01 - Dashboard Captação</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23ff6b2b'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-family='Arial,Helvetica,sans-serif' font-weight='900' font-size='12' fill='%23ffffff' letter-spacing='0.5'%3EJGT%3C/text%3E%3C/svg%3E">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
@@ -358,94 +357,6 @@ async function fetchCSV(sheetName) {
   return Papa.parse(text, { header: true, skipEmptyLines: true }).data;
 }
 
-async function fillFormsFaturamento(csvForms) {
-  /*
-   * O gviz CSV não resolve fórmulas da coluna "Quanto fatura 6 meses".
-   * Estratégia: tenta gviz JSON (cell.f), depois XLSX export.
-   */
-  const csvSample = csvForms[0] || {};
-  const csvFatCol = findCol(csvSample, ['fatura 6','fatura 6 meses','quanto fatura 6']);
-  if (!csvFatCol) { console.log('[FILL] Coluna fatura não encontrada. Colunas CSV:', Object.keys(csvSample)); return csvForms; }
-
-  const emptyBefore = csvForms.filter(r => !r[csvFatCol] || !String(r[csvFatCol]).trim()).length;
-  console.log('[FILL] CSV col:', csvFatCol, '| Vazios:', emptyBefore, '/', csvForms.length);
-  if (emptyBefore === 0) return csvForms; /* tudo preenchido, sem necessidade */
-
-  /* === ESTRATÉGIA 1: gviz JSON (cell.f tem o valor formatado das fórmulas) === */
-  try {
-    console.log('[FILL] Tentando gviz JSON...');
-    const url = `https://docs.google.com/spreadsheets/d/${CONFIG.sheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(CONFIG.formsSheet)}`;
-    const resp = await fetch(url);
-    const text = await resp.text();
-    const jsonStr = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
-    const gdata = JSON.parse(jsonStr);
-    const cols = gdata.table.cols;
-
-    /* Acha coluna faturamento por label ou fallback coluna G (index 6) */
-    let fatIdx = -1;
-    for (let i = 0; i < cols.length; i++) {
-      const lbl = (cols[i].label || '').toLowerCase();
-      if (lbl.includes('fatura 6')) { fatIdx = i; break; }
-    }
-    if (fatIdx === -1 && cols.length > 6) { fatIdx = 6; console.log('[FILL JSON] Fallback coluna G (idx 6):', cols[6].label); }
-    console.log('[FILL JSON] fatIdx:', fatIdx, '| label:', fatIdx >= 0 ? cols[fatIdx].label : 'N/A');
-
-    if (fatIdx >= 0) {
-      let filled = 0;
-      const jRows = gdata.table.rows;
-      for (let i = 0; i < Math.min(csvForms.length, jRows.length); i++) {
-        if (csvForms[i][csvFatCol] && String(csvForms[i][csvFatCol]).trim()) continue;
-        const cell = jRows[i].c ? jRows[i].c[fatIdx] : null;
-        const val = cell ? (cell.f || (cell.v != null ? String(cell.v) : '')) : '';
-        if (val) { csvForms[i][csvFatCol] = val; filled++; }
-      }
-      console.log('[FILL JSON] Preenchidos:', filled);
-      if (filled > 0) return csvForms;
-    }
-  } catch (e) { console.log('[FILL JSON] Falhou:', e.message); }
-
-  /* === ESTRATÉGIA 2: XLSX export (resolve todas as fórmulas) === */
-  try {
-    console.log('[FILL] Tentando XLSX export...');
-    const url = `https://docs.google.com/spreadsheets/d/${CONFIG.sheetId}/export?format=xlsx`;
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const buf = await resp.arrayBuffer();
-    const wb = XLSX.read(buf, { type: 'array' });
-    console.log('[FILL XLSX] Abas:', wb.SheetNames);
-    const ws = wb.Sheets[CONFIG.formsSheet];
-    if (!ws) throw new Error('Aba "' + CONFIG.formsSheet + '" não encontrada');
-    const xlRows = XLSX.utils.sheet_to_json(ws, { defval: '' });
-    const xlSample = xlRows[0] || {};
-    const xlFatCol = findCol(xlSample, ['fatura 6','fatura 6 meses','quanto fatura 6']);
-    const xlPhoneCol = findCol(xlSample, ['telefone','phone','tel','celular']);
-    const csvPhoneCol = findCol(csvSample, ['telefone','phone','tel','celular']);
-    console.log('[FILL XLSX] fatCol:', xlFatCol, '| phoneCol:', xlPhoneCol);
-
-    if (xlFatCol) {
-      /* Lookup por telefone */
-      const lookup = {};
-      xlRows.forEach(r => {
-        const fat = r[xlFatCol];
-        if (fat == null || !String(fat).trim()) return;
-        const ph = xlPhoneCol ? String(r[xlPhoneCol] || '').replace(/\D/g,'') : '';
-        if (ph) lookup[ph] = String(fat);
-      });
-      let filled = 0;
-      csvForms.forEach(r => {
-        if (r[csvFatCol] && String(r[csvFatCol]).trim()) return;
-        const ph = csvPhoneCol ? String(r[csvPhoneCol] || '').replace(/\D/g,'') : '';
-        if (ph && lookup[ph]) { r[csvFatCol] = lookup[ph]; filled++; }
-      });
-      console.log('[FILL XLSX] Preenchidos:', filled);
-    }
-  } catch (e) { console.log('[FILL XLSX] Falhou:', e.message); }
-
-  const emptyAfter = csvForms.filter(r => !r[csvFatCol] || !String(r[csvFatCol]).trim()).length;
-  console.log('[FILL] Resultado final: Vazios antes:', emptyBefore, '→ depois:', emptyAfter);
-  return csvForms;
-}
-
 async function loadAllData() {
   const ls = document.getElementById('loadingScreen');
   const es = document.getElementById('errorScreen');
@@ -455,10 +366,10 @@ async function loadAllData() {
     document.getElementById('loadingStatus').textContent = 'Buscando dados de captação...';
     RAW_CAP = await fetchCSV(CONFIG.capSheet);
 
-    /* Forms via CSV + merge faturamento do XLSX */
+    /* Forms via CSV */
     document.getElementById('loadingStatus').textContent = 'Buscando dados de formulários...';
     RAW_FORMS = await fetchCSV(CONFIG.formsSheet);
-    RAW_FORMS = await fillFormsFaturamento(RAW_FORMS);
+    console.log('[FORMS] Colunas CSV:', Object.keys(RAW_FORMS[0] || {}));
 
     document.getElementById('loadingStatus').textContent = 'Processando dados...';
     FILTERED_CAP = [...RAW_CAP];
@@ -564,13 +475,68 @@ function processData() {
     views95: findCol(s,['95 percent','95%','video 95'])
   };
 
-  // Forms processing — qualifica SOMENTE por "Quanto fatura 6 meses" >= threshold
+  // Forms processing — qualifica SOMENTE por faturamento >= threshold
   // Respeita o filtro de datas ativo
   const fs = RAW_FORMS.length ? RAW_FORMS[0] : {};
   const FC = {
     date: findCol(fs,['data preenchimento','data','created_time']),
-    fat: findCol(fs,['fatura 6','fatura 6 meses','quanto fatura 6'])
+    fat: findCol(fs,['fatura 6','fatura 6 meses','quanto fatura 6','faturamento','média','media','faturamento_médio'])
   };
+
+  /* Se a coluna mapeada tem poucos dados, escaneia TODAS as colunas pra achar a que tem valores de faturamento */
+  if (RAW_FORMS.length > 0) {
+    const mappedCount = FC.fat ? RAW_FORMS.filter(r => r[FC.fat] && String(r[FC.fat]).trim()).length : 0;
+    console.log('[QUAL] Coluna mapeada:', FC.fat, '| Com dados:', mappedCount, '/', RAW_FORMS.length);
+
+    if (mappedCount < RAW_FORMS.length * 0.3) {
+      /* Escaneia todas as colunas buscando padrões de faturamento (entre_, acima_, valores numéricos altos) */
+      const allCols = Object.keys(fs);
+      let bestCol = null, bestScore = 0;
+      for (const col of allCols) {
+        const cl = col.toLowerCase();
+        /* Pula colunas que claramente não são faturamento */
+        if (/data|date|time|nome|name|tel|phone|email|profiss|instagram|objetivo|ad_name|criativo|celular|whats/.test(cl)) continue;
+        let score = 0;
+        RAW_FORMS.forEach(row => {
+          const val = String(row[col] || '').toLowerCase();
+          if (/entre[_ ]?\d|acima[_ ]?\d|mais[_ ]?de[_ ]?\d|^\d{4,}$|_\d{3,}_a_\d{3,}/.test(val)) score++;
+        });
+        if (score > bestScore) { bestScore = score; bestCol = col; }
+      }
+      if (bestCol && bestScore > 3) {
+        console.log('[QUAL] Auto-detectada coluna faturamento:', bestCol, '| Matches:', bestScore);
+        /* Verifica se é coluna "quer faturar" (aspiracional) — se sim, procura a segunda melhor */
+        if (/quer[_ ]faturar/i.test(bestCol)) {
+          console.log('[QUAL] Coluna "quer faturar" ignorada, buscando segunda opção...');
+          let secondCol = null, secondScore = 0;
+          for (const col of allCols) {
+            if (col === bestCol) continue;
+            const cl = col.toLowerCase();
+            if (/data|date|time|nome|name|tel|phone|email|profiss|instagram|objetivo|ad_name|criativo|celular|whats|quer.?faturar/.test(cl)) continue;
+            let score = 0;
+            RAW_FORMS.forEach(row => {
+              const val = String(row[col] || '').toLowerCase();
+              if (/entre[_ ]?\d|acima[_ ]?\d|mais[_ ]?de[_ ]?\d|^\d{4,}$|_\d{3,}_a_\d{3,}/.test(val)) score++;
+            });
+            if (score > secondScore) { secondScore = score; secondCol = col; }
+          }
+          if (secondCol && secondScore > 3) {
+            FC.fat = secondCol;
+            console.log('[QUAL] Usando segunda coluna:', secondCol, '| Matches:', secondScore);
+          } else {
+            FC.fat = bestCol; /* usa "quer faturar" como último recurso */
+            console.log('[QUAL] Sem segunda opção, usando:', bestCol);
+          }
+        } else {
+          FC.fat = bestCol;
+        }
+      }
+      console.log('[QUAL] Coluna final:', FC.fat);
+      /* Log amostra dos primeiros valores encontrados */
+      const samples = RAW_FORMS.slice(0, 5).map(r => r[FC.fat] || '(vazio)');
+      console.log('[QUAL] Amostra valores:', samples);
+    }
+  }
 
   const dsVal = document.getElementById('dateStart').value;
   const deVal = document.getElementById('dateEnd').value;
