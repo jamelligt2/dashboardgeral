@@ -388,6 +388,7 @@ async function loadAllData() {
 
     /* XLSX merge: preenche coluna G vazia com valores do XLSX (resolve fórmulas) */
     document.getElementById('loadingStatus').textContent = 'Completando dados de qualificação...';
+    let xlsxStatus = 'não tentou';
     try {
       const xlsxUrl = `https://docs.google.com/spreadsheets/d/${CONFIG.sheetId}/export?format=xlsx`;
       const xlResp = await fetch(xlsxUrl, { redirect: 'follow' });
@@ -396,16 +397,23 @@ async function loadAllData() {
         const wb = XLSX.read(ab, { type: 'array' });
         /* Encontra aba Forms */
         let formsWs = null;
+        let formsSheetName = '';
         for (const name of wb.SheetNames) {
-          if (/forms/i.test(name) || /formul/i.test(name)) { formsWs = wb.Sheets[name]; break; }
+          if (/forms/i.test(name) || /formul/i.test(name)) { formsWs = wb.Sheets[name]; formsSheetName = name; break; }
         }
-        if (!formsWs && wb.SheetNames.length > 1) formsWs = wb.Sheets[wb.SheetNames[1]];
+        if (!formsWs && wb.SheetNames.length > 1) { formsWs = wb.Sheets[wb.SheetNames[1]]; formsSheetName = wb.SheetNames[1]; }
         if (formsWs) {
           const xlRows = XLSX.utils.sheet_to_json(formsWs, { header: 1, raw: true, defval: '' });
-          console.log('[XLSX] Forms sheet:', xlRows.length, 'rows');
+          console.log('[XLSX] Forms sheet "' + formsSheetName + '":', xlRows.length, 'rows');
+          console.log('[XLSX] Headers:', xlRows[0]);
           if (xlRows.length > 1) {
             /* Col C (idx 2) = Telefone, Col G (idx 6) = Faturamento no XLSX */
             const xlPhoneIdx = 2, xlFatIdx = 6;
+            console.log('[XLSX] Phone col header:', xlRows[0][xlPhoneIdx], '| Fat col header:', xlRows[0][xlFatIdx]);
+            /* Amostra das primeiras 5 linhas do XLSX */
+            for (let s = 1; s <= Math.min(5, xlRows.length-1); s++) {
+              console.log('[XLSX] Row', s, '| Phone:', xlRows[s][xlPhoneIdx], '| Fat:', xlRows[s][xlFatIdx]);
+            }
             /* Build phone→faturamento lookup from XLSX */
             const xlLookup = {};
             for (let i = 1; i < xlRows.length; i++) {
@@ -417,27 +425,53 @@ async function loadAllData() {
               }
             }
             console.log('[XLSX] Lookup size:', Object.keys(xlLookup).length);
+            /* Amostra do lookup */
+            const lookupKeys = Object.keys(xlLookup);
+            for (let s = 0; s < Math.min(5, lookupKeys.length); s++) {
+              console.log('[XLSX] Lookup:', lookupKeys[s], '→', xlLookup[lookupKeys[s]]);
+            }
             /* Fill empty Col G in RAW_FORMS by phone match */
             const csvHeaders = Object.keys(RAW_FORMS[0] || {});
             const csvFatCol = csvHeaders[6]; /* Col G by position */
             const csvPhoneCol = csvHeaders[2]; /* Col C by position */
-            let filled = 0;
+            console.log('[CSV] Phone col:', csvPhoneCol, '| Fat col:', csvFatCol);
+            let filled = 0, alreadyFilled = 0, noMatch = 0;
             RAW_FORMS.forEach(r => {
               const csvFat = r[csvFatCol];
-              if (csvFat && String(csvFat).trim()) return; /* already has value */
+              if (csvFat && String(csvFat).trim()) { alreadyFilled++; return; }
               const phone = String(r[csvPhoneCol] || '').replace(/\D/g, '');
               if (phone && xlLookup[phone]) {
                 r[csvFatCol] = xlLookup[phone];
                 filled++;
+              } else {
+                noMatch++;
               }
             });
-            console.log('[XLSX] Filled', filled, 'empty Col G cells');
+            console.log('[XLSX] Merge: filled=' + filled + ', alreadyHad=' + alreadyFilled + ', noMatch=' + noMatch);
+            xlsxStatus = '✓ ' + filled + ' preenchidos (já tinha ' + alreadyFilled + ')';
+
+            /* Conta qualificados pós-merge pra validação */
+            let postMergeQual = 0;
+            RAW_FORMS.forEach(r => {
+              const fat = parseFaturamento(r[csvFatCol]);
+              if (fat >= CONFIG.qualThreshold) postMergeQual++;
+            });
+            console.log('[XLSX] Pós-merge total qualificados (sem filtro data):', postMergeQual);
+            xlsxStatus += ' | Total qual: ' + postMergeQual;
           }
+        } else {
+          xlsxStatus = '⚠ Aba Forms não encontrada. Abas: ' + wb.SheetNames.join(', ');
         }
+      } else {
+        xlsxStatus = '⚠ HTTP ' + xlResp.status;
       }
     } catch (xlErr) {
-      console.warn('[XLSX] Merge falhou (CORS local esperado):', xlErr.message);
+      xlsxStatus = '✗ ' + xlErr.message;
+      console.warn('[XLSX] Merge falhou:', xlErr.message);
     }
+    /* Mostra status do merge no rodapé */
+    window._xlsxStatus = xlsxStatus;
+    console.log('[XLSX] Status final:', xlsxStatus);
 
     document.getElementById('loadingStatus').textContent = 'Processando dados...';
     FILTERED_CAP = [...RAW_CAP];
@@ -449,6 +483,13 @@ async function loadAllData() {
     document.getElementById('tabsBar').style.display = 'flex';
     document.getElementById('mainContent').style.display = 'block';
     document.getElementById('lastUpdate').textContent = 'Atualizado: ' + new Date().toLocaleString('pt-BR');
+    /* Status visual do XLSX merge (temporário p/ debug) */
+    const statusDiv = document.createElement('div');
+    statusDiv.style.cssText = 'position:fixed;bottom:8px;left:8px;background:#1a1a1a;border:1px solid #333;color:#aaa;padding:6px 12px;border-radius:6px;font-size:10px;font-family:monospace;z-index:9999;max-width:90vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+    statusDiv.textContent = 'XLSX: ' + (window._xlsxStatus || 'não executou');
+    statusDiv.title = 'Status do merge XLSX (clique pra fechar)';
+    statusDiv.onclick = () => statusDiv.remove();
+    document.body.appendChild(statusDiv);
   } catch (e) {
     ls.classList.add('hidden');
     es.classList.add('show');
