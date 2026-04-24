@@ -515,15 +515,26 @@ function processData() {
   };
 
   // Forms processing — qualifica SOMENTE por "Quanto fatura 6 meses" >= threshold
+  // Respeita o filtro de datas ativo
   const fs = RAW_FORMS.length ? RAW_FORMS[0] : {};
   const FC = {
     date: findCol(fs,['data preenchimento','data','created_time']),
     fat: findCol(fs,['fatura 6','fatura 6 meses','quanto fatura 6'])
   };
 
+  const dsVal = document.getElementById('dateStart').value;
+  const deVal = document.getElementById('dateEnd').value;
+  const filterStart = dsVal ? new Date(dsVal+'T00:00:00') : null;
+  const filterEnd = deVal ? new Date(deVal+'T23:59:59') : null;
+
   let totalQual = 0, totalFormsLeads = 0;
   RAW_FORMS.forEach(r => {
     if (!r[FC.date]) return;
+    // Filtra por período se ativo
+    if (filterStart && filterEnd) {
+      const fd = parseDate(r[FC.date]);
+      if (!fd || fd < filterStart || fd > filterEnd) return;
+    }
     totalFormsLeads++;
     const fat = parseFaturamento(r[FC.fat]);
     if (fat >= CONFIG.qualThreshold) totalQual++;
