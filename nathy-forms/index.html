@@ -358,15 +358,42 @@ async function fetchCSV(sheetName) {
   return Papa.parse(text, { header: true, skipEmptyLines: true }).data;
 }
 
-async function fetchFormsXLSX() {
-  const url = `https://docs.google.com/spreadsheets/d/${CONFIG.sheetId}/export?format=xlsx`;
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error('XLSX export failed: ' + resp.status);
-  const buf = await resp.arrayBuffer();
-  const wb = XLSX.read(buf, { type: 'array', cellDates: true });
-  const ws = wb.Sheets[CONFIG.formsSheet];
-  if (!ws) throw new Error('Aba "' + CONFIG.formsSheet + '" não encontrada no XLSX');
-  return XLSX.utils.sheet_to_json(ws, { defval: '', raw: false, dateNF: 'dd/mm/yyyy' });
+async function fillFormsFaturamento(csvForms) {
+  /* Baixa XLSX só pra preencher valores vazios da coluna faturamento (fórmulas que o CSV não resolve) */
+  try {
+    const url = `https://docs.google.com/spreadsheets/d/${CONFIG.sheetId}/export?format=xlsx`;
+    const resp = await fetch(url);
+    if (!resp.ok) return csvForms;
+    const buf = await resp.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    const ws = wb.Sheets[CONFIG.formsSheet];
+    if (!ws) return csvForms;
+    const xlsxRows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+    const csvSample = csvForms[0] || {};
+    const xlsxSample = xlsxRows[0] || {};
+    const csvFatCol = findCol(csvSample, ['fatura 6','fatura 6 meses','quanto fatura 6']);
+    const xlsxFatCol = findCol(xlsxSample, ['fatura 6','fatura 6 meses','quanto fatura 6']);
+
+    if (!csvFatCol || !xlsxFatCol) { console.log('[MERGE] Coluna fatura não encontrada'); return csvForms; }
+
+    let filled = 0;
+    const len = Math.min(csvForms.length, xlsxRows.length);
+    for (let i = 0; i < len; i++) {
+      const csvVal = csvForms[i][csvFatCol];
+      if (!csvVal || !String(csvVal).trim()) {
+        const xlsxVal = xlsxRows[i][xlsxFatCol];
+        if (xlsxVal != null && String(xlsxVal).trim()) {
+          csvForms[i][csvFatCol] = String(xlsxVal);
+          filled++;
+        }
+      }
+    }
+    console.log('[MERGE] Preenchidos', filled, 'valores vazios de faturamento via XLSX');
+  } catch (e) {
+    console.log('[MERGE] Falhou:', e.message, '— usando só CSV');
+  }
+  return csvForms;
 }
 
 async function loadAllData() {
@@ -374,28 +401,14 @@ async function loadAllData() {
   const es = document.getElementById('errorScreen');
   ls.classList.remove('hidden'); es.classList.remove('show');
   try {
-    /* Captação: sempre via CSV (funciona perfeitamente) */
+    /* Captação via CSV */
     document.getElementById('loadingStatus').textContent = 'Buscando dados de captação...';
     RAW_CAP = await fetchCSV(CONFIG.capSheet);
-    console.log('[CSV] Captação:', RAW_CAP.length, 'rows');
 
-    /* Forms: tenta XLSX primeiro (resolve fórmulas), fallback CSV */
+    /* Forms via CSV + merge faturamento do XLSX */
     document.getElementById('loadingStatus').textContent = 'Buscando dados de formulários...';
-    let formsOk = false;
-    try {
-      RAW_FORMS = await fetchFormsXLSX();
-      formsOk = true;
-      const fs = RAW_FORMS[0] || {};
-      const fatCol = findCol(fs, ['fatura 6','fatura 6 meses','quanto fatura 6']);
-      const nonEmpty = RAW_FORMS.filter(r => r[fatCol] && String(r[fatCol]).trim()).length;
-      console.log('[XLSX] Forms:', RAW_FORMS.length, 'rows | fatura col:', fatCol, '| non-empty:', nonEmpty);
-    } catch (xlsxErr) {
-      console.log('[XLSX Forms] Falhou, usando CSV:', xlsxErr.message);
-    }
-    if (!formsOk) {
-      RAW_FORMS = await fetchCSV(CONFIG.formsSheet);
-      console.log('[CSV] Forms:', RAW_FORMS.length, 'rows');
-    }
+    RAW_FORMS = await fetchCSV(CONFIG.formsSheet);
+    RAW_FORMS = await fillFormsFaturamento(RAW_FORMS);
 
     document.getElementById('loadingStatus').textContent = 'Processando dados...';
     FILTERED_CAP = [...RAW_CAP];
