@@ -360,35 +360,58 @@ async function fetchCSV(sheetName) {
 
 async function fillFormsFaturamento(csvForms) {
   /* Baixa XLSX só pra preencher valores vazios da coluna faturamento (fórmulas que o CSV não resolve) */
+  /* Match por telefone (campo único) pra evitar desalinhamento de índices */
   try {
     const url = `https://docs.google.com/spreadsheets/d/${CONFIG.sheetId}/export?format=xlsx`;
     const resp = await fetch(url);
-    if (!resp.ok) return csvForms;
+    if (!resp.ok) { console.log('[MERGE] XLSX fetch falhou:', resp.status); return csvForms; }
     const buf = await resp.arrayBuffer();
     const wb = XLSX.read(buf, { type: 'array' });
     const ws = wb.Sheets[CONFIG.formsSheet];
-    if (!ws) return csvForms;
+    if (!ws) { console.log('[MERGE] Aba Forms não encontrada. Abas:', wb.SheetNames); return csvForms; }
     const xlsxRows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    console.log('[MERGE] XLSX Forms:', xlsxRows.length, 'rows. Colunas:', Object.keys(xlsxRows[0] || {}));
 
     const csvSample = csvForms[0] || {};
     const xlsxSample = xlsxRows[0] || {};
     const csvFatCol = findCol(csvSample, ['fatura 6','fatura 6 meses','quanto fatura 6']);
     const xlsxFatCol = findCol(xlsxSample, ['fatura 6','fatura 6 meses','quanto fatura 6']);
+    const csvPhoneCol = findCol(csvSample, ['telefone','phone','tel','celular']);
+    const xlsxPhoneCol = findCol(xlsxSample, ['telefone','phone','tel','celular']);
+    const csvNameCol = findCol(csvSample, ['nome','name','full_name']);
+    const xlsxNameCol = findCol(xlsxSample, ['nome','name','full_name']);
+
+    console.log('[MERGE] CSV fatCol:', csvFatCol, '| phoneCol:', csvPhoneCol, '| nameCol:', csvNameCol);
+    console.log('[MERGE] XLSX fatCol:', xlsxFatCol, '| phoneCol:', xlsxPhoneCol, '| nameCol:', xlsxNameCol);
 
     if (!csvFatCol || !xlsxFatCol) { console.log('[MERGE] Coluna fatura não encontrada'); return csvForms; }
 
+    /* Monta lookup do XLSX: chave = telefone normalizado ou nome */
+    const xlsxLookup = {};
+    xlsxRows.forEach(r => {
+      const fat = r[xlsxFatCol];
+      if (fat == null || !String(fat).trim()) return;
+      const phone = xlsxPhoneCol ? String(r[xlsxPhoneCol] || '').replace(/\D/g,'') : '';
+      const name = xlsxNameCol ? String(r[xlsxNameCol] || '').trim().toLowerCase() : '';
+      if (phone) xlsxLookup['p_' + phone] = String(fat);
+      if (name) xlsxLookup['n_' + name] = String(fat);
+    });
+    console.log('[MERGE] Lookup XLSX:', Object.keys(xlsxLookup).length, 'entradas com faturamento');
+
     let filled = 0;
-    const len = Math.min(csvForms.length, xlsxRows.length);
-    for (let i = 0; i < len; i++) {
-      const csvVal = csvForms[i][csvFatCol];
-      if (!csvVal || !String(csvVal).trim()) {
-        const xlsxVal = xlsxRows[i][xlsxFatCol];
-        if (xlsxVal != null && String(xlsxVal).trim()) {
-          csvForms[i][csvFatCol] = String(xlsxVal);
-          filled++;
-        }
+    csvForms.forEach(r => {
+      const csvVal = r[csvFatCol];
+      if (csvVal && String(csvVal).trim()) return; /* já tem valor, pula */
+
+      /* Tenta match por telefone, depois por nome */
+      const phone = csvPhoneCol ? String(r[csvPhoneCol] || '').replace(/\D/g,'') : '';
+      const name = csvNameCol ? String(r[csvNameCol] || '').trim().toLowerCase() : '';
+      const xlsxVal = (phone && xlsxLookup['p_' + phone]) || (name && xlsxLookup['n_' + name]);
+      if (xlsxVal) {
+        r[csvFatCol] = xlsxVal;
+        filled++;
       }
-    }
+    });
     console.log('[MERGE] Preenchidos', filled, 'valores vazios de faturamento via XLSX');
   } catch (e) {
     console.log('[MERGE] Falhou:', e.message, '— usando só CSV');
