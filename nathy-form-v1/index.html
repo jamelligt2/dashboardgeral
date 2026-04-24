@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard Captação — Nathy Corassini</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231a1a2e'/><text x='16' y='22' font-family='Arial' font-size='14' font-weight='bold' text-anchor='middle' fill='%23ff6b35'>JGT</text></svg>">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0f0f1a;
+    color: #ffffff;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+  }
+  .header {
+    background: #16213e;
+    border-bottom: 2px solid #ff6b35;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .logo-badge {
+    background: linear-gradient(135deg, #ff6b35, #e04e1c);
+    border-radius: 10px;
+    color: #fff;
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 18px;
+    letter-spacing: 1px;
+  }
+  .header-divider {
+    width: 2px;
+    height: 46px;
+    background: #ff6b35;
+    opacity: 0.4;
+  }
+  .header-text h1 { font-size: 20px; font-weight: 700; letter-spacing: 0.3px; }
+  .header-text p { color: #ffd600; font-size: 12px; margin-top: 4px; letter-spacing: 0.3px; }
+
+  .tabs {
+    background: #16213e;
+    display: flex;
+    border-bottom: 1px solid #262640;
+    padding: 0 24px;
+  }
+  .tab {
+    padding: 14px 22px;
+    cursor: pointer;
+    color: #9aa0b4;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    border-bottom: 3px solid transparent;
+    transition: all .2s;
+  }
+  .tab:hover { color: #ffffff; }
+  .tab.active {
+    color: #ff6b35;
+    border-bottom: 3px solid #ff6b35;
+  }
+
+  .container { padding: 24px; max-width: 1600px; margin: 0 auto; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .kpi {
+    background: #1e1e35;
+    border: 1px solid #262640;
+    border-radius: 12px;
+    padding: 18px 20px;
+    position: relative;
+  }
+  .kpi .label {
+    color: #9aa0b4;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    font-weight: 600;
+  }
+  .kpi .value {
+    font-size: 28px;
+    font-weight: 800;
+    margin-top: 6px;
+    color: #fff;
+  }
+  .kpi .sub {
+    font-size: 11px;
+    color: #777;
+    margin-top: 4px;
+  }
+  .kpi.orange::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 3px; background: #ff6b35;
+    border-radius: 0 0 12px 12px;
+  }
+  .kpi.green::after { content:''; position:absolute; bottom:0; left:0; right:0; height:3px; background:#00c853; border-radius: 0 0 12px 12px;}
+  .kpi.blue::after  { content:''; position:absolute; bottom:0; left:0; right:0; height:3px; background:#42a5f5; border-radius: 0 0 12px 12px;}
+  .kpi.yellow::after{ content:''; position:absolute; bottom:0; left:0; right:0; height:3px; background:#ffd600; border-radius: 0 0 12px 12px;}
+
+  h2.section-title {
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: #ff6b35;
+    margin: 24px 0 14px 0;
+    font-weight: 700;
+    border-left: 3px solid #ff6b35;
+    padding-left: 10px;
+  }
+
+  .pub-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 280px;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .pub-card {
+    border-radius: 14px;
+    padding: 20px 22px;
+    border: 2px solid;
+  }
+  .pub-card.quente { background: #2a0a0a; border-color: #ff1744; }
+  .pub-card.frio   { background: #061428; border-color: #42a5f5; }
+  .pub-card h3 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.8;
+    margin-bottom: 4px;
+  }
+  .pub-card .sub-title {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 16px;
+  }
+  .pub-card.quente .sub-title { color: #ff6378; }
+  .pub-card.frio .sub-title   { color: #8ac4ff; }
+  .pub-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .pub-metrics .m {
+    background: rgba(0,0,0,0.3);
+    padding: 10px 12px;
+    border-radius: 8px;
+  }
+  .pub-metrics .m .label { font-size: 10px; color: #aaa; text-transform: uppercase; letter-spacing: 0.6px; }
+  .pub-metrics .m .val { font-size: 20px; font-weight: 800; margin-top: 4px; }
+  .pub-card .breakdown {
+    font-size: 12px;
+    color: #bbb;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    line-height: 1.7;
+  }
+  .pub-card .breakdown strong { color: #fff; }
+  .comparativo {
+    background: #1e1e35;
+    border: 1px solid #262640;
+    border-radius: 14px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 12px;
+  }
+  .comparativo .title { font-size: 11px; color: #777; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
+  .comparativo .row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
+  .comparativo .row .label { font-size: 11px; color: #aaa; }
+  .comparativo .row .val { font-weight: 800; font-size: 15px; }
+  .comparativo .row .val.q { color: #ff1744; }
+  .comparativo .row .val.f { color: #42a5f5; }
+  .comparativo .row .val.d { color: #ffd600; }
+
+  /* Funnel + metrics layout */
+  .funnel-wrap {
+    display: flex;
+    gap: 16px;
+    align-items: stretch;
+  }
+  .funnel-svg-wrap { flex: 0 0 52%; max-width: 52%; background: #1e1e35; border:1px solid #262640; border-radius: 12px; padding: 12px; }
+  .funnel-metrics-row { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+  .funnel-metric {
+    background: #1e1e35;
+    border: 1px solid #262640;
+    border-radius: 12px;
+    padding: 18px 20px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+  }
+  .funnel-metric .label { font-size: 11px; color: #9aa0b4; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
+  .funnel-metric .value { font-size: 36px; font-weight: 800; margin-top: 6px; }
+  .funnel-metric .desc { font-size: 11px; color: #777; margin-top: 2px; }
+  .funnel-metric.orange::after { content:''; position:absolute; bottom:0; left:0; right:0; height:3px; background:#ff6b35; border-radius: 0 0 12px 12px;}
+  .funnel-metric.yellow::after { content:''; position:absolute; bottom:0; left:0; right:0; height:3px; background:#ffd600; border-radius: 0 0 12px 12px;}
+  .funnel-metric.green::after  { content:''; position:absolute; bottom:0; left:0; right:0; height:3px; background:#00c853; border-radius: 0 0 12px 12px;}
+
+  /* Qualificação section */
+  .qual-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .qual-card {
+    background: #1e1e35;
+    border: 1px solid #262640;
+    border-radius: 14px;
+    padding: 20px;
+  }
+  .qual-card h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #ff6b35; margin-bottom: 14px; }
+  .qual-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #262640; }
+  .qual-row:last-child { border-bottom: none; }
+  .qual-label { flex: 1; font-size: 13px; color: #ddd; }
+  .qual-bar { flex: 2; background: #111; height: 14px; border-radius: 4px; overflow: hidden; position: relative; }
+  .qual-bar-fill { height: 100%; border-radius: 4px; }
+  .qual-count { min-width: 65px; text-align: right; font-weight: 700; font-size: 13px; }
+  .qual-pct { min-width: 55px; text-align: right; color: #777; font-size: 12px; }
+  .qual-total { background: linear-gradient(135deg,#ff6b35,#e04e1c); color:#fff; padding: 20px; border-radius: 14px; margin-bottom: 14px; text-align: center;}
+  .qual-total .big { font-size: 40px; font-weight: 800; }
+  .qual-total .lbl { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; background: #1e1e35; border: 1px solid #262640; border-radius: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  thead th {
+    background: #16213e;
+    color: #ff6b35;
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 0.8px;
+    padding: 10px 8px;
+    text-align: right;
+    border-bottom: 2px solid #262640;
+    white-space: nowrap;
+  }
+  thead th:first-child, thead th.left { text-align: left; }
+  tbody td {
+    padding: 9px 8px;
+    border-bottom: 1px solid #262640;
+    text-align: right;
+    white-space: nowrap;
+  }
+  tbody td.left { text-align: left; }
+  tbody tr:hover { background: #262640; }
+  tr.total-row { background: #ff6b35 !important; color: #fff; font-weight: 800; }
+  tr.total-row td { border-bottom: none; color: #fff; }
+  .badge { padding: 3px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+  .badge.escalar { background: #00c853; color: #0a1f10; }
+  .badge.manter  { background: #ff6b35; color: #fff; }
+  .badge.avaliar { background: #ffd600; color: #0a0a0a; }
+  .badge.pausar  { background: #ff1744; color: #fff; }
+  a.ad-link { color: #42a5f5; text-decoration: none; font-size: 11px; }
+  a.ad-link:hover { text-decoration: underline; }
+
+  .chart-card {
+    background: #1e1e35;
+    border: 1px solid #262640;
+    border-radius: 12px;
+    padding: 18px;
+    margin-top: 16px;
+    height: 340px;
+  }
+
+  .note {
+    background: #261a0a;
+    border-left: 3px solid #ffd600;
+    padding: 10px 14px;
+    border-radius: 6px;
+    color: #ffd600;
+    font-size: 12px;
+    margin-bottom: 16px;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo-badge">JGT</div>
+  <div class="header-divider"></div>
+  <div class="header-text">
+    <h1>DASHBOARD CAPTAÇÃO — NATHY CORASSINI</h1>
+    <p>[FORMULÁRIO] · 09/03/2026 a 24/04/2026 · 47 dias</p>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" data-tab="geral">Visão Geral</div>
+  <div class="tab" data-tab="criativos">Criativos</div>
+  <div class="tab" data-tab="publicos">Públicos</div>
+  <div class="tab" data-tab="diario">Análise Diária</div>
+</div>
+
+<div class="container">
+
+<!-- ====================== ABA 1: VISAO GERAL ====================== -->
+<div class="panel active" id="geral">
+
+  <div class="kpi-grid">
+    <div class="kpi orange">
+      <div class="label">Investimento Total</div>
+      <div class="value" id="kpi-spend"></div>
+      <div class="sub">47 dias de campanha</div>
+    </div>
+    <div class="kpi yellow">
+      <div class="label">CTR Médio</div>
+      <div class="value" id="kpi-ctr"></div>
+      <div class="sub" id="kpi-ctr-sub"></div>
+    </div>
+    <div class="kpi blue">
+      <div class="label">CPM Médio</div>
+      <div class="value" id="kpi-cpm"></div>
+      <div class="sub" id="kpi-cpm-sub"></div>
+    </div>
+    <div class="kpi green">
+      <div class="label">CPL Médio</div>
+      <div class="value" id="kpi-cpl"></div>
+      <div class="sub" id="kpi-cpl-sub"></div>
+    </div>
+  </div>
+
+  <h2 class="section-title">Público Quente vs Público Frio</h2>
+
+  <div class="pub-grid">
+    <div class="pub-card quente">
+      <h3>🔥 PÚBLICO QUENTE</h3>
+      <div class="sub-title">Engajamento 365D + Carrossel</div>
+      <div class="pub-metrics">
+        <div class="m"><div class="label">Invest.</div><div class="val" id="q-spend"></div></div>
+        <div class="m"><div class="label">CPL</div><div class="val" id="q-cpl"></div></div>
+        <div class="m"><div class="label">Leads</div><div class="val" id="q-leads"></div></div>
+      </div>
+      <div class="breakdown" id="q-breakdown"></div>
+    </div>
+
+    <div class="pub-card frio">
+      <h3>❄️ PÚBLICO FRIO</h3>
+      <div class="sub-title">Não ativado no período</div>
+      <div class="pub-metrics">
+        <div class="m"><div class="label">Invest.</div><div class="val">—</div></div>
+        <div class="m"><div class="label">CPL</div><div class="val">—</div></div>
+        <div class="m"><div class="label">Leads</div><div class="val">—</div></div>
+      </div>
+      <div class="breakdown">Campanha rodou 100% com <strong>públicos quentes</strong> (retargeting de engajamento 365D). Recomenda-se testar um conjunto frio (LAK 1% + interesses parentais) para escalar o volume sem saturar o público atual.</div>
+    </div>
+
+    <div class="comparativo">
+      <div class="title">Comparativo</div>
+      <div class="row"><div class="label">Leads Quente</div><div class="val q">100%</div></div>
+      <div class="row"><div class="label">Leads Frio</div><div class="val f">0%</div></div>
+      <div class="row"><div class="label">Δ CPL Quente–Frio</div><div class="val d">—</div></div>
+      <div class="row"><div class="label">Share Invest.</div><div class="val q">100% Quente</div></div>
+    </div>
+  </div>
+
+  <h2 class="section-title">Funil de Conversão</h2>
+
+  <div class="funnel-wrap">
+    <div class="funnel-svg-wrap">
+      <svg viewBox="0 0 1200 540" width="100%" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="gradImp" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#0d47a1"/>
+            <stop offset="50%" stop-color="#1976d2"/>
+            <stop offset="100%" stop-color="#0d47a1"/>
+          </linearGradient>
+          <linearGradient id="gradCli" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#1565c0"/>
+            <stop offset="50%" stop-color="#42a5f5"/>
+            <stop offset="100%" stop-color="#1565c0"/>
+          </linearGradient>
+          <linearGradient id="gradPV" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#c62400"/>
+            <stop offset="50%" stop-color="#ff6b35"/>
+            <stop offset="100%" stop-color="#c62400"/>
+          </linearGradient>
+          <linearGradient id="gradLe" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#1b5e20"/>
+            <stop offset="50%" stop-color="#00c853"/>
+            <stop offset="100%" stop-color="#1b5e20"/>
+          </linearGradient>
+          <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
+            <feMerge>
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+
+        <!-- Stage 1: IMPRESSOES (wide trapezoid) -->
+        <polygon points="60,20 1140,20 1060,120 140,120" fill="url(#gradImp)"/>
+        <text x="600" y="80" fill="#fff" font-size="14" font-weight="700" text-anchor="middle" opacity="0.8">IMPRESSÕES</text>
+        <text x="600" y="108" fill="#fff" font-size="56" font-weight="900" text-anchor="middle" id="f-imp"></text>
+
+        <!-- Conector CTR -->
+        <text x="600" y="150" fill="#ffd600" font-size="15" font-weight="700" text-anchor="middle">CTR <tspan id="f-ctr"></tspan></text>
+
+        <!-- Stage 2: CLIQUES -->
+        <polygon points="160,160 1040,160 960,260 240,260" fill="url(#gradCli)"/>
+        <text x="600" y="200" fill="#fff" font-size="13" font-weight="700" text-anchor="middle" opacity="0.85">CLIQUES</text>
+        <text x="600" y="246" fill="#fff" font-size="56" font-weight="900" text-anchor="middle" id="f-cli"></text>
+
+        <!-- Conector TX Entrada -->
+        <text x="600" y="290" fill="#ffd600" font-size="15" font-weight="700" text-anchor="middle">TX ENTRADA <tspan id="f-tx-ent"></tspan></text>
+
+        <!-- Stage 3: PAGE VIEWS -->
+        <polygon points="260,300 940,300 860,400 340,400" fill="url(#gradPV)"/>
+        <text x="600" y="340" fill="#fff" font-size="13" font-weight="700" text-anchor="middle" opacity="0.85">PAGE VIEWS</text>
+        <text x="600" y="385" fill="#fff" font-size="52" font-weight="900" text-anchor="middle" id="f-pv"></text>
+
+        <!-- Conector TX Cadastro -->
+        <text x="600" y="430" fill="#ffd600" font-size="15" font-weight="700" text-anchor="middle">TX CADASTRO <tspan id="f-tx-cad"></tspan></text>
+
+        <!-- Stage 4: LEADS (with glow) -->
+        <polygon points="360,440 840,440 760,530 440,530" fill="url(#gradLe)" filter="url(#glow)"/>
+        <text x="600" y="478" fill="#fff" font-size="13" font-weight="700" text-anchor="middle">LEADS</text>
+        <text x="600" y="520" fill="#fff" font-size="68" font-weight="900" text-anchor="middle" id="f-leads"></text>
+      </svg>
+    </div>
+
+    <div class="funnel-metrics-row">
+      <div class="funnel-metric orange">
+        <div class="label">CPC — Custo por Clique</div>
+        <div class="value" id="m-cpc"></div>
+        <div class="desc">Custo médio de cada clique no anúncio</div>
+      </div>
+      <div class="funnel-metric yellow">
+        <div class="label">TX Entrada</div>
+        <div class="value" id="m-tx-ent"></div>
+        <div class="desc">% de cliques que viram Page View (nativo Meta registra baixo)</div>
+      </div>
+      <div class="funnel-metric green">
+        <div class="label">TX Cadastro</div>
+        <div class="value" id="m-tx-cad"></div>
+        <div class="desc">% de Page Views que viram Lead</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">⚠️ Campanha com formulário nativo do Meta: o evento Page View não é disparado de forma padrão, por isso o valor é baixo. Use a métrica de <strong>CPL direto</strong> como referência principal.</div>
+
+  <h2 class="section-title">Qualificação de Leads (Forms · Coluna G)</h2>
+
+  <div class="qual-grid">
+    <div class="qual-card">
+      <h3>Distribuição por Faixa de Faturamento (6 meses)</h3>
+      <div id="qual-list"></div>
+    </div>
+    <div>
+      <div class="qual-total">
+        <div class="big" id="qual-qualified"></div>
+        <div class="lbl">Leads QUALIFICADOS (≥ R$ 7.000)</div>
+      </div>
+      <div class="kpi-grid" style="grid-template-columns: 1fr 1fr;">
+        <div class="kpi green">
+          <div class="label">CPMQL</div>
+          <div class="value" id="cpmql"></div>
+          <div class="sub">Custo por lead qualificado</div>
+        </div>
+        <div class="kpi yellow">
+          <div class="label">Taxa Qualificação</div>
+          <div class="value" id="qual-rate"></div>
+          <div class="sub">% do total de forms</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="section-title">Evolução Diária</h2>
+
+  <div class="table-wrap">
+    <table id="tbl-daily">
+      <thead>
+        <tr>
+          <th class="left">Dia</th>
+          <th>Invest.</th>
+          <th>Impressões</th>
+          <th>Cliques</th>
+          <th>PV</th>
+          <th>Leads</th>
+          <th>CTR</th>
+          <th>CPC</th>
+          <th>CPL</th>
+          <th>TX Cadastro</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="chart-card">
+    <canvas id="chart-daily"></canvas>
+  </div>
+
+</div>
+
+<!-- ====================== ABA 2: CRIATIVOS ====================== -->
+<div class="panel" id="criativos">
+  <h2 class="section-title">Ranking de Criativos por CPL</h2>
+  <div class="table-wrap">
+    <table id="tbl-creatives">
+      <thead>
+        <tr>
+          <th class="left">#</th>
+          <th class="left">Criativo</th>
+          <th>Invest.</th>
+          <th>Imp.</th>
+          <th>Cliques</th>
+          <th>PV</th>
+          <th>Leads</th>
+          <th>CTR</th>
+          <th>CPC</th>
+          <th>CPL</th>
+          <th>TX Entrada</th>
+          <th>TX Cadastro</th>
+          <th>Hook Rate</th>
+          <th class="left">Link</th>
+          <th class="left">Status</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ====================== ABA 3: PUBLICOS ====================== -->
+<div class="panel" id="publicos">
+  <h2 class="section-title">Ranking de Públicos / Conjuntos</h2>
+  <div class="table-wrap">
+    <table id="tbl-adsets">
+      <thead>
+        <tr>
+          <th class="left">#</th>
+          <th class="left">Conjunto</th>
+          <th class="left">Temperatura</th>
+          <th>Invest.</th>
+          <th>Imp.</th>
+          <th>Cliques</th>
+          <th>PV</th>
+          <th>Leads</th>
+          <th>CTR</th>
+          <th>CPC</th>
+          <th>CPL</th>
+          <th class="left">Status</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <h2 class="section-title">Leads por Conjunto (Share)</h2>
+  <div class="chart-card" style="height: 320px;">
+    <canvas id="chart-adsets"></canvas>
+  </div>
+</div>
+
+<!-- ====================== ABA 4: ANALISE DIARIA ====================== -->
+<div class="panel" id="diario">
+  <h2 class="section-title">Evolução Diária + Forms</h2>
+  <div class="table-wrap">
+    <table id="tbl-full-daily">
+      <thead>
+        <tr>
+          <th class="left">Dia</th>
+          <th>Invest.</th>
+          <th>Imp.</th>
+          <th>Cliques</th>
+          <th>PV</th>
+          <th>Leads</th>
+          <th>Forms Qual.</th>
+          <th>Forms N.Qual.</th>
+          <th>CTR</th>
+          <th>CPC</th>
+          <th>CPL</th>
+          <th>CPMQL</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="chart-card" style="margin-top: 20px;">
+    <canvas id="chart-leads-forms"></canvas>
+  </div>
+</div>
+
+</div>
+
+<script>
+function parseBR(str) { return parseFloat(String(str).replace(/\./g, '').replace(',', '.')) || 0; }
+function fmtBRL(v) { return 'R$ ' + (v).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
+function fmtInt(v) { return Math.round(v).toLocaleString('pt-BR'); }
+function fmtPct(v) { return (v).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%'; }
+function safeDiv(a, b) { return b > 0 ? a / b : 0; }
+
+// ========== DATA ==========
+const TOTALS = { spend: 1595.14, imp: 80290, clicks: 862, pv: 18, leads: 277, v3s: 6008 };
+
+const ADSETS = [
+  { adset: "00 - Engajamento 365D",              temp: "QUENTE", spend: 1271.89, imp: 70101, clicks: 706, pv: 16, leads: 264, v3s: 5536 },
+  { adset: "00 - Engajamento 365D — CARROSSEL", temp: "QUENTE", spend: 323.25,  imp: 10189, clicks: 156, pv: 2,  leads: 13,  v3s: 472  }
+];
+
+const ADS = [
+  { ad: "ADV1000", link: "https://www.instagram.com/p/DWjfs1fDDKN/", adset: "Engajamento 365D",            spend: 641.83, reach: 28594, imp: 31666, clicks: 278, pv: 6, leads: 102, v3s: 5255, v95: 354 },
+  { ad: "STE0007", link: "https://www.instagram.com/p/DWjfsgYjCOI/", adset: "Engajamento 365D",            spend: 424.00, reach: 24198, imp: 28178, clicks: 321, pv: 9, leads: 120, v3s: 0,    v95: 0 },
+  { ad: "CAR001",  link: "https://www.instagram.com/p/DWtV-wyjEAi/", adset: "Engajamento 365D — CARROSSEL",spend: 323.25, reach: 8957,  imp: 10189, clicks: 156, pv: 2, leads: 13,  v3s: 472,  v95: 44 },
+  { ad: "STE0008", link: "https://www.instagram.com/p/DWjfspfDDu3/", adset: "Engajamento 365D",            spend: 100.28, reach: 4369,  imp: 4971,  clicks: 60,  pv: 1, leads: 22,  v3s: 3,    v95: 2 },
+  { ad: "ADV1001", link: "https://www.instagram.com/p/DWjfs7KDPBu/", adset: "Engajamento 365D",            spend: 44.48,  reach: 1361,  imp: 1517,  clicks: 10,  pv: 0, leads: 4,   v3s: 268,  v95: 23 },
+  { ad: "STE0002", link: "https://www.instagram.com/p/DWjfstVDCOR/", adset: "Engajamento 365D",            spend: 22.30,  reach: 1130,  imp: 1256,  clicks: 9,   pv: 0, leads: 4,   v3s: 0,    v95: 0 },
+  { ad: "STE0001", link: "https://www.instagram.com/p/DWjfsglDDgl/", adset: "Engajamento 365D",            spend: 17.00,  reach: 1070,  imp: 1168,  clicks: 14,  pv: 0, leads: 7,   v3s: 0,    v95: 0 },
+  { ad: "STE0003", link: "https://www.instagram.com/p/DWjfsj-jBBU/", adset: "Engajamento 365D",            spend: 12.72,  reach: 628,   imp: 696,   clicks: 8,   pv: 0, leads: 3,   v3s: 6,    v95: 3 },
+  { ad: "STE0004", link: "https://www.instagram.com/p/DWjfsqGDCOp/", adset: "Engajamento 365D",            spend: 4.35,   reach: 276,   imp: 292,   clicks: 4,   pv: 0, leads: 2,   v3s: 0,    v95: 0 },
+  { ad: "STE0006", link: "https://www.instagram.com/p/DWjfstpDHLU/", adset: "Engajamento 365D",            spend: 3.64,   reach: 206,   imp: 243,   clicks: 1,   pv: 0, leads: 0,   v3s: 4,    v95: 2 },
+  { ad: "STE0005", link: "https://www.instagram.com/p/DWjfseWjNgi/", adset: "Engajamento 365D",            spend: 1.29,   reach: 108,   imp: 114,   clicks: 1,   pv: 0, leads: 0,   v3s: 0,    v95: 0 }
+];
+
+const DAILY = [
+  ["2026-03-09", 20.77, 520,  1,  0, 0,  106],
+  ["2026-03-10", 35.97, 1065, 16, 0, 6,  160],
+  ["2026-03-11", 22.45, 832,  11, 0, 2,  104],
+  ["2026-03-12", 22.80, 842,  6,  0, 1,  94],
+  ["2026-03-13", 25.96, 846,  11, 1, 4,  59],
+  ["2026-03-14", 27.72, 1108, 14, 0, 3,  121],
+  ["2026-03-15", 40.89, 1778, 20, 0, 6,  148],
+  ["2026-03-16", 30.55, 1613, 17, 1, 2,  146],
+  ["2026-03-17", 26.13, 1335, 11, 0, 5,  137],
+  ["2026-03-18", 27.42, 1194, 16, 0, 3,  147],
+  ["2026-03-19", 31.30, 1122, 14, 0, 4,  127],
+  ["2026-03-20", 27.55, 902,  8,  0, 1,  135],
+  ["2026-03-21", 25.32, 894,  15, 1, 1,  106],
+  ["2026-03-22", 33.70, 1160, 13, 0, 3,  146],
+  ["2026-03-23", 37.14, 1811, 21, 0, 7,  237],
+  ["2026-03-24", 30.18, 1328, 13, 1, 5,  192],
+  ["2026-03-25", 24.25, 1132, 3,  0, 0,  156],
+  ["2026-03-26", 40.72, 1859, 15, 1, 6,  106],
+  ["2026-03-27", 43.24, 1894, 20, 0, 6,  141],
+  ["2026-03-28", 52.63, 2225, 34, 0, 8,  160],
+  ["2026-03-29", 60.19, 2368, 22, 1, 4,  192],
+  ["2026-03-30", 50.29, 2415, 27, 0, 8,  142],
+  ["2026-03-31", 42.39, 1842, 18, 0, 8,  110],
+  ["2026-04-01", 32.74, 1569, 18, 1, 6,  97],
+  ["2026-04-02", 29.73, 1491, 14, 0, 5,  98],
+  ["2026-04-03", 34.39, 1633, 24, 2, 6,  114],
+  ["2026-04-04", 31.00, 1624, 19, 1, 8,  109],
+  ["2026-04-05", 43.36, 2302, 36, 0, 16, 139],
+  ["2026-04-06", 39.16, 2693, 34, 1, 10, 137],
+  ["2026-04-07", 29.70, 2374, 28, 0, 8,  147],
+  ["2026-04-08", 35.11, 1869, 22, 1, 9,  112],
+  ["2026-04-09", 34.62, 2290, 20, 1, 6,  123],
+  ["2026-04-10", 30.07, 2003, 12, 0, 5,  94],
+  ["2026-04-11", 32.01, 1662, 19, 1, 10, 106],
+  ["2026-04-12", 37.92, 2351, 17, 0, 3,  132],
+  ["2026-04-13", 37.85, 2749, 27, 0, 13, 143],
+  ["2026-04-14", 36.56, 2289, 26, 0, 9,  133],
+  ["2026-04-15", 36.53, 2079, 10, 0, 3,  96],
+  ["2026-04-16", 31.20, 1595, 19, 1, 5,  99],
+  ["2026-04-17", 30.77, 1394, 10, 0, 5,  107],
+  ["2026-04-18", 33.23, 1675, 27, 0, 12, 108],
+  ["2026-04-19", 38.05, 2143, 28, 0, 12, 132],
+  ["2026-04-20", 35.87, 2543, 24, 0, 9,  138],
+  ["2026-04-21", 35.67, 2263, 23, 0, 4,  134],
+  ["2026-04-22", 34.10, 2112, 22, 1, 6,  131],
+  ["2026-04-23", 35.09, 2165, 23, 0, 9,  135],
+  ["2026-04-24", 20.85, 1337, 14, 2, 5,  72]
+];
+
+// Forms aggregated per date
+const FORMS_DAILY = {
+  "2026-03-10": {q:0, nq:6}, "2026-03-11": {q:1, nq:1}, "2026-03-12": {q:0, nq:1},
+  "2026-03-13": {q:1, nq:4}, "2026-03-14": {q:0, nq:4}, "2026-03-15": {q:0, nq:4},
+  "2026-03-16": {q:0, nq:3}, "2026-03-17": {q:1, nq:4}, "2026-03-18": {q:0, nq:3},
+  "2026-03-19": {q:0, nq:4}, "2026-03-20": {q:0, nq:1}, "2026-03-21": {q:0, nq:1},
+  "2026-03-22": {q:1, nq:3}, "2026-03-23": {q:1, nq:6}, "2026-03-24": {q:1, nq:5},
+  "2026-03-25": {q:0, nq:0}, "2026-03-26": {q:1, nq:4}, "2026-03-27": {q:1, nq:4},
+  "2026-03-28": {q:2, nq:6}, "2026-03-29": {q:0, nq:4}, "2026-03-30": {q:1, nq:5},
+  "2026-03-31": {q:1, nq:7}, "2026-04-01": {q:1, nq:5}, "2026-04-02": {q:0, nq:5},
+  "2026-04-03": {q:1, nq:5}, "2026-04-04": {q:2, nq:6}, "2026-04-05": {q:2, nq:14},
+  "2026-04-06": {q:2, nq:8}, "2026-04-07": {q:1, nq:7}, "2026-04-08": {q:2, nq:7},
+  "2026-04-09": {q:1, nq:2}
+};
+
+// Qualification breakdown
+const QUAL = {
+  "até_3000":            { n: 177, q: false, label: "Até R$ 3.000" },
+  "entre_3000_a_5000":   { n: 43,  q: false, label: "R$ 3.000 – R$ 5.000" },
+  "entre_5000_a_7000":   { n: 14,  q: false, label: "R$ 5.000 – R$ 7.000" },
+  "entre_7000_a_12000":  { n: 23,  q: true,  label: "R$ 7.000 – R$ 12.000" },
+  "entre_12000_a_20000": { n: 13,  q: true,  label: "R$ 12.000 – R$ 20.000" },
+  "acima_de_20000":      { n: 6,   q: true,  label: "Acima de R$ 20.000" },
+  "em_branco":           { n: 9,   q: false, label: "Em branco / Sem resposta" }
+};
+
+const TOTAL_FORMS = 285;
+const TOTAL_QUALIFIED = 42;
+const TOTAL_NOT_QUAL = 234;
+
+// ========== RENDER ==========
+const CTR = safeDiv(TOTALS.clicks, TOTALS.imp) * 100;
+const CPM = safeDiv(TOTALS.spend, TOTALS.imp) * 1000;
+const CPC = safeDiv(TOTALS.spend, TOTALS.clicks);
+const CPL = safeDiv(TOTALS.spend, TOTALS.leads);
+const CPMQL = safeDiv(TOTALS.spend, TOTAL_QUALIFIED);
+const TX_ENT = safeDiv(TOTALS.pv, TOTALS.clicks) * 100;
+const TX_CAD = safeDiv(TOTALS.leads, TOTALS.pv) * 100;
+const QUAL_RATE = (TOTAL_QUALIFIED / TOTAL_FORMS) * 100;
+
+// KPIs
+document.getElementById('kpi-spend').textContent = fmtBRL(TOTALS.spend);
+document.getElementById('kpi-ctr').textContent = fmtPct(CTR);
+document.getElementById('kpi-ctr-sub').textContent = fmtInt(TOTALS.clicks) + ' cliques / ' + fmtInt(TOTALS.imp) + ' imp';
+document.getElementById('kpi-cpm').textContent = fmtBRL(CPM);
+document.getElementById('kpi-cpm-sub').textContent = fmtInt(TOTALS.imp) + ' impressões';
+document.getElementById('kpi-cpl').textContent = fmtBRL(CPL);
+document.getElementById('kpi-cpl-sub').textContent = fmtInt(TOTALS.leads) + ' leads · CPMQL ' + fmtBRL(CPMQL);
+
+// Público Quente
+const QUENTE = ADSETS.reduce((acc, a) => {
+  acc.spend += a.spend; acc.imp += a.imp; acc.clicks += a.clicks; acc.leads += a.leads;
+  return acc;
+}, {spend:0, imp:0, clicks:0, leads:0});
+document.getElementById('q-spend').textContent = fmtBRL(QUENTE.spend);
+document.getElementById('q-cpl').textContent = fmtBRL(safeDiv(QUENTE.spend, QUENTE.leads));
+document.getElementById('q-leads').textContent = fmtInt(QUENTE.leads);
+
+let bd = '';
+ADSETS.forEach(a => {
+  const cpl = safeDiv(a.spend, a.leads);
+  bd += `<div>• <strong>${a.adset}:</strong> ${fmtInt(a.leads)} leads · CPL ${fmtBRL(cpl)} · Invest. ${fmtBRL(a.spend)}</div>`;
+});
+document.getElementById('q-breakdown').innerHTML = bd;
+
+// Funil values
+document.getElementById('f-imp').textContent = fmtInt(TOTALS.imp);
+document.getElementById('f-cli').textContent = fmtInt(TOTALS.clicks);
+document.getElementById('f-pv').textContent = fmtInt(TOTALS.pv);
+document.getElementById('f-leads').textContent = fmtInt(TOTALS.leads);
+document.getElementById('f-ctr').textContent = ' ' + fmtPct(CTR);
+document.getElementById('f-tx-ent').textContent = ' ' + fmtPct(TX_ENT);
+document.getElementById('f-tx-cad').textContent = ' ' + fmtPct(TX_CAD);
+document.getElementById('m-cpc').textContent = fmtBRL(CPC);
+document.getElementById('m-tx-ent').textContent = fmtPct(TX_ENT);
+document.getElementById('m-tx-cad').textContent = fmtPct(TX_CAD);
+
+// Qualification list
+const qualOrder = ["até_3000", "entre_3000_a_5000", "entre_5000_a_7000", "entre_7000_a_12000", "entre_12000_a_20000", "acima_de_20000", "em_branco"];
+let qh = '';
+qualOrder.forEach(k => {
+  const item = QUAL[k];
+  const pct = (item.n / TOTAL_FORMS) * 100;
+  const color = item.q ? '#00c853' : (k === 'em_branco' ? '#777' : '#ff1744');
+  qh += `<div class="qual-row">
+    <div class="qual-label">${item.q ? '✅' : (k === 'em_branco' ? '⚪' : '❌')} ${item.label}</div>
+    <div class="qual-bar"><div class="qual-bar-fill" style="width:${pct}%;background:${color};"></div></div>
+    <div class="qual-count">${fmtInt(item.n)}</div>
+    <div class="qual-pct">${pct.toFixed(1)}%</div>
+  </div>`;
+});
+document.getElementById('qual-list').innerHTML = qh;
+document.getElementById('qual-qualified').textContent = fmtInt(TOTAL_QUALIFIED);
+document.getElementById('cpmql').textContent = fmtBRL(CPMQL);
+document.getElementById('qual-rate').textContent = fmtPct(QUAL_RATE);
+
+// Daily table
+const dailyBody = document.querySelector('#tbl-daily tbody');
+DAILY.forEach(d => {
+  const [date, spend, imp, clicks, pv, leads, v3s] = d;
+  const ctr = safeDiv(clicks, imp) * 100;
+  const cpc = safeDiv(spend, clicks);
+  const cpl = safeDiv(spend, leads);
+  const txc = safeDiv(leads, pv) * 100;
+  dailyBody.innerHTML += `<tr>
+    <td class="left">${date.split('-').reverse().join('/')}</td>
+    <td>${fmtBRL(spend)}</td>
+    <td>${fmtInt(imp)}</td>
+    <td>${fmtInt(clicks)}</td>
+    <td>${fmtInt(pv)}</td>
+    <td>${fmtInt(leads)}</td>
+    <td>${fmtPct(ctr)}</td>
+    <td>${fmtBRL(cpc)}</td>
+    <td>${leads > 0 ? fmtBRL(cpl) : '—'}</td>
+    <td>${pv > 0 ? fmtPct(txc) : '—'}</td>
+  </tr>`;
+});
+dailyBody.innerHTML += `<tr class="total-row">
+  <td class="left">TOTAL</td>
+  <td>${fmtBRL(TOTALS.spend)}</td>
+  <td>${fmtInt(TOTALS.imp)}</td>
+  <td>${fmtInt(TOTALS.clicks)}</td>
+  <td>${fmtInt(TOTALS.pv)}</td>
+  <td>${fmtInt(TOTALS.leads)}</td>
+  <td>${fmtPct(CTR)}</td>
+  <td>${fmtBRL(CPC)}</td>
+  <td>${fmtBRL(CPL)}</td>
+  <td>${fmtPct(TX_CAD)}</td>
+</tr>`;
+
+// Daily chart
+new Chart(document.getElementById('chart-daily').getContext('2d'), {
+  type: 'bar',
+  data: {
+    labels: DAILY.map(d => d[0].slice(5)),
+    datasets: [
+      {
+        type: 'bar', label: 'Leads', data: DAILY.map(d => d[5]),
+        backgroundColor: '#00c853', yAxisID: 'y', borderRadius: 4
+      },
+      {
+        type: 'line', label: 'CPL (R$)',
+        data: DAILY.map(d => d[5] > 0 ? (d[1] / d[5]) : null),
+        borderColor: '#ff6b35', backgroundColor: '#ff6b3533', yAxisID: 'y1', tension: 0.35, fill: false, pointRadius: 3
+      }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#fff' } } },
+    scales: {
+      x: { ticks: { color: '#aaa', maxRotation: 60, minRotation: 45 }, grid: { color: '#262640' }},
+      y: { ticks: { color: '#00c853' }, grid: { color: '#262640' }, title:{display:true,text:'Leads',color:'#00c853'}},
+      y1: { position: 'right', ticks: { color: '#ff6b35' }, grid: { drawOnChartArea: false }, title:{display:true,text:'CPL (R$)',color:'#ff6b35'}}
+    }
+  }
+});
+
+// ============ CREATIVES TABLE ============
+function getStatus(cpl, leads, spend, avgCpl) {
+  if (leads === 0 && spend > 20) return {c: 'pausar', t: 'PAUSAR'};
+  if (leads === 0) return {c: 'avaliar', t: 'AVALIAR'};
+  if (cpl <= avgCpl * 0.7) return {c: 'escalar', t: 'ESCALAR'};
+  if (cpl <= avgCpl * 1.15) return {c: 'manter', t: 'MANTER'};
+  if (cpl <= avgCpl * 1.5) return {c: 'avaliar', t: 'AVALIAR'};
+  return {c: 'pausar', t: 'PAUSAR'};
+}
+
+const adsSorted = ADS.slice().sort((a, b) => {
+  const ca = a.leads > 0 ? a.spend / a.leads : Infinity;
+  const cb = b.leads > 0 ? b.spend / b.leads : Infinity;
+  return ca - cb;
+});
+
+const crBody = document.querySelector('#tbl-creatives tbody');
+adsSorted.forEach((a, i) => {
+  const ctr = safeDiv(a.clicks, a.imp) * 100;
+  const cpc = safeDiv(a.spend, a.clicks);
+  const cpl = a.leads > 0 ? a.spend / a.leads : 0;
+  const txe = safeDiv(a.pv, a.clicks) * 100;
+  const txc = safeDiv(a.leads, a.pv) * 100;
+  const hook = safeDiv(a.v3s, a.imp) * 100;
+  const st = getStatus(cpl, a.leads, a.spend, CPL);
+  crBody.innerHTML += `<tr>
+    <td class="left">${i+1}</td>
+    <td class="left"><strong>${a.ad}</strong></td>
+    <td>${fmtBRL(a.spend)}</td>
+    <td>${fmtInt(a.imp)}</td>
+    <td>${fmtInt(a.clicks)}</td>
+    <td>${fmtInt(a.pv)}</td>
+    <td>${fmtInt(a.leads)}</td>
+    <td>${fmtPct(ctr)}</td>
+    <td>${fmtBRL(cpc)}</td>
+    <td>${a.leads > 0 ? fmtBRL(cpl) : '—'}</td>
+    <td>${a.pv > 0 ? fmtPct(txe) : '—'}</td>
+    <td>${a.pv > 0 ? fmtPct(txc) : '—'}</td>
+    <td>${a.v3s > 0 ? fmtPct(hook) : '—'}</td>
+    <td class="left"><a class="ad-link" href="${a.link}" target="_blank">🔗 Ver</a></td>
+    <td class="left"><span class="badge ${st.c}">${st.t}</span></td>
+  </tr>`;
+});
+
+// ============ ADSETS TABLE ============
+const adsetBody = document.querySelector('#tbl-adsets tbody');
+const adsetsSorted = ADSETS.slice().sort((a,b) => safeDiv(a.spend, a.leads) - safeDiv(b.spend, b.leads));
+adsetsSorted.forEach((a, i) => {
+  const ctr = safeDiv(a.clicks, a.imp) * 100;
+  const cpc = safeDiv(a.spend, a.clicks);
+  const cpl = a.leads > 0 ? a.spend / a.leads : 0;
+  const st = getStatus(cpl, a.leads, a.spend, CPL);
+  adsetBody.innerHTML += `<tr>
+    <td class="left">${i+1}</td>
+    <td class="left"><strong>${a.adset}</strong></td>
+    <td class="left"><span class="badge" style="background:#ff174433;color:#ff6378;border:1px solid #ff1744;">🔥 ${a.temp}</span></td>
+    <td>${fmtBRL(a.spend)}</td>
+    <td>${fmtInt(a.imp)}</td>
+    <td>${fmtInt(a.clicks)}</td>
+    <td>${fmtInt(a.pv)}</td>
+    <td>${fmtInt(a.leads)}</td>
+    <td>${fmtPct(ctr)}</td>
+    <td>${fmtBRL(cpc)}</td>
+    <td>${a.leads > 0 ? fmtBRL(cpl) : '—'}</td>
+    <td class="left"><span class="badge ${st.c}">${st.t}</span></td>
+  </tr>`;
+});
+
+// Adset chart
+new Chart(document.getElementById('chart-adsets').getContext('2d'), {
+  type: 'doughnut',
+  data: {
+    labels: ADSETS.map(a => a.adset),
+    datasets: [{
+      data: ADSETS.map(a => a.leads),
+      backgroundColor: ['#ff1744', '#ff6b35'],
+      borderColor: '#1e1e35', borderWidth: 3
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { position: 'right', labels: { color: '#fff' }}}
+  }
+});
+
+// ============ FULL DAILY TABLE ============
+const fullBody = document.querySelector('#tbl-full-daily tbody');
+let totQ = 0, totNQ = 0;
+DAILY.forEach(d => {
+  const [date, spend, imp, clicks, pv, leads] = d;
+  const f = FORMS_DAILY[date] || {q: 0, nq: 0};
+  totQ += f.q; totNQ += f.nq;
+  const ctr = safeDiv(clicks, imp) * 100;
+  const cpc = safeDiv(spend, clicks);
+  const cpl = safeDiv(spend, leads);
+  const cpmql = safeDiv(spend, f.q);
+  fullBody.innerHTML += `<tr>
+    <td class="left">${date.split('-').reverse().join('/')}</td>
+    <td>${fmtBRL(spend)}</td>
+    <td>${fmtInt(imp)}</td>
+    <td>${fmtInt(clicks)}</td>
+    <td>${fmtInt(pv)}</td>
+    <td>${fmtInt(leads)}</td>
+    <td style="color:#00c853;font-weight:700;">${fmtInt(f.q)}</td>
+    <td style="color:#ff6378;">${fmtInt(f.nq)}</td>
+    <td>${fmtPct(ctr)}</td>
+    <td>${fmtBRL(cpc)}</td>
+    <td>${leads > 0 ? fmtBRL(cpl) : '—'}</td>
+    <td>${f.q > 0 ? fmtBRL(cpmql) : '—'}</td>
+  </tr>`;
+});
+fullBody.innerHTML += `<tr class="total-row">
+  <td class="left">TOTAL</td>
+  <td>${fmtBRL(TOTALS.spend)}</td>
+  <td>${fmtInt(TOTALS.imp)}</td>
+  <td>${fmtInt(TOTALS.clicks)}</td>
+  <td>${fmtInt(TOTALS.pv)}</td>
+  <td>${fmtInt(TOTALS.leads)}</td>
+  <td>${fmtInt(totQ)}</td>
+  <td>${fmtInt(totNQ)}</td>
+  <td>${fmtPct(CTR)}</td>
+  <td>${fmtBRL(CPC)}</td>
+  <td>${fmtBRL(CPL)}</td>
+  <td>${fmtBRL(CPMQL)}</td>
+</tr>`;
+
+// Leads vs Forms chart
+new Chart(document.getElementById('chart-leads-forms').getContext('2d'), {
+  type: 'bar',
+  data: {
+    labels: DAILY.map(d => d[0].slice(5)),
+    datasets: [
+      { label: 'Leads Meta',            data: DAILY.map(d => d[5]),                                   backgroundColor: '#42a5f5', stack: 'a' },
+      { label: 'Forms Qualificados',    data: DAILY.map(d => (FORMS_DAILY[d[0]]||{q:0}).q),           backgroundColor: '#00c853', stack: 'b' },
+      { label: 'Forms Não Qualificados',data: DAILY.map(d => (FORMS_DAILY[d[0]]||{nq:0}).nq),         backgroundColor: '#ff1744', stack: 'b' }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#fff' } } },
+    scales: {
+      x: { ticks: { color: '#aaa', maxRotation: 60, minRotation: 45 }, grid: { color: '#262640' }, stacked: true },
+      y: { ticks: { color: '#aaa' }, grid: { color: '#262640' }, stacked: false }
+    }
+  }
+});
+
+// ============ TABS ============
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById(t.dataset.tab).classList.add('active');
+  });
+});
+</script>
+</body>
+</html>
