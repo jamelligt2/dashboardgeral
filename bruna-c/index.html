@@ -870,18 +870,16 @@ function renderAll() {
 // ═══════════════════════════════════════
 async function loadData() {
   try {
-    const [resGer, resWh, resVendas] = await Promise.all([
+    const [resGer, resWh] = await Promise.all([
       fetch(GViz('Gerenciador c')),
-      fetch(GViz('Webhook')),
-      fetch(GViz('vendas'))
+      fetch(GViz('Webhook'))
     ]);
 
     if (!resGer.ok) throw new Error('Não foi possível carregar a aba Gerenciador. Verifique se a planilha está pública.');
 
-    const [csvGer, csvWh, csvVendas] = await Promise.all([
+    const [csvGer, csvWh] = await Promise.all([
       resGer.text(),
-      resWh.ok ? resWh.text() : Promise.resolve(''),
-      resVendas.ok ? resVendas.text() : Promise.resolve('')
+      resWh.ok ? resWh.text() : Promise.resolve('')
     ]);
 
     const ger = parseCSV(csvGer);
@@ -889,13 +887,7 @@ async function loadData() {
 
     const { DIAS, PUBLICOS, CRIATIVOS, byPage, byPageDays } = processGerenciador(ger);
 
-    // Carrega aba "vendas" (dados históricos manuais)
-    if (csvVendas) {
-      const vd = parseCSV(csvVendas);
-      if (vd.rows.length) processWebhook(vd, DIAS, byPage, CRIATIVOS);
-    }
-
-    // Carrega aba "Webhook" (dados via webhook a partir de agora)
+    // Carrega aba "Webhook"
     if (csvWh) {
       const wh = parseCSV(csvWh);
       if (wh.rows.length) processWebhook(wh, DIAS, byPage, CRIATIVOS);
