@@ -154,6 +154,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
   <div class="tab" onclick="showTab('paginas',this)">📄 Páginas</div>
   <div class="tab" onclick="showTab('semanal',this)">Semana a Semana</div>
   <div class="tab" onclick="showTab('mensal',this)">Mês a Mês</div>
+  <div class="tab" onclick="showTab('debrief',this)">🏁 Debriefing</div>
 </div>
 
 <!-- MODAL DEBUG VENDAS -->
@@ -280,6 +281,11 @@ tr:hover td{background:rgba(255,255,255,.025)}
   </tr></thead><tbody id="tbody-mensal"></tbody></table></div>
 </div>
 
+<!-- DEBRIEFING -->
+<div id="tab-debrief" class="content">
+  <div id="debrief-content"></div>
+</div>
+
 <script>
 // ============ CONFIG ============
 const SHEET_ID = '1GvkAzmEHMob7R2PdAym_RZYnBj8wdcB1NJaM1CmuABQ';
@@ -303,6 +309,17 @@ const G_COL = { date:0, inv:1, cliques:2, pv:3, ck:4, comprasG:5, campaign:6, ad
 // Column mapping for Webhook (Kiwify OLD format)
 // trans_status: "3" = pago, "1" = pendente, "2" = cancelado
 const W_COL = { status:12, buyerName:42, utmSource:73, trackerUtmSource:69, utmCampaign:76, utmContent:74, utmMedium:75, createdAt:15, priceValue:10, paidValue:11 };
+
+// ============ DEBRIEF CONFIG ============
+const DEBRIEF_CONFIG = {
+  picoPresenca: 32,
+  vendasUpsell: 2,
+  taxaImposto: 0.1382,   // 13,82% de imposto sobre o investimento
+  ticketBruto: 2997,
+  ticketLiquido: 2871.93,
+  upsellBruto: 397,
+  upsellLiquido: 381.15
+};
 
 let DIAS=[], SEMANAL=[], MENSAL=[], CRIATIVOS=[], PUBLICOS=[], PAGINAS=[];
 let SALES=[]; // vendas globais do webhook para re-usar nos renders filtrados
@@ -854,6 +871,7 @@ function renderAll(){
   renderWebhookSalesPanel();
   renderKpiGeral(dias);
   renderCriativos();renderPublicos();renderPaginas();renderSemanal();renderMensal();
+  renderDebriefing();
 }
 
 // ============ PAINEL VENDAS WEBHOOK ============
@@ -1580,6 +1598,156 @@ function createChart(id,type,labels,datasets){
       }
     }
   });
+}
+
+// ============ DEBRIEFING ============
+function renderDebriefing(){
+  const el=document.getElementById('debrief-content');
+  if(!el)return;
+
+  // --- Computar métricas ---
+  const invBruto=DIAS.reduce((s,d)=>s+d.inv,0);
+  const invComImposto=invBruto*(1+DEBRIEF_CONFIG.taxaImposto);
+
+  const allSales=SALES;
+  const orgSales=allSales.filter(s=>!isTrackedSale(s));
+  const trafSales=allSales.filter(s=>isTrackedSale(s));
+
+  const totalVendas=allSales.length;
+  const vendasOrg=orgSales.length;
+  const vendasTraf=trafSales.length;
+
+  const fatTotal=allSales.reduce((s,x)=>s+x.valor,0);
+  const fatOrg=orgSales.reduce((s,x)=>s+x.valor,0);
+  const fatTraf=trafSales.reduce((s,x)=>s+x.valor,0);
+
+  const pico=DEBRIEF_CONFIG.picoPresenca;
+  const pctPresenca=totalVendas>0?pico/totalVendas*100:0;
+
+  const cacTotal=totalVendas>0?invComImposto/totalVendas:0;
+  const cacTraf=vendasTraf>0?invComImposto/vendasTraf:0;
+
+  const roasTotal=invComImposto>0?fatTotal/invComImposto:0;
+  const roasTraf=invComImposto>0?fatTraf/invComImposto:0;
+
+  const ticketTotal=totalVendas>0?fatTotal/totalVendas:0;
+  const ticketTraf=vendasTraf>0?fatTraf/vendasTraf:0;
+
+  const upsell=DEBRIEF_CONFIG.vendasUpsell;
+  const pctUpsell=totalVendas>0?upsell/totalVendas*100:0;
+
+  // Ganho líquido
+  const liqIngressos=totalVendas*DEBRIEF_CONFIG.ticketLiquido;
+  const liqUpsell=upsell*DEBRIEF_CONFIG.upsellLiquido;
+  const receitaLiqTotal=liqIngressos+liqUpsell;
+  const ganhoLiquido=receitaLiqTotal-invComImposto;
+
+  function kpi(label,val,color,sub){
+    return`<div style="background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:20px 22px;display:flex;flex-direction:column;gap:6px">
+      <div style="font-size:10px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.7px">${label}</div>
+      <div style="font-size:24px;font-weight:700;font-family:'DM Mono',monospace;color:${color||'#e8e6f0'}">${val}</div>
+      ${sub?`<div style="font-size:11px;color:rgba(255,255,255,.35);margin-top:2px">${sub}</div>`:''}
+    </div>`;
+  }
+
+  function divider(title){
+    return`<div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.65);margin:28px 0 14px;border-left:3px solid #ff6b2b;padding-left:10px">${title}</div>`;
+  }
+
+  const grid3=`display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:4px`;
+
+  el.innerHTML=`
+  <!-- Header -->
+  <div style="background:linear-gradient(135deg,rgba(255,107,43,.12),rgba(255,107,43,.04));border:1px solid rgba(255,107,43,.2);border-radius:14px;padding:24px 28px;margin-bottom:28px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px">
+    <div>
+      <div style="font-size:20px;font-weight:700;color:#ff6b2b;margin-bottom:4px">🏁 Debriefing — União em Chama</div>
+      <div style="font-size:12px;color:rgba(255,255,255,.5)">Análise completa do lançamento mensal · Gabi Bergo · 2026</div>
+    </div>
+    <div style="display:flex;gap:24px;flex-wrap:wrap">
+      <div style="text-align:right">
+        <div style="font-size:10px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Pico de Presença</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input type="number" id="debrief-pico" value="${DEBRIEF_CONFIG.picoPresenca}" min="0"
+            style="width:64px;background:rgba(255,255,255,.08);border:1px solid rgba(255,107,43,.3);color:#ff6b2b;font-family:'DM Mono',monospace;font-size:18px;font-weight:700;border-radius:6px;padding:4px 8px;text-align:center;outline:none"
+            oninput="DEBRIEF_CONFIG.picoPresenca=parseInt(this.value)||0;renderDebriefing()">
+          <span style="font-size:11px;color:rgba(255,255,255,.3)">pessoas</span>
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:10px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Vendas Upsell</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input type="number" id="debrief-upsell" value="${DEBRIEF_CONFIG.vendasUpsell}" min="0"
+            style="width:64px;background:rgba(255,255,255,.08);border:1px solid rgba(255,107,43,.3);color:#2ecc71;font-family:'DM Mono',monospace;font-size:18px;font-weight:700;border-radius:6px;padding:4px 8px;text-align:center;outline:none"
+            oninput="DEBRIEF_CONFIG.vendasUpsell=parseInt(this.value)||0;renderDebriefing()">
+          <span style="font-size:11px;color:rgba(255,255,255,.3)">vendas</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  ${divider('📦 Ingressos')}
+  <div style="${grid3}">
+    ${kpi('Total de Ingressos',totalVendas,'#ff6b2b',`Orgânico + Tráfego`)}
+    ${kpi('Ingressos Orgânicos',vendasOrg,'#f1c40f',`${brl(fatOrg)} faturados`)}
+    ${kpi('Ingressos Tráfego',vendasTraf,'#2ecc71',`${brl(fatTraf)} faturados`)}
+  </div>
+
+  ${divider('💰 Financeiro')}
+  <div style="${grid3}">
+    ${kpi('Total Investido*',brl(invComImposto),'#e74c3c',`Bruto ${brl(invBruto)} + 13,82% impostos`)}
+    ${kpi('Faturamento Total',brl(fatTotal),'#ff6b2b',`Ticket médio ${brl(ticketTotal)}`)}
+    ${kpi('Faturamento Tráfego',brl(fatTraf),'#e8e6f0',`Ticket médio ${brl(ticketTraf)}`)}
+  </div>
+
+  ${divider('📈 Performance de Aquisição')}
+  <div style="${grid3}">
+    ${kpi('CAC Total',brl(cacTotal),'#e8e6f0',`Invest. ÷ todos os ingressos`)}
+    ${kpi('CAC Tráfego',brl(cacTraf),'#e8e6f0',`Invest. ÷ ingressos tráfego`)}
+    ${kpi('ROAS Captação Total',br(roasTotal,2)+'x','#ff6b2b',`Fat. total ÷ invest. c/ imposto`)}
+  </div>
+  <div style="${grid3};margin-top:14px">
+    ${kpi('ROAS Captação Tráfego',br(roasTraf,2)+'x','#ff9a3c',`Fat. tráfego ÷ invest. c/ imposto`)}
+    ${kpi('Ticket Médio Total',brl(ticketTotal),'#e8e6f0',`Fat. total ÷ ${totalVendas} ingressos`)}
+    ${kpi('Ticket Médio Tráfego',brl(ticketTraf),'#e8e6f0',`Fat. tráfego ÷ ${vendasTraf} ingressos`)}
+  </div>
+
+  ${divider('🎯 Resultados do Evento')}
+  <div style="${grid3}">
+    ${kpi('Pico de Presença',pico,'#f1c40f','Ao vivo')}
+    ${kpi('% de Presença',pct(pctPresenca),'#f1c40f',`${pico} presenças ÷ ${totalVendas} ingressos`)}
+    ${kpi('Vendas Upsell',upsell,'#2ecc71','Dentro do evento')}
+    ${kpi('% Conversão Upsell',pct(pctUpsell),'#2ecc71',`${upsell} upsell ÷ ${totalVendas} ingressos`)}
+  </div>
+
+  ${divider('🟢 Resultado Financeiro Final')}
+  <div style="background:rgba(46,204,113,.08);border:2px solid rgba(46,204,113,.35);border-radius:14px;padding:24px 28px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:20px;align-items:center">
+    <div>
+      <div style="font-size:10px;color:rgba(46,204,113,.6);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">Receita Líq. Ingressos</div>
+      <div style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:#2ecc71">${brl(liqIngressos)}</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.3);margin-top:3px">${totalVendas} × ${brl(DEBRIEF_CONFIG.ticketLiquido)}</div>
+    </div>
+    <div>
+      <div style="font-size:10px;color:rgba(46,204,113,.6);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">Receita Líq. Upsell</div>
+      <div style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:#2ecc71">${brl(liqUpsell)}</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.3);margin-top:3px">${upsell} × ${brl(DEBRIEF_CONFIG.upsellLiquido)}</div>
+    </div>
+    <div>
+      <div style="font-size:10px;color:rgba(231,76,60,.6);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">Investimento c/ Imposto</div>
+      <div style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:#e74c3c">− ${brl(invComImposto)}</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.3);margin-top:3px">Bruto ${brl(invBruto)} + 13,82%</div>
+    </div>
+    <div style="border-left:2px solid rgba(46,204,113,.3);padding-left:20px">
+      <div style="font-size:10px;color:rgba(46,204,113,.8);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px;font-weight:700">💰 Ganho Líquido Total</div>
+      <div style="font-family:'DM Mono',monospace;font-size:28px;font-weight:700;color:${ganhoLiquido>=0?'#2ecc71':'#e74c3c'}">${brl(ganhoLiquido)}</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.35);margin-top:3px">Receita líq. − invest. c/ imposto</div>
+    </div>
+  </div>
+
+  <div style="margin-top:16px;padding:14px 18px;background:rgba(255,255,255,.03);border-radius:8px;font-size:11px;color:rgba(255,255,255,.3);line-height:1.6">
+    * Investimento com imposto = soma do investimento bruto do Gerenciador × 1,1382 (13,82% de impostos).<br>
+    Ticket líquido: ${brl(DEBRIEF_CONFIG.ticketLiquido)} (bruto ${brl(DEBRIEF_CONFIG.ticketBruto)}) · Upsell líquido: ${brl(DEBRIEF_CONFIG.upsellLiquido)} (bruto ${brl(DEBRIEF_CONFIG.upsellBruto)}) · Pico de presença e upsell ajustáveis acima.
+  </div>
+  `;
 }
 
 // ============ INIT ============
