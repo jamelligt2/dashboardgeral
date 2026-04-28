@@ -267,6 +267,15 @@ function normDate(d){
   if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(d)){const p=d.split('/');return`${p[0].padStart(2,'0')}/${p[1].padStart(2,'0')}/${p[2]}`;}
   return d;
 }
+// Busca flexível de coluna por substrings
+function findCol(row,keywords){
+  const keys=Object.keys(row);
+  for(const kw of keywords){
+    const found=keys.find(k=>k.includes(kw));
+    if(found&&row[found])return row[found];
+  }
+  return '';
+}
 
 // ===== DADOS (fallback) =====
 let DIAS = [{"data":"23/03/2026","inv":23.91,"fat":0,"compras":0,"cliques":10,"pv":6,"ck":0,"imp":792},{"data":"24/03/2026","inv":19.78,"fat":86.9,"compras":1,"cliques":9,"pv":8,"ck":0,"imp":748},{"data":"25/03/2026","inv":19.25,"fat":0,"compras":0,"cliques":7,"pv":5,"ck":0,"imp":681},{"data":"26/03/2026","inv":18.05,"fat":0,"compras":0,"cliques":6,"pv":4,"ck":0,"imp":571},{"data":"27/03/2026","inv":17.91,"fat":0,"compras":0,"cliques":4,"pv":4,"ck":0,"imp":346},{"data":"28/03/2026","inv":20.01,"fat":134,"compras":2,"cliques":8,"pv":3,"ck":0,"imp":455},{"data":"29/03/2026","inv":23.93,"fat":146.9,"compras":2,"cliques":8,"pv":5,"ck":0,"imp":507},{"data":"30/03/2026","inv":53.68,"fat":0,"compras":0,"cliques":20,"pv":10,"ck":1,"imp":1348},{"data":"31/03/2026","inv":68.08,"fat":99.8,"compras":1,"cliques":32,"pv":25,"ck":2,"imp":1848},{"data":"01/04/2026","inv":63.98,"fat":0,"compras":0,"cliques":26,"pv":19,"ck":3,"imp":1625},{"data":"02/04/2026","inv":52.32,"fat":0,"compras":0,"cliques":19,"pv":13,"ck":0,"imp":1216},{"data":"03/04/2026","inv":52.6,"fat":142.42,"compras":2,"cliques":20,"pv":14,"ck":2,"imp":1185},{"data":"04/04/2026","inv":54.42,"fat":0,"compras":0,"cliques":33,"pv":22,"ck":0,"imp":1223},{"data":"05/04/2026","inv":69.37,"fat":0,"compras":0,"cliques":22,"pv":15,"ck":0,"imp":1604},{"data":"06/04/2026","inv":57.94,"fat":0,"compras":0,"cliques":19,"pv":14,"ck":0,"imp":1424},{"data":"07/04/2026","inv":51.79,"fat":180.06,"compras":2,"cliques":36,"pv":27,"ck":7,"imp":1148}];
@@ -324,12 +333,17 @@ async function loadData(){
 
     // Sales from Vendas (historical)
     const salesByDate={};
+    if(vendas.length){
+      console.log('📋 Vendas: '+vendas.length+' linhas. Headers:',Object.keys(vendas[0]).join(', '));
+      console.log('📋 Vendas amostra:',JSON.stringify(vendas[0]));
+    }
     vendas.forEach(row=>{
-      const st=(row['status']||'').toLowerCase();
-      if(st&&!['aprovado','pago','completed','approved'].some(s=>st.includes(s)))return;
-      const dt=normDate(row['data de pagamento']||row['data pagamento']||row['data']||'');
-      const valor=num(row['valor da venda']||row['valor']);
-      const utmC=row['utm content']||row['utm_content']||'';
+      const st=findCol(row,['status']).toLowerCase();
+      // Aceita: aprovado, aprovada, pago, paga, completed, approved, completo, completa
+      if(st&&!['aprov','pag','complet','approved'].some(s=>st.includes(s)))return;
+      const dt=normDate(findCol(row,['data de pagamento','data pagamento','data_pagamento','data']));
+      const valor=num(findCol(row,['valor da venda','valor_venda','valor','value','price']));
+      const utmC=findCol(row,['utm content','utm_content','utmcontent']);
       if(!dt||valor<=0)return;
       if(!salesByDate[dt])salesByDate[dt]={fat:0,compras:0};
       salesByDate[dt].fat+=valor;salesByDate[dt].compras+=1;
@@ -340,10 +354,14 @@ async function loadData(){
     });
 
     // Sales from Webhook (recent/future)
+    if(wk.length){
+      console.log('🔗 Webhook: '+wk.length+' linhas. Headers:',Object.keys(wk[0]).join(', '));
+      console.log('🔗 Webhook amostra:',JSON.stringify(wk[0]));
+    }
     wk.forEach(row=>{
-      const dt=normDate(row['data de pagamento']||row['data pagamento']||row['data']||row['date']||'');
-      const valor=num(row['valor da venda']||row['valor']||row['value']);
-      const utmC=row['utm content']||row['utm_content']||'';
+      const dt=normDate(findCol(row,['data de pagamento','data pagamento','data_pagamento','data','date']));
+      const valor=num(findCol(row,['valor da venda','valor_venda','valor','value','price']));
+      const utmC=findCol(row,['utm content','utm_content','utmcontent']);
       if(!dt||valor<=0)return;
       if(!salesByDate[dt])salesByDate[dt]={fat:0,compras:0};
       salesByDate[dt].fat+=valor;salesByDate[dt].compras+=1;
@@ -353,10 +371,15 @@ async function loadData(){
       }
     });
 
-    // Apply sales to days
+    console.log('💰 Sales por data:', JSON.stringify(salesByDate));
+    console.log('📅 Datas no dayMap:', Object.keys(dayMap).join(', '));
+
+    // Apply sales to days (only override if we have sales data from Vendas/Webhook)
+    const hasSalesData=Object.keys(salesByDate).length>0;
     Object.keys(dayMap).forEach(dt=>{
       if(salesByDate[dt]){dayMap[dt].fat=salesByDate[dt].fat;dayMap[dt].compras=salesByDate[dt].compras;}
-      else{dayMap[dt].fat=0;dayMap[dt].compras=0;}
+      else if(hasSalesData){dayMap[dt].fat=0;dayMap[dt].compras=0;}
+      // Se não tem dados de Vendas/Webhook, mantém o que vier do Gerenciador (Action Omni Purchase)
     });
 
     // Finalize DIAS
