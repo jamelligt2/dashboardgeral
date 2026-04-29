@@ -354,15 +354,22 @@ async function loadData(){
       }
     });
 
-    // Sales from Webhook (recent/future)
+    // Sales from Webhook (Kiwify format: data.createdat, data.price.value, data.utm.content)
     if(wk.length){
       console.log('🔗 Webhook: '+wk.length+' linhas. Headers:',Object.keys(wk[0]).join(', '));
-      console.log('🔗 Webhook amostra:',JSON.stringify(wk[0]));
     }
     wk.forEach(row=>{
-      const dt=normDate(findCol(row,['data de pagamento','data pagamento','data_pagamento','data','date']));
-      const valor=num(findCol(row,['valor da venda','valor_venda','valor','value','price']));
-      const utmC=findCol(row,['utm content','utm_content','utmcontent']);
+      // Filtrar apenas vendas completadas
+      const evt=(findCol(row,['event'])||'').toLowerCase();
+      const wkSt=(findCol(row,['data.status','status'])||'').toLowerCase();
+      if(evt&&!['completed','approved','sale'].some(s=>evt.includes(s)))return;
+      if(wkSt&&!['completed','approved','paid','pag','aprov'].some(s=>wkSt.includes(s)))return;
+      // Data: usar data.createdat (ISO) — NÃO usar keyword genérica 'data' pois pega data.id
+      const dt=normDate(findCol(row,['data.createdat','createdat','data de pagamento','data pagamento']));
+      // Valor: data.price.value
+      const valor=num(findCol(row,['data.price.value','data.price.paid.value','valor da venda','valor_venda','valor']));
+      // UTM Content: data.utm.content
+      const utmC=findCol(row,['data.utm.content','utm.content','utm content','utm_content']);
       if(!dt||valor<=0)return;
       if(!salesByDate[dt])salesByDate[dt]={fat:0,compras:0};
       salesByDate[dt].fat+=valor;salesByDate[dt].compras+=1;
