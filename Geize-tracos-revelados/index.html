@@ -205,12 +205,16 @@ tr:hover td{background:rgba(255,255,255,.025)}
 <div id="tab-semanal" class="content">
   <div class="kpi-grid" id="kpi-semanal"></div>
   <div class="chart-grid-2x2">
-    <div class="chart-card"><h4>Investimento por Semana</h4><canvas id="chartSemInv"></canvas></div>
+    <div class="chart-card"><h4>CPC por Semana</h4><canvas id="chartSemCPC"></canvas></div>
+    <div class="chart-card"><h4>Ticket Médio por Semana</h4><canvas id="chartSemTicket"></canvas></div>
     <div class="chart-card"><h4>ROAS por Semana</h4><canvas id="chartSemRoas"></canvas></div>
+    <div class="chart-card"><h4>CAC por Semana</h4><canvas id="chartSemCAC"></canvas></div>
+    <div class="chart-card"><h4>Taxa de Conversão por Semana</h4><canvas id="chartSemTxConv"></canvas></div>
+    <div class="chart-card"><h4>CPM por Semana</h4><canvas id="chartSemCPM"></canvas></div>
   </div>
-  <div class="sec-title">Tabela Semana a Semana</div>
+  <div class="sec-title">Detalhamento Semanal</div>
   <div class="tbl-wrap"><table>
-    <thead><tr><th>Semana</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Ticket</th><th>Cliques</th><th>PV</th><th>CK</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Retorno</th><th>Status</th></tr></thead>
+    <thead><tr><th>Semana</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Retorno</th><th>Compras</th><th>Ticket</th><th>CAC</th><th>Taxa Conv.</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Taxa Compra</th><th>Status</th></tr></thead>
     <tbody id="tbody-semanal"></tbody>
   </table></div>
 </div>
@@ -218,9 +222,17 @@ tr:hover td{background:rgba(255,255,255,.025)}
 <!-- ABA 5: MÊS A MÊS -->
 <div id="tab-mensal" class="content">
   <div class="kpi-grid" id="kpi-mensal"></div>
-  <div class="sec-title">Tabela Mês a Mês</div>
+  <div class="chart-grid-2x2">
+    <div class="chart-card"><h4>CPC por Mês</h4><canvas id="chartMesCPC"></canvas></div>
+    <div class="chart-card"><h4>Ticket Médio por Mês</h4><canvas id="chartMesTicket"></canvas></div>
+    <div class="chart-card"><h4>ROAS por Mês</h4><canvas id="chartMesRoas"></canvas></div>
+    <div class="chart-card"><h4>CAC por Mês</h4><canvas id="chartMesCAC"></canvas></div>
+    <div class="chart-card"><h4>Taxa de Conversão por Mês</h4><canvas id="chartMesTxConv"></canvas></div>
+    <div class="chart-card"><h4>CPM por Mês</h4><canvas id="chartMesCPM"></canvas></div>
+  </div>
+  <div class="sec-title">Detalhamento Mensal</div>
   <div class="tbl-wrap"><table>
-    <thead><tr><th>Mês</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Ticket</th><th>Cliques</th><th>PV</th><th>CK</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Retorno</th><th>Status</th></tr></thead>
+    <thead><tr><th>Mês</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Retorno</th><th>Compras</th><th>Ticket</th><th>CAC</th><th>Taxa Conv.</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Taxa Compra</th><th>Status</th></tr></thead>
     <tbody id="tbody-mensal"></tbody>
   </table></div>
 </div>
@@ -452,56 +464,123 @@ function renderPublicos(){
 }
 
 // ==================== RENDER SEMANAL ====================
-let chartSemInv,chartSemRoas;
+let semCharts={};
 function renderSemanal(){
   const s=SEMANAL;
   const inv=s.reduce((a,w)=>a+w.inv,0);
   const fat=s.reduce((a,w)=>a+w.fat,0);
   const compras=s.reduce((a,w)=>a+w.compras,0);
   const roas=inv>0?fat/inv:0;
+  const ticket=compras>0?fat/compras:0;
+  const cac=compras>0?inv/compras:0;
+  const pvTotal=s.reduce((a,w)=>a+w.pv,0);
+  const txConv=pvTotal>0?(compras/pvTotal*100):0;
+  const retorno=fat-inv;
 
   document.getElementById('kpi-semanal').innerHTML=`
     <div class="kpi-card"><div class="kpi-label">Investimento Total</div><div class="kpi-value orange">${brl(inv)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Faturamento Total</div><div class="kpi-value green">${brl(fat)}</div></div>
     <div class="kpi-card"><div class="kpi-label">ROAS Geral</div><div class="kpi-value ${roas>=1?'green':'red'}">${br(roas,2)}x</div></div>
-    <div class="kpi-card"><div class="kpi-label">Compras Total</div><div class="kpi-value orange">${br(compras,0)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total Compras</div><div class="kpi-value orange">${br(compras,0)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value">${brl(ticket)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CAC</div><div class="kpi-value">${brl(cac)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Taxa de Conversão</div><div class="kpi-value">${pct(txConv)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Retorno</div><div class="kpi-value ${retorno>=0?'green':'red'}">${brl(retorno)}</div></div>
   `;
 
-  document.getElementById('tbody-semanal').innerHTML=s.map(w=>`
-    <tr><td>S${w.semana}</td><td>${brl(w.inv)}</td><td>${brl(w.fat)}</td><td>${br(w.roas,2)}x</td><td>${w.compras}</td><td>${w.ticket>0?brl(w.ticket):'—'}</td><td>${br(w.cliques,0)}</td><td>${br(w.pv,0)}</td><td>${br(w.ck,0)}</td><td>${brl(w.cpc)}</td><td>${brl(w.cpm)}</td><td>${pct(w.connectRate)}</td><td>${brl(w.retorno)}</td><td>${statusBadge(w.inv,w.fat)}</td></tr>`).join('');
+  document.getElementById('tbody-semanal').innerHTML=s.map(w=>{
+    const wCac=w.compras>0?(w.inv/w.compras):0;
+    const wTxConv=w.pv>0?(w.compras/w.pv*100):0;
+    return `<tr><td>S${w.semana}</td><td>${brl(w.inv)}</td><td>${brl(w.fat)}</td><td>${br(w.roas,2)}x</td><td>${brl(w.retorno)}</td><td>${w.compras}</td><td>${w.ticket>0?brl(w.ticket):'—'}</td><td>${wCac>0?brl(wCac):'—'}</td><td>${pct(wTxConv)}</td><td>${brl(w.cpc)}</td><td>${brl(w.cpm)}</td><td>${pct(w.connectRate)}</td><td>${pct(w.taxaCompra)}</td><td>${statusBadge(w.inv,w.fat)}</td></tr>`;
+  }).join('');
 
   const labels=s.map(w=>'S'+w.semana);
-  const chartOpts={responsive:true,plugins:{legend:{labels:{color:'rgba(255,255,255,.5)',font:{size:10}}}},scales:{x:{ticks:{color:'rgba(255,255,255,.3)',font:{size:9}},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'rgba(255,255,255,.3)',font:{size:9}},grid:{color:'rgba(255,255,255,.06)'}}}};
+  const co={responsive:true,plugins:{legend:{labels:{color:'rgba(255,255,255,.5)',font:{size:10}}}},scales:{x:{ticks:{color:'rgba(255,255,255,.3)',font:{size:9}},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'rgba(255,255,255,.3)',font:{size:9}},grid:{color:'rgba(255,255,255,.06)'}}}};
+  function mk(id,cfg){if(semCharts[id])semCharts[id].destroy();semCharts[id]=new Chart(document.getElementById(id),cfg);}
 
-  if(chartSemInv)chartSemInv.destroy();
-  chartSemInv=new Chart(document.getElementById('chartSemInv'),{type:'bar',data:{labels,datasets:[
-    {label:'Investimento',data:s.map(w=>w.inv),backgroundColor:'rgba(255,107,43,.6)',borderRadius:4},
-    {label:'Faturamento',data:s.map(w=>w.fat),backgroundColor:'rgba(46,204,113,.5)',borderRadius:4}
-  ]},options:chartOpts});
+  mk('chartSemCPC',{type:'bar',data:{labels,datasets:[
+    {label:'CPC',data:s.map(w=>w.cpc),backgroundColor:'rgba(241,196,15,.6)',borderRadius:4}
+  ]},options:co});
 
-  if(chartSemRoas)chartSemRoas.destroy();
-  chartSemRoas=new Chart(document.getElementById('chartSemRoas'),{type:'line',data:{labels,datasets:[
+  mk('chartSemTicket',{type:'line',data:{labels,datasets:[
+    {label:'Ticket Médio',data:s.map(w=>w.ticket),borderColor:'#3498db',backgroundColor:'rgba(52,152,219,.15)',fill:true,tension:.3,pointRadius:4}
+  ]},options:co});
+
+  mk('chartSemRoas',{type:'line',data:{labels,datasets:[
     {label:'ROAS',data:s.map(w=>w.roas),borderColor:'#ff6b2b',backgroundColor:'rgba(255,107,43,.15)',fill:true,tension:.3,pointRadius:4,pointBackgroundColor:s.map(w=>w.roas>=1?'#2ecc71':'#e74c3c')}
-  ]},options:chartOpts});
+  ]},options:co});
+
+  mk('chartSemCAC',{type:'line',data:{labels,datasets:[
+    {label:'CAC',data:s.map(w=>w.compras>0?w.inv/w.compras:0),borderColor:'#e74c3c',backgroundColor:'rgba(231,76,60,.15)',fill:true,tension:.3,pointRadius:4}
+  ]},options:co});
+
+  mk('chartSemTxConv',{type:'line',data:{labels,datasets:[
+    {label:'Taxa Conv. %',data:s.map(w=>w.pv>0?(w.compras/w.pv*100):0),borderColor:'#2ecc71',backgroundColor:'rgba(46,204,113,.15)',fill:true,tension:.3,pointRadius:4}
+  ]},options:co});
+
+  mk('chartSemCPM',{type:'bar',data:{labels,datasets:[
+    {label:'CPM',data:s.map(w=>w.cpm),backgroundColor:'rgba(26,188,156,.6)',borderRadius:4}
+  ]},options:co});
 }
 
 // ==================== RENDER MENSAL ====================
+let mesCharts={};
 function renderMensal(){
   const m=MENSAL;
   const inv=m.reduce((a,mo)=>a+mo.inv,0);
   const fat=m.reduce((a,mo)=>a+mo.fat,0);
   const compras=m.reduce((a,mo)=>a+mo.compras,0);
   const roas=inv>0?fat/inv:0;
+  const ticket=compras>0?fat/compras:0;
+  const cac=compras>0?inv/compras:0;
+  const pvTotal=m.reduce((a,mo)=>a+mo.pv,0);
+  const txConv=pvTotal>0?(compras/pvTotal*100):0;
+  const retorno=fat-inv;
 
   document.getElementById('kpi-mensal').innerHTML=`
     <div class="kpi-card"><div class="kpi-label">Investimento Total</div><div class="kpi-value orange">${brl(inv)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Faturamento Total</div><div class="kpi-value green">${brl(fat)}</div></div>
     <div class="kpi-card"><div class="kpi-label">ROAS Geral</div><div class="kpi-value ${roas>=1?'green':'red'}">${br(roas,2)}x</div></div>
-    <div class="kpi-card"><div class="kpi-label">Compras Total</div><div class="kpi-value orange">${br(compras,0)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total Compras</div><div class="kpi-value orange">${br(compras,0)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value">${brl(ticket)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CAC</div><div class="kpi-value">${brl(cac)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Taxa de Conversão</div><div class="kpi-value">${pct(txConv)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Retorno</div><div class="kpi-value ${retorno>=0?'green':'red'}">${brl(retorno)}</div></div>
   `;
 
-  document.getElementById('tbody-mensal').innerHTML=m.map(mo=>`
-    <tr><td>${mo.mes}</td><td>${brl(mo.inv)}</td><td>${brl(mo.fat)}</td><td>${br(mo.roas,2)}x</td><td>${mo.compras}</td><td>${mo.ticket>0?brl(mo.ticket):'—'}</td><td>${br(mo.cliques,0)}</td><td>${br(mo.pv,0)}</td><td>${br(mo.ck,0)}</td><td>${brl(mo.cpc)}</td><td>${brl(mo.cpm)}</td><td>${pct(mo.connectRate)}</td><td>${brl(mo.retorno)}</td><td>${statusBadge(mo.inv,mo.fat)}</td></tr>`).join('');
+  document.getElementById('tbody-mensal').innerHTML=m.map(mo=>{
+    const mCac=mo.compras>0?(mo.inv/mo.compras):0;
+    const mTxConv=mo.pv>0?(mo.compras/mo.pv*100):0;
+    return `<tr><td>${mo.mes}</td><td>${brl(mo.inv)}</td><td>${brl(mo.fat)}</td><td>${br(mo.roas,2)}x</td><td>${brl(mo.retorno)}</td><td>${mo.compras}</td><td>${mo.ticket>0?brl(mo.ticket):'—'}</td><td>${mCac>0?brl(mCac):'—'}</td><td>${pct(mTxConv)}</td><td>${brl(mo.cpc)}</td><td>${brl(mo.cpm)}</td><td>${pct(mo.connectRate)}</td><td>${pct(mo.taxaCompra)}</td><td>${statusBadge(mo.inv,mo.fat)}</td></tr>`;
+  }).join('');
+
+  const labels=m.map(mo=>mo.mes);
+  const co={responsive:true,plugins:{legend:{labels:{color:'rgba(255,255,255,.5)',font:{size:10}}}},scales:{x:{ticks:{color:'rgba(255,255,255,.3)',font:{size:9}},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'rgba(255,255,255,.3)',font:{size:9}},grid:{color:'rgba(255,255,255,.06)'}}}};
+  function mk(id,cfg){if(mesCharts[id])mesCharts[id].destroy();mesCharts[id]=new Chart(document.getElementById(id),cfg);}
+
+  mk('chartMesCPC',{type:'bar',data:{labels,datasets:[
+    {label:'CPC',data:m.map(mo=>mo.cpc),backgroundColor:'rgba(241,196,15,.6)',borderRadius:4}
+  ]},options:co});
+
+  mk('chartMesTicket',{type:'line',data:{labels,datasets:[
+    {label:'Ticket Médio',data:m.map(mo=>mo.ticket),borderColor:'#3498db',backgroundColor:'rgba(52,152,219,.15)',fill:true,tension:.3,pointRadius:4}
+  ]},options:co});
+
+  mk('chartMesRoas',{type:'line',data:{labels,datasets:[
+    {label:'ROAS',data:m.map(mo=>mo.roas),borderColor:'#ff6b2b',backgroundColor:'rgba(255,107,43,.15)',fill:true,tension:.3,pointRadius:4,pointBackgroundColor:m.map(mo=>mo.roas>=1?'#2ecc71':'#e74c3c')}
+  ]},options:co});
+
+  mk('chartMesCAC',{type:'line',data:{labels,datasets:[
+    {label:'CAC',data:m.map(mo=>mo.compras>0?mo.inv/mo.compras:0),borderColor:'#e74c3c',backgroundColor:'rgba(231,76,60,.15)',fill:true,tension:.3,pointRadius:4}
+  ]},options:co});
+
+  mk('chartMesTxConv',{type:'line',data:{labels,datasets:[
+    {label:'Taxa Conv. %',data:m.map(mo=>mo.pv>0?(mo.compras/mo.pv*100):0),borderColor:'#2ecc71',backgroundColor:'rgba(46,204,113,.15)',fill:true,tension:.3,pointRadius:4}
+  ]},options:co});
+
+  mk('chartMesCPM',{type:'bar',data:{labels,datasets:[
+    {label:'CPM',data:m.map(mo=>mo.cpm),backgroundColor:'rgba(26,188,156,.6)',borderRadius:4}
+  ]},options:co});
 }
 
 // ==================== RENDER ALL ====================
