@@ -286,11 +286,13 @@ tr:hover td{background:rgba(255,255,255,.025)}
 <script>
 // =================== CONFIG ===================
 const SHEET_ID = '1C2Xvdg3ORGIeRobxluq7vEZVEqjsW-uNHbIYhr8g02w';
-const GERENCIADOR_SHEET = 'Gerenciador';
-const WEBHOOK_SHEET = 'Webhook';
-const VENDAS_SHEET = 'vendas';        // export histórico Kiwify (UTMs deslocadas)
-const META_SOURCE_FILTER = 'metaads'; // normalizado sem espaço/underline
-const CAMPAIGN_FILTER = 'claude';     // utm_medium OU utm_campaign deve conter "claude"
+const GERENCIADOR_SHEET   = 'Gerenciador';
+const WEBHOOK_SHEET       = 'Webhook';        // webhook Kiwify (legacy)
+const VENDAS_SHEET        = 'vendas';         // export Kiwify (legacy)
+const VENDAS_EDUZZ_SHEET  = 'vendas_eduzz';   // export Eduzz (atual)
+const WEBHOOK_EDUZZ_SHEET = 'webhook_eduzz';  // webhook Eduzz (atual)
+const META_SOURCE_FILTER  = 'metaads';        // normalizado sem espaço/underline
+const CAMPAIGN_FILTER     = 'claude';         // utm_medium OU utm_campaign deve conter "claude"
 
 // Estado global
 let DIAS = [], SEMANAL = [], MENSAL = [], CRIATIVOS = [], CRIATIVOS_PERIODOS = [], PUBLICOS = [];
@@ -352,19 +354,23 @@ function normKey(s) { return String(s||'').toLowerCase().replace(/[\s_-]/g,''); 
 // =================== DATA LOADER ===================
 async function loadData() {
   try {
-    document.getElementById('loading-msg').textContent = 'Carregando Gerenciador, vendas e Webhook...';
-    const [gCSV, vCSV, wCSV] = await Promise.all([
+    document.getElementById('loading-msg').textContent = 'Carregando Gerenciador, vendas e webhooks (Kiwify + Eduzz)...';
+    const [gCSV, vCSV, wCSV, vECSV, wECSV] = await Promise.all([
       fetchSheetCSV(GERENCIADOR_SHEET),
       fetchSheetCSV(VENDAS_SHEET).catch(_ => ''),
-      fetchSheetCSV(WEBHOOK_SHEET).catch(_ => '')
+      fetchSheetCSV(WEBHOOK_SHEET).catch(_ => ''),
+      fetchSheetCSV(VENDAS_EDUZZ_SHEET).catch(_ => ''),
+      fetchSheetCSV(WEBHOOK_EDUZZ_SHEET).catch(_ => '')
     ]);
 
     processGerenciador(gCSV);
-    processVendas(vCSV);     // coleta RAW_SALES_ITEMS do export Kiwify
-    processWebhook(wCSV);    // coleta RAW_SALES_ITEMS do webhook (dedup por Order_ID)
-    commitSales();           // agrupa por pedido (Imersão + bumps) e popula DIAS/CRIATIVOS/VENDAS_RASTREADAS
+    processVendas(vCSV);          // Kiwify export histórico
+    processWebhook(wCSV);         // Kiwify webhook (legacy)
+    processVendasEduzz(vECSV);    // Eduzz export histórico (atual)
+    processWebhookEduzz(wECSV);   // Eduzz webhook (atual)
+    commitSales();                // agrupa por pedido (principal + bumps)
     finalizeCriativos();
-    rebuildPeriodBuckets();  // refaz SEMANAL/MENSAL caso vendas tenham adicionado datas novas
+    rebuildPeriodBuckets();
     fixFatFromDias();
 
     initDatePickers();
