@@ -261,7 +261,7 @@ function parseCSV(text){
 function num(v){if(!v)return 0;return parseFloat(String(v).replace(/[^\d.,\-]/g,'').replace(',','.'))||0;}
 function int(v){return parseInt(v)||0;}
 function normDate(d){
-  if(!d)return'';d=d.trim();
+  if(!d)return'';d=d.trim().split(' ')[0]; // Remove horário se houver (ex: "29/03/2026 17:14")
   if(/^\d{4}-\d{2}-\d{2}/.test(d)){const p=d.substring(0,10).split('-');return`${p[2]}/${p[1]}/${p[0]}`;}
   if(/^\d{2}\/\d{2}\/\d{4}$/.test(d))return d;
   if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(d)){const p=d.split('/');return`${p[0].padStart(2,'0')}/${p[1].padStart(2,'0')}/${p[2]}`;}
@@ -299,16 +299,16 @@ async function loadData(){
 
     const dayMap={},criMap={},pubMap={};
     ger.forEach(row=>{
-      const dateRaw=row['date']||row['data']||'';
-      const spend=num(row['spend']||row['amount spent (brl)']||row['valor usado (brl)']);
-      const clicks=int(row['action link clicks']||row['link clicks']||row['cliques no link']);
-      const pv=int(row['action landing page view']||row['landing page views']||row['visualizações da página de destino']);
-      const ck=int(row['action omni initiated checkout']||row['initiated checkouts']||row['checkouts iniciados']);
-      const purchases=int(row['action omni purchase']||row['purchases']||row['compras']);
-      const adsetName=row['adset name']||row['ad set name']||row['nome do conjunto de anúncios']||'';
-      const adName=row['ad name']||row['nome do anúncio']||'';
-      const link=row['instagram permalink url']||row['link permanente do instagram']||'';
-      const imp=int(row['impressions']||row['impressões']);
+      const dateRaw=findCol(row,['date','data']);
+      const spend=num(findCol(row,['spend','amount spent','valor usado','gasto']));
+      const clicks=int(findCol(row,['action link clicks','link clicks','cliques no link']));
+      const pv=int(findCol(row,['action landing page view','landing page view','visualiza']));
+      const ck=int(findCol(row,['action omni initiated checkout','initiated checkout','checkouts iniciados']));
+      const purchases=int(findCol(row,['action omni purchase','purchase','compras']));
+      const adsetName=findCol(row,['adset name','ad set name','conjunto de an']);
+      const adName=findCol(row,['ad name','nome do an']);
+      const link=findCol(row,['instagram permalink','link permanente']);
+      const imp=int(findCol(row,['impressions','impress']));
 
       const dt=normDate(dateRaw);
       if(!dt)return;
