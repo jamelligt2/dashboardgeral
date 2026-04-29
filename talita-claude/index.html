@@ -604,6 +604,140 @@ function processWebhook(csv) {
   });
 }
 
+// =================== VENDAS EDUZZ (export histórico) ===================
+// Colunas chave (export Eduzz CSV):
+// 0:Fatura | 1:Status | 8:Data Criação | 10:Data Pagamento | 17:Produto
+// 22:Valor da Venda (R$, ponto decimal) | 24:Valor do Item
+// 34:Cliente/Nome | 35:Cliente/E-mail
+// 47:UTM Source | 48:UTM Campaign | 49:UTM Medium | 50:UTM Content | 51:UTM Term
+function processVendasEduzz(csv) {
+  if (!csv || !csv.trim()) return;
+  const rows = parseCSV(csv);
+  if (rows.length < 2) return;
+  const header = rows[0].map(h => h.replace(/"/g,'').trim());
+  const I = (n) => header.indexOf(n);
+  const idx = {
+    fatura:  I('Fatura'),
+    status:  I('Status'),
+    dataPag: I('Data de Pagamento'),
+    dataCri: I('Data de Criação'),
+    produto: I('Produto'),
+    valor:   I('Valor da Venda'),
+    cliente: I('Cliente / Nome'),
+    email:   I('Cliente / E-mail'),
+    src:     I('UTM Source'),
+    medium:  I('UTM Medium'),
+    camp:    I('UTM Campaign'),
+    content: I('UTM Content')
+  };
+
+  const sales = rows.slice(1)
+    .filter(r => r.length > 5)
+    .filter(r => r[idx.status] && r[idx.status].toLowerCase().trim() === 'paga')
+    .filter(r => r[idx.src] && normKey(r[idx.src]) === META_SOURCE_FILTER)
+    .filter(r => {
+      const med = (r[idx.medium]||'').toLowerCase();
+      const cam = (r[idx.camp]||'').toLowerCase();
+      return med.includes(CAMPAIGN_FILTER) || cam.includes(CAMPAIGN_FILTER);
+    });
+
+  sales.forEach(r => {
+    const fatura = (r[idx.fatura]||'').trim();
+    if (fatura) SEEN_ORDER_IDS.add(fatura);
+    // Valor já em REAIS na export Eduzz
+    const valor = parseFloat(String(r[idx.valor]||'0').replace(',', '.')) || 0;
+    const dataRaw = r[idx.dataPag] || r[idx.dataCri] || '';
+    const dataBR = normalizeDateBR(dataRaw);
+    if (!dataBR) return;
+    RAW_SALES_ITEMS.push({
+      cliente: r[idx.cliente] || 'Cliente',
+      email: (r[idx.email]||'').toLowerCase().trim(),
+      valor,
+      dataBR,
+      iso: saleIsoFromBR(dataBR, dataRaw),
+      produto: r[idx.produto] || '',
+      criativo: String(r[idx.content]||'').split('::')[0].trim(),
+      campanha: r[idx.medium] || '',
+      adset: r[idx.camp] || '',
+      origem: 'vendas_eduzz',
+      orderId: fatura
+    });
+  });
+}
+
+// =================== WEBHOOK EDUZZ (Make → Sheets, futuro) ===================
+// Webhook Eduzz tem ~120 cols. Campos que importam (procuramos por nome no header):
+// trans_key (orderId) | trans_status | trans_paiddate / trans_paidtime | trans_value
+// product_name | cus_name | cus_email
+// utm_source/utm_medium/utm_campaign/utm_content (ou tracker_utm_*)
+function processWebhookEduzz(csv) {
+  if (!csv || !csv.trim()) return;
+  const rows = parseCSV(csv);
+  if (rows.length < 2) return;
+  const header = rows[0].map(h => h.replace(/"/g,'').trim());
+  const I = (n) => header.indexOf(n);
+  // utm_* preferencial; cai pra tracker_utm_* se não tiver
+  const utmSrcIdx  = I('utm_source')  >= 0 ? I('utm_source')  : I('tracker_utm_source');
+  const utmMedIdx  = I('utm_medium')  >= 0 ? I('utm_medium')  : I('tracker_utm_medium');
+  const utmCampIdx = I('utm_campaign')>= 0 ? I('utm_campaign'): I('tracker_utm_campaign');
+  const utmContIdx = I('utm_content') >= 0 ? I('utm_content') : I('tracker_utm_content');
+  const idx = {
+    orderid:  I('trans_key'),
+    status:   I('trans_status'),
+    dataPag:  I('trans_paiddate'),
+    horaPag:  I('trans_paidtime'),
+    dataCri:  I('trans_createdate'),
+    horaCri:  I('trans_createtime'),
+    valor:    I('trans_value'),
+    produto:  I('product_name'),
+    nome:     I('cus_name'),
+    email:    I('cus_email'),
+    src:      utmSrcIdx, medium: utmMedIdx, camp: utmCampIdx, content: utmContIdx
+  };
+
+  // Eduzz status pago: "paid" / "Paga" / "1" — aceita variantes
+  const isPaid = (s) => {
+    if (!s) return false;
+    const v = String(s).toLowerCase().replace(/"/g,'').trim();
+    return v === 'paid' || v === 'paga' || v === 'pago' || v === '1';
+  };
+
+  const sales = rows.slice(1)
+    .filter(r => r.length > 5)
+    .filter(r => isPaid(r[idx.status]))
+    .filter(r => r[idx.src] >= 0 && idx.src >=0 && r[idx.src] && normKey(r[idx.src]) === META_SOURCE_FILTER)
+    .filter(r => {
+      const med = (idx.medium >=0 ? (r[idx.medium]||'') : '').toLowerCase();
+      const cam = (idx.camp   >=0 ? (r[idx.camp]||'')   : '').toLowerCase();
+      return med.includes(CAMPAIGN_FILTER) || cam.includes(CAMPAIGN_FILTER);
+    });
+
+  sales.forEach(r => {
+    const orderId = idx.orderid >=0 ? (r[idx.orderid]||'').trim() : '';
+    if (orderId && SEEN_ORDER_IDS.has(orderId)) return;
+    if (orderId) SEEN_ORDER_IDS.add(orderId);
+    // trans_value vem em REAIS (Eduzz não envia em centavos)
+    const valor = parseFloat(String(r[idx.valor]||'0').replace(',', '.')) || 0;
+    const dataRaw = (r[idx.dataPag]||'') + ' ' + (r[idx.horaPag]||'');
+    const dataRawFallback = (r[idx.dataCri]||'') + ' ' + (r[idx.horaCri]||'');
+    const dataBR = normalizeDateBR(dataRaw.trim()) || normalizeDateBR(dataRawFallback.trim());
+    if (!dataBR) return;
+    RAW_SALES_ITEMS.push({
+      cliente: r[idx.nome] || 'Cliente',
+      email: (r[idx.email]||'').toLowerCase().trim(),
+      valor,
+      dataBR,
+      iso: saleIsoFromBR(dataBR, dataRaw.trim() || dataRawFallback.trim()),
+      produto: r[idx.produto] || '',
+      criativo: String(idx.content>=0 ? (r[idx.content]||'') : '').split('::')[0].trim(),
+      campanha: idx.medium>=0 ? (r[idx.medium]||'') : '',
+      adset:    idx.camp>=0   ? (r[idx.camp]||'')   : '',
+      origem: 'webhook_eduzz',
+      orderId
+    });
+  });
+}
+
 // =================== COMMIT: agrupa items por pedido (Imersão + bumps) ===================
 function commitSales(){
   // Agrupa por chave: email + (data-hora truncada ao minuto)
