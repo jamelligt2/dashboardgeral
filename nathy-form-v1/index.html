@@ -234,7 +234,8 @@ a.ad-link:hover{text-decoration:underline}
   </div>
 
   <div class="panel" id="panel-1">
-    <h2 class="section-title">Ranking de Criativos por CPL Qualificado</h2>
+    <h2 class="section-title">Ranking de Criativos por CPL</h2>
+    <div style="background:rgba(255,170,0,.08);border:1px solid rgba(255,170,0,.3);border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:11px;color:var(--yellow)">⚠️ Qualificação por criativo não disponível: a aba Forms não traz <code>ad_name</code>, então só é possível atribuir leads qualificados a nível de campanha/período (visível nas abas Visão Geral, Semanal e Mensal).</div>
     <div class="table-wrap">
       <table id="tbl-creatives">
         <thead>
@@ -300,9 +301,10 @@ a.ad-link:hover{text-decoration:underline}
             <th class="sortable" data-type="money">Invest.</th>
             <th class="sortable" data-type="num">Cliques</th>
             <th class="sortable" data-type="num">Leads</th>
+            <th class="sortable" data-type="num">Qualif.</th>
             <th class="sortable" data-type="money">CPC</th>
-            <th class="sortable" data-type="money">CPM</th>
             <th class="sortable" data-type="money">CPL</th>
+            <th class="sortable" data-type="money">CPL Qual.</th>
             <th class="sortable" data-type="pct">Conv. Rate</th>
             <th class="left sortable" data-type="text">Tendência</th>
           </tr>
@@ -531,7 +533,7 @@ function getFiltered(){
   return STATE.cap.filter(r => r.date >= STATE.filterStart && r.date <= STATE.filterEnd);
 }
 function getFormsFiltered(){
-  return STATE.forms.filter(f => !f.date || (f.date >= STATE.filterStart && f.date <= STATE.filterEnd));
+  return STATE.forms.filter(f => f.date && f.date >= STATE.filterStart && f.date <= STATE.filterEnd);
 }
 
 function applyFilter(){
@@ -569,24 +571,33 @@ function render(){
   const rows = getFiltered();
   const formsF = getFormsFiltered();
   const t = totals(rows);
-  const qualF = formsF.filter(f=>f.fatura>=CONFIG.qualThreshold).length;
-  const qualRateF = formsF.length>0? qualF/formsF.length : STATE.qualRate;
-  const estQual = Math.round(t.leads * qualRateF);
-  const cplQual = estQual>0? t.spend/estQual : 0;
+  const realQual = formsF.filter(f=>f.fatura>=CONFIG.qualThreshold).length;
+  const qualRateF = formsF.length>0? realQual/formsF.length : 0;
+  const cplQual = realQual>0? t.spend/realQual : 0;
+
+  // Real qualified by date (for weekly/monthly breakdowns)
+  const qualByDate = {};
+  formsF.forEach(f=>{
+    if(!f.date) return;
+    const k = fmtISO(f.date);
+    if(!qualByDate[k]) qualByDate[k] = 0;
+    if(f.fatura>=CONFIG.qualThreshold) qualByDate[k]++;
+  });
+  STATE.qualByDate = qualByDate;
 
   const days = Math.round((STATE.filterEnd - STATE.filterStart) / 86400000) + 1;
   document.getElementById('filters-info').textContent = days + ' dias · ' + fmtDateBR(STATE.filterStart) + ' → ' + fmtDateBR(STATE.filterEnd);
 
-  renderKPIs(t, estQual, qualRateF, cplQual, formsF.length);
-  renderFunnel(t, estQual, qualRateF, cplQual);
+  renderKPIs(t, realQual, qualRateF, cplQual, formsF.length);
+  renderFunnel(t, realQual, qualRateF, cplQual);
   renderDailyCharts(rows);
-  renderCreatives(rows, qualRateF);
+  renderCreatives(rows);
   renderAdsets(rows);
-  renderWeekly(rows, qualRateF);
-  renderMonthly(rows, qualRateF);
+  renderWeekly(rows, qualByDate);
+  renderMonthly(rows, qualByDate);
 }
 
-function renderKPIs(t, estQual, qualRate, cplQual, totalFormsF){
+function renderKPIs(t, realQual, qualRate, cplQual, totalFormsF){
   const CTR = safeDiv(t.clicks, t.imp) * 100;
   const CPC = safeDiv(t.spend, t.clicks);
   const CPM = safeDiv(t.spend, t.imp) * 1000;
@@ -595,9 +606,9 @@ function renderKPIs(t, estQual, qualRate, cplQual, totalFormsF){
   g.innerHTML = `
     <div class="kpi-card accent-orange"><div class="label">Investimento</div><div class="value">${fmtBRL(t.spend)}</div><div class="sub">${fmtInt(t.imp)} impressões</div></div>
     <div class="kpi-card accent-blue"><div class="label">Leads Meta</div><div class="value">${fmtInt(t.leads)}</div><div class="sub">${fmtInt(t.clicks)} cliques</div></div>
-    <div class="kpi-card accent-green"><div class="label">Leads Qualificados (est.)</div><div class="value">${fmtInt(estQual)}</div><div class="sub">${fmtInt(totalFormsF)} forms · ≥ R$ ${CONFIG.qualThreshold.toLocaleString('pt-BR')}</div></div>
-    <div class="kpi-card accent-yellow"><div class="label">Taxa de Qualificação</div><div class="value">${fmtPct(qualRate*100)}</div><div class="sub">% do total de forms</div></div>
-    <div class="kpi-card accent-green"><div class="label">CPL Qualificado</div><div class="value">${fmtBRL(cplQual)}</div><div class="sub">Custo por lead qualif.</div></div>
+    <div class="kpi-card accent-green"><div class="label">Leads Qualificados</div><div class="value">${fmtInt(realQual)}</div><div class="sub">${fmtInt(totalFormsF)} forms · ≥ R$ ${CONFIG.qualThreshold.toLocaleString('pt-BR')} (real)</div></div>
+    <div class="kpi-card accent-yellow"><div class="label">Taxa de Qualificação</div><div class="value">${fmtPct(qualRate*100)}</div><div class="sub">% real do total de forms</div></div>
+    <div class="kpi-card accent-green"><div class="label">CPL Qualificado</div><div class="value">${fmtBRL(cplQual)}</div><div class="sub">Investimento ÷ qualif. reais</div></div>
     <div class="kpi-card accent-orange"><div class="label">CPL Médio</div><div class="value">${fmtBRL(CPL)}</div><div class="sub">Lead bruto</div></div>
     <div class="kpi-card accent-blue"><div class="label">CPC</div><div class="value">${fmtBRL(CPC)}</div><div class="sub">Custo por clique</div></div>
     <div class="kpi-card accent-yellow"><div class="label">CTR</div><div class="value">${fmtPct(CTR)}</div><div class="sub">Cliques ÷ impressões</div></div>
@@ -606,7 +617,7 @@ function renderKPIs(t, estQual, qualRate, cplQual, totalFormsF){
   `;
 }
 
-function renderFunnel(t, estQual, qualRate, cplQual){
+function renderFunnel(t, realQual, qualRate, cplQual){
   const CTR = safeDiv(t.clicks,t.imp)*100;
   const convRate = safeDiv(t.leads,t.clicks)*100;
   const qPct = qualRate*100;
@@ -617,7 +628,7 @@ function renderFunnel(t, estQual, qualRate, cplQual){
     {label:'Impressões', val:t.imp, pct:100, color:'linear-gradient(90deg,#ff6b00,#ff8533)'},
     {label:'Cliques',    val:t.clicks, pct:72, color:'linear-gradient(90deg,#e85f00,#ff6b00)'},
     {label:'Leads',      val:t.leads, pct:44, color:'linear-gradient(90deg,#c05000,#e85f00)'},
-    {label:'Qualificados (est.)', val:estQual, pct:26, color:'linear-gradient(90deg,#00a874,#00d68f)'}
+    {label:'Qualificados', val:realQual, pct:26, color:'linear-gradient(90deg,#00a874,#00d68f)'}
   ];
   const arrows = [CTR, convRate, qPct];
   const arrLabels = ['CTR','Conv. Rate','Taxa Qualif.'];
@@ -686,44 +697,41 @@ function renderDailyCharts(rows){
   });
 }
 
-function renderCreatives(rows, qualRate){
+function renderCreatives(rows){
   const ads = aggregate(rows, r=>r.ad);
   const lastDate = rows.map(r=>r.date).sort((a,b)=>b-a)[0];
 
   ads.forEach(a=>{
-    a.estQual = Math.round(a.leads * qualRate);
     a.cpl = a.leads>0? a.spend/a.leads : Infinity;
-    a.cplQual = a.estQual>0? a.spend/a.estQual : Infinity;
     a.ativo = a.lastDate && lastDate && fmtISO(a.lastDate) === fmtISO(lastDate);
-    if(a.estQual > 0 && a.cplQual <= 80) a.status = {t:'ESCALAR', c:'badge-green'};
-    else if(a.estQual > 0 && a.cplQual <= 110) a.status = {t:'TESTAR', c:'badge-orange'};
-    else if(a.estQual > 0) a.status = {t:'MONITORAR', c:'badge-yellow'};
-    else if(a.leads >= 3 && a.cpl <= 25) a.status = {t:'MONITORAR', c:'badge-yellow'};
+    // Status by CPL bruto (Forms não tem ad_name, então não dá pra atribuir qualificados por criativo)
+    if(a.leads >= 5 && a.cpl <= 8) a.status = {t:'ESCALAR', c:'badge-green'};
+    else if(a.leads >= 3 && a.cpl <= 15) a.status = {t:'TESTAR', c:'badge-orange'};
+    else if(a.leads >= 1 && a.cpl <= 25) a.status = {t:'MONITORAR', c:'badge-yellow'};
     else a.status = {t:'PAUSAR', c:'badge-red'};
   });
 
-  ads.sort((a,b) => a.cplQual - b.cplQual);
+  ads.sort((a,b) => a.cpl - b.cpl);
 
   const body = document.querySelector('#tbl-creatives tbody');
   body.innerHTML = '';
   ads.forEach((a,i)=>{
     const CTR = safeDiv(a.clicks,a.imp)*100;
     const CPC = safeDiv(a.spend,a.clicks);
-    const pctQ = a.leads>0? (a.estQual/a.leads)*100 : 0;
     const hook = safeDiv(a.v3s, a.imp)*100;
     const hold = safeDiv(a.v95, a.v3s)*100;
-    const dimCls = a.estQual === 0 ? (a.leads === 0 ? 'dimmed-deep' : 'dimmed') : '';
+    const dimCls = a.leads === 0 ? 'dimmed-deep' : '';
     body.innerHTML += `<tr class="${dimCls}">
       <td class="left">${i+1}</td>
       <td class="left"><span class="status-dot ${a.ativo?'ativo':'inativo'}">${a.ativo?'Ativo':'Inativo'}</span></td>
       <td class="left"><strong>${a.ad}</strong></td>
       <td>${fmtBRL(a.spend)}</td>
       <td>${fmtInt(a.leads)}</td>
-      <td>${fmtInt(a.estQual)}</td>
-      <td>${fmtPct(pctQ)}</td>
+      <td title="Forms não tem ad_name — qualificação só rastreável a nível de campanha">—</td>
+      <td>—</td>
       <td>${fmtBRL(CPC)}</td>
       <td>${a.leads>0?fmtBRL(a.cpl):'—'}</td>
-      <td>${a.estQual>0?fmtBRL(a.cplQual):'—'}</td>
+      <td>—</td>
       <td>${fmtPct(CTR)}</td>
       <td>${hook>0?fmtPct(hook)+'<span class="ratebar hook"><span class="fill" style="width:'+Math.min(hook*2,100)+'%"></span></span>':'—'}</td>
       <td>${hold>0?fmtPct(hold)+'<span class="ratebar hold"><span class="fill" style="width:'+Math.min(hold,100)+'%"></span></span>':'—'}</td>
@@ -748,8 +756,8 @@ function renderCreatives(rows, qualRate){
     const hook = safeDiv(a.v3s,a.imp)*100;
     return `<div class="insight-card"><h4>${['🥇','🥈','🥉'][i]} ${a.ad}</h4>
       <div>Invest: <strong>${fmtBRL(a.spend)}</strong></div>
-      <div>CPL Qual.: <strong style="color:${a.cplQual<=80?'var(--green)':a.cplQual<=110?'var(--yellow)':'var(--red)'}">${a.estQual>0?fmtBRL(a.cplQual):'—'}</strong></div>
-      <div>Leads/Qual.: <strong>${a.leads}/${a.estQual}</strong></div>
+      <div>CPL: <strong style="color:${a.cpl<=10?'var(--green)':a.cpl<=20?'var(--yellow)':'var(--red)'}">${fmtBRL(a.cpl)}</strong></div>
+      <div>Leads: <strong>${a.leads}</strong></div>
       <div>Hook Rate: <strong>${hook>0?fmtPct(hook):'—'}</strong></div>
     </div>`;
   }).join('');
@@ -804,13 +812,21 @@ function weekKey(d){
   dt.setDate(diff); dt.setHours(0,0,0,0);
   return dt;
 }
-function renderWeekly(rows, qualRate){
+function renderWeekly(rows, qualByDate){
   const by = {};
   rows.forEach(r=>{
     const wk = weekKey(r.date);
     const k = fmtISO(wk);
-    if(!by[k]) by[k] = {start:wk, spend:0, imp:0, clicks:0, leads:0};
+    if(!by[k]) by[k] = {start:wk, spend:0, imp:0, clicks:0, leads:0, qual:0};
     by[k].spend+=r.spend; by[k].imp+=r.imp; by[k].clicks+=r.clicks; by[k].leads+=r.leads;
+  });
+  // Add real qualified by week
+  Object.keys(qualByDate||{}).forEach(dateStr=>{
+    const d = parseDateAny(dateStr);
+    if(!d) return;
+    const wk = weekKey(d);
+    const k = fmtISO(wk);
+    if(by[k]) by[k].qual += qualByDate[dateStr];
   });
   const weeks = Object.values(by).sort((a,b)=>a.start-b.start);
   weeks.forEach((w,i)=>{
@@ -820,8 +836,7 @@ function renderWeekly(rows, qualRate){
     w.cpc = safeDiv(w.spend,w.clicks);
     w.cpm = safeDiv(w.spend,w.imp)*1000;
     w.convRate = safeDiv(w.leads,w.clicks)*100;
-    w.estQual = Math.round(w.leads * qualRate);
-    w.cplQual = w.estQual>0? w.spend/w.estQual : 0;
+    w.cplQual = w.qual>0? w.spend/w.qual : 0;
     if(i>0){
       const prev = weeks[i-1].cpl;
       if(w.cpl < prev*0.9) w.trend = {t:'Melhora', s:'▲', c:'var(--green)'};
@@ -838,9 +853,10 @@ function renderWeekly(rows, qualRate){
       <td>${fmtBRL(w.spend)}</td>
       <td>${fmtInt(w.clicks)}</td>
       <td>${fmtInt(w.leads)}</td>
+      <td style="color:${w.qual>0?'var(--green)':'var(--text-muted)'};font-weight:700">${fmtInt(w.qual)}</td>
       <td>${fmtBRL(w.cpc)}</td>
-      <td>${fmtBRL(w.cpm)}</td>
       <td>${w.leads>0?fmtBRL(w.cpl):'—'}</td>
+      <td>${w.qual>0?fmtBRL(w.cplQual):'—'}</td>
       <td>${fmtPct(w.convRate)}</td>
       <td class="left"><span style="color:${w.trend.c};font-weight:700">${w.trend.s} ${w.trend.t}</span></td>
     </tr>`;
@@ -870,12 +886,12 @@ function renderWeekly(rows, qualRate){
   });
 
   destroyChart('chart-weekly-cplq');
-  const cplQs = weeks.map(w => w.estQual>0? w.cplQual : null);
+  const cplQs = weeks.map(w => w.qual>0? w.cplQual : null);
   const cplQColors = cplQs.map(v => v==null?'#666': v<=80?'#00d68f': v<=110?'#ffaa00':'#ff3d71');
   STATE.charts['chart-weekly-cplq'] = new Chart(document.getElementById('chart-weekly-cplq'),{
     type:'line',
     data:{labels, datasets:[
-      {label:'CPL Qualif. (est.)', data:cplQs, borderColor:'#00d68f', backgroundColor:'rgba(0,214,143,.1)', pointBackgroundColor:cplQColors, pointRadius:5, tension:.3, fill:true},
+      {label:'CPL Qualif. (real)', data:cplQs, borderColor:'#00d68f', backgroundColor:'rgba(0,214,143,.1)', pointBackgroundColor:cplQColors, pointRadius:5, tension:.3, fill:true},
       {label:'CPL ref.', data:cpls, borderColor:'#ff6b00', borderDash:[5,5], pointRadius:0}
     ]},
     options: chartOptsBR()
@@ -895,12 +911,19 @@ function renderWeekly(rows, qualRate){
   }
 }
 
-function renderMonthly(rows, qualRate){
+function renderMonthly(rows, qualByDate){
   const by = {};
   rows.forEach(r=>{
     const k = r.date.getFullYear() + '-' + String(r.date.getMonth()+1).padStart(2,'0');
-    if(!by[k]) by[k] = {key:k, date:new Date(r.date.getFullYear(),r.date.getMonth(),1), spend:0, imp:0, clicks:0, leads:0, days:new Set()};
+    if(!by[k]) by[k] = {key:k, date:new Date(r.date.getFullYear(),r.date.getMonth(),1), spend:0, imp:0, clicks:0, leads:0, qual:0, days:new Set()};
     by[k].spend+=r.spend; by[k].imp+=r.imp; by[k].clicks+=r.clicks; by[k].leads+=r.leads; by[k].days.add(fmtISO(r.date));
+  });
+  // Add real qualified by month
+  Object.keys(qualByDate||{}).forEach(dateStr=>{
+    const d = parseDateAny(dateStr);
+    if(!d) return;
+    const k = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    if(by[k]) by[k].qual += qualByDate[dateStr];
   });
   const months = Object.values(by).sort((a,b)=>a.date-b.date);
   const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -911,8 +934,7 @@ function renderMonthly(rows, qualRate){
     m.cpm = safeDiv(m.spend,m.imp)*1000;
     m.ctr = safeDiv(m.clicks,m.imp)*100;
     m.convRate = safeDiv(m.leads,m.clicks)*100;
-    m.estQual = Math.round(m.leads * qualRate);
-    m.cplQual = m.estQual>0? m.spend/m.estQual : 0;
+    m.cplQual = m.qual>0? m.spend/m.qual : 0;
   });
 
   const cards = document.getElementById('month-cards');
@@ -924,7 +946,7 @@ function renderMonthly(rows, qualRate){
       <div class="kv"><span>Dias ativos</span><span>${m.days.size}</span></div>
       <div class="kv"><span>Investimento</span><span>${fmtBRL(m.spend)}</span></div>
       <div class="kv"><span>Leads</span><span>${fmtInt(m.leads)}</span></div>
-      <div class="kv"><span>Qualif. (est.)</span><span>${fmtInt(m.estQual)}</span></div>
+      <div class="kv"><span>Qualificados</span><span>${fmtInt(m.qual)}</span></div>
       <div class="kv"><span>CPL</span><span>${fmtBRL(m.cpl)}</span></div>
       <div class="kv"><span>CPC</span><span>${fmtBRL(m.cpc)}</span></div>
       <div class="kv"><span>CTR</span><span>${fmtPct(m.ctr)}</span></div>
@@ -940,7 +962,7 @@ function renderMonthly(rows, qualRate){
   const metrics = [
     {l:'Investimento', a:a&&a.spend, b:b&&b.spend, fmt:fmtBRL, invertido:false},
     {l:'Leads', a:a&&a.leads, b:b&&b.leads, fmt:fmtInt, invertido:false},
-    {l:'Leads Qualificados (est.)', a:a&&a.estQual, b:b&&b.estQual, fmt:fmtInt, invertido:false},
+    {l:'Leads Qualificados (real)', a:a&&a.qual, b:b&&b.qual, fmt:fmtInt, invertido:false},
     {l:'CPL', a:a&&a.cpl, b:b&&b.cpl, fmt:fmtBRL, invertido:true},
     {l:'CPL Qualificado', a:a&&a.cplQual, b:b&&b.cplQual, fmt:fmtBRL, invertido:true},
     {l:'CPC', a:a&&a.cpc, b:b&&b.cpc, fmt:fmtBRL, invertido:true},
