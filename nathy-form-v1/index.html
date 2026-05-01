@@ -400,22 +400,35 @@ function parseFaturamento(raw){
   if(!raw) return 0;
   let s = String(raw).toLowerCase().trim();
   if(!s || s === '-' || s === ',') return 0;
-  const cats = {
-    'ate_3000': 2999, 'até_3000': 2999,
-    'entre_3000_a_5000': 3000,
-    'entre_5000_a_7000': 5000,
-    'entre_7000_a_12000': 7000,
-    'entre_12000_a_20000': 12000,
-    'acima_de_20000': 20001, 'acima_20000': 20001
-  };
-  const k = s.replace(/\s/g,'');
-  if(cats[k] != null) return cats[k];
-  const mAc = s.match(/acima[_\s]*(?:de[_\s]*)?(\d+(?:\.\d+)?)/);
+  // Normalize: lowercase + remove spaces + replace accents
+  const norm = s.replace(/\s+/g,'_').replace(/á/g,'a').replace(/é/g,'e').replace(/í/g,'i').replace(/ó/g,'o').replace(/ú/g,'u');
+
+  // "acima_de_X" or "acima_X" or "mais_de_X" — returns X+1 (qualified if X>=threshold)
+  const mAc = norm.match(/(?:acima|mais)(?:_de)?_(\d+(?:\.\d+)?k?)/);
   if(mAc){
-    const n = parseFloat(mAc[1]);
-    return (n < 100 ? n*1000 : n) + 1;
+    let n = parseFloat(mAc[1].replace('k',''));
+    if(/k$/.test(mAc[1]) || n < 100) n *= 1000;
+    return n + 1;
   }
-  const hasK = /\dk/i.test(s) || s.endsWith('k');
+
+  // "X_a_Y" or "entre_X_a_Y" or "de_X_a_Y" — returns lower bound X (so threshold catches edge cases)
+  const mRange = norm.match(/(?:entre_|de_)?(\d+(?:\.\d+)?k?)_(?:a|ate|até|to)_(\d+(?:\.\d+)?k?)/);
+  if(mRange){
+    let lo = parseFloat(mRange[1].replace('k',''));
+    if(/k$/.test(mRange[1]) || lo < 100) lo *= 1000;
+    return lo;
+  }
+
+  // "ate_X" / "até_X" — returns X-1 (so "até_3000" is below 3000 threshold)
+  const mAte = norm.match(/(?:ate|ate_de|até)_(\d+(?:\.\d+)?k?)/);
+  if(mAte){
+    let n = parseFloat(mAte[1].replace('k',''));
+    if(/k$/.test(mAte[1]) || n < 100) n *= 1000;
+    return Math.max(0, n - 1);
+  }
+
+  // Free text: "10k", "25 k", "15mil", "10 mil", "R$ 7.000"
+  const hasK = /\dk\b/.test(s) || s.endsWith('k');
   const hasMil = s.includes('mil');
   const num = parseBR(s.replace(/k/gi,'').replace(/mil/gi,'').replace(/r\$/gi,'').trim());
   if(hasK || hasMil) return num * 1000;
