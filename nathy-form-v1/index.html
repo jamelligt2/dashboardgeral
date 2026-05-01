@@ -357,6 +357,8 @@ const CONFIG = {
   sheetId: '1fmf1mic4HcFBMlM2RhqLi88ExZYEPgSBBI7bNkKKspI',
   capSheet: 'Captação',
   formsSheet: 'Forms',
+  capGid: 295055587,
+  formsGid: 129523461,
   qualThreshold: 7000
 };
 
@@ -448,11 +450,11 @@ function findCol(row, keywords){
   return null;
 }
 
-async function fetchCSV(sheetName){
-  // range=A:Z força gviz a varrer todas as linhas, mesmo com gaps em branco
-  const url = `https://docs.google.com/spreadsheets/d/${CONFIG.sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}&range=A1:Z10000&headers=1&_=${Date.now()}`;
+async function fetchCSV(sheetName, gid){
+  // /export?format=csv exporta a aba inteira (sem auto-detecção de tabela como o gviz)
+  const url = `https://docs.google.com/spreadsheets/d/${CONFIG.sheetId}/export?format=csv&gid=${gid}&_=${Date.now()}`;
   const resp = await fetch(url, {cache:'no-store'});
-  if(!resp.ok) throw new Error('HTTP '+resp.status+' em "'+sheetName+'"');
+  if(!resp.ok) throw new Error('HTTP '+resp.status+' em "'+sheetName+'" (gid '+gid+'). Verifique se a planilha está pública.');
   const txt = await resp.text();
   return Papa.parse(txt, {header:true, skipEmptyLines:true}).data;
 }
@@ -462,9 +464,9 @@ async function loadData(){
     document.getElementById('loader').style.display='flex';
     document.getElementById('error-screen').style.display='none';
     document.getElementById('loader-status').textContent='Buscando dados de captação…';
-    const cap = await fetchCSV(CONFIG.capSheet);
+    const cap = await fetchCSV(CONFIG.capSheet, CONFIG.capGid);
     document.getElementById('loader-status').textContent='Buscando dados de formulários…';
-    const forms = await fetchCSV(CONFIG.formsSheet);
+    const forms = await fetchCSV(CONFIG.formsSheet, CONFIG.formsGid);
     document.getElementById('loader-status').textContent='Processando métricas…';
     STATE.rawCap = cap;
     STATE.rawForms = forms;
