@@ -368,6 +368,7 @@ async function loadData() {
     // Parse webhook sales — ALL approved for cards, meta_ads only for metrics
     const wSalesByDate = {};
     const wSalesByDateFrio = {}, wSalesByDateQuente = {};
+    const salesByContent = {}; // UTM Content → {fat, compras} para atribuir ao criativo
     let totalWbkSales = 0;
     VENDAS_LIST = [];
     wRows.forEach(r => {
@@ -409,6 +410,12 @@ async function loadData() {
       const audW = classifyAudience(utmMedium);
       const audMapW = audW === 'frio' ? wSalesByDateFrio : audW === 'quente' ? wSalesByDateQuente : null;
       if (audMapW) { if (!audMapW[d]) audMapW[d] = { fat: 0, compras: 0 }; audMapW[d].fat += price; audMapW[d].compras++; }
+      // Atribui ao criativo via UTM Content
+      if (utmCampaign || utmMedium) {
+        const ck = utmCampaign || utmMedium;
+        if (!salesByContent[ck]) salesByContent[ck] = { fat: 0, compras: 0 };
+        salesByContent[ck].fat += price; salesByContent[ck].compras++;
+      }
     });
 
     // --- Parse Vendas (Eduzz) ---
@@ -466,6 +473,11 @@ async function loadData() {
           const audV = classifyAudience(utmMedium);
           const audMapV = audV === 'frio' ? wSalesByDateFrio : audV === 'quente' ? wSalesByDateQuente : null;
           if (audMapV) { if (!audMapV[d]) audMapV[d] = { fat: 0, compras: 0 }; audMapV[d].fat += price; audMapV[d].compras++; }
+          // Atribui ao criativo via UTM Content (bate com Ad Name no Gerenciador)
+          if (utmContent) {
+            if (!salesByContent[utmContent]) salesByContent[utmContent] = { fat: 0, compras: 0 };
+            salesByContent[utmContent].fat += price; salesByContent[utmContent].compras++;
+          }
         }
       });
     }
@@ -544,6 +556,13 @@ async function loadData() {
         if (!criMap[nome].lastDate || dISO > criMap[nome].lastDate) criMap[nome].lastDate = dISO;
       }
     });
+    // Mescla vendas por criativo (UTM Content bate com Ad Name)
+    Object.entries(salesByContent).forEach(([content, sv]) => {
+      // Tenta match exato ou parcial com o nome do criativo
+      const key = Object.keys(criMap).find(k => k === content || k.includes(content) || content.includes(k));
+      if (key) { criMap[key].fat += sv.fat; criMap[key].compras += sv.compras; }
+    });
+
     CRIATIVOS = Object.values(criMap).map(c => {
       const ativo = c.lastDate ? new Date(c.lastDate) >= d7ago : false;
       const ctr = c.imp > 0 ? c.cliques / c.imp * 100 : 0;
