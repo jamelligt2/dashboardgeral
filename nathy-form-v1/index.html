@@ -217,6 +217,7 @@ a.ad-link:hover{text-decoration:underline}
 <div class="container" id="main" style="display:none">
 
   <div class="panel active" id="panel-0">
+    <div id="diag-panel" style="background:#1e1e1e;border:1px solid #2a2a2a;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:11px;color:#a0a0a0;font-family:monospace;line-height:1.6"></div>
     <h2 class="section-title">KPIs Principais</h2>
     <div class="kpi-grid" id="kpi-grid"></div>
 
@@ -448,8 +449,8 @@ function findCol(row, keywords){
 }
 
 async function fetchCSV(sheetName){
-  const url = `https://docs.google.com/spreadsheets/d/${CONFIG.sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
-  const resp = await fetch(url);
+  const url = `https://docs.google.com/spreadsheets/d/${CONFIG.sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}&_=${Date.now()}`;
+  const resp = await fetch(url, {cache:'no-store'});
   if(!resp.ok) throw new Error('HTTP '+resp.status+' em "'+sheetName+'"');
   const txt = await resp.text();
   return Papa.parse(txt, {header:true, skipEmptyLines:true}).data;
@@ -526,6 +527,7 @@ function processData(){
 
   STATE.forms = STATE.rawForms.map(r => ({
     date: formsDateCol? parseDateAny(r[formsDateCol]) : null,
+    faturaRaw: (r[faturaCol]||'').toString().trim(),
     fatura: parseFaturamento(r[faturaCol]),
     ad: adNameCol ? (r[adNameCol] || '') : ''
   }));
@@ -533,6 +535,23 @@ function processData(){
   STATE.totalForms = STATE.forms.length;
   STATE.totalQualified = STATE.forms.filter(f => f.fatura >= CONFIG.qualThreshold).length;
   STATE.qualRate = STATE.totalForms>0 ? STATE.totalQualified/STATE.totalForms : 0;
+
+  // DEBUG: log col detection + qualifying samples
+  console.log('[JGT-DASH] faturaCol=', faturaCol, '| dateCol=', formsDateCol);
+  console.log('[JGT-DASH] Forms total:', STATE.totalForms, '| Qualif. real:', STATE.totalQualified);
+  const cats = {};
+  STATE.rawForms.forEach(r => {
+    const v = (r[faturaCol]||'').toString().trim();
+    cats[v] = (cats[v]||0)+1;
+  });
+  console.log('[JGT-DASH] Categorias coluna G:', cats);
+  // Test parser on each unique cat
+  const tests = {};
+  Object.keys(cats).forEach(v => {
+    const p = parseFaturamento(v);
+    tests[v] = {parsed:p, qualif: p>=CONFIG.qualThreshold};
+  });
+  console.log('[JGT-DASH] parseFaturamento tests:', tests);
 
   // Date range = UNION of Captação + Forms (em caso de uma aba estar desatualizada)
   const capDates = STATE.cap.map(r=>r.date).filter(Boolean);
@@ -605,6 +624,18 @@ function render(){
 
   const days = Math.round((STATE.filterEnd - STATE.filterStart) / 86400000) + 1;
   document.getElementById('filters-info').textContent = days + ' dias · ' + fmtDateBR(STATE.filterStart) + ' → ' + fmtDateBR(STATE.filterEnd);
+
+  // Diagnóstico visível
+  const diag = document.getElementById('diag-panel');
+  if(diag){
+    const cats = {};
+    formsF.forEach(f=>{
+      const v = f.faturaRaw||'(vazio)';
+      cats[v] = (cats[v]||0)+1;
+    });
+    const qList = formsF.filter(f=>f.fatura>=CONFIG.qualThreshold).map(f=> (f.faturaRaw||'?')+'='+f.fatura);
+    diag.innerHTML = '🔍 <b style="color:#ff6b00">DIAG</b> · período <b style="color:#fff">'+fmtDateBR(STATE.filterStart)+' → '+fmtDateBR(STATE.filterEnd)+'</b> · forms no período: <b style="color:#fff">'+formsF.length+'</b> · qualif. reais (≥R$'+CONFIG.qualThreshold+'): <b style="color:#00d68f">'+realQual+'</b><br>Categorias coluna G: '+Object.entries(cats).map(([k,v])=>'<span style="color:#fff">'+k+'</span>='+v).join(' · ');
+  }
 
   renderKPIs(t, realQual, qualRateF, cplQual, formsF.length);
   renderFunnel(t, realQual, qualRateF, cplQual);
