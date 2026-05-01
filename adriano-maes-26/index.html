@@ -99,7 +99,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
 .pub-bar-fill{height:100%;background:linear-gradient(90deg,#ff6b2b,#ff9a3c);border-radius:3px;transition:width .5s}
 .alert-box{background:rgba(255,107,43,.08);border:1px solid rgba(255,107,43,.25);border-radius:8px;padding:12px 16px;font-size:12px;color:rgba(255,107,43,.9);margin-bottom:16px}
 .funil-3col{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:16px 0}
-@media(max-width:800px){.funil-3col{grid-template-columns:1fr}}
+@media(max-width:600px){.funil-3col{grid-template-columns:1fr}}
 .funil-block{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:16px}
 .funil-block-title{font-size:10px;color:rgba(255,107,43,.8);text-transform:uppercase;letter-spacing:.7px;margin-bottom:12px;font-weight:700}
 .funil-mini-taxas{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
@@ -351,8 +351,9 @@ async function loadData() {
     const wPriceI = wI('data.price.value');
     const wDateI = wI('data.createdAt');
     const wDateAltI = wI('sentDate');
-    // Nome do comprador — tenta várias variações
-    const wNameI = (() => { for (const n of ['data.customer.name','data.Order.Customer.name','customer_name','name','data.customer_name','Nome']) { const i = wI(n); if (i >= 0) return i; } return -1; })();
+    // Nome do comprador — tenta várias variações (Kiwify usa data.buyer.name)
+    const wNameI = (() => { for (const n of ['data.buyer.name','data.customer.name','data.Order.Customer.name','buyer_name','customer_name','name','data.customer_name','Nome']) { const i = wI(n); if (i >= 0) return i; } return -1; })();
+    const wEmailI = (() => { for (const n of ['data.buyer.email','data.customer.email','email','buyer_email']) { const i = wI(n); if (i >= 0) return i; } return -1; })();
     const wTermI = (() => { for (const n of ['data.utm.term','utm_term','term']) { const i = wI(n); if (i >= 0) return i; } return -1; })();
     const wMediumI = (() => { for (const n of ['data.utm.medium','utm_medium','medium']) { const i = wI(n); if (i >= 0) return i; } return -1; })();
     const wCampaignI = (() => { for (const n of ['data.utm.campaign','utm_campaign','campaign']) { const i = wI(n); if (i >= 0) return i; } return -1; })();
@@ -381,7 +382,9 @@ async function loadData() {
       if (!d) return;
       const source = gvizS(r[wSourceI]).toLowerCase().replace(/[\s_-]/g, '');
       const isMeta = source === 'metaads' || source === 'meta';
-      const nome = gvizS(r[wNameI]) || '';
+      const nomeRaw = gvizS(r[wNameI]);
+      const emailRaw = wEmailI >= 0 ? gvizS(r[wEmailI]) : '';
+      const nome = nomeRaw || (emailRaw ? emailRaw.split('@')[0] : '');
       const utmSource = gvizS(r[wSourceI]);
       const utmTerm = wTermI >= 0 ? gvizS(r[wTermI]) : '';
       const utmMedium = wMediumI >= 0 ? gvizS(r[wMediumI]) : '';
@@ -808,8 +811,8 @@ function renderFunil(dias) {
   const quenteD = filteredQuente();
   document.getElementById('funil-3col').innerHTML = [
     renderFunilBlock(dias, '🌐 Geral', null, true),
-    renderFunilBlock(frioD, '❄️ Frio', 'linear-gradient(90deg,#4facfe,#00f2fe)', false),
-    renderFunilBlock(quenteD, '🔥 Quente', 'linear-gradient(90deg,#e74c3c,#ff6b6b)', false),
+    renderFunilBlock(frioD, '❄️ Frio', 'linear-gradient(90deg,#4facfe,#00f2fe)', true),
+    renderFunilBlock(quenteD, '🔥 Quente', 'linear-gradient(90deg,#e74c3c,#ff6b6b)', true),
   ].join('');
 
   const cliques = dias.reduce((s,d) => s + d.cliques, 0);
