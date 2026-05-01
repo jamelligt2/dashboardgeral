@@ -387,23 +387,23 @@ async function loadData() {
       setLoading('Processando vendas manuais (Vendas)...');
       const { cols: vCols, rows: vRows } = gvizToTable(vGviz);
       const vI = name => vCols.indexOf(name);
+      // Nomes de coluna flexíveis (Eduzz varia)
       const vStatusI = vI('Status');
-      const vSourceI = vI('UTM Source');
-      const vPriceI = vI('Valor da Venda');
-      const vNomeI = vI('Nome');
+      const vSourceI = (() => { for (const n of ['UTM Source','UTM_Source','utm_source','Utm Source','UTM source']) { const i = vI(n); if (i >= 0) return i; } return -1; })();
+      const vPriceI = (() => { for (const n of ['Valor da Venda','Valor','Preço','Price','value']) { const i = vI(n); if (i >= 0) return i; } return -1; })();
+      const vNomeI = (() => { for (const n of ['Nome','Cliente','Comprador','Customer Name','name']) { const i = vI(n); if (i >= 0) return i; } return -1; })();
       let vDateI = vI('Data de Pagamento');
       if (vDateI < 0) vDateI = vI('Data de Criação');
+      if (vDateI < 0) vDateI = vI('Data');
 
       vRows.forEach(r => {
         if (!r) return;
         const status = gvizS(r[vStatusI]).toLowerCase();
-        const source = gvizS(r[vSourceI]).toLowerCase().replace(/[\s_-]/g, '');
-        if (status !== 'paga' && status !== 'paid') return;
-        if (source !== 'metaads' && source !== 'meta') return;
-        const price = gvizN(r[vPriceI]);
+        if (status !== 'paga' && status !== 'paid' && status !== 'aprovado' && status !== 'approved') return;
+        const price = vPriceI >= 0 ? gvizN(r[vPriceI]) : 0;
         if (price <= 0) return;
-        let d = gvizDate(r[vDateI]);
-        if (!d) {
+        let d = vDateI >= 0 ? gvizDate(r[vDateI]) : null;
+        if (!d && vDateI >= 0) {
           const dateStr = gvizS(r[vDateI]);
           if (dateStr) {
             const dt = new Date(dateStr);
@@ -412,11 +412,17 @@ async function loadData() {
         }
         if (!d) return;
         const vNome = (vNomeI >= 0 ? gvizS(r[vNomeI]) : '') || 'Comprador';
-        VENDAS_LIST.push({ nome: vNome, valor: price, data: d, dataISO: toISO(d), tipo: 'Meta Ads' });
-        if (!wSalesByDate[d]) wSalesByDate[d] = { fat: 0, compras: 0 };
-        wSalesByDate[d].fat += price;
-        wSalesByDate[d].compras++;
-        totalWbkSales++;
+        const source = vSourceI >= 0 ? gvizS(r[vSourceI]).toLowerCase().replace(/[\s_-]/g, '') : '';
+        const isMeta = source === 'metaads' || source === 'meta' || source === '';
+        // Sempre mostra nos cards
+        VENDAS_LIST.push({ nome: vNome, valor: price, data: d, dataISO: toISO(d), tipo: source && source !== '' && !isMeta ? 'Orgânica' : 'Meta Ads' });
+        // Só conta nas métricas se veio do Meta ou não tem UTM (manual)
+        if (isMeta) {
+          if (!wSalesByDate[d]) wSalesByDate[d] = { fat: 0, compras: 0 };
+          wSalesByDate[d].fat += price;
+          wSalesByDate[d].compras++;
+          totalWbkSales++;
+        }
       });
     }
 
@@ -530,10 +536,10 @@ async function loadData() {
     initDatePickers();
     renderAll();
 
-    // Alert if no webhook sales
+    // Alert if no sales at all
     const alertEl = document.getElementById('alert-area');
-    if (totalWbkSales === 0) {
-      alertEl.innerHTML = `<div class="alert-box">⚠️ Nenhuma venda do Meta Ads registrada no Webhook ainda. Faturamento e ROAS serão R$0,00 até as primeiras vendas entrarem.</div>`;
+    if (VENDAS_LIST.length === 0) {
+      alertEl.innerHTML = `<div class="alert-box">⚠️ Nenhuma venda registrada ainda. Faturamento e ROAS serão R$0,00 até as primeiras vendas entrarem via Webhook ou aba Vendas.</div>`;
     } else {
       alertEl.innerHTML = '';
     }
@@ -598,22 +604,27 @@ function toISO(d) {
 }
 
 function initDatePickers() {
-  if (!DIAS.length) return;
-  const dates = DIAS.map(d => toISO(d.data)).sort();
-  document.getElementById('dateFrom').value = dates[0];
-  document.getElementById('dateTo').value = dates[dates.length-1];
-  dateFrom = dates[0];
-  dateTo = dates[dates.length-1];
+  const diasDates = DIAS.map(d => toISO(d.data));
+  const vendasDates = VENDAS_LIST.map(v => v.dataISO).filter(Boolean);
+  const allDates = [...diasDates, ...vendasDates].sort();
+  if (!allDates.length) return;
+  document.getElementById('dateFrom').value = allDates[0];
+  document.getElementById('dateTo').value = allDates[allDates.length-1];
+  dateFrom = allDates[0];
+  dateTo = allDates[allDates.length-1];
   updateRangeInfo();
 }
 
 function setPreset(days, btn) {
   document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  const dates = DIAS.map(d => toISO(d.data)).sort();
-  const last = dates[dates.length-1];
+  const diasDates = DIAS.map(d => toISO(d.data));
+  const vendasDates = VENDAS_LIST.map(v => v.dataISO).filter(Boolean);
+  const allDates = [...diasDates, ...vendasDates].sort();
+  if (!allDates.length) return;
+  const first = allDates[0], last = allDates[allDates.length-1];
   if (days === 'all') {
-    document.getElementById('dateFrom').value = dates[0];
+    document.getElementById('dateFrom').value = first;
     document.getElementById('dateTo').value = last;
   } else {
     const from = new Date(last + 'T00:00:00');
@@ -780,7 +791,7 @@ function renderFunil(dias) {
   document.getElementById('funil-3col').innerHTML = [
     renderFunilBlock(dias, '🌐 Geral', null),
     renderFunilBlock(frioD, '❄️ Frio', 'linear-gradient(90deg,#4facfe,#00f2fe)'),
-    renderFunilBlock(quenteD, '🔥 Quente', 'linear-gradient(90deg,#f7971e,#ffd200)'),
+    renderFunilBlock(quenteD, '🔥 Quente', 'linear-gradient(90deg,#e74c3c,#ff6b6b)'),
   ].join('');
 
   const cliques = dias.reduce((s,d) => s + d.cliques, 0);
