@@ -534,10 +534,15 @@ function processData(){
   STATE.totalQualified = STATE.forms.filter(f => f.fatura >= CONFIG.qualThreshold).length;
   STATE.qualRate = STATE.totalForms>0 ? STATE.totalQualified/STATE.totalForms : 0;
 
-  const dates = STATE.cap.map(r=>r.date).filter(Boolean).sort((a,b)=>a-b);
-  STATE.minDate = dates[0];
-  STATE.maxDate = dates[dates.length-1];
-  if(!STATE.filterStart){ STATE.filterStart = STATE.minDate; STATE.filterEnd = STATE.maxDate; }
+  // Date range = UNION of Captação + Forms (em caso de uma aba estar desatualizada)
+  const capDates = STATE.cap.map(r=>r.date).filter(Boolean);
+  const formDates = STATE.forms.map(f=>f.date).filter(Boolean);
+  const allDates = capDates.concat(formDates).sort((a,b)=>a-b);
+  STATE.minDate = allDates[0];
+  STATE.maxDate = allDates[allDates.length-1];
+  // Sempre re-sincroniza com os dados frescos
+  STATE.filterStart = STATE.minDate;
+  STATE.filterEnd = STATE.maxDate;
   document.getElementById('date-start').value = fmtISO(STATE.minDate);
   document.getElementById('date-end').value = fmtISO(STATE.maxDate);
 }
