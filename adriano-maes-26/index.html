@@ -122,6 +122,12 @@ tr:hover td{background:rgba(255,255,255,.025)}
 .venda-card-tipo{display:inline-block;font-size:9px;padding:2px 7px;border-radius:4px;font-weight:600}
 .venda-card-tipo.meta{background:rgba(255,107,43,.12);color:#ff9a3c;border:1px solid rgba(255,107,43,.25)}
 .venda-card-tipo.organica{background:rgba(255,183,55,.1);color:#f1c40f;border:1px solid rgba(255,183,55,.2)}
+.venda-card-top{display:flex;align-items:center;gap:5px;margin-bottom:5px;flex-wrap:nowrap}
+.venda-star-icon{font-size:13px;flex-shrink:0}
+.venda-card-name{font-size:11px;font-weight:600;color:#e8e6f0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.venda-card-val{font-family:'DM Mono',monospace;font-size:13px;font-weight:700;color:#ff6b2b;flex-shrink:0}
+.venda-utms{display:flex;flex-direction:column;gap:3px;margin:4px 0}
+.venda-utm-tag{font-size:9px;color:rgba(255,255,255,.4);font-family:'DM Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -173,12 +179,12 @@ tr:hover td{background:rgba(255,255,255,.025)}
 <div id="tab-visao" class="content active">
   <div id="alert-area"></div>
   <div class="kpi-grid" id="kpi-visao"></div>
-  <div class="funil-3col" id="funil-3col"></div>
-  <div class="taxa-grid" id="taxa-grid" style="margin-bottom:16px"></div>
   <div class="vendas-wrap" id="vendas-section">
     <div class="vendas-header-row" id="vendas-header"></div>
     <div class="vendas-scroll" id="vendas-cards"></div>
   </div>
+  <div class="funil-3col" id="funil-3col"></div>
+  <div class="taxa-grid" id="taxa-grid" style="margin-bottom:16px"></div>
   <div class="chart-grid-2x2">
     <div class="chart-card"><h4>Investimento Diário</h4><canvas id="chart-inv-dia"></canvas></div>
     <div class="chart-card"><h4>Cliques vs PV Diário</h4><canvas id="chart-cliq-dia"></canvas></div>
@@ -345,7 +351,11 @@ async function loadData() {
     const wPriceI = wI('data.price.value');
     const wDateI = wI('data.createdAt');
     const wDateAltI = wI('sentDate');
-    const wNameI = wI('data.customer.name');
+    // Nome do comprador — tenta várias variações
+    const wNameI = (() => { for (const n of ['data.customer.name','data.Order.Customer.name','customer_name','name','data.customer_name','Nome']) { const i = wI(n); if (i >= 0) return i; } return -1; })();
+    const wTermI = (() => { for (const n of ['data.utm.term','utm_term','term']) { const i = wI(n); if (i >= 0) return i; } return -1; })();
+    const wMediumI = (() => { for (const n of ['data.utm.medium','utm_medium','medium']) { const i = wI(n); if (i >= 0) return i; } return -1; })();
+    const wCampaignI = (() => { for (const n of ['data.utm.campaign','utm_campaign','campaign']) { const i = wI(n); if (i >= 0) return i; } return -1; })();
 
     // Parse webhook sales — ALL approved for cards, meta_ads only for metrics
     const wSalesByDate = {};
@@ -371,9 +381,13 @@ async function loadData() {
       if (!d) return;
       const source = gvizS(r[wSourceI]).toLowerCase().replace(/[\s_-]/g, '');
       const isMeta = source === 'metaads' || source === 'meta';
-      const nome = gvizS(r[wNameI]) || 'Comprador';
+      const nome = gvizS(r[wNameI]) || '';
+      const utmSource = gvizS(r[wSourceI]);
+      const utmTerm = wTermI >= 0 ? gvizS(r[wTermI]) : '';
+      const utmMedium = wMediumI >= 0 ? gvizS(r[wMediumI]) : '';
+      const utmCampaign = wCampaignI >= 0 ? gvizS(r[wCampaignI]) : '';
       // Add to cards list regardless of source
-      VENDAS_LIST.push({ nome, valor: price, data: d, dataISO: toISO(d), tipo: isMeta ? 'Meta Ads' : 'Orgânica' });
+      VENDAS_LIST.push({ nome, valor: price, data: d, dataISO: toISO(d), tipo: isMeta ? 'Meta Ads' : 'Orgânica', utmSource, utmTerm, utmMedium, utmCampaign });
       // Metrics only for meta_ads
       if (!isMeta) return;
       if (!wSalesByDate[d]) wSalesByDate[d] = { fat: 0, compras: 0 };
@@ -834,16 +848,26 @@ function renderVendasCards() {
   const hdr = document.getElementById('vendas-header');
   const cards = document.getElementById('vendas-cards');
   if (!vendas.length) { hdr.innerHTML = ''; cards.innerHTML = ''; return; }
-  hdr.innerHTML = `<span class="vendas-count-title">⚡ Vendas no Período (${vendas.length})</span><span class="vendas-subtitle">${vendas.length} total · ${brl(total)} faturamento · ← arraste para ver mais</span>`;
-  cards.innerHTML = vendas.map(v => `
-    <div class="venda-card">
-      <div class="venda-card-star">⭐</div>
-      <div class="venda-card-name" title="${v.nome}">${v.nome}</div>
-      <div class="venda-card-val">${brl(v.valor)}</div>
-      <div class="venda-card-date">📅 ${v.data}</div>
-      <span class="venda-card-tipo ${v.tipo === 'Meta Ads' ? 'meta' : 'organica'}">${v.tipo === 'Meta Ads' ? '📱 Meta Ads' : '⭐ Orgânica'}</span>
-    </div>
-  `).join('');
+  hdr.innerHTML = `<span class="vendas-count-title">⚡ Vendas no Período (${vendas.length})</span><span class="vendas-subtitle">${vendas.length} total · ${brl(total)} faturamento total · ← arraste para ver mais</span>`;
+  cards.innerHTML = vendas.map(v => {
+    const nome = v.nome || 'Sem nome';
+    const nomeShort = nome.length > 18 ? nome.slice(0,17) + '…' : nome;
+    const utms = [
+      v.utmSource ? `<span class="venda-utm-tag">source: ${v.utmSource}</span>` : '',
+      v.utmMedium ? `<span class="venda-utm-tag">medium: ${v.utmMedium}</span>` : '',
+      v.utmTerm   ? `<span class="venda-utm-tag">term: ${v.utmTerm}</span>` : '',
+    ].filter(Boolean).join('');
+    return `<div class="venda-card">
+      <div class="venda-card-top">
+        <span class="venda-star-icon">⭐</span>
+        <span class="venda-card-name" title="${nome}">${nomeShort}</span>
+        <span class="venda-card-val">${brl(v.valor)}</span>
+      </div>
+      <div class="venda-card-date">📅 ${v.dataISO || v.data}</div>
+      ${utms ? `<div class="venda-utms">${utms}</div>` : ''}
+      <div style="margin-top:5px"><span class="venda-card-tipo ${v.tipo === 'Meta Ads' ? 'meta' : 'organica'}">⭐ ${v.tipo}</span></div>
+    </div>`;
+  }).join('');
 }
 
 // ============ TABELA DIA A DIA ============
