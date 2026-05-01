@@ -473,10 +473,13 @@ async function loadData() {
           const audV = classifyAudience(utmMedium);
           const audMapV = audV === 'frio' ? wSalesByDateFrio : audV === 'quente' ? wSalesByDateQuente : null;
           if (audMapV) { if (!audMapV[d]) audMapV[d] = { fat: 0, compras: 0 }; audMapV[d].fat += price; audMapV[d].compras++; }
-          // Atribui ao criativo via UTM Content (bate com Ad Name no Gerenciador)
-          if (utmContent) {
-            if (!salesByContent[utmContent]) salesByContent[utmContent] = { fat: 0, compras: 0 };
-            salesByContent[utmContent].fat += price; salesByContent[utmContent].compras++;
+          // Na Eduzz, criativo vem no UTM Term (ex: MAE26-ADV02 - NAOACASO)
+          // UTM Content pode ter número de telefone — ignorar se for numérico
+          const criKey = (utmTerm && !/^\d/.test(utmTerm)) ? utmTerm
+                       : (utmContent && !/^\d/.test(utmContent)) ? utmContent : null;
+          if (criKey) {
+            if (!salesByContent[criKey]) salesByContent[criKey] = { fat: 0, compras: 0 };
+            salesByContent[criKey].fat += price; salesByContent[criKey].compras++;
           }
         }
       });
