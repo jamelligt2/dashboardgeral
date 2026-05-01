@@ -343,22 +343,27 @@ async function loadData() {
     // --- Parse Webhook ---
     setLoading('Processando vendas do Webhook...');
     const { cols: wCols, rows: wRows } = gvizToTable(wGviz);
-    console.log('=== COLUNAS WEBHOOK ===', wCols);
-    if (wRows[0]) console.log('=== PRIMEIRA LINHA WEBHOOK ===', wRows[0].map((v,i) => `[${wCols[i]}]: ${v?.v}`));
 
     const wI = name => wCols.indexOf(name);
+    // Busca fuzzy — encontra qualquer coluna que contenha o termo
+    const wFind = (...terms) => {
+      for (const t of terms) {
+        const i = wCols.findIndex(c => c.toLowerCase().includes(t.toLowerCase()));
+        if (i >= 0) return i;
+      }
+      return -1;
+    };
     const wEventI = wI('event');
-    const wSourceI = wI('data.utm.source');
-    const wPaidI = wI('data.price.paid.value');
-    const wPriceI = wI('data.price.value');
-    const wDateI = wI('data.createdAt');
+    const wSourceI = wFind('utm.source','utm_source','utm source');
+    const wPaidI = wFind('price.paid','paid.value');
+    const wPriceI = wFind('price.value','price value');
+    const wDateI = wFind('createdAt','created_at','createdat');
     const wDateAltI = wI('sentDate');
-    // Nome do comprador — tenta várias variações (Kiwify usa data.buyer.name)
-    const wNameI = (() => { for (const n of ['data.buyer.name','data.customer.name','data.Order.Customer.name','buyer_name','customer_name','name','data.customer_name','Nome']) { const i = wI(n); if (i >= 0) return i; } return -1; })();
-    const wEmailI = (() => { for (const n of ['data.buyer.email','data.customer.email','email','buyer_email']) { const i = wI(n); if (i >= 0) return i; } return -1; })();
-    const wTermI = (() => { for (const n of ['data.utm.term','utm_term','term']) { const i = wI(n); if (i >= 0) return i; } return -1; })();
-    const wMediumI = (() => { for (const n of ['data.utm.medium','utm_medium','medium']) { const i = wI(n); if (i >= 0) return i; } return -1; })();
-    const wCampaignI = (() => { for (const n of ['data.utm.campaign','utm_campaign','campaign']) { const i = wI(n); if (i >= 0) return i; } return -1; })();
+    const wNameI = wFind('buyer.name','customer.name','buyer_name','customer_name','.name','nome');
+    const wEmailI = wFind('buyer.email','customer.email','buyer_email','customer_email','.email','email');
+    const wTermI = wFind('utm.term','utm_term');
+    const wMediumI = wFind('utm.medium','utm_medium');
+    const wCampaignI = wFind('utm.campaign','utm_campaign');
 
     // Parse webhook sales — ALL approved for cards, meta_ads only for metrics
     const wSalesByDate = {};
@@ -406,11 +411,16 @@ async function loadData() {
       setLoading('Processando vendas manuais (Vendas)...');
       const { cols: vCols, rows: vRows } = gvizToTable(vGviz);
       const vI = name => vCols.indexOf(name);
-      // Nomes de coluna flexíveis (Eduzz varia)
+      // Colunas Eduzz — nomes exatos confirmados da planilha
       const vStatusI = vI('Status');
-      const vSourceI = (() => { for (const n of ['UTM Source','UTM_Source','utm_source','Utm Source','UTM source']) { const i = vI(n); if (i >= 0) return i; } return -1; })();
-      const vPriceI = (() => { for (const n of ['Valor da Venda','Valor','Preço','Price','value']) { const i = vI(n); if (i >= 0) return i; } return -1; })();
-      const vNomeI = (() => { for (const n of ['Nome','Cliente','Comprador','Customer Name','name']) { const i = vI(n); if (i >= 0) return i; } return -1; })();
+      const vSourceI = vI('UTM Source');
+      const vPriceI = vI('Valor da Venda');
+      const vNomeI = (() => { for (const n of ['Cliente / Nome','Nome do Cliente','Nome','Cliente']) { const i = vI(n); if (i >= 0) return i; } return -1; })();
+      const vEmailI = (() => { for (const n of ['Cliente / E-mail','E-mail','Email','cliente email']) { const i = vI(n); if (i >= 0) return i; } return -1; })();
+      const vMediumI = vI('UTM Medium');
+      const vCampaignI = vI('UTM Campaign');
+      const vContentI = vI('UTM Content');
+      const vTermI = vI('UTM Term');
       let vDateI = vI('Data de Pagamento');
       if (vDateI < 0) vDateI = vI('Data de Criação');
       if (vDateI < 0) vDateI = vI('Data');
@@ -430,11 +440,17 @@ async function loadData() {
           }
         }
         if (!d) return;
-        const vNome = (vNomeI >= 0 ? gvizS(r[vNomeI]) : '') || 'Comprador';
+        const vNomeVal = (vNomeI >= 0 ? gvizS(r[vNomeI]) : '');
+        const vEmailVal = (vEmailI >= 0 ? gvizS(r[vEmailI]) : '');
+        const vNome = vNomeVal || (vEmailVal ? vEmailVal.split('@')[0] : 'Sem nome');
         const source = vSourceI >= 0 ? gvizS(r[vSourceI]).toLowerCase().replace(/[\s_-]/g, '') : '';
         const isMeta = source === 'metaads' || source === 'meta' || source === '';
-        // Sempre mostra nos cards
-        VENDAS_LIST.push({ nome: vNome, valor: price, data: d, dataISO: toISO(d), tipo: source && source !== '' && !isMeta ? 'Orgânica' : 'Meta Ads' });
+        const utmSource = vSourceI >= 0 ? gvizS(r[vSourceI]) : '';
+        const utmMedium = vMediumI >= 0 ? gvizS(r[vMediumI]) : '';
+        const utmCampaign = vCampaignI >= 0 ? gvizS(r[vCampaignI]) : '';
+        const utmContent = vContentI >= 0 ? gvizS(r[vContentI]) : '';
+        const utmTerm = vTermI >= 0 ? gvizS(r[vTermI]) : '';
+        VENDAS_LIST.push({ nome: vNome, valor: price, data: d, dataISO: toISO(d), tipo: isMeta ? 'Meta Ads' : 'Orgânica', utmSource, utmMedium, utmCampaign, utmContent, utmTerm });
         // Só conta nas métricas se veio do Meta ou não tem UTM (manual)
         if (isMeta) {
           if (!wSalesByDate[d]) wSalesByDate[d] = { fat: 0, compras: 0 };
@@ -858,9 +874,10 @@ function renderVendasCards() {
     const nome = v.nome || 'Sem nome';
     const nomeShort = nome.length > 18 ? nome.slice(0,17) + '…' : nome;
     const utms = [
-      v.utmSource ? `<span class="venda-utm-tag">source: ${v.utmSource}</span>` : '',
-      v.utmMedium ? `<span class="venda-utm-tag">medium: ${v.utmMedium}</span>` : '',
-      v.utmTerm   ? `<span class="venda-utm-tag">term: ${v.utmTerm}</span>` : '',
+      v.utmSource   ? `<span class="venda-utm-tag">source: ${v.utmSource}</span>` : '',
+      v.utmMedium   ? `<span class="venda-utm-tag">medium: ${v.utmMedium}</span>` : '',
+      v.utmContent  ? `<span class="venda-utm-tag">criativo: ${v.utmContent}</span>` : '',
+      v.utmTerm     ? `<span class="venda-utm-tag">term: ${v.utmTerm}</span>` : '',
     ].filter(Boolean).join('');
     return `<div class="venda-card">
       <div class="venda-card-top">
