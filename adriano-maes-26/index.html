@@ -749,10 +749,11 @@ function renderKpiVisao(dias) {
 }
 
 // ============ FUNIL ============
-function renderFunilBlock(dias, label, gradient) {
+function renderFunilBlock(dias, label, gradient, showCompras = false) {
   const cliques = dias.reduce((s,d) => s + (d.cliques||0), 0);
   const pv = dias.reduce((s,d) => s + (d.pv||0), 0);
   const ck = dias.reduce((s,d) => s + (d.ck||0), 0);
+  const compras = dias.reduce((s,d) => s + (d.compras||0), 0);
   const inv = dias.reduce((s,d) => s + (d.inv||0), 0);
   const imp = dias.reduce((s,d) => s + (d.imp||0), 0);
   const max = Math.max(cliques, 1);
@@ -761,10 +762,12 @@ function renderFunilBlock(dias, label, gradient) {
     { label: 'Cliques', val: cliques },
     { label: 'Page Views', val: pv },
     { label: 'Checkouts', val: ck },
+    ...(showCompras ? [{ label: 'Compras', val: compras }] : []),
   ];
   const ctr = imp > 0 ? cliques/imp*100 : 0;
   const cr = cliques > 0 ? pv/cliques*100 : 0;
   const taxaCk = pv > 0 ? ck/pv*100 : 0;
+  const taxaCompra = pv > 0 ? compras/pv*100 : 0;
   const noData = inv === 0 && cliques === 0;
   return `<div class="funil-block">
     <div class="funil-block-title">${label}</div>
@@ -779,6 +782,7 @@ function renderFunilBlock(dias, label, gradient) {
         <div class="funil-mini-tax"><span>CTR</span><span>${pct(ctr)}</span></div>
         <div class="funil-mini-tax"><span>Connect Rate</span><span>${pct(cr)}</span></div>
         <div class="funil-mini-tax"><span>Taxa CK</span><span>${pct(taxaCk)}</span></div>
+        ${showCompras ? `<div class="funil-mini-tax"><span>Taxa Compra</span><span>${pct(taxaCompra)}</span></div>` : ''}
         <div class="funil-mini-tax"><span>Invest.</span><span style="font-size:11px">${brl(inv)}</span></div>
       </div>`
     }
@@ -789,9 +793,9 @@ function renderFunil(dias) {
   const frioD = filteredFrio();
   const quenteD = filteredQuente();
   document.getElementById('funil-3col').innerHTML = [
-    renderFunilBlock(dias, '🌐 Geral', null),
-    renderFunilBlock(frioD, '❄️ Frio', 'linear-gradient(90deg,#4facfe,#00f2fe)'),
-    renderFunilBlock(quenteD, '🔥 Quente', 'linear-gradient(90deg,#e74c3c,#ff6b6b)'),
+    renderFunilBlock(dias, '🌐 Geral', null, true),
+    renderFunilBlock(frioD, '❄️ Frio', 'linear-gradient(90deg,#4facfe,#00f2fe)', false),
+    renderFunilBlock(quenteD, '🔥 Quente', 'linear-gradient(90deg,#e74c3c,#ff6b6b)', false),
   ].join('');
 
   const cliques = dias.reduce((s,d) => s + d.cliques, 0);
