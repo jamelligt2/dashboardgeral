@@ -367,6 +367,7 @@ async function loadData() {
 
     // Parse webhook sales — ALL approved for cards, meta_ads only for metrics
     const wSalesByDate = {};
+    const wSalesByDateFrio = {}, wSalesByDateQuente = {};
     let totalWbkSales = 0;
     VENDAS_LIST = [];
     wRows.forEach(r => {
@@ -404,6 +405,10 @@ async function loadData() {
       wSalesByDate[d].fat += price;
       wSalesByDate[d].compras++;
       totalWbkSales++;
+      // Atribui ao funil por temperatura via UTM medium
+      const audW = classifyAudience(utmMedium);
+      const audMapW = audW === 'frio' ? wSalesByDateFrio : audW === 'quente' ? wSalesByDateQuente : null;
+      if (audMapW) { if (!audMapW[d]) audMapW[d] = { fat: 0, compras: 0 }; audMapW[d].fat += price; audMapW[d].compras++; }
     });
 
     // --- Parse Vendas (Eduzz) ---
@@ -457,6 +462,10 @@ async function loadData() {
           wSalesByDate[d].fat += price;
           wSalesByDate[d].compras++;
           totalWbkSales++;
+          // Atribui ao funil por temperatura via UTM medium (ex: FRIO-ADV-ABERTO)
+          const audV = classifyAudience(utmMedium);
+          const audMapV = audV === 'frio' ? wSalesByDateFrio : audV === 'quente' ? wSalesByDateQuente : null;
+          if (audMapV) { if (!audMapV[d]) audMapV[d] = { fat: 0, compras: 0 }; audMapV[d].fat += price; audMapV[d].compras++; }
         }
       });
     }
@@ -480,7 +489,7 @@ async function loadData() {
       diasMap[d].v95 += gvizN(r[v95I]);
       const targetMap = audienceType === 'frio' ? diasMapFrio : audienceType === 'quente' ? diasMapQuente : null;
       if (targetMap) {
-        if (!targetMap[d]) targetMap[d] = { data: d, inv: 0, cliques: 0, pv: 0, ck: 0, imp: 0 };
+        if (!targetMap[d]) targetMap[d] = { data: d, inv: 0, cliques: 0, pv: 0, ck: 0, imp: 0, fat: 0, compras: 0 };
         targetMap[d].inv += gvizN(r[spendI]);
         targetMap[d].cliques += gvizN(r[clickI]);
         targetMap[d].pv += gvizN(r[pvI]);
@@ -493,6 +502,18 @@ async function loadData() {
       if (!diasMap[d]) diasMap[d] = { data: d, inv: 0, cliques: 0, pv: 0, ck: 0, imp: 0, v3s: 0, v95: 0, fat: 0, compras: 0 };
       diasMap[d].fat += wSalesByDate[d].fat;
       diasMap[d].compras += wSalesByDate[d].compras;
+    });
+
+    // Merge vendas por temperatura nos mapas de audiência
+    Object.keys(wSalesByDateFrio).forEach(d => {
+      if (!diasMapFrio[d]) diasMapFrio[d] = { data: d, inv: 0, cliques: 0, pv: 0, ck: 0, imp: 0, fat: 0, compras: 0 };
+      diasMapFrio[d].fat += wSalesByDateFrio[d].fat;
+      diasMapFrio[d].compras += wSalesByDateFrio[d].compras;
+    });
+    Object.keys(wSalesByDateQuente).forEach(d => {
+      if (!diasMapQuente[d]) diasMapQuente[d] = { data: d, inv: 0, cliques: 0, pv: 0, ck: 0, imp: 0, fat: 0, compras: 0 };
+      diasMapQuente[d].fat += wSalesByDateQuente[d].fat;
+      diasMapQuente[d].compras += wSalesByDateQuente[d].compras;
     });
 
     DIAS = Object.values(diasMap).sort((a, b) => toISO(a.data).localeCompare(toISO(b.data)));
