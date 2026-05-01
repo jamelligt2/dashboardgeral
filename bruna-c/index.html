@@ -532,14 +532,22 @@ function inRange(dateStr){
 const DATA_INICIO=new Date(2026,3,25);
 function getFilteredDias(){return(DATA.DIAS||[]).filter(d=>{const dt=parseDMY(d.data);if(dt<DATA_INICIO)return false;return inRange(d.data);});}
 function reaggCri(c){
-  if(!dateFrom&&!dateTo)return c;
-  const days=Object.entries(c.days||{}).filter(([d])=>inRange(d));
+  if(!dateFrom&&!dateTo&&typeof DATA_INICIO==='undefined')return c;
+  const days=Object.entries(c.days||{}).filter(([d])=>{
+    const dt=parseDMY(d);
+    if(typeof DATA_INICIO!=='undefined'&&dt<DATA_INICIO)return false;
+    return inRange(d);
+  });
   const agg=days.reduce((a,[,v])=>({inv:a.inv+v.inv,cliques:a.cliques+v.cliques,pv:a.pv+v.pv,ck:a.ck+v.ck,imp:a.imp+v.imp,compras:a.compras+v.compras,fat:a.fat+v.fat}),{inv:0,cliques:0,pv:0,ck:0,imp:0,compras:0,fat:0});
   return{...c,...agg,ctr:agg.imp>0?safe(agg.cliques/agg.imp*100):0,cpc:agg.cliques>0?safe(agg.inv/agg.cliques):0,connectRate:agg.cliques>0?safe(agg.pv/agg.cliques*100):0};
 }
 function reaggPub(p){
-  if(!dateFrom&&!dateTo)return p;
-  const days=Object.entries(p.days||{}).filter(([d])=>inRange(d));
+  if(!dateFrom&&!dateTo&&typeof DATA_INICIO==='undefined')return p;
+  const days=Object.entries(p.days||{}).filter(([d])=>{
+    const dt=parseDMY(d);
+    if(typeof DATA_INICIO!=='undefined'&&dt<DATA_INICIO)return false;
+    return inRange(d);
+  });
   const agg=days.reduce((a,[,v])=>({inv:a.inv+v.inv,cliques:a.cliques+v.cliques,pv:a.pv+v.pv,ck:a.ck+v.ck,imp:a.imp+v.imp}),{inv:0,cliques:0,pv:0,ck:0,imp:0});
   return{...p,...agg,ctr:agg.imp>0?safe(agg.cliques/agg.imp*100):0,cpc:agg.cliques>0?safe(agg.inv/agg.cliques):0,connectRate:agg.cliques>0?safe(agg.pv/agg.cliques*100):0};
 }
