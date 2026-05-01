@@ -232,6 +232,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
 const SHEET_ID = '1Lcn6DZkYgWVUFyblLZaRLMKZ8R_m2hZklaZCayoFUUY';
 const GERENCIADOR_SHEET = 'Gerenciador';
 const WEBHOOK_SHEET = 'Webhook';
+const VENDAS_SHEET = 'Vendas';
 
 // ============ STATE ============
 let DIAS = [], SEMANAL = [], MENSAL = [], CRIATIVOS = [], PUBLICOS = [];
@@ -276,9 +277,10 @@ function gvizS(v) { return (v && v.v !== null && v.v !== undefined) ? String(v.v
 async function loadData() {
   setLoading('Carregando dados do Gerenciador...');
   try {
-    const [gGviz, wGviz] = await Promise.all([
+    const [gGviz, wGviz, vGviz] = await Promise.all([
       fetchGviz(GERENCIADOR_SHEET),
-      fetchGviz(WEBHOOK_SHEET)
+      fetchGviz(WEBHOOK_SHEET),
+      fetchGviz(VENDAS_SHEET).catch(() => null)
     ]);
 
     setLoading('Processando Gerenciador...');
@@ -343,6 +345,44 @@ async function loadData() {
       wSalesByDate[d].compras++;
       totalWbkSales++;
     });
+
+    // --- Parse Vendas (Eduzz) ---
+    if (vGviz) {
+      setLoading('Processando vendas manuais (Vendas)...');
+      const { cols: vCols, rows: vRows } = gvizToTable(vGviz);
+      const vI = name => vCols.indexOf(name);
+      const vStatusI = vI('Status');
+      const vSourceI = vI('UTM Source');
+      const vPriceI = vI('Valor da Venda');
+      // Prefer "Data de Pagamento", fallback to "Data de Criação"
+      let vDateI = vI('Data de Pagamento');
+      if (vDateI < 0) vDateI = vI('Data de Criação');
+
+      vRows.forEach(r => {
+        if (!r) return;
+        const status = gvizS(r[vStatusI]).toLowerCase();
+        const source = gvizS(r[vSourceI]).toLowerCase().replace(/[\s_-]/g, '');
+        if (status !== 'paga' && status !== 'paid') return;
+        if (source !== 'metaads' && source !== 'meta') return;
+        // Eduzz price is already in BRL (not centavos)
+        const price = gvizN(r[vPriceI]);
+        if (price <= 0) return;
+        // Date from gviz (may be Date(...) format or string)
+        let d = gvizDate(r[vDateI]);
+        if (!d) {
+          const dateStr = gvizS(r[vDateI]);
+          if (dateStr) {
+            const dt = new Date(dateStr);
+            if (!isNaN(dt)) d = `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`;
+          }
+        }
+        if (!d) return;
+        if (!wSalesByDate[d]) wSalesByDate[d] = { fat: 0, compras: 0 };
+        wSalesByDate[d].fat += price;
+        wSalesByDate[d].compras++;
+        totalWbkSales++;
+      });
+    }
 
     // --- Build DIAS from Gerenciador ---
     setLoading('Calculando métricas diárias...');
