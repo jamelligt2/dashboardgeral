@@ -2,6 +2,9 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JU GOMES - Dashboard Captação | Meta Ads</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -1191,10 +1194,12 @@
                                     <th class="sortable" onclick="sortTable(this, 'publicos', 2)">Investimento</th>
                                     <th class="sortable" onclick="sortTable(this, 'publicos', 3)">Cliques</th>
                                     <th class="sortable" onclick="sortTable(this, 'publicos', 4)">Leads</th>
-                                    <th class="sortable" onclick="sortTable(this, 'publicos', 5)">CPC</th>
-                                    <th class="sortable" onclick="sortTable(this, 'publicos', 6)">CPL</th>
-                                    <th class="sortable" onclick="sortTable(this, 'publicos', 7)">CTR</th>
-                                    <th class="sortable" onclick="sortTable(this, 'publicos', 8)">Status</th>
+                                    <th class="sortable" onclick="sortTable(this, 'publicos', 5)">MQL</th>
+                                    <th class="sortable" onclick="sortTable(this, 'publicos', 6)">CPC</th>
+                                    <th class="sortable" onclick="sortTable(this, 'publicos', 7)">CPL</th>
+                                    <th class="sortable" onclick="sortTable(this, 'publicos', 8)">CPMQL</th>
+                                    <th class="sortable" onclick="sortTable(this, 'publicos', 9)">CTR</th>
+                                    <th class="sortable" onclick="sortTable(this, 'publicos', 10)">Status</th>
                                 </tr>
                             </thead>
                             <tbody id="table-publicos-body"></tbody>
@@ -1218,7 +1223,10 @@
                                     <th class="sortable" onclick="sortTable(this, 'semanal', 5)">CPM</th>
                                     <th class="sortable" onclick="sortTable(this, 'semanal', 6)">CPL</th>
                                     <th class="sortable" onclick="sortTable(this, 'semanal', 7)">Conv. Rate</th>
-                                    <th class="sortable" onclick="sortTable(this, 'semanal', 8)">Tendência</th>
+                                    <th class="sortable" onclick="sortTable(this, 'semanal', 8)">Qualif.</th>
+                                    <th class="sortable" onclick="sortTable(this, 'semanal', 9)">Taxa Qualif.</th>
+                                    <th class="sortable" onclick="sortTable(this, 'semanal', 10)">CPMQL</th>
+                                    <th class="sortable" onclick="sortTable(this, 'semanal', 11)">Tendência</th>
                                 </tr>
                             </thead>
                             <tbody id="table-semanal-body"></tbody>
@@ -1348,6 +1356,11 @@
             ],
         };
 
+        // Helper: lead qualificado = faturamento >= threshold E utm_source = meta_ads
+        function isQualified(form) {
+            return form.faturamento >= CONFIG.qualThreshold && form.utmSource === 'meta_ads';
+        }
+
         // GLOBAL STATE
         let allData = {
             captacao: [],
@@ -1387,8 +1400,15 @@
             } else if (lastComma > -1) {
                 // Only comma: could be BR decimal (66,80)
                 s = s.replace(',', '.');
+            } else if (lastDot > -1) {
+                // Only dot: check if BR thousands separator (exactly 3 digits after dot)
+                // e.g. "5.000" → 5000, "15.000" → 15000 (NOT US decimal 5.0 or 15.0)
+                const afterDot = s.substring(lastDot + 1);
+                if (afterDot.length === 3) {
+                    s = s.replace(/\./g, ''); // remove thousands dot → "5000"
+                }
+                // else: true decimal like "66.80" — leave as is
             }
-            // If only dot: it's already US decimal (66.80) — leave as is
             return parseFloat(s) || 0;
         }
 
@@ -1550,7 +1570,7 @@
                 startIdx = 1;
             }
 
-            let colDate, colDateAlt, colId, colFaturamento, colUtmContent, colEstado, colCidade;
+            let colDate, colDateAlt, colId, colFaturamento, colUtmContent, colUtmSource, colEstado, colCidade;
 
             if (hasHeaders) {
                 colDate = findCol(firstRow, ['enviado às', 'enviado']);
@@ -1558,6 +1578,7 @@
                 colId = findCol(firstRow, ['id']);
                 colFaturamento = findCol(firstRow, ['faturamento', 'faturamento médio']);
                 colUtmContent = findCol(firstRow, ['utm_content', 'utm content']);
+                colUtmSource = findCol(firstRow, ['utm_source', 'utm source']);
                 colEstado = findCol(firstRow, ['estado', 'state']);
                 colCidade = findCol(firstRow, ['cidade', 'city']);
             } else {
@@ -1566,6 +1587,7 @@
                 colId = 2;
                 colFaturamento = 10;
                 colUtmContent = 21;
+                colUtmSource = 18;
                 colEstado = 28;
                 colCidade = 29;
             }
@@ -1610,14 +1632,9 @@
                 if (!parsedDate && colDateAlt >= 0) parsedDate = parseAnyDate(row[colDateAlt]);
                 if (!parsedDate && colId >= 0) parsedDate = dateFromObjectId(row[colId]);
 
-                // Skip rows with no date AND no meaningful data
-                if (!parsedDate) {
-                    // Check if row has any useful data (name or faturamento)
-                    const hasData = row[4] || row[colFaturamento];
-                    if (!hasData) continue;
-                    // Use today as last resort
-                    parsedDate = new Date();
-                }
+                // Skip rows with no parseable date — never assign today as fallback
+                // (leads with bad/missing dates would pollute the current month's count)
+                if (!parsedDate) continue;
 
                 if (isNaN(parsedDate.getTime())) continue;
 
@@ -1625,6 +1642,7 @@
                     date: parsedDate,
                     faturamento: parseFaturamento(row[colFaturamento] || ''),
                     utmContent: row[colUtmContent] || '',
+                    utmSource: (row[colUtmSource] || '').toLowerCase().trim(),
                     estado: row[colEstado] || '',
                     cidade: row[colCidade] || '',
                 });
@@ -1777,18 +1795,20 @@
                         impressions: 0,
                         clicks: 0,
                         leads: 0,
+                        qualified: 0,
                     };
                 }
                 map[key].spend += row.spend;
                 map[key].impressions += row.impressions;
                 map[key].clicks += row.clicks;
             });
-            // Leads do Forms por adset (via ad → adset mapping, match exato)
+            // Leads e Qualificados do Forms por adset (via ad → adset mapping)
             filteredData.forms.forEach((form) => {
                 const utmLower = (form.utmContent || '').toLowerCase().trim();
                 const matchedAdset = adToAdset[Object.keys(adToAdset).find(ad => ad.toLowerCase().trim() === utmLower)];
                 if (matchedAdset && map[matchedAdset]) {
                     map[matchedAdset].leads += 1;
+                    if (isQualified(form)) map[matchedAdset].qualified += 1;
                 }
             });
             return Object.values(map);
@@ -1853,6 +1873,7 @@
                         impressions: 0,
                         clicks: 0,
                         leads: 0,
+                        qualified: 0,
                         startDate: getWeekStart(row.date),
                     };
                 }
@@ -1860,11 +1881,12 @@
                 map[key].impressions += row.impressions;
                 map[key].clicks += row.clicks;
             });
-            // Leads do Forms
+            // Leads e Qualificados do Forms
             filteredData.forms.forEach((form) => {
                 const key = getWeekKey(form.date);
                 if (map[key]) {
                     map[key].leads += 1;
+                    if (isQualified(form)) map[key].qualified += 1;
                 }
             });
             return Object.values(map).sort((a, b) => a.startDate - b.startDate);
@@ -1886,6 +1908,7 @@
                         impressions: 0,
                         clicks: 0,
                         leads: 0,
+                        qualified: 0,
                         days: new Set(),
                     };
                 }
@@ -1894,11 +1917,12 @@
                 map[key].clicks += row.clicks;
                 map[key].days.add(dateToString(row.date));
             });
-            // Leads do Forms
+            // Leads e Qualificados do Forms
             filteredData.forms.forEach((form) => {
                 const key = getMonthKey(form.date);
                 if (map[key]) {
                     map[key].leads += 1;
+                    if (isQualified(form)) map[key].qualified += 1;
                 }
             });
             return Object.values(map)
@@ -1974,7 +1998,7 @@
             // Leads = total de formulários enviados (Forms sheet)
             const totalLeads = filteredData.forms.length;
             // Qualificados = formulários com faturamento >= threshold
-            const totalQualified = filteredData.forms.filter(f => f.faturamento >= CONFIG.qualThreshold).length;
+            const totalQualified = filteredData.forms.filter(f => isQualified(f)).length;
 
             return {
                 spend: totalSpend,
@@ -2012,7 +2036,7 @@
                 <div class="kpi-card">
                     <div class="kpi-label">Leads Qualificados</div>
                     <div class="kpi-value">${Math.round(metrics.qualified)}</div>
-                    <div class="kpi-unit">faturamento ≥ R$${CONFIG.qualThreshold.toLocaleString('pt-BR')}</div>
+                    <div class="kpi-unit">Meta Ads · fat. ≥ R$${CONFIG.qualThreshold.toLocaleString('pt-BR')}</div>
                 </div>
                 <div class="kpi-card">
                     <div class="kpi-label">Taxa de Qualificação</div>
@@ -2089,7 +2113,7 @@
                         <span class="funnel-bar-label">Qualificados</span>
                     </div>
                 </div>
-                <div class="funnel-note">* Leads qualificados = faturamento ≥ R$ ${CONFIG.qualThreshold.toLocaleString('pt-BR')}/mês</div>
+                <div class="funnel-note">* Leads qualificados = utm_source Meta Ads + faturamento ≥ R$ ${CONFIG.qualThreshold.toLocaleString('pt-BR')}/mês</div>
             `;
             document.getElementById('tab0-funnel').innerHTML = funnelHtml;
 
@@ -2170,7 +2194,7 @@
             const cplData = dailyData.map((d) => {
                 const qualified = Array.from(new Set(
                     filteredData.forms
-                        .filter((f) => dateToString(f.date) === dateToString(d.date) && f.faturamento >= CONFIG.qualThreshold)
+                        .filter((f) => dateToString(f.date) === dateToString(d.date) && isQualified(f))
                         .map((f) => f.utmContent)
                 )).length;
                 return {
@@ -2431,20 +2455,33 @@
                 ...d,
                 cpc: d.clicks > 0 ? d.spend / d.clicks : 0,
                 cpl: d.leads > 0 ? d.spend / d.leads : 0,
+                cplQual: d.qualified > 0 ? d.spend / d.qualified : 0,
                 ctr: d.impressions > 0 ? (d.clicks / d.impressions) * 100 : 0,
                 status: 'PAUSAR',
             }));
 
-            // Determine status
+            // Determine status — prioriza CPMQL quando disponível
             enriched.forEach((item) => {
-                if (item.cpl <= 20) item.status = 'ESCALAR';
-                else if (item.cpl <= 30) item.status = 'TESTAR';
-                else if (item.cpl <= 40) item.status = 'MONITORAR';
-                else item.status = 'PAUSAR';
+                if (item.qualified > 0) {
+                    if (item.cplQual <= 80)  item.status = 'ESCALAR';
+                    else if (item.cplQual <= 110) item.status = 'TESTAR';
+                    else if (item.cplQual <= 150) item.status = 'MONITORAR';
+                    else item.status = 'PAUSAR';
+                } else {
+                    if (item.cpl <= 20) item.status = 'ESCALAR';
+                    else if (item.cpl <= 30) item.status = 'TESTAR';
+                    else if (item.cpl <= 40) item.status = 'MONITORAR';
+                    else item.status = 'PAUSAR';
+                }
             });
 
-            // Sort by CPL
-            enriched.sort((a, b) => a.cpl - b.cpl);
+            // Sort by CPMQL (qualified first), then CPL
+            enriched.sort((a, b) => {
+                if (a.qualified === 0 && b.qualified === 0) return a.cpl - b.cpl;
+                if (a.qualified === 0) return 1;
+                if (b.qualified === 0) return -1;
+                return a.cplQual - b.cplQual;
+            });
 
             // Render table
             let tbody = '';
@@ -2456,8 +2493,10 @@
                         <td class="table-money">${formatMoney(item.spend)}</td>
                         <td class="table-number">${Math.round(item.clicks)}</td>
                         <td class="table-number">${Math.round(item.leads)}</td>
+                        <td class="table-number">${item.qualified > 0 ? Math.round(item.qualified) : '-'}</td>
                         <td class="table-money">${formatMoney(item.cpc)}</td>
                         <td class="table-money">${item.leads > 0 ? formatMoney(item.cpl) : '-'}</td>
+                        <td class="table-money">${item.qualified > 0 ? formatMoney(item.cplQual) : '-'}</td>
                         <td class="table-number">${formatPercent(item.ctr)}</td>
                         <td><span class="status-badge status-${item.status.toLowerCase()}">${item.status}</span></td>
                     </tr>
@@ -2476,6 +2515,8 @@
                 ctr: d.impressions > 0 ? (d.clicks / d.impressions) * 100 : 0,
                 convRate: d.clicks > 0 ? (d.leads / d.clicks) * 100 : 0,
                 cpm: d.impressions > 0 ? (d.spend / d.impressions) * 1000 : 0,
+                qualRate: d.leads > 0 ? (d.qualified / d.leads) * 100 : 0,
+                cplQual: d.qualified > 0 ? d.spend / d.qualified : 0,
             }));
 
             // Calculate trend
@@ -2505,6 +2546,9 @@
                         <td class="table-money">${formatMoney(item.cpm)}</td>
                         <td class="table-money">${item.leads > 0 ? formatMoney(item.cpl) : '-'}</td>
                         <td class="table-number">${formatPercent(item.convRate)}</td>
+                        <td class="table-number">${Math.round(item.qualified)}</td>
+                        <td class="table-number">${formatPercent(item.qualRate)}</td>
+                        <td class="table-money">${item.qualified > 0 ? formatMoney(item.cplQual) : '-'}</td>
                         <td style="color: ${item.trend === '▲' ? '#00d68f' : item.trend === '▼' ? '#ff3d71' : '#a0a0a0'};">${item.trend}</td>
                     </tr>
                 `;
@@ -2609,7 +2653,7 @@
                         return fDate >= week.startDate && fDate < new Date(week.startDate.getTime() + 7 * 24 * 60 * 60 * 1000);
                     }
                 );
-                const qualLeads = weekLeads.filter((f) => f.faturamento >= CONFIG.qualThreshold).length;
+                const qualLeads = weekLeads.filter((f) => isQualified(f)).length;
                 qualByWeek[week.week] = qualLeads > 0 ? week.spend / qualLeads : 0;
             });
 
@@ -2679,6 +2723,9 @@
                 cpc: month1.clicks > 0 ? month1.spend / month1.clicks : 0,
                 ctr: month1.impressions > 0 ? (month1.clicks / month1.impressions) * 100 : 0,
                 activeDays: month1.activeDays,
+                qualified: month1.qualified || 0,
+                qualRate: month1.leads > 0 ? ((month1.qualified || 0) / month1.leads) * 100 : 0,
+                cplQual: (month1.qualified || 0) > 0 ? month1.spend / month1.qualified : 0,
             };
 
             const metrics2 = {
@@ -2690,6 +2737,9 @@
                 cpc: month2.clicks > 0 ? month2.spend / month2.clicks : 0,
                 ctr: month2.impressions > 0 ? (month2.clicks / month2.impressions) * 100 : 0,
                 activeDays: month2.activeDays,
+                qualified: month2.qualified || 0,
+                qualRate: month2.leads > 0 ? ((month2.qualified || 0) / month2.leads) * 100 : 0,
+                cplQual: (month2.qualified || 0) > 0 ? month2.spend / month2.qualified : 0,
             };
 
             // KPI Cards
@@ -2766,6 +2816,25 @@
                     m1: metrics1.ctr,
                     m2: metrics2.ctr,
                     format: 'percent',
+                },
+                {
+                    label: 'Qualificados',
+                    m1: metrics1.qualified,
+                    m2: metrics2.qualified,
+                    format: 'number',
+                },
+                {
+                    label: 'Taxa Qualif.',
+                    m1: metrics1.qualRate,
+                    m2: metrics2.qualRate,
+                    format: 'percent',
+                },
+                {
+                    label: 'CPLQ',
+                    m1: metrics1.cplQual,
+                    m2: metrics2.cplQual,
+                    format: 'money',
+                    inverted: true,
                 },
             ];
 
@@ -2880,7 +2949,7 @@
                 const estado = f.estado || 'Não informado';
                 if (!stateMap[estado]) stateMap[estado] = { leads: 0, qualified: 0 };
                 stateMap[estado].leads += 1;
-                if (f.faturamento >= CONFIG.qualThreshold) stateMap[estado].qualified += 1;
+                if (isQualified(f)) stateMap[estado].qualified += 1;
             });
 
             const stateData = Object.entries(stateMap)
@@ -2895,7 +2964,7 @@
 
             const totalEstados = stateData.filter(s => s.estado !== 'Não informado').length;
             const topEstado = stateData[0] || { estado: '-', leads: 0 };
-            const totalQualified = forms.filter(f => f.faturamento >= CONFIG.qualThreshold).length;
+            const totalQualified = forms.filter(f => isQualified(f)).length;
 
             // KPIs
             document.getElementById('tab5-kpi').innerHTML = `
@@ -2922,7 +2991,7 @@
                 <div class="kpi-card">
                     <div class="kpi-label">Qualificados</div>
                     <div class="kpi-value">${totalQualified}</div>
-                    <div class="kpi-unit">faturamento ≥ R$${CONFIG.qualThreshold.toLocaleString('pt-BR')}</div>
+                    <div class="kpi-unit">Meta Ads · fat. ≥ R$${CONFIG.qualThreshold.toLocaleString('pt-BR')}</div>
                 </div>
             `;
 
