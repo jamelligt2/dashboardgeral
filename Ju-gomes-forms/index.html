@@ -1804,15 +1804,27 @@
                 map[key].impressions += row.impressions;
                 map[key].clicks += row.clicks;
             });
-            // Leads e MQLs do Forms usando coluna U (adset direto do formulário)
+            // Leads e MQLs do Forms usando coluna U — match parcial com adsets da Captação
+            const adsetKeys = Object.keys(map);
             filteredData.forms.forEach((form) => {
-                const key = (form.adset || '').trim();
-                if (!key) return;
-                if (!map[key]) {
-                    map[key] = { adset: key, spend: 0, impressions: 0, clicks: 0, leads: 0, qualified: 0 };
+                const formAdset = (form.adset || '').toLowerCase().trim();
+                if (!formAdset) return;
+                // Tenta match exato primeiro, depois parcial (um contém o outro)
+                let matchedKey = adsetKeys.find(k => k.toLowerCase().trim() === formAdset);
+                if (!matchedKey) {
+                    matchedKey = adsetKeys.find(k => {
+                        const kl = k.toLowerCase();
+                        return kl.includes(formAdset) || formAdset.includes(kl);
+                    });
                 }
-                map[key].leads += 1;
-                if (isQualified(form)) map[key].qualified += 1;
+                if (!matchedKey) {
+                    // Cria entrada nova caso não haja match (sem dados de spend)
+                    matchedKey = form.adset.trim();
+                    map[matchedKey] = { adset: matchedKey, spend: 0, impressions: 0, clicks: 0, leads: 0, qualified: 0 };
+                    adsetKeys.push(matchedKey);
+                }
+                map[matchedKey].leads += 1;
+                if (isQualified(form)) map[matchedKey].qualified += 1;
             });
             return Object.values(map);
         }
