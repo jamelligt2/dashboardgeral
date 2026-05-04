@@ -168,6 +168,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
 
 <!-- VISÃO GERAL -->
 <div id="tab-visao" class="content active">
+  <div id="origem-vendas" style="background:rgba(255,107,43,.05);border:1px solid rgba(255,107,43,.15);border-radius:8px;padding:8px 14px;margin-bottom:14px;font-size:11px;color:rgba(255,255,255,.7);font-family:'DM Mono',monospace;display:flex;gap:18px;flex-wrap:wrap;align-items:center"></div>
   <div class="kpi-grid" id="kpi-visao"></div>
 
   <div class="vendas-section" id="vendas-section" style="display:none">
@@ -727,18 +728,26 @@ function processWebhookEduzz(csv) {
     const orderId = idx.orderid >=0 ? (r[idx.orderid]||'').trim() : '';
     if (orderId && SEEN_ORDER_IDS.has(orderId)) return;
     if (orderId) SEEN_ORDER_IDS.add(orderId);
-    // trans_value vem em REAIS (Eduzz não envia em centavos)
-    const valor = parseFloat(String(r[idx.valor]||'0').replace(',', '.')) || 0;
-    const dataRaw = (r[idx.dataPag]||'') + ' ' + (r[idx.horaPag]||'');
-    const dataRawFallback = (r[idx.dataCri]||'') + ' ' + (r[idx.horaCri]||'');
-    const dataBR = normalizeDateBR(dataRaw.trim()) || normalizeDateBR(dataRawFallback.trim());
-    if (!dataBR) return;
+    // Valor: aceita "R$ 297,00", "297,00", "297.00", "29700" (centavos)
+    const valor = parseEduzzValue(r[idx.valor]);
+    // Data: tenta paiddate+horaPag, depois createdate+horaCri, depois HOJE como último recurso
+    const dataRaw = ((r[idx.dataPag]||'') + ' ' + (r[idx.horaPag]||'')).trim();
+    const dataRawFb = ((r[idx.dataCri]||'') + ' ' + (r[idx.horaCri]||'')).trim();
+    let dataBR = normalizeDateBR(dataRaw) || normalizeDateBR(dataRawFb);
+    let iso = saleIsoFromBR(dataBR, dataRaw || dataRawFb);
+    if (!dataBR) {
+      // Fallback final: usa data de hoje pra não perder a venda
+      const hoje = new Date();
+      dataBR = String(hoje.getDate()).padStart(2,'0')+'/'+String(hoje.getMonth()+1).padStart(2,'0')+'/'+hoje.getFullYear();
+      iso = hoje.toISOString();
+      console.warn('[webhook_eduzz] sem data parseável p/', r[idx.nome], '— usando hoje');
+    }
     RAW_SALES_ITEMS.push({
       cliente: r[idx.nome] || 'Cliente',
       email: (r[idx.email]||'').toLowerCase().trim(),
       valor,
       dataBR,
-      iso: saleIsoFromBR(dataBR, dataRaw.trim() || dataRawFallback.trim()),
+      iso,
       produto: r[idx.produto] || '',
       criativo: String(idx.content>=0 ? (r[idx.content]||'') : '').split('::')[0].trim(),
       campanha: idx.medium>=0 ? (r[idx.medium]||'') : '',
@@ -747,6 +756,25 @@ function processWebhookEduzz(csv) {
       orderId
     });
   });
+}
+
+// Parser de valor ultra-tolerante: aceita "R$ 297,00", "297.00", "297,00", "29700" (centavos), "R$ 1.299,90"
+function parseEduzzValue(raw){
+  if (raw === null || raw === undefined) return 0;
+  let s = String(raw).replace(/r\$\s?/i,'').replace(/"/g,'').trim();
+  if (!s) return 0;
+  // Se tem vírgula → BR (ex: "1.299,90" ou "297,00")
+  if (s.includes(',')) {
+    s = s.replace(/\./g,'').replace(',', '.');
+    return parseFloat(s) || 0;
+  }
+  // Se tem ponto E mais de 2 casas → US (ex: "297.00")
+  if (s.includes('.')) return parseFloat(s) || 0;
+  // Se é só dígitos e tem >=4 dígitos → pode ser centavos (ex: "29700" = R$ 297,00)
+  // Mas se for valor pequeno tipo "297" mantém como reais.
+  const n = parseFloat(s) || 0;
+  if (/^\d{4,}$/.test(s) && n >= 1000) return n / 100;  // assume centavos quando ≥ 4 dígitos sem decimal
+  return n;
 }
 
 // =================== COMMIT: agrupa items por pedido (Imersão + bumps) ===================
@@ -1300,6 +1328,7 @@ function renderMensal(){
 function renderAll(){
   const dias = filteredDias();
   renderKpiVisao(dias);
+  renderOrigemVendas();
   renderVendasRastreadas();
   renderFunil(dias);
   renderTaxaGrid(dias);
@@ -1308,6 +1337,29 @@ function renderAll(){
   renderPublicos();
   renderSemanal();
   renderMensal();
+}
+
+function renderOrigemVendas(){
+  const el = document.getElementById('origem-vendas');
+  if (!el) return;
+  const counts = RAW_SALES_ITEMS.reduce((acc,it)=>{
+    acc[it.origem] = (acc[it.origem]||0)+1;
+    return acc;
+  }, {});
+  const labels = {
+    'vendas': 'Kiwify export',
+    'webhook': 'Kiwify webhook',
+    'vendas_eduzz': 'Eduzz export',
+    'webhook_eduzz': 'Eduzz webhook'
+  };
+  const parts = Object.entries(labels).map(([k,lbl]) => {
+    const n = counts[k] || 0;
+    const cor = n > 0 ? '#2ecc71' : 'rgba(255,255,255,.3)';
+    return `<span><span style="color:rgba(255,255,255,.4)">${lbl}:</span> <b style="color:${cor};font-weight:700">${n}</b></span>`;
+  });
+  parts.unshift(`<span><span style="color:rgba(255,255,255,.4)">📦 Linhas de venda capturadas:</span> <b style="color:#ff6b2b">${RAW_SALES_ITEMS.length}</b></span>`);
+  parts.push(`<span style="color:rgba(255,255,255,.3);font-size:10px">→ <a href="debug.html" style="color:rgba(255,107,43,.7);text-decoration:none">debug por aba</a></span>`);
+  el.innerHTML = parts.join('');
 }
 
 // =================== RELOAD MANUAL ===================
