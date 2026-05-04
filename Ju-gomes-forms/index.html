@@ -1808,9 +1808,9 @@
                 map[key].impressions += row.impressions;
                 map[key].clicks += row.clicks;
             });
-            // Leads e MQLs do Forms usando coluna U — match parcial com adsets da Captação
+            // Leads e MQLs do Forms usando coluna U — apenas meta_ads
             const adsetKeys = Object.keys(map);
-            filteredData.forms.forEach((form) => {
+            filteredData.forms.filter(f => f.utmSource === 'meta_ads').forEach((form) => {
                 const formAdset = (form.adset || '').toLowerCase().trim();
                 if (!formAdset) return;
                 // Tenta match exato primeiro, depois parcial (um contém o outro)
@@ -2014,10 +2014,11 @@
             const totalClicks = data.reduce((s, r) => s + r.clicks, 0);
             const totalLeadsGerenciador = data.reduce((s, r) => s + r.leads, 0);
 
-            // Leads = total de formulários enviados (Forms sheet)
-            const totalLeads = filteredData.forms.length;
-            // Qualificados = formulários com faturamento >= threshold
-            const totalQualified = filteredData.forms.filter(f => isQualified(f)).length;
+            // Leads = apenas formulários com origem meta_ads
+            const metaForms = filteredData.forms.filter(f => f.utmSource === 'meta_ads');
+            const totalLeads = metaForms.length;
+            // Qualificados = meta_ads + faturamento >= threshold
+            const totalQualified = metaForms.filter(f => isQualified(f)).length;
 
             return {
                 spend: totalSpend,
