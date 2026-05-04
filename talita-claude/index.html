@@ -153,6 +153,8 @@ tr:hover td{background:rgba(255,255,255,.025)}
     <button class="preset-btn" onclick="setPreset(30,this)">30d</button>
     <button class="preset-btn active" id="btn-all" onclick="setPreset('all',this)">Tudo</button>
     <span class="range-info" id="range-info"></span>
+    <button class="preset-btn" id="btn-reload" onclick="reloadData()" title="Recarregar dados da planilha (sem cache)" style="margin-left:12px">↻ Reload</button>
+    <span id="last-update" style="font-size:10px;color:rgba(255,255,255,.35);font-family:'DM Mono',monospace;padding-left:6px"></span>
   </div>
 </div>
 
@@ -306,8 +308,9 @@ let pubFilter = 'todos', pubSort = 'inv';
 
 // =================== FETCH + PARSE ===================
 async function fetchSheetCSV(sheetName) {
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
-  const r = await fetch(url);
+  // Cache-bust: gviz cacheia ~5min. Timestamp na query força sempre dados frescos.
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}&_=${Date.now()}`;
+  const r = await fetch(url, { cache: 'no-store' });
   if (!r.ok) throw new Error(`Erro ao carregar "${sheetName}": ${r.status}`);
   return await r.text();
 }
@@ -695,22 +698,48 @@ function processWebhookEduzz(csv) {
     src:      utmSrcIdx, medium: utmMedIdx, camp: utmCampIdx, content: utmContIdx
   };
 
-  // Eduzz status pago: "paid" / "Paga" / "1" — aceita variantes
-  const isPaid = (s) => {
-    if (!s) return false;
-    const v = String(s).toLowerCase().replace(/"/g,'').trim();
-    return v === 'paid' || v === 'paga' || v === 'pago' || v === '1';
+  // Eduzz: regra simplificada. NÃO filtra por status (Eduzz manda em vários formatos)
+  // Considera venda válida se: tem source meta_ads + campanha contém "claude" + tem valor > 0
+  // Status de cancelamento/reembolso explícito EXCLUI a venda
+  const isCancelled = (statusVal) => {
+    const v = String(statusVal||'').toLowerCase().replace(/"/g,'').trim();
+    return ['3','8','9','cancelled','canceled','cancelada','refunded','refund','reembolsada','chargeback','contestado'].includes(v);
   };
 
   const sales = rows.slice(1)
     .filter(r => r.length > 5)
-    .filter(r => isPaid(r[idx.status]))
     .filter(r => idx.src >= 0 && r[idx.src] && normKey(r[idx.src]) === META_SOURCE_FILTER)
     .filter(r => {
       const med = (idx.medium >= 0 ? (r[idx.medium]||'') : '').toLowerCase();
       const cam = (idx.camp   >= 0 ? (r[idx.camp]||'')   : '').toLowerCase();
       return med.includes(CAMPAIGN_FILTER) || cam.includes(CAMPAIGN_FILTER);
+    })
+    .filter(r => {
+      const valor = parseFloat(String(r[idx.valor]||'0').replace(',', '.')) || 0;
+      return valor > 0; // tem dinheiro que entrou
+    })
+    .filter(r => !isCancelled(r[idx.status]));
+
+  console.log('[webhook_eduzz] cols:', header.length,
+    '| src@'+idx.src, 'medium@'+idx.medium, 'camp@'+idx.camp, 'status@'+idx.status, 'valor@'+idx.valor, 'paiddate@'+idx.dataPag);
+  console.log('[webhook_eduzz] linhas brutas:', rows.length-1, '| pós-filtro:', sales.length);
+  if (sales.length === 0 && rows.length > 1) {
+    console.warn('[webhook_eduzz] NENHUMA venda passou nos filtros. Amostras das 5 primeiras:');
+    rows.slice(1, 6).forEach((r, i) => {
+      console.log(`  L${i+2}:`, {
+        status: r[idx.status], valor: r[idx.valor],
+        src: idx.src>=0?r[idx.src]:'?',
+        medium: (idx.medium>=0?(r[idx.medium]||''):'?').slice(0,50),
+        camp: (idx.camp>=0?(r[idx.camp]||''):'?').slice(0,50),
+        paiddate: r[idx.dataPag]
+      });
     });
+  } else if (sales.length > 0) {
+    console.log('[webhook_eduzz] vendas válidas:', sales.length);
+    sales.forEach((r,i)=>{
+      console.log(`  ✓ ${i+1}: ${r[idx.nome]||'?'} | R$ ${r[idx.valor]} | ${r[idx.dataPag]||r[idx.dataCri]} | ${(r[idx.medium]||'').slice(0,40)}`);
+    });
+  }
 
   sales.forEach(r => {
     const orderId = idx.orderid >=0 ? (r[idx.orderid]||'').trim() : '';
@@ -835,14 +864,40 @@ function rebuildPeriodBuckets(){
 }
 
 function normalizeDateBR(s) {
-  if (!s) return '';
+  if (s === null || s === undefined) return '';
   s = String(s).replace(/"/g,'').trim();
+  if (!s) return '';
   // Try ISO YYYY-MM-DD or YYYY-MM-DDTHH...
   const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
   // Try DD/MM/YYYY already
   const br = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
   if (br) return `${br[1]}/${br[2]}/${br[3]}`;
+  // Try DD-MM-YYYY
+  const brd = s.match(/^(\d{2})-(\d{2})-(\d{4})/);
+  if (brd) return `${brd[1]}/${brd[2]}/${brd[3]}`;
+  // Try YYYY/MM/DD
+  const isoSlash = s.match(/^(\d{4})\/(\d{2})\/(\d{2})/);
+  if (isoSlash) return `${isoSlash[3]}/${isoSlash[2]}/${isoSlash[1]}`;
+  // Try Unix timestamp (10 ou 13 dígitos)
+  if (/^\d{10}$/.test(s) || /^\d{13}$/.test(s)) {
+    const ms = s.length === 10 ? Number(s) * 1000 : Number(s);
+    const d = new Date(ms);
+    if (!isNaN(d.getTime())) {
+      const dd = String(d.getDate()).padStart(2,'0');
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      const yy = d.getFullYear();
+      return `${dd}/${mm}/${yy}`;
+    }
+  }
+  // Última tentativa: Date.parse
+  const parsed = new Date(s);
+  if (!isNaN(parsed.getTime())) {
+    const dd = String(parsed.getDate()).padStart(2,'0');
+    const mm = String(parsed.getMonth()+1).padStart(2,'0');
+    const yy = parsed.getFullYear();
+    return `${dd}/${mm}/${yy}`;
+  }
   return '';
 }
 
@@ -1273,8 +1328,26 @@ function renderAll(){
   renderMensal();
 }
 
+// =================== RELOAD MANUAL ===================
+async function reloadData(){
+  // Reseta state e refaz fetch
+  DIAS = []; SEMANAL = []; MENSAL = []; CRIATIVOS = []; PUBLICOS = [];
+  VENDAS_RASTREADAS = []; RAW_SALES_ITEMS = []; SEEN_ORDER_IDS = new Set();
+  document.getElementById('loading-overlay').style.display = 'flex';
+  document.getElementById('loading-msg').textContent = 'Recarregando da planilha...';
+  await loadData();
+  const now = new Date();
+  document.getElementById('last-update').textContent = 'atualizado ' + now.toLocaleTimeString('pt-BR').slice(0,5);
+}
+
 // =================== BOOT ===================
-document.addEventListener('DOMContentLoaded', () => { loadData(); });
+document.addEventListener('DOMContentLoaded', () => {
+  loadData().then(() => {
+    const now = new Date();
+    const el = document.getElementById('last-update');
+    if (el) el.textContent = 'atualizado ' + now.toLocaleTimeString('pt-BR').slice(0,5);
+  });
+});
 </script>
 </body>
 </html>
