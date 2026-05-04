@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>MQLs por Estado — Jamelli GT</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; padding: 32px 24px; }
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; color: #fff; }
+  .sub { font-size: 13px; color: #64748b; margin-bottom: 28px; }
+  .card { background: #1a1d27; border: 1px solid #2d3748; border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+  .card h2 { font-size: 15px; font-weight: 600; color: #94a3b8; margin-bottom: 16px; text-transform: uppercase; letter-spacing: .05em; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 12px; font-weight: 600; color: #64748b; padding: 8px 12px; border-bottom: 1px solid #2d3748; }
+  td { padding: 10px 12px; font-size: 14px; border-bottom: 1px solid #1e2433; }
+  tr:last-child td { border-bottom: none; }
+  .rank { color: #64748b; font-size: 12px; }
+  .state-name { font-weight: 600; color: #f1f5f9; }
+  .bar-wrap { background: #0f1117; border-radius: 4px; height: 8px; width: 120px; display: inline-block; vertical-align: middle; margin-left: 8px; }
+  .bar { height: 8px; border-radius: 4px; background: linear-gradient(90deg, #6366f1, #8b5cf6); }
+  .mql-count { font-weight: 700; color: #a78bfa; }
+  .pct { color: #64748b; font-size: 12px; }
+  .loading { text-align: center; padding: 60px; color: #64748b; }
+  .err { color: #f87171; padding: 16px; background: #1f0a0a; border-radius: 8px; }
+  .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+  .kpi { background: #1a1d27; border: 1px solid #2d3748; border-radius: 10px; padding: 18px; }
+  .kpi-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+  .kpi-value { font-size: 26px; font-weight: 700; color: #fff; }
+  .kpi-sub { font-size: 12px; color: #64748b; margin-top: 4px; }
+  .medal { font-size: 18px; margin-right: 6px; }
+</style>
+</head>
+<body>
+
+<h1>📍 MQLs por Estado</h1>
+<p class="sub">Todos os dados do Forms — leads qualificados (faturamento ≥ R$8.000 + origem meta_ads)</p>
+
+<div id="loading" class="loading">⏳ Carregando dados do Forms...</div>
+<div id="main" style="display:none"></div>
+
+<script>
+const SHEET_ID = '1O7xzXMxQuvQqsw3HXbc5d8q_FvLhi-hCHHrBqFwtk5E';
+const FORMS_SHEET = 'Forms';
+const QUAL_THRESHOLD = 8000;
+
+function parseMoney(s) {
+  if (s == null) return 0;
+  s = String(s).replace(/R\$\s*/g, '').replace(/\s/g, '').trim();
+  if (!s || s === '-') return 0;
+  const lastComma = s.lastIndexOf(',');
+  const lastDot = s.lastIndexOf('.');
+  if (lastComma > lastDot) {
+    s = s.replace(/\./g, '').replace(',', '.');
+  } else if (lastDot > -1) {
+    const afterDot = s.substring(lastDot + 1);
+    if (afterDot.length === 3) {
+      s = s.replace(/\./g, '');
+    }
+  }
+  return parseFloat(s) || 0;
+}
+
+function findCol(headers, names) {
+  for (const name of names) {
+    const idx = headers.findIndex(h => h.toLowerCase().trim().includes(name.toLowerCase()));
+    if (idx >= 0) return idx;
+  }
+  return -1;
+}
+
+async function loadForms() {
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(FORMS_SHEET)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Falha ao carregar Forms: ' + res.status);
+  const csv = await res.text();
+  const parsed = Papa.parse(csv, { skipEmptyLines: true });
+  return parsed.data;
+}
+
+function processData(rows) {
+  if (!rows || rows.length < 2) return [];
+  const headers = rows[0].map(h => h.toLowerCase().trim());
+
+  const colFaturamento = findCol(headers, ['faturamento', 'receita', 'revenue']);
+  const colUtmSource   = findCol(headers, ['utm_source', 'utmsource', 'origem', 'source']);
+  const colEstado      = findCol(headers, ['estado', 'state', 'uf']);
+  const colCidade      = findCol(headers, ['cidade', 'city']);
+  const colVendeDigital = findCol(headers, ['vende digital', 'vendedigital', 'digital']);
+
+  // fallbacks by index (as established in prior sessions)
+  const colFat  = colFaturamento >= 0 ? colFaturamento : 10;
+  const colSrc  = colUtmSource   >= 0 ? colUtmSource   : 18;
+  const colEst  = colEstado      >= 0 ? colEstado      : 28;
+  const colCid  = colCidade      >= 0 ? colCidade      : 29;
+
+  console.log('Cols:', { colFat, colSrc, colEst, colCid });
+
+  const leads = [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || row.length < 5) continue;
+    const utmSource  = (row[colSrc] || '').toLowerCase().trim();
+    const faturamento = parseMoney(row[colFat]);
+    const estado = (row[colEst] || '').trim();
+    const cidade = (row[colCid] || '').trim();
+    const isQual = utmSource === 'meta_ads' && faturamento >= QUAL_THRESHOLD;
+    leads.push({ utmSource, faturamento, estado, cidade, isQual });
+  }
+  return leads;
+}
+
+function buildUI(leads) {
+  const totalLeads = leads.filter(l => l.utmSource === 'meta_ads').length;
+  const mqls = leads.filter(l => l.isQual);
+  const totalMqls = mqls.length;
+
+  // Group by estado
+  const byState = {};
+  mqls.forEach(l => {
+    const est = l.estado || '(não informado)';
+    byState[est] = (byState[est] || 0) + 1;
+  });
+
+  // Group all meta_ads leads by state for context
+  const allByState = {};
+  leads.filter(l => l.utmSource === 'meta_ads').forEach(l => {
+    const est = l.estado || '(não informado)';
+    allByState[est] = (allByState[est] || 0) + 1;
+  });
+
+  const sorted = Object.entries(byState).sort((a, b) => b[1] - a[1]);
+  const maxCount = sorted[0]?.[1] || 1;
+
+  const medals = ['🥇','🥈','🥉'];
+  const statesCount = sorted.length;
+
+  let rows = sorted.map(([state, count], i) => {
+    const pct = ((count / totalMqls) * 100).toFixed(1);
+    const barPct = (count / maxCount * 100).toFixed(0);
+    const medal = medals[i] || '';
+    const allCount = allByState[state] || 0;
+    const convRate = allCount > 0 ? ((count / allCount) * 100).toFixed(0) : '-';
+    return `
+      <tr>
+        <td class="rank">${i + 1}</td>
+        <td><span class="medal">${medal}</span><span class="state-name">${state}</span></td>
+        <td><span class="mql-count">${count}</span></td>
+        <td class="pct">${pct}%</td>
+        <td>${allCount}</td>
+        <td>${convRate}%</td>
+        <td><span class="bar-wrap"><span class="bar" style="width:${barPct}%"></span></span></td>
+      </tr>`;
+  }).join('');
+
+  document.getElementById('main').innerHTML = `
+    <div class="summary-grid">
+      <div class="kpi">
+        <div class="kpi-label">Total Leads (meta_ads)</div>
+        <div class="kpi-value">${totalLeads}</div>
+        <div class="kpi-sub">Todos os tempos</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Total MQLs</div>
+        <div class="kpi-value">${totalMqls}</div>
+        <div class="kpi-sub">Faturamento ≥ R$8.000</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Estados com MQL</div>
+        <div class="kpi-value">${statesCount}</div>
+        <div class="kpi-sub">Estados únicos representados</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Ranking de Estados por MQL</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Estado</th>
+            <th>MQLs</th>
+            <th>% do total</th>
+            <th>Leads (meta)</th>
+            <th>Taxa MQL</th>
+            <th>Volume</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('main').style.display = 'block';
+}
+
+(async () => {
+  try {
+    const rows = await loadForms();
+    const leads = processData(rows);
+    buildUI(leads);
+  } catch (e) {
+    document.getElementById('loading').innerHTML = `<div class="err">Erro: ${e.message}<br><br>Abra este arquivo num servidor local ou no navegador com acesso à planilha.</div>`;
+    console.error(e);
+  }
+})();
+</script>
+</body>
+</html>

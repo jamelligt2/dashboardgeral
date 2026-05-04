@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MQLs por Região — Jamelli GT</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+:root{
+  --bg:#0b0d14;--surface:#13161f;--border:#1e2435;
+  --text:#e2e8f0;--muted:#64748b;
+  --purple:#7c3aed;--purple2:#a78bfa;--purple3:#c4b5fd;
+  --green:#10b981;--red:#f43f5e;--yellow:#f59e0b;--blue:#3b82f6;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:32px 28px 60px;}
+.container{max-width:1200px;margin:0 auto;}
+
+/* Header */
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:12px;}
+.header-left{display:flex;align-items:center;gap:14px;}
+.logo{width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a78bfa);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#fff;flex-shrink:0;}
+h1{font-size:22px;font-weight:800;color:#fff;}
+.subtitle{font-size:13px;color:var(--muted);margin-top:3px;}
+
+/* Toggle */
+.toggle-wrap{display:flex;background:#0f1117;border:1px solid var(--border);border-radius:12px;padding:4px;gap:4px;}
+.toggle-btn{padding:8px 18px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:transparent;color:var(--muted);transition:all .2s;}
+.toggle-btn.active-meta{background:linear-gradient(135deg,#1d4ed8,#7c3aed);color:#fff;box-shadow:0 2px 12px rgba(124,58,237,.4);}
+.toggle-btn.active-org{background:linear-gradient(135deg,#065f46,#10b981);color:#fff;box-shadow:0 2px 12px rgba(16,185,129,.3);}
+
+/* KPIs */
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 16px;position:relative;overflow:hidden;}
+.kpi::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;}
+.kpi.k1::after{background:linear-gradient(90deg,#7c3aed,#a78bfa);}
+.kpi.k2::after{background:linear-gradient(90deg,#3b82f6,#60a5fa);}
+.kpi.k3::after{background:linear-gradient(90deg,#10b981,#34d399);}
+.kpi.k4::after{background:linear-gradient(90deg,#f59e0b,#fbbf24);}
+.kpi-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;}
+.kpi-value{font-size:30px;font-weight:900;color:#fff;line-height:1;transition:all .3s;}
+.kpi-sub{font-size:11px;color:var(--muted);margin-top:5px;}
+
+/* Source tag */
+.source-tag{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;margin-bottom:20px;}
+.source-tag.meta{background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.3);color:#60a5fa;}
+.source-tag.org{background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3);color:#34d399;}
+
+/* Main layout */
+.main-grid{display:grid;grid-template-columns:1fr 380px;gap:24px;align-items:start;}
+
+/* Map */
+.map-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;}
+.map-card h2{font-size:14px;font-weight:700;color:#fff;margin-bottom:4px;}
+.map-sub{font-size:12px;color:var(--muted);margin-bottom:16px;}
+#brazil-map{width:100%;display:block;}
+#brazil-map path{stroke:#0b0d14;stroke-width:1.5;transition:fill .4s, stroke .15s;cursor:pointer;}
+#brazil-map path:hover{stroke:#fff;stroke-width:2;}
+
+.legend-bar{margin-top:18px;display:flex;align-items:center;gap:10px;}
+.legend-gradient{height:7px;flex:1;border-radius:4px;}
+.lg-meta{background:linear-gradient(90deg,#1a2040,#3b1fa8,#7c3aed,#c4b5fd);}
+.lg-org {background:linear-gradient(90deg,#052e16,#065f46,#10b981,#6ee7b7);}
+.legend-labels{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px;}
+
+/* Tooltip */
+.tooltip{position:fixed;background:#1a1e2e;border:1px solid rgba(124,58,237,.4);border-radius:10px;padding:12px 14px;font-size:12px;pointer-events:none;opacity:0;transition:opacity .15s;z-index:1000;min-width:160px;box-shadow:0 8px 32px rgba(0,0,0,.5);}
+.tooltip-state{font-size:14px;font-weight:700;color:#fff;margin-bottom:8px;}
+.tooltip-row{display:flex;justify-content:space-between;gap:16px;margin-bottom:4px;}
+.tooltip-label{color:var(--muted);font-size:11px;}
+.tooltip-val{color:#fff;font-weight:600;font-size:11px;}
+.tooltip-rate{margin-top:6px;padding-top:6px;border-top:1px solid var(--border);font-size:11px;}
+
+/* Right panel */
+.right-panel{display:flex;flex-direction:column;gap:16px;}
+
+.insights{background:linear-gradient(135deg,rgba(124,58,237,.08),rgba(59,130,246,.04));border:1px solid rgba(124,58,237,.2);border-radius:14px;padding:18px;}
+.insights.org-style{background:linear-gradient(135deg,rgba(16,185,129,.06),rgba(59,130,246,.04));border-color:rgba(16,185,129,.2);}
+.insights h3{font-size:12px;font-weight:700;color:var(--purple3);margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em;}
+.insights.org-style h3{color:#6ee7b7;}
+.insight-item{display:flex;gap:8px;font-size:12px;color:#94a3b8;margin-bottom:7px;line-height:1.5;}
+.insight-item:last-child{margin-bottom:0;}
+.insight-item::before{content:'→';color:var(--purple2);font-weight:700;flex-shrink:0;}
+.insights.org-style .insight-item::before{color:#34d399;}
+.insight-item strong{color:#e2e8f0;}
+
+.rank-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;}
+.rank-card-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.rank-card-header h3{font-size:13px;font-weight:700;color:#fff;}
+.mini-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:12px;}
+.mb-blue{background:rgba(59,130,246,.15);color:#60a5fa;border:1px solid rgba(59,130,246,.2);}
+.mb-green{background:rgba(16,185,129,.15);color:#34d399;border:1px solid rgba(16,185,129,.2);}
+
+.rank-list{padding:8px 0;}
+.rank-item{display:flex;align-items:center;gap:10px;padding:8px 16px;transition:background .15s;}
+.rank-item:hover{background:rgba(255,255,255,.025);}
+.rank-num{font-size:11px;font-weight:700;color:var(--muted);width:20px;flex-shrink:0;text-align:center;}
+.rank-state{font-size:13px;font-weight:600;color:#f1f5f9;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rank-bar-wrap{width:55px;height:5px;background:rgba(255,255,255,.07);border-radius:3px;flex-shrink:0;}
+.rank-bar-fill{height:5px;border-radius:3px;}
+.fill-meta{background:linear-gradient(90deg,#3b82f6,#7c3aed);}
+.fill-org {background:linear-gradient(90deg,#10b981,#3b82f6);}
+.rank-mql{font-size:13px;font-weight:800;color:#fff;width:22px;text-align:right;flex-shrink:0;}
+.rank-rate{font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;flex-shrink:0;}
+.rh{background:rgba(16,185,129,.15);color:#34d399;}
+.rm{background:rgba(245,158,11,.15);color:#fbbf24;}
+.rl{background:rgba(244,63,94,.15);color:#fb7185;}
+
+.footer{text-align:center;font-size:11px;color:var(--muted);margin-top:32px;padding-top:20px;border-top:1px solid var(--border);}
+
+@media(max-width:900px){.main-grid{grid-template-columns:1fr;}.kpi-row{grid-template-columns:repeat(2,1fr);}}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <div class="logo">J</div>
+      <div>
+        <h1>MQLs por Região</h1>
+        <p class="subtitle">Leads qualificados por estado · 1.055 formulários · Faturamento ≥ R$8.000/mês</p>
+      </div>
+    </div>
+    <div class="toggle-wrap">
+      <button class="toggle-btn active-meta" id="btn-meta" onclick="setView('meta')">🎯 Meta Ads</button>
+      <button class="toggle-btn" id="btn-org"  onclick="setView('org')">🌿 Orgânico</button>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-row">
+    <div class="kpi k1">
+      <div class="kpi-label">Formulários</div>
+      <div class="kpi-value" id="kpi-forms">602</div>
+      <div class="kpi-sub" id="kpi-forms-sub">via Meta Ads</div>
+    </div>
+    <div class="kpi k2">
+      <div class="kpi-label">MQLs</div>
+      <div class="kpi-value" id="kpi-mqls" style="color:#34d399">119</div>
+      <div class="kpi-sub" id="kpi-mqls-sub">leads qualificados</div>
+    </div>
+    <div class="kpi k3">
+      <div class="kpi-label">Taxa de Qualif.</div>
+      <div class="kpi-value" id="kpi-taxa" style="color:#fbbf24">20%</div>
+      <div class="kpi-sub">de qualificação média</div>
+    </div>
+    <div class="kpi k4">
+      <div class="kpi-label">Estados com MQL</div>
+      <div class="kpi-value" id="kpi-states" style="color:#a78bfa">18</div>
+      <div class="kpi-sub">estados representados</div>
+    </div>
+  </div>
+
+  <!-- Main grid -->
+  <div class="main-grid">
+    <div class="map-card">
+      <h2>🗺️ Mapa de Calor — MQLs por Estado</h2>
+      <div class="map-sub">
+        <span class="source-tag meta" id="source-tag">🎯 Meta Ads · passe o mouse para detalhes</span>
+      </div>
+      <svg id="brazil-map" viewBox="0 0 760 680"></svg>
+      <div class="legend-bar">
+        <span style="font-size:11px;color:var(--muted)">0</span>
+        <div style="flex:1">
+          <div class="legend-gradient lg-meta" id="legend-grad"></div>
+          <div class="legend-labels"><span>Sem MQL</span><span>Baixo</span><span>Médio</span><span>Alto</span></div>
+        </div>
+        <span style="font-size:11px;color:var(--muted)" id="legend-max">49</span>
+      </div>
+    </div>
+
+    <div class="right-panel">
+      <div class="insights" id="insights-box">
+        <h3 id="insights-title">💡 Meta Ads — Destaques</h3>
+        <div id="insights-content"></div>
+      </div>
+      <div class="rank-card">
+        <div class="rank-card-header">
+          <h3 id="rank-title">🎯 Top Estados — Meta Ads</h3>
+          <span class="mini-badge mb-blue" id="rank-badge">119 MQLs</span>
+        </div>
+        <div class="rank-list" id="rank-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Critério de qualificação: faturamento ≥ R$8.000/mês · MQL = Marketing Qualified Lead · Gerado para Jamelli GT
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip">
+  <div class="tooltip-state" id="tt-state"></div>
+  <div class="tooltip-row"><span class="tooltip-label">MQLs</span><span class="tooltip-val" id="tt-mqls"></span></div>
+  <div class="tooltip-row"><span class="tooltip-label">Leads</span><span class="tooltip-val" id="tt-leads"></span></div>
+  <div class="tooltip-rate" id="tt-rate"></div>
+</div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────────
+const META = {
+  'São Paulo':          { mqls:49, leads:198 },
+  'Rio de Janeiro':     { mqls:16, leads:135 },
+  'Minas Gerais':       { mqls:12, leads:90  },
+  'Espírito Santo':     { mqls:7,  leads:17  },
+  'Rio Grande do Sul':  { mqls:5,  leads:17  },
+  'Bahia':              { mqls:4,  leads:43  },
+  'Santa Catarina':     { mqls:4,  leads:20  },
+  'Goiás':              { mqls:3,  leads:6   },
+  'Pernambuco':         { mqls:3,  leads:13  },
+  'Maranhão':           { mqls:2,  leads:5   },
+  'Distrito Federal':   { mqls:2,  leads:2   },
+  'Pará':               { mqls:2,  leads:6   },
+  'Mato Grosso':        { mqls:2,  leads:11  },
+  'Paraná':             { mqls:2,  leads:9   },
+  'Rondônia':           { mqls:1,  leads:3   },
+  'Paraíba':            { mqls:1,  leads:2   },
+  'Ceará':              { mqls:1,  leads:6   },
+  'Mato Grosso do Sul': { mqls:1,  leads:4   },
+};
+
+const ORG = {
+  'São Paulo':          { mqls:12, leads:81  },
+  'Minas Gerais':       { mqls:6,  leads:34  },
+  'Goiás':              { mqls:5,  leads:19  },
+  'Rio de Janeiro':     { mqls:4,  leads:68  },
+  'Distrito Federal':   { mqls:2,  leads:7   },
+  'Bahia':              { mqls:2,  leads:37  },
+  'Espírito Santo':     { mqls:2,  leads:22  },
+  'Mato Grosso do Sul': { mqls:1,  leads:3   },
+  'Paraná':             { mqls:1,  leads:14  },
+  'Santa Catarina':     { mqls:1,  leads:13  },
+  'Rondônia':           { mqls:1,  leads:3   },
+  'Alagoas':            { mqls:1,  leads:3   },
+  'Mato Grosso':        { mqls:1,  leads:9   },
+  'Maranhão':           { mqls:1,  leads:7   },
+  'Sergipe':            { mqls:1,  leads:5   },
+  'Piauí':              { mqls:1,  leads:2   },
+};
+
+const IBGE = {
+  '11':'Rondônia','12':'Acre','13':'Amazonas','14':'Roraima','15':'Pará',
+  '16':'Amapá','17':'Tocantins','21':'Maranhão','22':'Piauí','23':'Ceará',
+  '24':'Rio Grande do Norte','25':'Paraíba','26':'Pernambuco','27':'Alagoas',
+  '28':'Sergipe','29':'Bahia','31':'Minas Gerais','32':'Espírito Santo',
+  '33':'Rio de Janeiro','35':'São Paulo','41':'Paraná','42':'Santa Catarina',
+  '43':'Rio Grande do Sul','50':'Mato Grosso do Sul','51':'Mato Grosso',
+  '52':'Goiás','53':'Distrito Federal'
+};
+
+const INSIGHTS = {
+  meta: [
+    '<strong>SP lidera com folga:</strong> 49 MQLs (41% do total) com 198 leads — estado mais estratégico.',
+    '<strong>RJ: volume sem qualidade.</strong> 135 leads, só 12% qualifica — público fora do ICP.',
+    '<strong>Distrito Federal: 100% de taxa</strong> — cada lead que chega do Meta qualifica.',
+    '<strong>ES e Goiás</strong> têm taxas acima de 40% — alta qualidade por lead, potencial de escala.',
+    '<strong>Bahia:</strong> 43 leads Meta, apenas 9% qualifica — maior desperdício relativo de verba.',
+  ],
+  org: [
+    '<strong>SP continua líder</strong> no orgânico: 12 MQLs de 81 leads (15% de taxa).',
+    '<strong>Goiás surpreende:</strong> 5 MQLs com 26% de taxa — melhor performance relativa no orgânico.',
+    '<strong>RJ piora no orgânico:</strong> 68 leads, apenas 6% qualifica — audience ainda mais fria.',
+    '<strong>Bahia no orgânico:</strong> 37 leads, só 5% qualifica — pior taxa entre os grandes estados.',
+    '<strong>Origem principal:</strong> ig, postreels e stories — todo conteúdo de feed e stories.',
+  ],
+};
+
+// ── STATE ──────────────────────────────────────────────────────────────────
+let currentView = 'meta';
+let mapPaths = null;
+let labelTexts = null;
+
+function getColor(state, view) {
+  const d = (view === 'meta' ? META : ORG)[state];
+  if (!d || d.mqls === 0) return '#161b2e';
+  const max = view === 'meta' ? 49 : 12;
+  const t = Math.min(d.mqls / max, 1);
+  if (view === 'meta') {
+    const cols = ['#1e1145','#2d1580','#3b1fa8','#5b21b6','#7c3aed','#9333ea','#a855f7','#c084fc'];
+    return cols[Math.min(Math.floor(t * cols.length), cols.length - 1)];
+  } else {
+    const cols = ['#052e16','#065f46','#047857','#059669','#10b981','#34d399','#6ee7b7'];
+    return cols[Math.min(Math.floor(t * cols.length), cols.length - 1)];
+  }
+}
+
+function getRateClass(r){ return r>=40?'rh':r>=20?'rm':'rl'; }
+
+function updateKPIs(view) {
+  const data = view === 'meta' ? META : ORG;
+  const totalLeads = view === 'meta' ? 602 : 453;
+  const totalMqls  = Object.values(data).reduce((s,d) => s+d.mqls, 0);
+  const taxa = Math.round(totalMqls / totalLeads * 100);
+  const states = Object.values(data).filter(d => d.mqls > 0).length;
+  document.getElementById('kpi-forms').textContent = totalLeads.toLocaleString('pt-BR');
+  document.getElementById('kpi-forms-sub').textContent = view==='meta' ? 'via Meta Ads' : 'orgânico / outros';
+  document.getElementById('kpi-mqls').textContent = totalMqls;
+  document.getElementById('kpi-taxa').textContent = taxa + '%';
+  document.getElementById('kpi-states').textContent = states;
+}
+
+function updateInsights(view) {
+  const box = document.getElementById('insights-box');
+  const title = document.getElementById('insights-title');
+  const content = document.getElementById('insights-content');
+  box.className = 'insights' + (view==='org' ? ' org-style' : '');
+  title.textContent = view==='meta' ? '💡 Meta Ads — Destaques' : '💡 Orgânico — Destaques';
+  content.innerHTML = INSIGHTS[view].map(t =>
+    `<div class="insight-item">${t}</div>`
+  ).join('');
+}
+
+function updateRankList(view) {
+  const data = view === 'meta' ? META : ORG;
+  const totalMqls = Object.values(data).reduce((s,d) => s+d.mqls, 0);
+  const fill = view==='meta' ? 'fill-meta' : 'fill-org';
+  const sorted = Object.entries(data).sort((a,b) => b[1].mqls - a[1].mqls).slice(0,12);
+  const maxMqls = sorted[0][1].mqls;
+  const medals = ['🥇','🥈','🥉'];
+  document.getElementById('rank-title').textContent = view==='meta' ? '🎯 Top Estados — Meta Ads' : '🌿 Top Estados — Orgânico';
+  document.getElementById('rank-badge').textContent = totalMqls + ' MQLs';
+  document.getElementById('rank-badge').className = 'mini-badge ' + (view==='meta' ? 'mb-blue' : 'mb-green');
+  document.getElementById('rank-list').innerHTML = sorted.map(([state,d],i) => {
+    const pct = Math.round(d.mqls/maxMqls*100);
+    const rate = d.leads>0 ? Math.round(d.mqls/d.leads*100) : 0;
+    return `<div class="rank-item">
+      <span class="rank-num">${medals[i]||i+1}</span>
+      <span class="rank-state">${state}</span>
+      <div class="rank-bar-wrap"><div class="rank-bar-fill ${fill}" style="width:${pct}%"></div></div>
+      <span class="rank-mql">${d.mqls}</span>
+      <span class="rank-rate ${getRateClass(rate)}">${rate}%</span>
+    </div>`;
+  }).join('');
+}
+
+function updateMap(view) {
+  if (!mapPaths) return;
+  const data = view==='meta' ? META : ORG;
+  mapPaths.attr('fill', d => getColor(IBGE[d.properties.codarea], view));
+  // Update labels
+  if (labelTexts) {
+    labelTexts.each(function(d) {
+      const name = IBGE[d.properties.codarea];
+      const dat = data[name];
+      const el = d3.select(this);
+      el.selectAll('*').remove();
+      if (dat && dat.mqls >= (view==='meta' ? 2 : 1)) {
+        el.append('tspan')
+          .attr('x',0).attr('dy','0')
+          .style('font-size', dat.mqls >= 10 ? '12px' : '10px')
+          .style('font-weight','700')
+          .style('fill','#fff')
+          .style('pointer-events','none')
+          .text(dat.mqls);
+      }
+    });
+  }
+  // Legend
+  document.getElementById('legend-grad').className = 'legend-gradient ' + (view==='meta' ? 'lg-meta' : 'lg-org');
+  document.getElementById('legend-max').textContent = view==='meta' ? '49' : '12';
+  // Source tag
+  const tag = document.getElementById('source-tag');
+  if (view==='meta') {
+    tag.className='source-tag meta';
+    tag.textContent='🎯 Meta Ads · passe o mouse para detalhes';
+  } else {
+    tag.className='source-tag org';
+    tag.textContent='🌿 Orgânico (ig, reels, stories) · passe o mouse para detalhes';
+  }
+}
+
+function setView(view) {
+  currentView = view;
+  document.getElementById('btn-meta').className = 'toggle-btn' + (view==='meta' ? ' active-meta' : '');
+  document.getElementById('btn-org').className  = 'toggle-btn' + (view==='org'  ? ' active-org'  : '');
+  updateKPIs(view);
+  updateInsights(view);
+  updateRankList(view);
+  updateMap(view);
+}
+
+// ── MAP ────────────────────────────────────────────────────────────────────
+const svg = d3.select('#brazil-map');
+const tooltip = document.getElementById('tooltip');
+
+const projection = d3.geoMercator()
+  .center([-54,-15]).scale(700).translate([380,340]);
+const path = d3.geoPath().projection(projection);
+
+fetch('https://servicodados.ibge.gov.br/api/v3/malhas/paises/BR?formato=application/vnd.geo+json&qualidade=minima&intrarregiao=UF')
+  .then(r => r.json())
+  .then(geo => {
+    mapPaths = svg.selectAll('path')
+      .data(geo.features)
+      .enter().append('path')
+      .attr('d', path)
+      .attr('fill', d => getColor(IBGE[d.properties.codarea], 'meta'))
+      .on('mousemove', function(event, d) {
+        const name = IBGE[d.properties.codarea] || d.properties.codarea;
+        const data = currentView==='meta' ? META : ORG;
+        const dat = data[name] || { mqls:0, leads:0 };
+        const rate = dat.leads>0 ? Math.round(dat.mqls/dat.leads*100) : 0;
+        document.getElementById('tt-state').textContent = name;
+        document.getElementById('tt-mqls').textContent = dat.mqls || '—';
+        document.getElementById('tt-leads').textContent = dat.leads || '—';
+        document.getElementById('tt-rate').innerHTML = dat.mqls>0
+          ? `Taxa de qualificação: <strong style="color:${rate>=40?'#34d399':rate>=20?'#fbbf24':'#fb7185'}">${rate}%</strong>`
+          : '<span style="color:#64748b">Sem MQLs registrados</span>';
+        tooltip.style.opacity='1';
+        tooltip.style.left=(event.clientX+14)+'px';
+        tooltip.style.top=(event.clientY-10)+'px';
+      })
+      .on('mouseleave', () => { tooltip.style.opacity='0'; });
+
+    labelTexts = svg.selectAll('text')
+      .data(geo.features)
+      .enter().append('text')
+      .attr('transform', d => `translate(${path.centroid(d)})`)
+      .attr('text-anchor','middle').attr('dominant-baseline','central');
+
+    // Initial labels
+    labelTexts.each(function(d) {
+      const name = IBGE[d.properties.codarea];
+      const dat = META[name];
+      if (dat && dat.mqls >= 2) {
+        d3.select(this).append('tspan')
+          .attr('x',0).attr('dy','0')
+          .style('font-size', dat.mqls>=10?'12px':'10px')
+          .style('font-weight','700')
+          .style('fill','#fff')
+          .style('pointer-events','none')
+          .text(dat.mqls);
+      }
+    });
+  })
+  .catch(() => {
+    svg.append('text')
+      .attr('x',380).attr('y',340).attr('text-anchor','middle')
+      .style('fill','#64748b').style('font-size','14px')
+      .text('Abra com conexão à internet para ver o mapa');
+  });
+
+// Init
+updateInsights('meta');
+updateRankList('meta');
+updateKPIs('meta');
+</script>
+</body>
+</html>
