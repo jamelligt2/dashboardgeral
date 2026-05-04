@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Debug · webhook_eduzz · Imersão Claude</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:'DM Sans',-apple-system,system-ui,sans-serif}
+body{background:#1a1a2e;color:#e8e6f0;padding:20px;min-height:100vh}
+h1{color:#ff6b2b;font-size:18px;margin-bottom:8px}
+.sub{color:rgba(255,255,255,.4);font-size:12px;margin-bottom:16px}
+.btn{background:#ff6b2b;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-weight:600;margin-right:8px}
+.btn:hover{background:#ff8c4d}
+.tab-sel{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.tab-sel button{background:#12121f;color:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.1);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px}
+.tab-sel button.active{background:rgba(255,107,43,.2);color:#ff6b2b;border-color:#ff6b2b}
+.box{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:16px;margin-bottom:14px}
+.box h2{font-size:13px;color:#ff6b2b;margin-bottom:8px}
+.kpi{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:8px}
+.kpi div{font-size:12px;color:rgba(255,255,255,.6)}
+.kpi b{color:#fff;font-family:'DM Mono',monospace;font-size:14px;display:block;margin-top:2px}
+table{width:100%;border-collapse:collapse;font-size:11px;font-family:'DM Mono',monospace}
+th{background:#1a1a2e;color:rgba(255,255,255,.5);text-align:left;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.1);position:sticky;top:0;font-weight:500;white-space:nowrap}
+td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.04);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#e8e6f0}
+tr:hover td{background:rgba(255,255,255,.03)}
+.passa{background:rgba(46,204,113,.08)!important}
+.passa:hover td{background:rgba(46,204,113,.12)!important}
+.morre{background:rgba(231,76,60,.06)!important}
+.morre td:first-child::before{content:"❌ "}
+.passa td:first-child::before{content:"✅ "}
+.scroll{overflow:auto;max-height:600px;border:1px solid rgba(255,255,255,.05);border-radius:6px}
+.tag{display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;margin-right:4px}
+.tag.ok{background:rgba(46,204,113,.15);color:#2ecc71}
+.tag.fail{background:rgba(231,76,60,.15);color:#e74c3c}
+.search{background:rgba(255,255,255,.06);color:#fff;border:1px solid rgba(255,255,255,.1);padding:6px 10px;border-radius:6px;font-size:12px;width:300px;margin-bottom:8px}
+</style>
+</head>
+<body>
+
+<h1>🔍 Debug · Pipeline Imersão Claude</h1>
+<div class="sub">Lê as 5 abas direto da planilha (sem cache), aplica os filtros do dashboard e mostra cada linha + o que passou ou foi rejeitado e por quê. <a href="index.html" style="color:#ff6b2b">← voltar pro dashboard</a></div>
+
+<button class="btn" onclick="run()">↻ Recarregar dados</button>
+<input type="text" class="search" id="search" placeholder="Buscar (ex: Romario, ICM-ADV103, 04/05)..." oninput="renderTable()">
+
+<div class="tab-sel" id="tabs"></div>
+<div id="output"></div>
+
+<script>
+const SHEET_ID='1C2Xvdg3ORGIeRobxluq7vEZVEqjsW-uNHbIYhr8g02w';
+const ABAS = ['Gerenciador','Webhook','vendas','vendas_eduzz','webhook_eduzz'];
+let dados = {};
+let activeAba = 'webhook_eduzz';
+
+function parseCSV(csv){const lines=[];let cur='',inQ=false;for(let i=0;i<csv.length;i++){const c=csv[i];if(c==='"'){inQ=!inQ;cur+=c;}else if(c==='\n'&&!inQ){lines.push(cur);cur='';}else{cur+=c;}}if(cur.trim())lines.push(cur);return lines.map(line=>{const cols=[];let val='',q=false;for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'){q=!q;}else if(c===','&&!q){cols.push(val.trim());val='';}else{val+=c;}}cols.push(val.trim());return cols;});}
+function normKey(s){return String(s||'').toLowerCase().replace(/[\s_-]/g,'');}
+
+async function run(){
+  document.getElementById('output').innerHTML = '<div class="box">Carregando ' + ABAS.length + ' abas...</div>';
+  for (const aba of ABAS) {
+    try {
+      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(aba)}&_=${Date.now()}`;
+      const r = await fetch(url, {cache:'no-store'});
+      const t = await r.text();
+      dados[aba] = { raw: t, rows: parseCSV(t) };
+    } catch(e) { dados[aba] = { raw: '', rows: [], err: e.message }; }
+  }
+  renderTabs();
+  renderTable();
+}
+
+function renderTabs(){
+  document.getElementById('tabs').innerHTML = ABAS.map(a => {
+    const n = (dados[a]?.rows?.length || 1) - 1;
+    return `<button class="${a===activeAba?'active':''}" onclick="setAba('${a}')">${a} (${n})</button>`;
+  }).join('');
+}
+function setAba(a){ activeAba = a; renderTabs(); renderTable(); }
+
+function renderTable(){
+  const search = document.getElementById('search').value.toLowerCase();
+  const d = dados[activeAba];
+  if (!d || !d.rows || d.rows.length < 1) {
+    document.getElementById('output').innerHTML = '<div class="box">Sem dados pra "'+activeAba+'"</div>';
+    return;
+  }
+  const header = d.rows[0];
+  const dataRows = d.rows.slice(1).filter(r => r[0] || r[1] || r[2]);
+
+  // Aplica filtro de busca
+  const filtered = search
+    ? dataRows.filter(r => r.some(c => String(c||'').toLowerCase().includes(search)))
+    : dataRows;
+
+  // Determina índices das colunas-chave por aba
+  let keyCols = [];
+  let filterAnalysis = (r) => ({ passa: true, motivo: '—' });
+
+  if (activeAba === 'webhook_eduzz') {
+    const I = n => header.indexOf(n);
+    const utmSrc = I('utm_source')>=0 ? I('utm_source') : I('tracker_utm_source');
+    const utmMed = I('utm_medium')>=0 ? I('utm_medium') : I('tracker_utm_medium');
+    const utmCamp = I('utm_campaign')>=0 ? I('utm_campaign') : I('tracker_utm_campaign');
+    const utmCont = I('utm_content')>=0 ? I('utm_content') : I('tracker_utm_content');
+    const status = I('trans_status');
+    const valor = I('trans_value');
+    const paidDate = I('trans_paiddate');
+    const cusName = I('cus_name');
+    keyCols = [
+      {label:'cus_name', idx: cusName},
+      {label:'trans_value', idx: valor},
+      {label:'trans_paiddate', idx: paidDate},
+      {label:'trans_status', idx: status},
+      {label:'utm_source', idx: utmSrc},
+      {label:'utm_medium', idx: utmMed},
+      {label:'utm_campaign', idx: utmCamp},
+      {label:'utm_content', idx: utmCont}
+    ];
+    filterAnalysis = (r) => {
+      const motivos = [];
+      const v = parseFloat(String(r[valor]||'0').replace(',','.')) || 0;
+      const src = r[utmSrc]||'';
+      const med = (r[utmMed]||'').toLowerCase();
+      const camp = (r[utmCamp]||'').toLowerCase();
+      const st = String(r[status]||'').toLowerCase().trim();
+      const isCancel = ['3','8','9','cancelled','canceled','cancelada','refunded','refund','reembolsada','chargeback'].includes(st);
+      if (utmSrc < 0) motivos.push('coluna utm_source não encontrada no header');
+      else if (!src) motivos.push('utm_source vazio');
+      else if (normKey(src) !== 'metaads') motivos.push(`utm_source="${src}" não é meta_ads`);
+      if (!med.includes('claude') && !camp.includes('claude')) motivos.push('nenhum utm_medium/campaign contém "claude"');
+      if (v <= 0) motivos.push(`trans_value="${r[valor]}" é zero`);
+      if (isCancel) motivos.push(`trans_status="${st}" é cancelamento`);
+      return motivos.length ? { passa: false, motivo: motivos.join(' | ') } : { passa: true, motivo: 'OK' };
+    };
+  } else if (activeAba === 'vendas_eduzz') {
+    const I = n => header.indexOf(n);
+    const status = I('Status');
+    const src = I('UTM Source');
+    const med = I('UTM Medium');
+    const camp = I('UTM Campaign');
+    const cliente = I('Cliente / Nome');
+    const valor = I('Valor da Venda');
+    const data = I('Data de Pagamento');
+    keyCols = [
+      {label:'Cliente', idx: cliente},
+      {label:'Valor', idx: valor},
+      {label:'Data Pag', idx: data},
+      {label:'Status', idx: status},
+      {label:'UTM Source', idx: src},
+      {label:'UTM Medium', idx: med},
+      {label:'UTM Campaign', idx: camp}
+    ];
+    filterAnalysis = (r) => {
+      const motivos = [];
+      const st = String(r[status]||'').toLowerCase().trim();
+      const m = (r[med]||'').toLowerCase();
+      const c = (r[camp]||'').toLowerCase();
+      if (st !== 'paga') motivos.push(`Status="${r[status]}" não é "Paga"`);
+      if (!r[src] || normKey(r[src]) !== 'metaads') motivos.push(`UTM Source="${r[src]}" não é meta_ads`);
+      if (!m.includes('claude') && !c.includes('claude')) motivos.push('nenhum UTM contém "claude"');
+      return motivos.length ? { passa: false, motivo: motivos.join(' | ') } : { passa: true, motivo: 'OK' };
+    };
+  } else if (activeAba === 'Webhook') {
+    const lower = header.map(h=>h.toLowerCase());
+    const idx = {
+      data: lower.indexOf('data'),
+      status: lower.indexOf('status'),
+      source: lower.indexOf('source'),
+      campaign: lower.indexOf('campaign'),
+      valor: lower.indexOf('valor'),
+      medium: lower.indexOf('medium'),
+      nome: lower.indexOf('nome')
+    };
+    keyCols = Object.entries(idx).filter(([k,v])=>v>=0).map(([k,v])=>({label:k,idx:v}));
+    filterAnalysis = (r) => {
+      const motivos = [];
+      if (r[idx.status]?.toLowerCase().trim() !== 'paid') motivos.push(`Status="${r[idx.status]}" não é "paid"`);
+      if (!r[idx.source] || normKey(r[idx.source]) !== 'metaads') motivos.push(`Source="${r[idx.source]}" não é meta_ads`);
+      const med = (r[idx.medium]||'').toLowerCase();
+      const cam = (r[idx.campaign]||'').toLowerCase();
+      if (!med.includes('claude') && !cam.includes('claude')) motivos.push('nenhum medium/campaign contém "claude"');
+      return motivos.length ? { passa: false, motivo: motivos.join(' | ') } : { passa: true, motivo: 'OK' };
+    };
+  } else {
+    // Gerenciador / vendas (Kiwify) — mostra colunas chave sem analyzer especial
+    keyCols = header.map((h,i)=>({label: h.slice(0,20), idx: i})).slice(0,8);
+  }
+
+  const passou = filtered.filter(r => filterAnalysis(r).passa).length;
+  const morreu = filtered.length - passou;
+
+  let html = `<div class="box">
+    <h2>${activeAba}</h2>
+    <div class="kpi">
+      <div>Linhas brutas <b>${dataRows.length}</b></div>
+      <div>Filtradas (busca) <b>${filtered.length}</b></div>
+      <div>Passa filtro do dashboard <b style="color:#2ecc71">${passou}</b></div>
+      <div>Rejeitadas pelo filtro <b style="color:#e74c3c">${morreu}</b></div>
+      ${header.length > 0 ? `<div>Colunas no header <b>${header.length}</b></div>`:''}
+    </div>
+    <div class="sub">Verde = passa nos filtros e entra no dashboard. Vermelho = rejeitada (motivo na coluna "🚦").</div>
+  </div>
+  <div class="scroll"><table>
+    <thead><tr><th>#</th><th>🚦 status filtro</th>${keyCols.map(k=>`<th>${k.label}</th>`).join('')}</tr></thead>
+    <tbody>`;
+  filtered.forEach((r,i) => {
+    const a = filterAnalysis(r);
+    html += `<tr class="${a.passa?'passa':'morre'}"><td>${i+2}</td><td>${a.motivo}</td>${keyCols.map(k=>{
+      const v = k.idx>=0 ? (r[k.idx]||'') : '?';
+      return `<td title="${String(v).replace(/"/g,'&quot;')}">${String(v).slice(0,80)}</td>`;
+    }).join('')}</tr>`;
+  });
+  html += '</tbody></table></div>';
+  document.getElementById('output').innerHTML = html;
+}
+
+document.addEventListener('DOMContentLoaded', run);
+</script>
+</body>
+</html>
