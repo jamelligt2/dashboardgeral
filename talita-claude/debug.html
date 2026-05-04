@@ -118,18 +118,12 @@ function renderTable(){
     filterAnalysis = (r) => {
       const motivos = [];
       const v = parseFloat(String(r[valor]||'0').replace(',','.')) || 0;
-      const src = r[utmSrc]||'';
-      const med = (r[utmMed]||'').toLowerCase();
-      const camp = (r[utmCamp]||'').toLowerCase();
       const st = String(r[status]||'').toLowerCase().trim();
-      const isCancel = ['3','8','9','cancelled','canceled','cancelada','refunded','refund','reembolsada','chargeback'].includes(st);
-      if (utmSrc < 0) motivos.push('coluna utm_source não encontrada no header');
-      else if (!src) motivos.push('utm_source vazio');
-      else if (normKey(src) !== 'metaads') motivos.push(`utm_source="${src}" não é meta_ads`);
-      if (!med.includes('claude') && !camp.includes('claude')) motivos.push('nenhum utm_medium/campaign contém "claude"');
-      if (v <= 0) motivos.push(`trans_value="${r[valor]}" é zero`);
+      const isCancel = ['3','8','9','cancelled','canceled','cancelada','refunded','refund','reembolsada','chargeback','estornada'].includes(st);
+      // Regra atual (permissiva): só exclui valor zero ou cancelamento
+      if (v <= 0) motivos.push(`trans_value="${r[valor]}" é zero/vazio`);
       if (isCancel) motivos.push(`trans_status="${st}" é cancelamento`);
-      return motivos.length ? { passa: false, motivo: motivos.join(' | ') } : { passa: true, motivo: 'OK' };
+      return motivos.length ? { passa: false, motivo: motivos.join(' | ') } : { passa: true, motivo: 'OK (filtro permissivo: valor>0 + não cancelada)' };
     };
   } else if (activeAba === 'vendas_eduzz') {
     const I = n => header.indexOf(n);

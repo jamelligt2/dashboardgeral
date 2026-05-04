@@ -698,22 +698,16 @@ function processWebhookEduzz(csv) {
     src:      utmSrcIdx, medium: utmMedIdx, camp: utmCampIdx, content: utmContIdx
   };
 
-  // Eduzz: regra simplificada. NÃO filtra por status (Eduzz manda em vários formatos)
-  // Considera venda válida se: tem source meta_ads + campanha contém "claude" + tem valor > 0
-  // Status de cancelamento/reembolso explícito EXCLUI a venda
+  // ESTRATÉGIA WEBHOOK_EDUZZ: confia no usuário. O cenário Make já filtra o que entra nessa aba.
+  // Aqui o dashboard só exclui vendas cancela­das/reembolsadas explicitamente.
+  // Não exige meta_ads/claude — se está aqui, é porque o user quer contabilizar.
   const isCancelled = (statusVal) => {
     const v = String(statusVal||'').toLowerCase().replace(/"/g,'').trim();
-    return ['3','8','9','cancelled','canceled','cancelada','refunded','refund','reembolsada','chargeback','contestado'].includes(v);
+    return ['3','8','9','cancelled','canceled','cancelada','refunded','refund','reembolsada','chargeback','contestado','estornada'].includes(v);
   };
 
   const sales = rows.slice(1)
     .filter(r => r.length > 5)
-    .filter(r => idx.src >= 0 && r[idx.src] && normKey(r[idx.src]) === META_SOURCE_FILTER)
-    .filter(r => {
-      const med = (idx.medium >= 0 ? (r[idx.medium]||'') : '').toLowerCase();
-      const cam = (idx.camp   >= 0 ? (r[idx.camp]||'')   : '').toLowerCase();
-      return med.includes(CAMPAIGN_FILTER) || cam.includes(CAMPAIGN_FILTER);
-    })
     .filter(r => {
       const valor = parseFloat(String(r[idx.valor]||'0').replace(',', '.')) || 0;
       return valor > 0; // tem dinheiro que entrou
@@ -722,22 +716,10 @@ function processWebhookEduzz(csv) {
 
   console.log('[webhook_eduzz] cols:', header.length,
     '| src@'+idx.src, 'medium@'+idx.medium, 'camp@'+idx.camp, 'status@'+idx.status, 'valor@'+idx.valor, 'paiddate@'+idx.dataPag);
-  console.log('[webhook_eduzz] linhas brutas:', rows.length-1, '| pós-filtro:', sales.length);
-  if (sales.length === 0 && rows.length > 1) {
-    console.warn('[webhook_eduzz] NENHUMA venda passou nos filtros. Amostras das 5 primeiras:');
-    rows.slice(1, 6).forEach((r, i) => {
-      console.log(`  L${i+2}:`, {
-        status: r[idx.status], valor: r[idx.valor],
-        src: idx.src>=0?r[idx.src]:'?',
-        medium: (idx.medium>=0?(r[idx.medium]||''):'?').slice(0,50),
-        camp: (idx.camp>=0?(r[idx.camp]||''):'?').slice(0,50),
-        paiddate: r[idx.dataPag]
-      });
-    });
-  } else if (sales.length > 0) {
-    console.log('[webhook_eduzz] vendas válidas:', sales.length);
+  console.log('[webhook_eduzz] linhas brutas:', rows.length-1, '| pós-filtro:', sales.length, '(filtro permissivo: valor>0 + não cancelada)');
+  if (sales.length > 0) {
     sales.forEach((r,i)=>{
-      console.log(`  ✓ ${i+1}: ${r[idx.nome]||'?'} | R$ ${r[idx.valor]} | ${r[idx.dataPag]||r[idx.dataCri]} | ${(r[idx.medium]||'').slice(0,40)}`);
+      console.log(`  ✓ webhook_eduzz #${i+1}: ${r[idx.nome]||'?'} | R$ ${r[idx.valor]} | ${r[idx.dataPag]||r[idx.dataCri]} | utm_med="${(r[idx.medium]||'').slice(0,40)}"`);
     });
   }
 
