@@ -485,9 +485,17 @@ function processWebhook({ headers, rows }, DIAS, byPage, CRIATIVOS) {
   }
 
 
-  for (const d of DIAS) {
-    if (fatByDate[d.data])  d.fat     = fatByDate[d.data];
-    if (compByDate[d.data]) d.compras = compByDate[d.data];
+  // Atribui vendas ao DIAS — cria entrada se o dia não existir no Gerenciador
+  for (const [dateKey, fatVal] of Object.entries(fatByDate)) {
+    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dateKey)) continue; // só DD/MM/YYYY
+    let d = DIAS.find(x => x.data === dateKey);
+    if (!d) {
+      d = {data:dateKey,inv:0,cliques:0,pv:0,ck:0,imp:0,compras:0,fat:0};
+      DIAS.push(d);
+      DIAS.sort((a,b)=>{ const [da,ma,ya]=a.data.split('/'); const [db,mb,yb]=b.data.split('/'); return new Date(ya,ma-1,da)-new Date(yb,mb-1,db); });
+    }
+    d.fat     = fatVal;
+    d.compras = compByDate[dateKey] || 0;
   }
 }
 
