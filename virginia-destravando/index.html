@@ -520,34 +520,38 @@ function processWH(csv, orgMode=false){
   const iVal=idx('trans_value'),iDateP=idx('trans_paiddate'),iTs=idx('timestamp_incoming');
   const iName=idx('cus_name'),iCod=idx('trans_cod');
 
-  // DEDUPLICAÇÃO: uma venda por trans_cod
-  // Prioridade: invoice_paid > invoice_open (paid confirma pagamento)
-  const seenCod={};
+  // DEDUPLICAÇÃO: só conta transações com invoice_paid confirmado
+  // invoice_open sem paid correspondente = boleto/pix não pago → ignorar
+  const paidCods=new Set();
+  const openCods=new Set();
+  for(let i=1;i<rows.length;i++){
+    const r=rows[i];
+    const ev=(r[iEv]||'').trim().toLowerCase();
+    const cod=(iCod>=0?(r[iCod]||'').trim():'');
+    if(ev==='invoice_paid'&&cod)paidCods.add(cod);
+    if(ev==='invoice_open'&&cod)openCods.add(cod);
+  }
+  // Trans sem cod algum: aceita se for paid
+  // Deduplica: um registro por trans_cod, apenas se tiver invoice_paid
+  const seenCod=new Set();
   const dedupRows=[];
   for(let i=1;i<rows.length;i++){
     const r=rows[i];
     const ev=(r[iEv]||'').trim().toLowerCase();
-    if(ev!=='invoice_open'&&ev!=='invoice_paid')continue;
+    if(ev!=='invoice_paid')continue; // só processa pagamentos confirmados
     const cod=(iCod>=0?(r[iCod]||'').trim():'');
-    if(!cod){dedupRows.push(r);continue;} // sem cod → inclui sem dedup
-    if(!seenCod[cod]){
-      seenCod[cod]={idx:dedupRows.length,ev};
-      dedupRows.push(r);
-    } else if(ev==='invoice_paid'&&seenCod[cod].ev!=='invoice_paid'){
-      // Substitui invoice_open pelo invoice_paid da mesma transação
-      dedupRows[seenCod[cod].idx]=r;
-      seenCod[cod].ev='invoice_paid';
+    if(cod){
+      if(seenCod.has(cod))continue; // dedup: já processou essa transação
+      seenCod.add(cod);
     }
-    // Se já tem invoice_paid e encontra outro → ignora
+    dedupRows.push(r);
   }
 
   const fatDia={},fatCri={};
 
   for(let i=0;i<dedupRows.length;i++){
     const r=dedupRows[i];
-    // Aceita invoice_open (pendente pix/boleto) e invoice_paid (pago)
-    const ev=(r[iEv]||'').trim().toLowerCase();
-    if(ev!=='invoice_open'&&ev!=='invoice_paid')continue;
+    // Todas as linhas em dedupRows já são invoice_paid confirmados
     const src=(r[iSrc]||'').trim();
     const isMeta=isMetaSrc(src);
     if(orgMode&&isMeta)continue;   // modo orgânico: pular rastreados
