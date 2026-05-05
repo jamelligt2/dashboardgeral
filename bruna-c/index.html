@@ -433,7 +433,7 @@ function processWebhook({ headers, rows }, DIAS, byPage, CRIATIVOS) {
   if (!rows.length) return;
 
   const iStatus = col(headers, /^status$/i, /purchase\.status$/i, /\.status$/i);
-  const iData   = col(headers, /data.*pagamento/i, /paid.*at/i, /data de cr[eé]dito/i, /approved_date$/i, /^creation_date$/i, /^created_at$/i, /^purchase.date$/i);
+  const iData   = col(headers, /^creation_date$/i, /^created_at$/i, /data.*pagamento/i, /paid.*at/i, /data de cr[eé]dito/i, /approved_date$/i);
   const iGanho  = col(headers, /ganho l[ií]quido/i, /net.*gain/i, /receita l[ií]quida/i);
   const iValor  = col(headers, /valor da venda/i, /^valor$/i, /gross/i, /price\.value$/i);
 
@@ -444,6 +444,15 @@ function processWebhook({ headers, rows }, DIAS, byPage, CRIATIVOS) {
     const status = fv(row, iStatus).toLowerCase();
     if (!status.includes('pago') && !status.includes('paid') && !status.includes('approved') && !status.includes('aprovado')) continue;
     let rawDate = fv(row, iData);
+    if (!rawDate) {
+      // fallback: escaneia todas colunas buscando valor com data
+      for (let _i = 0; _i < row.length; _i++) {
+        const _v = (row[_i]||'').trim();
+        if (/^\d{13}$/.test(_v) || /^\d{4}-\d{2}-\d{2}/.test(_v) || /^\d{2}\/\d{2}\/\d{4}/.test(_v)) {
+          rawDate = _v; break;
+        }
+      }
+    }
     if (!rawDate) continue;
 
     // Normalizar data → DD/MM/YYYY
