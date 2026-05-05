@@ -430,18 +430,22 @@ function processGerenciador({ headers, rows }) {
 }
 
 function processWebhook({ headers, rows }, DIAS, byPage, CRIATIVOS) {
-  if (!rows.length) return;
+  if (!rows.length) { window._whDebug = 'Webhook: 0 linhas'; return; }
 
   const iStatus = col(headers, /^status$/i, /purchase\.status$/i, /\.status$/i);
   const iData   = col(headers, /data.*pagamento/i, /paid.*at/i, /data de cr[eé]dito/i, /approved_date$/i);
   const iGanho  = col(headers, /ganho l[ií]quido/i, /net.*gain/i, /receita l[ií]quida/i);
   const iValor  = col(headers, /valor da venda/i, /^valor$/i, /gross/i, /price\.value$/i);
 
+  window._whDebug = `WH: ${rows.length} linhas | iStatus=${iStatus} iData=${iData} iValor=${iValor>=0?iValor:iGanho} | statuses: ${[...new Set(rows.slice(0,5).map(r=>fv(r,iStatus)))].join(',')}`;
+
   const fatByDate = {}, compByDate = {};
+  let vendas = 0;
 
   for (const row of rows) {
     const status = fv(row, iStatus).toLowerCase();
     if (!status.includes('pago') && !status.includes('paid') && !status.includes('approved') && !status.includes('aprovado')) continue;
+    vendas++;
 
     let rawDate = fv(row, iData);
     if (!rawDate) continue;
@@ -474,6 +478,8 @@ function processWebhook({ headers, rows }, DIAS, byPage, CRIATIVOS) {
     // Atribui venda ao criativo configurado
     if (CRIATIVOS) { let cri = CRIATIVOS.find(c => c.nome === WEBHOOK_CRIATIVO); if (!cri) { cri = {nome:WEBHOOK_CRIATIVO,inv:0,cliques:0,pv:0,ck:0,imp:0,compras:0,fat:0,ativo:true,url:'',days:{},ctr:0,cpc:0,cpm:0,connectRate:0}; CRIATIVOS.push(cri); } cri.compras += 1; cri.fat += valor; if(!cri.days)cri.days={}; if(!cri.days[data])cri.days[data]={inv:0,cliques:0,pv:0,ck:0,imp:0,compras:0,fat:0}; cri.days[data].compras+=1; cri.days[data].fat+=valor; }
   }
+
+  window._whDebug += ` | vendas_pagas=${vendas} | fatByDate=${JSON.stringify(fatByDate)}`;
 
   for (const d of DIAS) {
     if (fatByDate[d.data])  d.fat     = fatByDate[d.data];
@@ -912,7 +918,7 @@ async function loadData() {
 
     const now = new Date();
     document.getElementById('update-info').textContent =
-      `Atualizado às ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+      `Atualizado às ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')} | ${window._whDebug||'Webhook não carregado'}`;
 
     renderAll();
 
