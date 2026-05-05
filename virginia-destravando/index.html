@@ -518,13 +518,36 @@ function processWH(csv, orgMode=false){
   const idx=n=>h.findIndex(x=>x===n||x.includes(n));
   const iEv=idx('event_name'),iSrc=idx('utm_source'),iCont=idx('utm_content');
   const iVal=idx('trans_value'),iDateP=idx('trans_paiddate'),iTs=idx('timestamp_incoming');
-  const iName=idx('cus_name');
+  const iName=idx('cus_name'),iCod=idx('trans_cod');
+
+  // DEDUPLICAÇÃO: uma venda por trans_cod
+  // Prioridade: invoice_paid > invoice_open (paid confirma pagamento)
+  const seenCod={};
+  const dedupRows=[];
+  for(let i=1;i<rows.length;i++){
+    const r=rows[i];
+    const ev=(r[iEv]||'').trim().toLowerCase();
+    if(ev!=='invoice_open'&&ev!=='invoice_paid')continue;
+    const cod=(iCod>=0?(r[iCod]||'').trim():'');
+    if(!cod){dedupRows.push(r);continue;} // sem cod → inclui sem dedup
+    if(!seenCod[cod]){
+      seenCod[cod]={idx:dedupRows.length,ev};
+      dedupRows.push(r);
+    } else if(ev==='invoice_paid'&&seenCod[cod].ev!=='invoice_paid'){
+      // Substitui invoice_open pelo invoice_paid da mesma transação
+      dedupRows[seenCod[cod].idx]=r;
+      seenCod[cod].ev='invoice_paid';
+    }
+    // Se já tem invoice_paid e encontra outro → ignora
+  }
 
   const fatDia={},fatCri={};
 
-  for(let i=1;i<rows.length;i++){
-    const r=rows[i];
-    if((r[iEv]||'').trim().toLowerCase()!=='invoice_open')continue;
+  for(let i=0;i<dedupRows.length;i++){
+    const r=dedupRows[i];
+    // Aceita invoice_open (pendente pix/boleto) e invoice_paid (pago)
+    const ev=(r[iEv]||'').trim().toLowerCase();
+    if(ev!=='invoice_open'&&ev!=='invoice_paid')continue;
     const src=(r[iSrc]||'').trim();
     const isMeta=isMetaSrc(src);
     if(orgMode&&isMeta)continue;   // modo orgânico: pular rastreados
