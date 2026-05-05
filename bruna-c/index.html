@@ -169,7 +169,8 @@ tr:hover td{background:rgba(255,255,255,.025)}
 <!-- App -->
 <div id="app">
   <div class="tabs">
-    <div class="tab active" onclick="showTab('visao',this)">Visão Geral</div>
+    <div class="tab active" onclick="showTab('visao',this)">Tráfego</div>
+    <div class="tab" onclick="showTab('total',this)">Visão Geral</div>
     <div class="tab" onclick="showTab('criativos',this)">Criativos</div>
     <div class="tab" onclick="showTab('publicos',this)">Públicos</div>
     <div class="tab" onclick="showTab('semanal',this)">Semana a Semana</div>
@@ -211,6 +212,26 @@ tr:hover td{background:rgba(255,255,255,.025)}
         <th>Data</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>CTR</th>
         <th>CPC</th><th>CPM</th><th>PV</th><th>Connect Rate</th><th>Checkouts</th><th>Compras</th><th>Faturamento</th>
       </tr></thead><tbody id="tbody-dias"></tbody></table>
+    </div>
+  </div>
+
+  <!-- VISAO TOTAL -->
+  <div class="content" id="tab-total">
+    <div class="kpi-grid" id="kpi-grid-total"></div>
+    <div class="chart-grid-2x2">
+      <div class="chart-card"><h4>Investimento por Dia</h4><canvas id="chartInv2"></canvas></div>
+      <div class="chart-card"><h4>Cliques & Page Views por Dia</h4><canvas id="chartCliqPv2"></canvas></div>
+      <div class="chart-card"><h4>Impressões por Dia</h4><canvas id="chartImp2"></canvas></div>
+      <div class="chart-card"><h4>Checkouts por Dia</h4><canvas id="chartCk2"></canvas></div>
+    </div>
+    <div class="sec-title">🔀 Funis de Conversão por Página</div>
+    <div class="funil-section" id="funil-section-total"></div>
+    <div class="sec-title">📅 Detalhamento Diário</div>
+    <div style="overflow-x:auto;background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px">
+      <table><thead><tr>
+        <th>Data</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>CTR</th>
+        <th>CPC</th><th>CPM</th><th>PV</th><th>Connect Rate</th><th>Checkouts</th><th>Compras</th><th>Faturamento</th>
+      </tr></thead><tbody id="tbody-dias2"></tbody></table>
     </div>
   </div>
 
@@ -432,17 +453,18 @@ function processGerenciador({ headers, rows }) {
 function processWebhook({ headers, rows }, DIAS, byPage, CRIATIVOS) {
   if (!rows.length) return;
 
-  const iStatus = col(headers, /^status$/i, /purchase\.status$/i, /\.status$/i);
+  const iStatus = col(headers, /^status$/i, /purchase\.status$/i, /\.status$/i, /^event$/i);
   const iData   = col(headers, /^creation_date$/i, /^created_at$/i, /data.*pagamento/i, /paid.*at/i, /data de cr[eé]dito/i, /approved_date$/i);
   const iGanho  = col(headers, /ganho l[ií]quido/i, /net.*gain/i, /receita l[ií]quida/i);
   const iValor  = col(headers, /valor da venda/i, /^valor$/i, /gross/i, /price\.value$/i);
 
 
   const fatByDate = {}, compByDate = {};
+  let whTotalCompras = 0, whTotalFat = 0;
 
   for (const row of rows) {
     const status = fv(row, iStatus).toLowerCase();
-    if (!status.includes('pago') && !status.includes('paid') && !status.includes('approved') && !status.includes('aprovado')) continue;
+    if (!status.includes('pago') && !status.includes('paid') && !status.includes('approved') && !status.includes('aprovado') && !status.includes('purchase_approved')) continue;
     let rawDate = fv(row, iData);
     if (!rawDate) {
       // fallback: escaneia todas colunas buscando valor com data
@@ -471,6 +493,9 @@ function processWebhook({ headers, rows }, DIAS, byPage, CRIATIVOS) {
     }
 
     const valor = fn(row, iGanho > -1 ? iGanho : iValor);
+    // Acumula total geral (todas as vendas aprovadas)
+    whTotalCompras += 1;
+    whTotalFat     += valor;
     // Armazena em DD/MM/YYYY e também em YYYY-MM-DD (formato do Gerenciador)
     const [dd, mm, yyyy] = data.split('/');
     const isoData = yyyy && mm && dd ? `${yyyy}-${mm}-${dd}` : data;
@@ -485,6 +510,9 @@ function processWebhook({ headers, rows }, DIAS, byPage, CRIATIVOS) {
   }
 
 
+  // Retorna totais de todas as vendas aprovadas
+  const _totRetorno = {compras: whTotalCompras, fat: whTotalFat};
+
   // Atribui vendas ao DIAS — cria entrada se o dia não existir no Gerenciador
   for (const [dateKey, fatVal] of Object.entries(fatByDate)) {
     if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dateKey)) continue; // só DD/MM/YYYY
@@ -497,6 +525,7 @@ function processWebhook({ headers, rows }, DIAS, byPage, CRIATIVOS) {
     d.fat     = fatVal;
     d.compras = compByDate[dateKey] || 0;
   }
+  return _totRetorno;
 }
 
 function buildPeriodicos(DIAS) {
@@ -671,6 +700,48 @@ const CDEFS = {
   }
 };
 
+function renderKPIsTotal() {
+  const DIAS = getFilteredDias();
+  const tot = DIAS.reduce((acc,d)=>({
+    inv:acc.inv+d.inv, cliques:acc.cliques+d.cliques, pv:acc.pv+d.pv,
+    ck:acc.ck+d.ck, imp:acc.imp+d.imp, compras:acc.compras+d.compras, fat:acc.fat+d.fat
+  }), {inv:0,cliques:0,pv:0,ck:0,imp:0,compras:0,fat:0});
+
+  // Usa totais reais do webhook (todas as vendas aprovadas)
+  const wh = DATA.whTotais || {compras:0,fat:0};
+  const comprasTotal = wh.compras;
+  const fatTotal     = wh.fat;
+
+  const ctrTot    = tot.imp>0 ? tot.cliques/tot.imp*100 : 0;
+  const cpcTot    = tot.cliques>0 ? tot.inv/tot.cliques : 0;
+  const cpmTot    = tot.imp>0 ? tot.inv/tot.imp*1000 : 0;
+  const crTot     = tot.cliques>0 ? tot.pv/tot.cliques*100 : 0;
+  const roasTot   = tot.inv>0 ? safe(fatTotal/tot.inv) : 0;
+  const ticketTot = comprasTotal>0 ? safe(fatTotal/comprasTotal) : 0;
+
+  const kpis = [
+    {label:'Investimento',  val:brl(tot.inv),       cls:'orange'},
+    {label:'Faturamento',   val:brl(fatTotal),       cls:'green'},
+    {label:'ROAS',          val:roasTot.toFixed(2).replace('.',',')+'x', cls:'green'},
+    {label:'Ticket Médio',  val:brl(ticketTot),      cls:''},
+    {label:'Compras',       val:num(comprasTotal),   cls:''},
+    {label:'Impressões',    val:num(tot.imp),         cls:''},
+    {label:'Cliques',       val:num(tot.cliques),    cls:''},
+    {label:'Page Views',    val:num(tot.pv),          cls:''},
+    {label:'Checkouts',     val:num(tot.ck),          cls:'yellow'},
+    {label:'CTR',           val:pct(ctrTot),          cls:''},
+    {label:'CPC',           val:brl(cpcTot),          cls:''},
+    {label:'CPM',           val:brl(cpmTot),          cls:''},
+    {label:'Connect Rate',  val:pct(crTot),           cls:'orange'},
+  ];
+
+  document.getElementById('kpi-grid-total').innerHTML = kpis.map(k=>`
+    <div class="kpi-card">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-val ${k.cls}">${k.val}</div>
+    </div>`).join('');
+}
+
 function mkChart(id, type, datasets, extra={}) {
   if (charts[id]) charts[id].destroy();
   const ctx = document.getElementById(id).getContext('2d');
@@ -755,6 +826,13 @@ function renderFunnels() {
 // ═══════════════════════════════════════
 // TABELA DIAS
 // ═══════════════════════════════════════
+function renderFunnelsFor(containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const byPage = getFilteredByPage();
+  el.innerHTML = document.getElementById('funil-section').innerHTML;
+}
+
 function renderDias() {
   document.getElementById('tbody-dias').innerHTML = getFilteredDias().map(d=>{
     const crv  = safe(cr(d));
@@ -775,6 +853,20 @@ function renderDias() {
 // ═══════════════════════════════════════
 // CRIATIVOS
 // ═══════════════════════════════════════
+function renderDiasFor(tbodyId) {
+  const el = document.getElementById(tbodyId);
+  if (!el) return;
+  el.innerHTML = getFilteredDias().map(d=>{
+    const crv  = safe(cr(d));
+    const ctrv = d.imp>0 ? safe(d.cliques/d.imp*100) : 0;
+    const cpcv = d.cliques>0 ? safe(d.inv/d.cliques) : 0;
+    const cpmv = d.imp>0 ? safe(d.inv/d.imp*1000) : 0;
+    return `<tr><td>${d.data}</td><td>${brl(d.inv)}</td><td>${num(d.imp)}</td><td>${num(d.cliques)}</td>
+      <td>${pct(ctrv)}</td><td>${brl(cpcv)}</td><td>${brl(cpmv)}</td><td>${num(d.pv)}</td>
+      <td>${pct(crv)}</td><td>${num(d.ck)}</td><td>${num(d.compras)}</td><td>${brl(d.fat)}</td></tr>`;
+  }).join('');
+}
+
 function setCriFiltro(f,el){criFiltro=f;document.querySelectorAll('#tab-criativos button[onclick*="setCriFiltro"]').forEach(b=>b.classList.remove('active'));el.classList.add('active');renderCriativos()}
 function setCriSort(s,el){criSort=s;document.querySelectorAll('#tab-criativos button[onclick*="setCriSort"]').forEach(b=>b.classList.remove('active'));el.classList.add('active');renderCriativos()}
 
@@ -882,11 +974,35 @@ function renderMensal() {
 // ═══════════════════════════════════════
 // RENDER ALL
 // ═══════════════════════════════════════
+function renderChartsFor(ids) {
+  // Renders same charts as renderCharts but with different canvas IDs
+  const dias = getFilteredDias();
+  const labels = dias.map(d=>d.data);
+  const inv = dias.map(d=>d.inv);
+  const cliques = dias.map(d=>d.cliques);
+  const pv = dias.map(d=>d.pv);
+  const imp = dias.map(d=>d.imp);
+  const ck = dias.map(d=>d.ck);
+  function mkChart(id, datasets, type='bar') {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (el._chart) el._chart.destroy();
+    el._chart = new Chart(el.getContext('2d'), {type, data:{labels, datasets}, options:{responsive:true, plugins:{legend:{labels:{color:'#aaa'}}}, scales:{x:{ticks:{color:'#777'}}, y:{ticks:{color:'#777'}}}}});
+  }
+  mkChart(ids[0], [{label:'Investimento (R$)', data:inv, backgroundColor:'#ff6b2b88', borderColor:'#ff6b2b', borderWidth:1}]);
+  mkChart(ids[1], [{label:'Cliques', data:cliques, borderColor:'#ff6b2b', tension:.3, fill:false}, {label:'PV', data:pv, borderColor:'#4caf50', tension:.3, fill:false}], 'line');
+  mkChart(ids[2], [{label:'Impressões', data:imp, backgroundColor:'#9c59d188', borderColor:'#9c59d1', borderWidth:1}]);
+  mkChart(ids[3], [{label:'Checkouts', data:ck, backgroundColor:'#f1c40f88', borderColor:'#f1c40f', borderWidth:1}]);
+}
 function renderAll() {
   renderKPIs();
+  renderKPIsTotal();
   renderCharts();
+  renderChartsFor(['chartInv2','chartCliqPv2','chartImp2','chartCk2']);
   renderFunnels();
+  renderFunnelsFor('funil-section-total');
   renderDias();
+  renderDiasFor('tbody-dias2');
   renderCriativos();
   renderPublicos();
   renderSemanal();
@@ -916,14 +1032,15 @@ async function loadData() {
     const { DIAS, PUBLICOS, CRIATIVOS, byPage, byPageDays } = processGerenciador(ger);
 
     // Carrega aba "Webhook"
+    let whTotais = {compras:0, fat:0};
     if (csvWh) {
       const wh = parseCSV(csvWh);
-      if (wh.rows.length) processWebhook(wh, DIAS, byPage, CRIATIVOS);
+      if (wh.rows.length) whTotais = processWebhook(wh, DIAS, byPage, CRIATIVOS) || whTotais;
     }
 
     const { SEMANAL, MENSAL } = buildPeriodicos(DIAS);
 
-    DATA = { DIAS, PUBLICOS, CRIATIVOS, byPage, byPageDays, SEMANAL, MENSAL, labels: [] };
+    DATA = { DIAS, PUBLICOS, CRIATIVOS, byPage, byPageDays, SEMANAL, MENSAL, labels: [], whTotais };
 
     document.getElementById('loading').style.display = 'none';
     document.getElementById('app').style.display = 'block';
