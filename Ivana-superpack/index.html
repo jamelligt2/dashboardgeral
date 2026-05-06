@@ -259,7 +259,7 @@ const DATA_MINIMA = '2026-01-14';
 // 0:Data | 1:Campanha | 2:Conjunto | 3:Anúncio | 4:Link | 5:Investimento
 // 6:Alcance | 7:Impressões | 8:Clicks | 9:PageView | 10:Checkout
 // 11:Status Anúncio | 12:Status Conjunto | 13:Status Campanha
-const G = { date:0, campaign:1, adset:2, ad:3, link:4, inv:5, reach:6, imp:7, cliques:8, pv:9, ck:10, statusAd:11, statusAdset:12, statusCampaign:13 };
+const G = { date:0, campaign:1, adset:2, ad:3, link:4, inv:5, reach:6, imp:7, cliques:8, pv:9, ck:10, statusCampaign:11, statusAdset:12, statusAd:13 };
 
 // Webhook colunas (0-based):
 // 0:Data | 1:Produto | 2:É Super Pack? | 3:Status | 4:Cliente | 5:Email
@@ -312,9 +312,20 @@ function pNum(v){
 // ============ FETCH ============
 async function fetchSheetCSV(sheetName){
   const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
-  const resp=await fetch(url);
-  if(!resp.ok)throw new Error(`Erro ao carregar "${sheetName}": ${resp.status}`);
-  return await resp.text();
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),20000);
+  try{
+    const resp=await fetch(url,{signal:controller.signal});
+    clearTimeout(timeout);
+    if(!resp.ok)throw new Error(`Planilha "${sheetName}": HTTP ${resp.status}. Verifique se a planilha está pública (Compartilhar → Qualquer pessoa com o link).`);
+    const text=await resp.text();
+    if(text.includes('Signin')||text.includes('accounts.google'))throw new Error(`Planilha "${sheetName}" requer login. Defina como pública: Compartilhar → Qualquer pessoa com o link → Visualizador.`);
+    return text;
+  }catch(e){
+    clearTimeout(timeout);
+    if(e.name==='AbortError')throw new Error(`Timeout ao carregar "${sheetName}". Verifique a conexão e se a planilha está pública.`);
+    throw e;
+  }
 }
 
 // ============ DATE HELPERS ============
@@ -459,11 +470,12 @@ async function loadData(){
       const link=r[G.link]||'';
 
       // Determinar status ativo para criativos e conjuntos
-      // Ativo = todos os 3 status são ACTIVE
+      // Ativo = nenhum status contém PAUSED
       const sAd=(r[G.statusAd]||'').trim().toUpperCase();
       const sAdset=(r[G.statusAdset]||'').trim().toUpperCase();
       const sCamp=(r[G.statusCampaign]||'').trim().toUpperCase();
-      const isActive=sAd==='ACTIVE'&&sAdset==='ACTIVE'&&sCamp==='ACTIVE';
+      const isPaused=(s)=>s.includes('PAUSED');
+      const isActive=!isPaused(sAd)&&!isPaused(sAdset)&&!isPaused(sCamp)&&(sAd!==''||sAdset!==''||sCamp!=='');
 
       // DIA
       if(!diaMap[dt])diaMap[dt]={data:dt,inv:0,fat:0,compras:0,cliques:0,pv:0,ck:0,imp:0};
@@ -681,41 +693,36 @@ function renderSalesPanel(fSales){
   const totalFat=fSales.reduce((s,v)=>s+v.fatTotal,0);
   const tracked=fSales.filter(s=>s.utmContent||s.utmMedium||s.utmCampaign);
   const organic=fSales.filter(s=>!s.utmContent&&!s.utmMedium&&!s.utmCampaign);
-  panel.innerHTML=`
-  <div style="background:#12121f;border:1px solid rgba(255,107,43,.25);border-radius:10px;padding:16px;margin-bottom:20px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
-      <div style="display:flex;align-items:center;gap:10px">
-        <span style="font-size:18px">💸</span>
-        <div>
-          <div style="font-size:13px;font-weight:600;color:#ff9a3c">Vendas no Período (${fSales.length})</div>
-          <div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px">${SALES.length} total · ${brl(totalFat)} faturamento · ✅ ${tracked.length} rastreadas · ⭐ ${organic.length} orgânicas · ← arraste para ver mais</div>
-        </div>
-      </div>
-    </div>
-    <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:6px">
-    ${fSales.map(s=>{
-      const isTracked=!!(s.utmContent||s.utmMedium||s.utmCampaign);
-      const color=isTracked?'rgba(46,204,113,.12)':'rgba(241,196,15,.08)';
-      const border=isTracked?'rgba(46,204,113,.35)':'rgba(241,196,15,.25)';
-      const icon=isTracked?'✅':'⭐';
-      const src=(s.utmSource||'').toLowerCase();
-      const srcLabel=src?src:'orgânico';
-      return\`<div style="flex-shrink:0;width:210px;background:\${color};border:1px solid \${border};border-radius:8px;padding:10px 12px">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
-          <div style="font-size:11px;font-weight:600;color:#e8e6f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px">\${icon} \${s.nome||'Sem nome'}</div>
-          <div style="font-size:13px;font-weight:700;color:#2ecc71;font-family:'DM Mono',monospace;flex-shrink:0">\${brl(s.fatTotal)}</div>
-        </div>
-        <div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:4px">📅 \${toBR(s.data)||'—'}</div>
-        \${isTracked?\`
-        <div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:2px">🎨 <span style="color:#2ecc71">\${s.utmContent||'—'}</span></div>
-        <div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:2px">👥 <span style="color:#2ecc71">\${s.utmMedium?s.utmMedium.slice(0,28)+(s.utmMedium.length>28?'…':''):'—'}</span></div>
-        <div style="font-size:10px;color:rgba(255,255,255,.45)">📣 <span style="color:#e8e6f0">\${srcLabel}</span></div>
-        \`:\`<div style="font-size:10px;color:rgba(241,196,15,.7);margin-top:4px">⭐ Venda orgânica</div>\`}
-      </div>\`;
-    }).join('')}
-    ${fSales.length===0?'<div style="color:rgba(255,255,255,.3);font-size:12px;padding:10px">Nenhuma venda no período</div>':''}
-    </div>
-  </div>`;
+  const cards=fSales.map(s=>{
+    const isTracked=!!(s.utmContent||s.utmMedium||s.utmCampaign);
+    const color=isTracked?'rgba(46,204,113,.12)':'rgba(241,196,15,.08)';
+    const border=isTracked?'rgba(46,204,113,.35)':'rgba(241,196,15,.25)';
+    const icon=isTracked?'✅':'⭐';
+    const srcLabel=(s.utmSource||'').toLowerCase()||'orgânico';
+    const utmMedShort=s.utmMedium?(s.utmMedium.length>28?s.utmMedium.slice(0,28)+'…':s.utmMedium):'—';
+    const trackedHtml=isTracked
+      ?'<div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:2px">🎨 <span style="color:#2ecc71">'+( s.utmContent||'—')+'</span></div>'
+       +'<div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:2px">👥 <span style="color:#2ecc71">'+utmMedShort+'</span></div>'
+       +'<div style="font-size:10px;color:rgba(255,255,255,.45)">📣 <span style="color:#e8e6f0">'+srcLabel+'</span></div>'
+      :'<div style="font-size:10px;color:rgba(241,196,15,.7);margin-top:4px">⭐ Venda orgânica</div>';
+    return '<div style="flex-shrink:0;width:210px;background:'+color+';border:1px solid '+border+';border-radius:8px;padding:10px 12px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">'
+      +'<div style="font-size:11px;font-weight:600;color:#e8e6f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px">'+icon+' '+(s.nome||'Sem nome')+'</div>'
+      +'<div style="font-size:13px;font-weight:700;color:#2ecc71;font-family:DM Mono,monospace;flex-shrink:0">'+brl(s.fatTotal)+'</div>'
+      +'</div>'
+      +'<div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:4px">📅 '+(toBR(s.data)||'—')+'</div>'
+      +trackedHtml
+      +'</div>';
+  }).join('');
+  const emptyMsg=fSales.length===0?'<div style="color:rgba(255,255,255,.3);font-size:12px;padding:10px">Nenhuma venda no período</div>':'';
+  panel.innerHTML='<div style="background:#12121f;border:1px solid rgba(255,107,43,.25);border-radius:10px;padding:16px;margin-bottom:20px">'
+    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">'
+    +'<span style="font-size:18px">💸</span>'
+    +'<div><div style="font-size:13px;font-weight:600;color:#ff9a3c">Vendas no Período ('+fSales.length+')</div>'
+    +'<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px">'+SALES.length+' total · '+brl(totalFat)+' faturamento · ✅ '+tracked.length+' rastreadas · ⭐ '+organic.length+' orgânicas · ← arraste para ver mais</div>'
+    +'</div></div>'
+    +'<div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:6px">'+cards+emptyMsg+'</div>'
+    +'</div>';
 }
 
 // ============ VISÃO GERAL KPIs (todas as vendas) ============
@@ -762,17 +769,17 @@ function renderTbodyGeral(dias,fSales){
     const ticket=comprasTotal>0?fatTotal/comprasTotal:0;
     const cac=comprasTotal>0&&inv>0?inv/comprasTotal:0;
     const roas=inv>0&&fatTotal>0?fatTotal/inv:0;
-    return\`<tr>
-      <td>\${toBR(d.data)}</td>
-      <td>\${brl(inv)}</td>
-      <td>\${fatTotal>0?brl(fatTotal):'—'}</td>
-      <td>\${fatTotal>0&&inv>0?br(roas,2)+'x':'—'}</td>
-      <td>\${comprasTotal>0?br(comprasTotal,0):'—'}</td>
-      <td style="color:#2ecc71">\${comprasRastr>0?br(comprasRastr,0):'—'}</td>
-      <td style="color:#f1c40f">\${comprasOrg>0?br(comprasOrg,0):'—'}</td>
-      <td>\${ticket>0?brl(ticket):'—'}</td>
-      <td>\${cac>0?brl(cac):'—'}</td>
-    </tr>\`;
+    return '<tr>'
+      +'<td>'+toBR(d.data)+'</td>'
+      +'<td>'+brl(inv)+'</td>'
+      +'<td>'+(fatTotal>0?brl(fatTotal):'—')+'</td>'
+      +'<td>'+(fatTotal>0&&inv>0?br(roas,2)+'x':'—')+'</td>'
+      +'<td>'+(comprasTotal>0?br(comprasTotal,0):'—')+'</td>'
+      +'<td style="color:#2ecc71">'+(comprasRastr>0?br(comprasRastr,0):'—')+'</td>'
+      +'<td style="color:#f1c40f">'+(comprasOrg>0?br(comprasOrg,0):'—')+'</td>'
+      +'<td>'+(ticket>0?brl(ticket):'—')+'</td>'
+      +'<td>'+(cac>0?brl(cac):'—')+'</td>'
+      +'</tr>';
   }).join('');
 }
 
