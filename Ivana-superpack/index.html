@@ -669,7 +669,7 @@ function renderKpiTrafego(dias,fSales){
   const cpm=imp>0?inv/imp*1000:0;
 
   // Separar tráfego vs orgânico
-  const isTraf=s=>!!(s.utmContent||s.utmMedium||s.utmSource);
+  const isTraf=s=>(s.utmSource||'').toLowerCase().replace(/[\s_-]/g,'')==='metaads';
   const vendTraf=fSales.filter(isTraf);
   const vendOrg=fSales.filter(s=>!isTraf(s));
 
@@ -709,14 +709,15 @@ function renderSalesPanel(fSales){
   const panel=document.getElementById('sales-panel');
   if(!panel)return;
   const totalFat=fSales.reduce((s,v)=>s+v.fatTotal,0);
-  const tracked=fSales.filter(s=>s.utmContent||s.utmMedium||s.utmCampaign);
-  const organic=fSales.filter(s=>!s.utmContent&&!s.utmMedium&&!s.utmCampaign);
+  const isTrafego=s=>(s.utmSource||'').toLowerCase().replace(/[\s_-]/g,'')==='metaads';
+  const tracked=fSales.filter(isTrafego);
+  const organic=fSales.filter(s=>!isTrafego(s));
   const cards=fSales.map(s=>{
-    const isTracked=!!(s.utmContent||s.utmMedium||s.utmCampaign);
+    const isTracked=(s.utmSource||'').toLowerCase().replace(/[\s_-]/g,'')==='metaads';
     const color=isTracked?'rgba(46,204,113,.12)':'rgba(241,196,15,.08)';
     const border=isTracked?'rgba(46,204,113,.35)':'rgba(241,196,15,.25)';
     const icon=isTracked?'✅':'⭐';
-    const srcLabel=(s.utmSource||'').toLowerCase()||'orgânico';
+    const srcLabel=isTracked?'meta_ads':'orgânico';
     const utmMedShort=s.utmMedium?(s.utmMedium.length>28?s.utmMedium.slice(0,28)+'…':s.utmMedium):'—';
     const obTag=s.fatOB>0
       ?'<div style="font-size:10px;color:#f39c12;margin-bottom:3px">🛒 OB: '+brl(s.fatOB)+'</div>'
