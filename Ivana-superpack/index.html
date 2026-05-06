@@ -180,7 +180,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
   <div class="sec-title">Dia a Dia — Visão Geral</div>
   <div class="ob-info">ℹ️ <strong>Hotmart:</strong> Todas as vendas contadas (orgânico + pago) a partir de 14/01/2026. Faturamento inclui produto principal + order bumps vinculados via <strong>transaction_root</strong>. Investimento = Meta Ads (Gerenciador).</div>
   <div class="tbl-wrap"><table><thead><tr>
-    <th>Data</th><th>Invest.</th><th>Fat. Total</th><th>ROAS</th><th>Compras Total</th><th>Rastreadas</th><th>Orgânicas</th><th>Ticket Médio</th><th>CAC</th>
+    <th>Data</th><th>Invest.</th><th>Fat. Total</th><th>ROAS</th><th>Compras Total</th><th>Tráfego</th><th>Orgânicas</th><th>Ticket Médio</th><th>CAC</th>
   </tr></thead><tbody id="tbody-geral"></tbody></table></div>
 </div>
 
@@ -752,9 +752,10 @@ function renderSalesPanel(fSales){
 function renderKpiVisao(dias,fSales){
   const inv=dias.reduce((s,d)=>s+d.inv,0);
   const fatTotal=fSales.reduce((s,v)=>s+v.fatTotal,0);
+  const isTraf=s=>(s.utmSource||'').toLowerCase().replace(/[\s_-]/g,'')==='metaads';
   const comprasTotal=fSales.length;
-  const comprasRastr=dias.reduce((s,d)=>s+d.compras,0);
-  const comprasOrg=comprasTotal-comprasRastr;
+  const comprasRastr=fSales.filter(isTraf).length;
+  const comprasOrg=fSales.filter(s=>!isTraf(s)).length;
   const ticket=comprasTotal>0?fatTotal/comprasTotal:0;
   const cac=comprasTotal>0?inv/comprasTotal:0;
   const roas=inv>0?fatTotal/inv:0;
@@ -764,7 +765,7 @@ function renderKpiVisao(dias,fSales){
     <div class="kpi-card"><div class="kpi-label">Fat. Total</div><div class="kpi-value orange">${brl(fatTotal)}</div></div>
     <div class="kpi-card"><div class="kpi-label">ROAS Total</div><div class="kpi-value ${roas>=1?'green':'red'}">${br(roas,2)}x</div></div>
     <div class="kpi-card"><div class="kpi-label">Vendas Total</div><div class="kpi-value orange">${br(comprasTotal,0)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Rastreadas</div><div class="kpi-value green">${br(comprasRastr,0)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Tráfego</div><div class="kpi-value green">${br(comprasRastr,0)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Orgânicas</div><div class="kpi-value yellow">${br(comprasOrg>=0?comprasOrg:0,0)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value">${brl(ticket)}</div></div>
     <div class="kpi-card"><div class="kpi-label">CAC Total</div><div class="kpi-value">${brl(cac)}</div></div>
@@ -776,18 +777,21 @@ function renderTbodyGeral(dias,fSales){
   const el=document.getElementById('tbody-geral');
   if(!el)return;
   // Agrupa vendas por data
+  const isTrafG=s=>(s.utmSource||'').toLowerCase().replace(/[\s_-]/g,'')==='metaads';
   const salesByDate={};
   fSales.forEach(s=>{
-    if(!salesByDate[s.data])salesByDate[s.data]={total:0,fat:0};
+    if(!salesByDate[s.data])salesByDate[s.data]={total:0,fat:0,traf:0};
     salesByDate[s.data].total+=1;
     salesByDate[s.data].fat+=s.fatTotal;
+    if(isTrafG(s))salesByDate[s.data].traf+=1;
   });
   el.innerHTML=dias.slice().reverse().map(d=>{
     const inv=d.inv;
     const sd=salesByDate[d.data]||{total:0,fat:0};
     const fatTotal=sd.fat;
     const comprasTotal=sd.total;
-    const comprasRastr=d.compras;
+    const isTrafD=s=>(s.utmSource||'').toLowerCase().replace(/[\s_-]/g,'')==='metaads';
+    const comprasRastr=(salesByDate[d.data]||{traf:0}).traf;
     const comprasOrg=Math.max(0,comprasTotal-comprasRastr);
     const ticket=comprasTotal>0?fatTotal/comprasTotal:0;
     const cac=comprasTotal>0&&inv>0?inv/comprasTotal:0;
