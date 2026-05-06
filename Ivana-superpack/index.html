@@ -269,7 +269,7 @@ const W = { data:0, produto:1, isSuperPack:2, status:3, cliente:4, email:5,
             fatTotal:6, fatPrincipal:7, fatOB:8, txRoot:9, tipo:10, src:11,
             utmSource:12, utmMedium:13, utmCampaign:14, utmContent:15 };
 
-let DIAS=[], SEMANAL=[], MENSAL=[], CRIATIVOS=[], PUBLICOS=[], SALES=[];
+let DIAS=[], SEMANAL=[], MENSAL=[], CRIATIVOS=[], PUBLICOS=[], SALES=[], GROWS=[], WROWS=[];
 let dateFrom=null, dateTo=null;
 let chartInstances={};
 
@@ -521,6 +521,10 @@ async function loadData(){
       }
     });
 
+    // Save raw rows for re-filtering
+    GROWS=gRows;
+    WROWS=wRows;
+
     // Build DIAS
     DIAS=Object.values(diaMap).sort((a,b)=>a.data.localeCompare(b.data));
 
@@ -646,8 +650,8 @@ function renderAll(){
   renderTbodyDias(dias);
   renderKpiVisao(dias,fSales);
   renderTbodyGeral(dias,fSales);
-  renderCriativos();
-  renderPublicos();
+  renderCriativos(dateFrom,dateTo);
+  renderPublicos(dateFrom,dateTo);
   renderSemanal(dias);
   renderMensal(dias);
   renderCharts(dias);
@@ -873,9 +877,72 @@ function renderTbodyDias(dias){
 
 // ============ CRIATIVOS ============
 let criFilter='todos', criSort='inv';
-function setCriFiltro(f,btn){criFilter=f;document.querySelectorAll('.cri-status-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderCriativos();}
-function setCriSort(s,btn){criSort=s;document.querySelectorAll('.cri-sort-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderCriativos();}
-function renderCriativos(){
+function setCriFiltro(f,btn){criFilter=f;document.querySelectorAll('.cri-status-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderCriativos(dateFrom,dateTo);}
+function setCriSort(s,btn){criSort=s;document.querySelectorAll('.cri-sort-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderCriativos(dateFrom,dateTo);}
+function buildCriPubMaps(from,to){
+  const criMap={}, pubMap={};
+  const fSales=SALES.filter(s=>(!from||s.data>=from)&&(!to||s.data<=to));
+  for(let i=1;i<GROWS.length;i++){
+    const r=GROWS[i];
+    if(!r||!r[G.date])continue;
+    const dt=r[G.date].trim();
+    if(!dt.match(/^\d{4}-\d{2}-\d{2}$/))continue;
+    if(dt<DATA_MINIMA)continue;
+    if(from&&dt<from)continue;
+    if(to&&dt>to)continue;
+    const inv=pNum(r[G.inv]);
+    const cliq=pNum(r[G.cliques]);
+    const pv=pNum(r[G.pv]);
+    const ck=pNum(r[G.ck]);
+    const imp=pNum(r[G.imp]);
+    const adset=r[G.adset]||'';
+    const ad=r[G.ad]||'';
+    const link=r[G.link]||'';
+    const sAd=(r[G.statusAd]||'').trim().toUpperCase();
+    const sAdset=(r[G.statusAdset]||'').trim().toUpperCase();
+    const sCamp=(r[G.statusCampaign]||'').trim().toUpperCase();
+    const isPaused=s=>s.includes('PAUSED');
+    const isActive=!isPaused(sAd)&&!isPaused(sAdset)&&!isPaused(sCamp)&&(sAd!==''||sAdset!==''||sCamp!=='');
+    if(ad){
+      if(!criMap[ad])criMap[ad]={nome:ad,inv:0,cliques:0,imp:0,pv:0,ck:0,compras:0,fat:0,link:'',lastDate:'',ativo:false};
+      const c=criMap[ad];
+      c.inv+=inv;c.cliques+=cliq;c.imp+=imp;c.pv+=pv;c.ck+=ck;
+      if(link)c.link=link;
+      if(dt>c.lastDate){c.lastDate=dt;c.ativo=isActive;}
+    }
+    if(adset){
+      if(!pubMap[adset])pubMap[adset]={nome:adset,inv:0,cliques:0,imp:0,pv:0,ck:0,compras:0,fat:0,lastDate:'',ativo:false};
+      const p=pubMap[adset];
+      p.inv+=inv;p.cliques+=cliq;p.imp+=imp;p.pv+=pv;p.ck+=ck;
+      if(dt>p.lastDate){p.lastDate=dt;p.ativo=isActive;}
+    }
+  }
+  fSales.forEach(s=>{
+    const c=s.utmContent||'';
+    if(c&&criMap[c]){criMap[c].fat+=s.fatTotal;criMap[c].compras+=1;}
+    const m=s.utmMedium||'';
+    if(m&&pubMap[m]){pubMap[m].fat+=s.fatTotal;pubMap[m].compras+=1;}
+  });
+  // Compute metrics
+  Object.values(criMap).forEach(c=>{
+    c.cpc=c.cliques>0?c.inv/c.cliques:0;
+    c.cpm=c.imp>0?c.inv/c.imp*1000:0;
+    c.ctr=c.imp>0?c.cliques/c.imp*100:0;
+    c.cac=c.compras>0?c.inv/c.compras:0;
+    c.ticket=c.compras>0?c.fat/c.compras:0;
+    c.roas=c.inv>0?c.fat/c.inv:0;
+  });
+  Object.values(pubMap).forEach(p=>{
+    p.cpc=p.cliques>0?p.inv/p.cliques:0;
+    p.cpm=p.imp>0?p.inv/p.imp*1000:0;
+    p.ctr=p.imp>0?p.cliques/p.imp*100:0;
+    p.connectRate=p.cliques>0?p.pv/p.cliques*100:0;
+    p.roas=p.inv>0&&p.fat>0?p.fat/p.inv:0;
+  });
+  return {criMap,pubMap};
+}
+
+function renderCriativos(from,to){
   let cris=[...CRIATIVOS];
   if(criFilter==='ativos')cris=cris.filter(c=>c.ativo);
   if(criFilter==='inativos')cris=cris.filter(c=>!c.ativo);
@@ -935,9 +1002,9 @@ function renderCriativos(){
 
 // ============ PÚBLICOS ============
 let pubFilter='todos', pubSort='inv';
-function setPubFiltro(f,btn){pubFilter=f;document.querySelectorAll('.pub-filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderPublicos();}
-function setPubSort(s,btn){pubSort=s;document.querySelectorAll('.pub-sort-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderPublicos();}
-function renderPublicos(){
+function setPubFiltro(f,btn){pubFilter=f;document.querySelectorAll('.pub-filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderPublicos(dateFrom,dateTo);}
+function setPubSort(s,btn){pubSort=s;document.querySelectorAll('.pub-sort-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderPublicos(dateFrom,dateTo);}
+function renderPublicos(from,to){
   let pubs=[...PUBLICOS];
   if(pubFilter==='ativos')pubs=pubs.filter(p=>p.ativo);
   if(pubFilter==='inativos')pubs=pubs.filter(p=>!p.ativo);
