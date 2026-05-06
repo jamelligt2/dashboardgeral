@@ -169,8 +169,10 @@ tr:hover td{background:rgba(255,255,255,.025)}
 
 <div class="tabs">
   <div class="tab active" onclick="showTab('visao',this)">📊 Visão Geral</div>
+  <div class="tab" onclick="showTab('trafego',this)">📈 Visão Tráfego</div>
   <div class="tab" onclick="showTab('criativos',this)">Criativos</div>
   <div class="tab" onclick="showTab('publicos',this)">Públicos</div>
+  <div class="tab" onclick="showTab('comparativo',this)">🔲 Comp. de Página</div>
   <div class="tab" onclick="showTab('semanal',this)">Semana a Semana</div>
   <div class="tab" onclick="showTab('mensal',this)">Mês a Mês</div>
 </div>
@@ -229,12 +231,42 @@ tr:hover td{background:rgba(255,255,255,.025)}
     <button class="pub-sort-btn cri-filter-btn" onclick="setPubSort('ctr',this)">CTR</button>
     <button class="pub-sort-btn cri-filter-btn" onclick="setPubSort('cpc',this)">CPC</button>
     <button class="pub-sort-btn cri-filter-btn" onclick="setPubSort('cr',this)">Connect Rate</button>
+    <button class="pub-sort-btn cri-filter-btn" onclick="setPubSort('roas',this)">ROAS</button>
+    <button class="pub-sort-btn cri-filter-btn" onclick="setPubSort('cac',this)">CAC</button>
   </div>
   <div class="pub-grid" id="pub-cards"></div>
   <div class="sec-title">Tabela de Públicos</div>
   <div class="tbl-wrap"><table><thead><tr>
-    <th>Público (Adset)</th><th>Invest.</th><th>Cliques</th><th>Imp.</th><th>PV</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Status</th>
+    <th>Público (Adset)</th><th>Tipo</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>CAC</th><th>Cliques</th><th>Imp.</th><th>PV</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Taxa Compra</th><th>Status</th>
   </tr></thead><tbody id="tbody-publicos"></tbody></table></div>
+</div>
+
+<!-- VISÃO TRÁFEGO -->
+<div id="tab-trafego" class="content">
+  <div style="background:rgba(255,107,43,.07);border:1px solid rgba(255,107,43,.2);border-radius:8px;padding:10px 14px;font-size:11px;color:rgba(255,107,43,.8);margin-bottom:16px">📢 Somente dados de tráfego pago Meta Ads — investimento + vendas atribuídas via UTM (meta_ads)</div>
+  <div class="kpi-grid" id="kpi-trafego"></div>
+  <div class="funil-3col" id="funil-trafego"></div>
+  <div class="taxa-grid" id="taxa-trafego" style="margin-bottom:16px"></div>
+  <div class="chart-grid-2x2">
+    <div class="chart-card"><h4>Investimento Diário — Meta</h4><canvas id="chart-inv-trafego"></canvas></div>
+    <div class="chart-card"><h4>Cliques vs PV — Meta</h4><canvas id="chart-cliq-trafego"></canvas></div>
+  </div>
+  <div class="sec-title">Dia a Dia — Meta Ads</div>
+  <div class="tbl-wrap"><table><thead><tr>
+    <th>Data</th><th>Invest.</th><th>Fat. Meta</th><th>ROAS</th><th>Compras</th><th>Cliques</th><th>PV</th><th>CK</th><th>Imp.</th><th>CPC</th><th>CPM</th><th>CTR</th><th>Hook Rate</th><th>Hold Rate</th><th>Status</th>
+  </tr></thead><tbody id="tbody-trafego"></tbody></table></div>
+</div>
+
+<!-- COMPARATIVO DE PÁGINA -->
+<div id="tab-comparativo" class="content">
+  <div class="sec-title" style="margin-top:0">Comparativo de Cenário</div>
+  <div id="comp-cenarios" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px"></div>
+  <div class="sec-title">Funil por Temperatura</div>
+  <div id="comp-funil-temp" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px"></div>
+  <div class="sec-title">Desempenho por Adset — Funil de Página</div>
+  <div class="tbl-wrap"><table><thead><tr>
+    <th>Adset</th><th>Tipo</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>CAC</th><th>Cliques</th><th>PV</th><th>CTR</th><th>Connect Rate</th><th>Taxa CK</th><th>Taxa Compra</th><th>Status</th>
+  </tr></thead><tbody id="tbody-comparativo"></tbody></table></div>
 </div>
 
 <!-- SEMANAL -->
@@ -270,7 +302,7 @@ const VENDAS_SHEET = 'Vendas';
 let DIAS = [], DIAS_FRIO = [], DIAS_QUENTE = [], SEMANAL = [], MENSAL = [], CRIATIVOS = [], PUBLICOS = [];
 let VENDAS_LIST = [];
 let dateFrom = null, dateTo = null;
-let chartInvDia, chartCliqDia, chartInvSem, chartCtrSem;
+let chartInvDia, chartCliqDia, chartInvSem, chartCtrSem, chartInvTrafego, chartCliqTrafego;
 let criFilter = 'todos', criSort = 'inv';
 let pubFilter = 'todos', pubSort = 'inv';
 
@@ -586,7 +618,7 @@ async function loadData() {
       const nome = gvizS(r[adsetI]);
       if (!nome) return;
       const d = gvizDate(r[dateI]);
-      if (!pubMap[nome]) pubMap[nome] = { nome, inv: 0, cliques: 0, pv: 0, ck: 0, imp: 0, lastDate: null };
+      if (!pubMap[nome]) pubMap[nome] = { nome, inv: 0, cliques: 0, pv: 0, ck: 0, imp: 0, fat: 0, compras: 0, lastDate: null };
       pubMap[nome].inv += gvizN(r[spendI]);
       pubMap[nome].cliques += gvizN(r[clickI]);
       pubMap[nome].pv += gvizN(r[pvI]);
@@ -597,13 +629,25 @@ async function loadData() {
         if (!pubMap[nome].lastDate || dISO > pubMap[nome].lastDate) pubMap[nome].lastDate = dISO;
       }
     });
+    // Atribuir vendas aos públicos via UTM Medium (= nome do adset no Meta Ads)
+    VENDAS_LIST.forEach(v => {
+      const medium = (v.utmMedium || '').trim();
+      if (!medium) return;
+      // Match exato ou parcial
+      const key = Object.keys(pubMap).find(k => k === medium || k.toLowerCase().includes(medium.toLowerCase()) || medium.toLowerCase().includes(k.toLowerCase()));
+      if (key) { pubMap[key].fat += v.valor; pubMap[key].compras++; }
+    });
     PUBLICOS = Object.values(pubMap).map(p => {
       const ativo = p.lastDate ? new Date(p.lastDate) >= d7ago : false;
       const ctr = p.imp > 0 ? p.cliques / p.imp * 100 : 0;
       const cpc = p.cliques > 0 ? p.inv / p.cliques : 0;
       const cpm = p.imp > 0 ? p.inv / p.imp * 1000 : 0;
       const connectRate = p.cliques > 0 ? p.pv / p.cliques * 100 : 0;
-      return { ...p, ativo, ctr, cpc, cpm, connectRate };
+      const roas = p.inv > 0 && p.fat > 0 ? p.fat / p.inv : 0;
+      const cac = p.compras > 0 ? p.inv / p.compras : 0;
+      const taxaConversao = p.pv > 0 ? p.compras / p.pv * 100 : 0;
+      const tipo = classifyAudience(p.nome);
+      return { ...p, ativo, ctr, cpc, cpm, connectRate, roas, cac, taxaConversao, tipo };
     });
 
     // --- Build SEMANAL / MENSAL ---
@@ -784,41 +828,47 @@ function renderAll() {
   renderVendasCards();
   renderTbodyDias(dias);
   renderChartsDia(dias);
+  renderTrafego(dias);
   renderCriativos();
   renderPublicos();
+  renderComparativo(dias);
   renderSemanal();
   renderMensal();
 }
 
-// ============ KPI VISÃO ============
+// ============ KPI VISÃO (TOTAL = organic + Meta) ============
 function renderKpiVisao(dias) {
   const inv = dias.reduce((s,d) => s + d.inv, 0);
-  const fat = dias.reduce((s,d) => s + d.fat, 0);
-  const compras = dias.reduce((s,d) => s + d.compras, 0);
   const cliques = dias.reduce((s,d) => s + d.cliques, 0);
   const pv = dias.reduce((s,d) => s + d.pv, 0);
   const ck = dias.reduce((s,d) => s + d.ck, 0);
   const imp = dias.reduce((s,d) => s + d.imp, 0);
+  // Fat/Compras = TOTAL (organic + Meta) — cenário geral
+  const filtVendas = VENDAS_LIST.filter(v => (!dateFrom || v.dataISO >= dateFrom) && (!dateTo || v.dataISO <= dateTo));
+  const fat = filtVendas.reduce((s,v) => s + v.valor, 0);
+  const compras = filtVendas.length;
   const roas = inv > 0 ? fat / inv : 0;
   const cpc = cliques > 0 ? inv / cliques : 0;
   const cpm = imp > 0 ? inv / imp * 1000 : 0;
   const ctr = imp > 0 ? cliques / imp * 100 : 0;
   const ticket = compras > 0 ? fat / compras : 0;
   const cac = compras > 0 ? inv / compras : 0;
+  const metaFat = filtVendas.filter(v => v.tipo === 'Meta Ads').reduce((s,v) => s + v.valor, 0);
+  const orgFat = fat - metaFat;
 
   const kpis = [
-    { label: 'Investimento', value: brl(inv), cls: 'orange' },
-    { label: 'Faturamento', value: brl(fat), cls: 'green' },
-    { label: 'ROAS', value: br(roas, 2) + 'x', cls: roas >= 1.7 ? 'green' : roas >= 1 ? 'yellow' : 'red' },
-    { label: 'Compras', value: br(compras, 0), cls: compras > 0 ? 'green' : '' },
+    { label: 'Investimento (Meta)', value: brl(inv), cls: 'orange' },
+    { label: 'Fat. Total ★', value: brl(fat), cls: 'green' },
+    { label: 'ROAS Total', value: br(roas, 2) + 'x', cls: roas >= 1.7 ? 'green' : roas >= 1 ? 'yellow' : 'red' },
+    { label: 'Compras Totais', value: br(compras, 0), cls: compras > 0 ? 'green' : '' },
+    { label: 'Fat. Meta Ads', value: brl(metaFat), cls: '' },
+    { label: 'Fat. Orgânico', value: brl(orgFat), cls: orgFat > 0 ? 'yellow' : '' },
     { label: 'Cliques', value: br(cliques, 0), cls: '' },
     { label: 'Impressões', value: br(imp, 0), cls: '' },
     { label: 'CPC', value: brl(cpc), cls: '' },
     { label: 'CPM', value: brl(cpm), cls: '' },
-    { label: 'CTR', value: pct(ctr), cls: '' },
     { label: 'CAC', value: compras > 0 ? brl(cac) : '—', cls: '' },
     { label: 'Ticket Médio', value: compras > 0 ? brl(ticket) : '—', cls: '' },
-    { label: 'Retorno', value: brl(fat - inv), cls: fat >= inv ? 'green' : 'red' },
   ];
 
   document.getElementById('kpi-visao').innerHTML = kpis.map(k =>
@@ -1086,6 +1136,9 @@ function setPubSort(s, btn) {
   renderPublicos();
 }
 
+const TIPO_LABEL = { frio: '❄️ Frio', quente: '🔥 Quente', outro: '⚪ Outro' };
+const TIPO_COLOR = { frio: '#4facfe', quente: '#e74c3c', outro: 'rgba(255,255,255,.4)' };
+
 function renderPublicos() {
   let pubs = [...PUBLICOS];
   if (pubFilter === 'ativos') pubs = pubs.filter(p => p.ativo);
@@ -1094,27 +1147,43 @@ function renderPublicos() {
   else if (pubSort === 'ctr') pubs.sort((a,b) => b.ctr - a.ctr);
   else if (pubSort === 'cpc') pubs.sort((a,b) => (a.cpc||999) - (b.cpc||999));
   else if (pubSort === 'cr') pubs.sort((a,b) => b.connectRate - a.connectRate);
+  else if (pubSort === 'roas') pubs.sort((a,b) => b.roas - a.roas);
+  else if (pubSort === 'cac') pubs.sort((a,b) => {
+    if (!a.compras && !b.compras) return 0;
+    if (!a.compras) return 1; if (!b.compras) return -1;
+    return a.cac - b.cac;
+  });
 
   const totalInv = pubs.reduce((s,p) => s + p.inv, 0);
 
   document.getElementById('pub-cards').innerHTML = pubs.length ? pubs.map(p => {
     const pctInv = totalInv > 0 ? p.inv / totalInv * 100 : 0;
+    const tipoLabel = TIPO_LABEL[p.tipo] || '⚪';
+    const tipoColor = TIPO_COLOR[p.tipo] || 'rgba(255,255,255,.4)';
     return `<div class="pub-card ${p.ativo ? 'ativo' : ''}">
-      <div class="pub-card-header"><div class="pub-name">${p.nome}</div><div class="cri-badge ${p.ativo ? 'ativo' : 'inativo'}">${p.ativo ? 'Ativo' : 'Inativo'}</div></div>
+      <div class="pub-card-header">
+        <div>
+          <div style="font-size:10px;color:${tipoColor};margin-bottom:3px;font-weight:600">${tipoLabel}</div>
+          <div class="pub-name">${p.nome}</div>
+        </div>
+        <div class="cri-badge ${p.ativo ? 'ativo' : 'inativo'}">${p.ativo ? 'Ativo' : 'Inativo'}</div>
+      </div>
       <div class="pub-metrics">
         <div class="pub-metric"><div class="pub-metric-val">${brl(p.inv)}</div><div class="pub-metric-lbl">Invest.</div></div>
-        <div class="pub-metric"><div class="pub-metric-val neutral">${pct(p.ctr)}</div><div class="pub-metric-lbl">CTR</div></div>
-        <div class="pub-metric"><div class="pub-metric-val neutral">${pct(p.connectRate)}</div><div class="pub-metric-lbl">Connect Rate</div></div>
+        <div class="pub-metric"><div class="pub-metric-val ${p.roas >= 1.7 ? 'green' : p.roas >= 1 ? 'yellow' : ''}">${p.compras > 0 ? br(p.roas,2)+'x' : '—'}</div><div class="pub-metric-lbl">ROAS</div></div>
+        <div class="pub-metric"><div class="pub-metric-val neutral">${p.compras > 0 ? brl(p.cac) : '—'}</div><div class="pub-metric-lbl">CAC</div></div>
       </div>
       <div class="cri-metrics">
+        <div class="cri-metric"><div class="cri-metric-label">Fat.</div><div class="cri-metric-val">${p.compras > 0 ? brl(p.fat) : '—'}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">Compras</div><div class="cri-metric-val">${br(p.compras, 0)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">CTR</div><div class="cri-metric-val">${pct(p.ctr)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">Connect Rate</div><div class="cri-metric-val">${pct(p.connectRate)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">Taxa Compra</div><div class="cri-metric-val">${pct(p.taxaConversao)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">CPC</div><div class="cri-metric-val">${brl(p.cpc)}</div></div>
-        <div class="cri-metric"><div class="cri-metric-label">CPM</div><div class="cri-metric-val">${brl(p.cpm)}</div></div>
-        <div class="cri-metric"><div class="cri-metric-label">Cliques</div><div class="cri-metric-val">${br(p.cliques, 0)}</div></div>
-        <div class="cri-metric"><div class="cri-metric-label">Imp.</div><div class="cri-metric-val">${br(p.imp, 0)}</div></div>
       </div>
       <div class="pub-bar-wrap">
         <div class="pub-bar-label"><span>% do Investimento Total</span><span>${br(pctInv,1)}%</span></div>
-        <div class="pub-bar-bg"><div class="pub-bar-fill" style="width:${Math.min(100,pctInv)}%"></div></div>
+        <div class="pub-bar-bg"><div class="pub-bar-fill" style="width:${Math.min(100,pctInv)}%;background:${tipoColor}"></div></div>
       </div>
     </div>`;
   }).join('') : '<div style="color:rgba(255,255,255,.3);font-size:13px;padding:20px 0">Nenhum público disponível.</div>';
@@ -1122,7 +1191,12 @@ function renderPublicos() {
   document.getElementById('tbody-publicos').innerHTML = pubs.map(p => `
     <tr>
       <td>${p.nome}</td>
+      <td style="color:${TIPO_COLOR[p.tipo]};font-size:11px;font-family:'DM Sans',sans-serif">${TIPO_LABEL[p.tipo]||'⚪'}</td>
       <td>${brl(p.inv)}</td>
+      <td>${p.compras > 0 ? brl(p.fat) : '—'}</td>
+      <td class="${p.roas >= 1.7 ? 'green' : p.roas >= 1 ? 'yellow' : ''}">${p.compras > 0 ? br(p.roas,2)+'x' : '—'}</td>
+      <td>${br(p.compras, 0)}</td>
+      <td>${p.compras > 0 ? brl(p.cac) : '—'}</td>
       <td>${br(p.cliques, 0)}</td>
       <td>${br(p.imp, 0)}</td>
       <td>${br(p.pv, 0)}</td>
@@ -1130,9 +1204,213 @@ function renderPublicos() {
       <td>${brl(p.cpc)}</td>
       <td>${brl(p.cpm)}</td>
       <td>${pct(p.connectRate)}</td>
-      <td><span class="cri-badge ${p.ativo ? 'ativo' : 'inativo'}">${p.ativo ? 'Ativo' : 'Inativo'}</span></td>
+      <td>${pct(p.taxaConversao)}</td>
+      <td>${statusBadge(p.inv, p.fat)}</td>
     </tr>
   `).join('');
+}
+
+// ============ VISÃO TRÁFEGO (Meta Ads Only) ============
+function renderTrafego(dias) {
+  const inv = dias.reduce((s,d) => s + d.inv, 0);
+  const fat = dias.reduce((s,d) => s + d.fat, 0); // Meta-only sales already in DIAS
+  const compras = dias.reduce((s,d) => s + d.compras, 0);
+  const cliques = dias.reduce((s,d) => s + d.cliques, 0);
+  const pv = dias.reduce((s,d) => s + d.pv, 0);
+  const ck = dias.reduce((s,d) => s + d.ck, 0);
+  const imp = dias.reduce((s,d) => s + d.imp, 0);
+  const v3s = dias.reduce((s,d) => s + (d.v3s||0), 0);
+  const v95 = dias.reduce((s,d) => s + (d.v95||0), 0);
+  const roas = inv > 0 ? fat / inv : 0;
+  const cpc = cliques > 0 ? inv / cliques : 0;
+  const cpm = imp > 0 ? inv / imp * 1000 : 0;
+  const ctr = imp > 0 ? cliques / imp * 100 : 0;
+  const ticket = compras > 0 ? fat / compras : 0;
+  const cac = compras > 0 ? inv / compras : 0;
+  const connectRate = cliques > 0 ? pv / cliques * 100 : 0;
+  const taxaCk = pv > 0 ? ck / pv * 100 : 0;
+  const taxaCompra = pv > 0 ? compras / pv * 100 : 0;
+  const hookRate = imp > 0 ? v3s / imp * 100 : 0;
+  const holdRate = v3s > 0 ? v95 / v3s * 100 : 0;
+
+  const kpiEl = document.getElementById('kpi-trafego');
+  if (!kpiEl) return;
+  const kpis = [
+    { label: 'Investimento', value: brl(inv), cls: 'orange' },
+    { label: 'Fat. Meta Ads', value: brl(fat), cls: 'green' },
+    { label: 'ROAS', value: br(roas,2)+'x', cls: roas >= 1.7 ? 'green' : roas >= 1 ? 'yellow' : 'red' },
+    { label: 'Compras Meta', value: br(compras, 0), cls: compras > 0 ? 'green' : '' },
+    { label: 'Cliques', value: br(cliques, 0), cls: '' },
+    { label: 'Impressões', value: br(imp, 0), cls: '' },
+    { label: 'CPC', value: brl(cpc), cls: '' },
+    { label: 'CPM', value: brl(cpm), cls: '' },
+    { label: 'CTR', value: pct(ctr), cls: '' },
+    { label: 'CAC', value: compras > 0 ? brl(cac) : '—', cls: '' },
+    { label: 'Connect Rate', value: pct(connectRate), cls: '' },
+    { label: 'Retorno', value: brl(fat - inv), cls: fat >= inv ? 'green' : 'red' },
+  ];
+  kpiEl.innerHTML = kpis.map(k =>
+    `<div class="kpi-card"><div class="kpi-label">${k.label}</div><div class="kpi-value ${k.cls}">${k.value}</div></div>`
+  ).join('');
+
+  // Funnels (same as Visão Geral)
+  const frioD = filteredFrio();
+  const quenteD = filteredQuente();
+  const funilEl = document.getElementById('funil-trafego');
+  if (funilEl) funilEl.innerHTML = [
+    renderFunilBlock(dias, '🌐 Meta Total', null, true),
+    renderFunilBlock(frioD, '❄️ Frio', 'linear-gradient(90deg,#4facfe,#00f2fe)', true),
+    renderFunilBlock(quenteD, '🔥 Quente', 'linear-gradient(90deg,#e74c3c,#ff6b6b)', true),
+  ].join('');
+
+  // Taxas
+  const taxaEl = document.getElementById('taxa-trafego');
+  if (taxaEl) taxaEl.innerHTML = `
+    <div class="sec-title" style="margin-top:0">Taxas — Meta Ads</div>
+    ${[['CTR', pct(ctr)],['Connect Rate', pct(connectRate)],['Taxa Checkout', pct(taxaCk)],['Taxa Compra', pct(taxaCompra)],['🎣 Hook Rate', pct(hookRate)],['🔒 Hold Rate', pct(holdRate)]].map(([l,v]) => `<div class="taxa-item"><span>${l}</span><span class="taxa-val">${v}</span></div>`).join('')}
+  `;
+
+  // Charts
+  const labels = dias.map(d => d.data.substring(0,5));
+  const idInv = document.getElementById('chart-inv-trafego');
+  const idCliq = document.getElementById('chart-cliq-trafego');
+  if (idInv) {
+    if (chartInvTrafego) chartInvTrafego.destroy();
+    chartInvTrafego = new Chart(idInv, {
+      type: 'bar',
+      data: { labels, datasets: [{ label: 'Investimento', data: dias.map(d => d.inv), backgroundColor: 'rgba(255,107,43,0.85)', borderRadius: 4 }] },
+      options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: 'rgba(255,255,255,.35)', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.04)' } }, y: { ticks: { color: 'rgba(255,255,255,.35)', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.04)' } } } }
+    });
+  }
+  if (idCliq) {
+    if (chartCliqTrafego) chartCliqTrafego.destroy();
+    chartCliqTrafego = new Chart(idCliq, {
+      type: 'bar',
+      data: { labels, datasets: [{ label: 'Cliques', data: dias.map(d => d.cliques), backgroundColor: 'rgba(255,107,43,0.85)', borderRadius: 4 }, { label: 'PV', data: dias.map(d => d.pv), backgroundColor: 'rgba(255,183,55,0.85)', borderRadius: 4 }] },
+      options: { responsive: true, plugins: { legend: { labels: { color: 'rgba(255,255,255,.5)', font: { size: 10 } } } }, scales: { x: { ticks: { color: 'rgba(255,255,255,.35)', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.04)' } }, y: { ticks: { color: 'rgba(255,255,255,.35)', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.04)' } } } }
+    });
+  }
+
+  // Table
+  const tbEl = document.getElementById('tbody-trafego');
+  if (!tbEl) return;
+  if (!dias.length) { tbEl.innerHTML = '<tr><td colspan="15" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Nenhum dado no período</td></tr>'; return; }
+  tbEl.innerHTML = [...dias].reverse().map(d => {
+    const ctr2 = d.imp > 0 ? d.cliques/d.imp*100 : 0;
+    const cpc2 = d.cliques > 0 ? d.inv/d.cliques : 0;
+    const cpm2 = d.imp > 0 ? d.inv/d.imp*1000 : 0;
+    const roas2 = d.inv > 0 ? d.fat/d.inv : 0;
+    const hook2 = d.imp > 0 ? d.v3s/d.imp*100 : 0;
+    const hold2 = d.v3s > 0 ? d.v95/d.v3s*100 : 0;
+    return `<tr><td>${d.data}</td><td>${brl(d.inv)}</td><td>${brl(d.fat)}</td><td class="${roas2>=1.7?'green':roas2>=1?'yellow':roas2>0?'red':''}">${br(roas2,2)}x</td><td>${br(d.compras,0)}</td><td>${br(d.cliques,0)}</td><td>${br(d.pv,0)}</td><td>${br(d.ck,0)}</td><td>${br(d.imp,0)}</td><td>${brl(cpc2)}</td><td>${brl(cpm2)}</td><td>${pct(ctr2)}</td><td>${pct(hook2)}</td><td>${pct(hold2)}</td><td>${statusBadge(d.inv,d.fat)}</td></tr>`;
+  }).join('');
+}
+
+// ============ COMPARATIVO DE PÁGINA ============
+function renderComparativo(dias) {
+  const filtVendas = VENDAS_LIST.filter(v => (!dateFrom || v.dataISO >= dateFrom) && (!dateTo || v.dataISO <= dateTo));
+  const metaV = filtVendas.filter(v => v.tipo === 'Meta Ads');
+  const orgV = filtVendas.filter(v => v.tipo !== 'Meta Ads');
+  const totalFat = filtVendas.reduce((s,v) => s+v.valor, 0);
+  const metaFat = metaV.reduce((s,v) => s+v.valor, 0);
+  const orgFat = orgV.reduce((s,v) => s+v.valor, 0);
+  const metaInv = dias.reduce((s,d) => s+d.inv, 0);
+  const metaCliques = dias.reduce((s,d) => s+d.cliques, 0);
+  const metaPV = dias.reduce((s,d) => s+d.pv, 0);
+  const metaCK = dias.reduce((s,d) => s+d.ck, 0);
+  const metaImp = dias.reduce((s,d) => s+d.imp, 0);
+  const metaRoas = metaInv > 0 ? metaFat / metaInv : 0;
+  const totalRoas = metaInv > 0 ? totalFat / metaInv : 0;
+  const frioD = filteredFrio();
+  const quenteD = filteredQuente();
+
+  // Helper to build scenario card
+  const scenCard = (icon, label, inv, fat, compras, cliques, imp, extra='') => {
+    const roas = inv > 0 ? fat/inv : 0;
+    const ctr = imp > 0 ? cliques/imp*100 : 0;
+    const cac = compras > 0 ? inv/compras : 0;
+    return `<div class="funil-block" style="border-color:rgba(255,107,43,.2)">
+      <div class="funil-block-title">${icon} ${label}</div>
+      <div class="funil-mini-taxas">
+        <div class="funil-mini-tax"><span>Faturamento</span><span style="color:#2ecc71">${brl(fat)}</span></div>
+        <div class="funil-mini-tax"><span>Compras</span><span>${br(compras,0)}</span></div>
+        <div class="funil-mini-tax"><span>ROAS</span><span class="${roas>=1.7?'green':roas>=1?'yellow':'red'}">${inv > 0 ? br(roas,2)+'x' : '—'}</span></div>
+        <div class="funil-mini-tax"><span>CAC</span><span>${compras>0?brl(cac):'—'}</span></div>
+        ${inv>0?`<div class="funil-mini-tax"><span>Invest. Meta</span><span>${brl(inv)}</span></div>`:''}
+        ${cliques>0?`<div class="funil-mini-tax"><span>CTR</span><span>${pct(ctr)}</span></div>`:''}
+        ${extra}
+      </div>
+    </div>`;
+  };
+
+  const cenEl = document.getElementById('comp-cenarios');
+  if (cenEl) cenEl.innerHTML = [
+    scenCard('🌐','Total Geral', metaInv, totalFat, filtVendas.length, metaCliques, metaImp),
+    scenCard('📢','Meta Ads', metaInv, metaFat, metaV.length, metaCliques, metaImp),
+    scenCard('🌿','Orgânico', 0, orgFat, orgV.length, 0, 0),
+  ].join('');
+
+  // Funnel by temp
+  const buildFunilComp = (diasArr, label, color) => {
+    const inv2 = diasArr.reduce((s,d) => s+d.inv, 0);
+    const cliq2 = diasArr.reduce((s,d) => s+d.cliques, 0);
+    const pv2 = diasArr.reduce((s,d) => s+d.pv, 0);
+    const ck2 = diasArr.reduce((s,d) => s+d.ck, 0);
+    const comp2 = diasArr.reduce((s,d) => s+d.compras, 0);
+    const fat2 = diasArr.reduce((s,d) => s+d.fat, 0);
+    const imp2 = diasArr.reduce((s,d) => s+d.imp, 0);
+    const cr = cliq2 > 0 ? pv2/cliq2*100 : 0;
+    const taxaCk2 = pv2 > 0 ? ck2/pv2*100 : 0;
+    const taxaComp = pv2 > 0 ? comp2/pv2*100 : 0;
+    const roas2 = inv2 > 0 ? fat2/inv2 : 0;
+    const cac2 = comp2 > 0 ? inv2/comp2 : 0;
+    return `<div class="funil-block" style="border-color:${color}33">
+      <div class="funil-block-title" style="color:${color}">${label}</div>
+      <div class="funil-mini-taxas">
+        <div class="funil-mini-tax"><span>Invest.</span><span>${brl(inv2)}</span></div>
+        <div class="funil-mini-tax"><span>Fatur.</span><span style="color:#2ecc71">${brl(fat2)}</span></div>
+        <div class="funil-mini-tax"><span>ROAS</span><span class="${roas2>=1.7?'green':roas2>=1?'yellow':'red'}">${inv2>0?br(roas2,2)+'x':'—'}</span></div>
+        <div class="funil-mini-tax"><span>CAC</span><span>${comp2>0?brl(cac2):'—'}</span></div>
+        <div class="funil-mini-tax"><span>Compras</span><span>${br(comp2,0)}</span></div>
+        <div class="funil-mini-tax"><span>Cliques</span><span>${br(cliq2,0)}</span></div>
+        <div class="funil-mini-tax"><span>PVs</span><span>${br(pv2,0)}</span></div>
+        <div class="funil-mini-tax"><span>Connect Rate</span><span>${pct(cr)}</span></div>
+        <div class="funil-mini-tax"><span>Taxa CK</span><span>${pct(taxaCk2)}</span></div>
+        <div class="funil-mini-tax"><span>Taxa Compra</span><span>${pct(taxaComp)}</span></div>
+      </div>
+    </div>`;
+  };
+
+  const ftEl = document.getElementById('comp-funil-temp');
+  if (ftEl) ftEl.innerHTML = [
+    buildFunilComp(frioD, '❄️ Frio — Topo de Funil', '#4facfe'),
+    buildFunilComp(quenteD, '🔥 Quente — Retargeting', '#e74c3c'),
+  ].join('');
+
+  // Adset table
+  const tbEl = document.getElementById('tbody-comparativo');
+  if (!tbEl) return;
+  let pubs = [...PUBLICOS].sort((a,b) => b.inv - a.inv);
+  if (!pubs.length) { tbEl.innerHTML = '<tr><td colspan="14" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Nenhum dado</td></tr>'; return; }
+  tbEl.innerHTML = pubs.map(p => {
+    const taxaCkP = p.pv > 0 ? p.ck/p.pv*100 : 0;
+    return `<tr>
+      <td>${p.nome}</td>
+      <td style="color:${TIPO_COLOR[p.tipo]};font-family:'DM Sans',sans-serif;font-size:11px">${TIPO_LABEL[p.tipo]||'⚪'}</td>
+      <td>${brl(p.inv)}</td>
+      <td>${p.compras>0?brl(p.fat):'—'}</td>
+      <td class="${p.roas>=1.7?'green':p.roas>=1?'yellow':''}">${p.compras>0?br(p.roas,2)+'x':'—'}</td>
+      <td>${br(p.compras,0)}</td>
+      <td>${p.compras>0?brl(p.cac):'—'}</td>
+      <td>${br(p.cliques,0)}</td>
+      <td>${br(p.pv,0)}</td>
+      <td>${pct(p.ctr)}</td>
+      <td>${pct(p.connectRate)}</td>
+      <td>${pct(taxaCkP)}</td>
+      <td>${pct(p.taxaConversao)}</td>
+      <td>${statusBadge(p.inv,p.fat)}</td>
+    </tr>`;
+  }).join('');
 }
 
 // ============ SEMANAL ============
