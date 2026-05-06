@@ -432,9 +432,10 @@ async function loadData(){
         };
       }
       const g=txGroups[txRoot];
-      // Identifica Super Pack: col H (Faturado principal) >= 300
-      const fp0=pNum(r[W.fatPrincipal]);
-      if(fp0>=300)g.hasSuperPack=true;
+      // Identifica Super Pack: col B = "Super Pack do RH" E col G (fatTotal) >= 300
+      const nomeProd=(r[W.produto]||'').toLowerCase();
+      const fatG=pNum(r[W.fatTotal]);
+      if(nomeProd.includes('super pack do rh')&&fatG>=300)g.hasSuperPack=true;
 
       const fp=pNum(r[W.fatPrincipal]);
       const fob=pNum(r[W.fatOB]);
@@ -660,30 +661,47 @@ function filteredSales(){
 function renderKpiTrafego(dias,fSales){
   const inv=dias.reduce((s,d)=>s+d.inv,0);
   const fat=dias.reduce((s,d)=>s+d.fat,0);
-  const compras=dias.reduce((s,d)=>s+d.compras,0);
   const cliques=dias.reduce((s,d)=>s+d.cliques,0);
   const imp=dias.reduce((s,d)=>s+d.imp,0);
   const pv=dias.reduce((s,d)=>s+d.pv,0);
   const ck=dias.reduce((s,d)=>s+d.ck,0);
-  const roas=inv>0?fat/inv:0;
-  const cac=compras>0?inv/compras:0;
-  const ticket=compras>0?fat/compras:0;
   const cpc=cliques>0?inv/cliques:0;
   const cpm=imp>0?inv/imp*1000:0;
-  const ctr=imp>0?cliques/imp*100:0;
 
-  document.getElementById('kpi-trafego').innerHTML=`
-    <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${brl(inv)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Fat. (Rastreado)</div><div class="kpi-value orange">${brl(fat)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">ROAS</div><div class="kpi-value ${roas>=1?'green':'red'}">${br(roas,2)}x</div></div>
-    <div class="kpi-card"><div class="kpi-label">Vendas Rastr.</div><div class="kpi-value orange">${br(compras,0)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">CAC</div><div class="kpi-value">${brl(cac)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value">${brl(ticket)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Cliques</div><div class="kpi-value">${br(cliques,0)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Impressões</div><div class="kpi-value">${br(imp,0)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">CPC</div><div class="kpi-value">${brl(cpc)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">CPM</div><div class="kpi-value">${brl(cpm)}</div></div>
-  `;
+  // Separar tráfego vs orgânico
+  const isTraf=s=>!!(s.utmContent||s.utmMedium||s.utmSource);
+  const vendTraf=fSales.filter(isTraf);
+  const vendOrg=fSales.filter(s=>!isTraf(s));
+
+  const fatTraf=vendTraf.reduce((s,v)=>s+v.fatTotal,0);
+  const fatOrg=vendOrg.reduce((s,v)=>s+v.fatTotal,0);
+
+  // OBs: vendas que têm fatOB > 0
+  const obTraf=vendTraf.filter(v=>v.fatOB>0);
+  const obOrg=vendOrg.filter(v=>v.fatOB>0);
+  const fatObTraf=obTraf.reduce((s,v)=>s+v.fatOB,0);
+  const fatObOrg=obOrg.reduce((s,v)=>s+v.fatOB,0);
+
+  const roas=inv>0?fatTraf/inv:0;
+  const cac=vendTraf.length>0?inv/vendTraf.length:0;
+  const ticket=vendTraf.length>0?fatTraf/vendTraf.length:0;
+  const lucroTraf=fatTraf-inv;
+
+  document.getElementById('kpi-trafego').innerHTML=
+    '<div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">'+brl(inv)+'</div></div>'
+   +'<div class="kpi-card"><div class="kpi-label">Fat. Tráfego</div><div class="kpi-value orange">'+brl(fatTraf)+'</div></div>'
+   +'<div class="kpi-card"><div class="kpi-label">Fat. Orgânico</div><div class="kpi-value yellow">'+brl(fatOrg)+'</div></div>'
+   +'<div class="kpi-card"><div class="kpi-label">ROAS Tráfego</div><div class="kpi-value '+(roas>=1?'green':'red')+'">'+br(roas,2)+'x</div></div>'
+   +'<div class="kpi-card"><div class="kpi-label">Vendas Tráfego</div><div class="kpi-value orange">'+vendTraf.length+'<span style="font-size:11px;color:rgba(255,255,255,.4);margin-left:6px">+'+obTraf.length+' OB</span></div></div>'
+   +'<div class="kpi-card"><div class="kpi-label">Vendas Orgânico</div><div class="kpi-value yellow">'+vendOrg.length+'<span style="font-size:11px;color:rgba(255,255,255,.4);margin-left:6px">+'+obOrg.length+' OB</span></div></div>'
+   +'<div class="kpi-card"><div class="kpi-label">Fat. OB Tráfego</div><div class="kpi-value">'+brl(fatObTraf)+'</div></div>'
+   +'<div class="kpi-card"><div class="kpi-label">Fat. OB Orgânico</div><div class="kpi-value">'+brl(fatObOrg)+'</div></div>'
+   +'<div class="kpi-card"><div class="kpi-label">CAC</div><div class="kpi-value">'+brl(cac)+'</div></div>'
+   +'<div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value">'+brl(ticket)+'</div></div>'
+   +'<div class="kpi-card"><div class="kpi-label">Cliques</div><div class="kpi-value">'+br(cliques,0)+'</div></div>'
+   +'<div class="kpi-card"><div class="kpi-label">Impressões</div><div class="kpi-value">'+br(imp,0)+'</div></div>'
+   +'<div class="kpi-card"><div class="kpi-label">CPC</div><div class="kpi-value">'+brl(cpc)+'</div></div>'
+   +'<div class="kpi-card"><div class="kpi-label">CPM</div><div class="kpi-value">'+brl(cpm)+'</div></div>';
 }
 
 // ============ PAINEL DE VENDAS (cards compradores) ============
@@ -700,6 +718,9 @@ function renderSalesPanel(fSales){
     const icon=isTracked?'✅':'⭐';
     const srcLabel=(s.utmSource||'').toLowerCase()||'orgânico';
     const utmMedShort=s.utmMedium?(s.utmMedium.length>28?s.utmMedium.slice(0,28)+'…':s.utmMedium):'—';
+    const obTag=s.fatOB>0
+      ?'<div style="font-size:10px;color:#f39c12;margin-bottom:3px">🛒 OB: '+brl(s.fatOB)+'</div>'
+      :'';
     const trackedHtml=isTracked
       ?'<div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:2px">🎨 <span style="color:#2ecc71">'+( s.utmContent||'—')+'</span></div>'
        +'<div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:2px">👥 <span style="color:#2ecc71">'+utmMedShort+'</span></div>'
@@ -711,6 +732,7 @@ function renderSalesPanel(fSales){
       +'<div style="font-size:13px;font-weight:700;color:#2ecc71;font-family:DM Mono,monospace;flex-shrink:0">'+brl(s.fatTotal)+'</div>'
       +'</div>'
       +'<div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:4px">📅 '+(toBR(s.data)||'—')+'</div>'
+      +obTag
       +trackedHtml
       +'</div>';
   }).join('');
