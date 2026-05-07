@@ -11,8 +11,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
 .header{background:#16213e;border-bottom:2px solid #ff6b35;padding:18px 32px;display:flex;align-items:center;gap:18px;}
 .logo-badge{background:linear-gradient(135deg,#ff6b35,#e04e1c);color:#fff;font-weight:900;font-size:18px;padding:12px 16px;border-radius:10px;letter-spacing:1px;box-shadow:0 4px 12px rgba(255,107,53,.3);}
 .header-divider{width:2px;height:42px;background:#ff6b35;opacity:.5;}
+.header-text{flex:1;}
 .header-text h1{font-size:20px;font-weight:800;letter-spacing:.5px;}
 .header-text p{font-size:13px;color:#aaa;margin-top:3px;}
+.refresh-btn{background:rgba(255,107,53,.15);border:1px solid #ff6b35;color:#ff6b35;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;transition:all .2s;}
+.refresh-btn:hover{background:#ff6b35;color:#fff;}
+.refresh-btn:disabled{opacity:.5;cursor:wait;}
+.live-dot{width:8px;height:8px;border-radius:50%;background:#00c853;display:inline-block;animation:pulse 2s infinite;margin-right:6px;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+
 .tabs{display:flex;background:#16213e;border-bottom:1px solid #262640;padding:0 32px;gap:4px;}
 .tab{padding:14px 22px;cursor:pointer;font-size:13px;font-weight:600;color:#888;border-bottom:3px solid transparent;transition:all .2s;letter-spacing:.5px;text-transform:uppercase;}
 .tab:hover{color:#fff;}
@@ -35,21 +42,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
 .audience-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px;}
 .aud-card{border-radius:14px;padding:22px;border:2px solid;}
 .aud-card.hot{border-color:#ff1744;background:#2a0a0a;}
-.aud-card.cold{border-color:#42a5f5;background:#061428;}
 .aud-card.compare{border-color:#ff6b35;background:#1a1004;}
 .aud-tag{font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;padding:4px 10px;border-radius:4px;display:inline-block;margin-bottom:10px;}
 .aud-tag.hot{background:#ff1744;color:#fff;}
-.aud-tag.cold{background:#42a5f5;color:#fff;}
 .aud-tag.compare{background:#ff6b35;color:#fff;}
 .aud-name{font-size:15px;font-weight:700;margin-bottom:14px;color:#fff;}
 .aud-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;}
 .aud-row:last-child{border-bottom:none;}
 .aud-row span:first-child{color:#aaa;}
 .aud-row span:last-child{font-weight:700;color:#fff;}
-.aud-breakdown{margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1);font-size:11px;color:#888;}
 .aud-cpl{font-size:24px;font-weight:800;margin-top:6px;}
-.aud-cpl.hot{color:#ff1744;}
-.aud-cpl.cold{color:#42a5f5;}
 
 .funnel-section{display:flex;gap:18px;align-items:stretch;margin-bottom:24px;}
 .funnel-svg-wrap{flex:0 0 52%;max-width:52%;background:#1e1e35;border:1px solid #262640;border-radius:12px;padding:18px;}
@@ -83,6 +85,11 @@ tr.total td{color:#fff;border-top:2px solid #ff6b35;}
 .chart-wrap{background:#1e1e35;border:1px solid #262640;border-radius:12px;padding:20px;margin-bottom:20px;height:340px;}
 
 .note{background:rgba(255,214,0,.08);border-left:3px solid #ffd600;padding:10px 14px;font-size:12px;color:#ccc;border-radius:6px;margin-bottom:18px;}
+.note.error{background:rgba(255,23,68,.1);border-left-color:#ff1744;color:#ff8da6;}
+
+.loading{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 20px;color:#aaa;}
+.loading-spinner{width:48px;height:48px;border:4px solid #262640;border-top-color:#ff6b35;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:16px;}
+@keyframes spin{to{transform:rotate(360deg);}}
 
 @media(max-width:1100px){
   .kpis{grid-template-columns:repeat(2,1fr);}
@@ -99,8 +106,9 @@ tr.total td{color:#fff;border-top:2px solid #ff6b35;}
   <div class="header-divider"></div>
   <div class="header-text">
     <h1>DASHBOARD CAPTAÇÃO — ANA PAULA PÓS</h1>
-    <p>CL39 · CAP110526 · 04/05/2026 a 06/05/2026</p>
+    <p><span class="live-dot"></span>CL39 · CAP110526 · <span id="period">carregando…</span> <span id="last-update" style="color:#777;"></span></p>
   </div>
+  <button class="refresh-btn" onclick="loadAll()" id="refreshBtn">↻ Atualizar</button>
 </div>
 
 <div class="tabs">
@@ -110,345 +118,437 @@ tr.total td{color:#fff;border-top:2px solid #ff6b35;}
   <div class="tab" onclick="showTab(3)">Análise Diária</div>
 </div>
 
-<!-- ABA 1 -->
+<div id="loadingScreen" class="loading">
+  <div class="loading-spinner"></div>
+  <div>Carregando dados da planilha…</div>
+</div>
+
+<div id="errorScreen" style="display:none;padding:32px;">
+  <div class="note error">
+    <strong>Não consegui carregar a planilha.</strong><br>
+    Verifique se a planilha está com acesso "<em>Qualquer pessoa com o link · Leitor</em>".<br>
+    <span id="errorDetail" style="color:#888;font-size:11px;"></span>
+  </div>
+</div>
+
+<div id="dashboardContent" style="display:none;">
+
 <div class="tab-content active">
   <div class="kpis">
-    <div class="kpi">
-      <div class="kpi-label">Investimento Total</div>
-      <div class="kpi-value">R$ 182,00</div>
-      <div class="kpi-sub">3 dias de campanha</div>
-    </div>
-    <div class="kpi yellow">
-      <div class="kpi-label">CTR Médio</div>
-      <div class="kpi-value">0,40%</div>
-      <div class="kpi-sub">30 cliques / 7.568 impressões</div>
-    </div>
-    <div class="kpi blue">
-      <div class="kpi-label">CPM Médio</div>
-      <div class="kpi-value">R$ 24,05</div>
-      <div class="kpi-sub">por 1.000 impressões</div>
-    </div>
-    <div class="kpi green">
-      <div class="kpi-label">CPL Médio</div>
-      <div class="kpi-value">R$ 16,55</div>
-      <div class="kpi-sub">11 leads gerados</div>
-    </div>
+    <div class="kpi"><div class="kpi-label">Investimento Total</div><div class="kpi-value" id="kpi-spend">—</div><div class="kpi-sub" id="kpi-spend-sub">—</div></div>
+    <div class="kpi yellow"><div class="kpi-label">CTR Médio</div><div class="kpi-value" id="kpi-ctr">—</div><div class="kpi-sub" id="kpi-ctr-sub">—</div></div>
+    <div class="kpi blue"><div class="kpi-label">CPM Médio</div><div class="kpi-value" id="kpi-cpm">—</div><div class="kpi-sub">por 1.000 impressões</div></div>
+    <div class="kpi green"><div class="kpi-label">CPL Médio</div><div class="kpi-value" id="kpi-cpl">—</div><div class="kpi-sub" id="kpi-cpl-sub">—</div></div>
   </div>
 
-  <div class="note">⚠ Campanha somente com públicos quentes (Engajamento 30D e 365D). Não há público frio nesta veiculação. Para comparativo, mostramos os 2 conjuntos quentes lado a lado.</div>
+  <div class="note" id="note-audiences" style="display:none;"></div>
 
-  <div class="section-title">Público Quente — Engajamento 30D vs 365D</div>
-  <div class="audience-grid">
-    <div class="aud-card hot">
-      <div class="aud-tag hot">Quente · 30D</div>
-      <div class="aud-name">00 — ENGAJAMENTO 30D</div>
-      <div class="aud-row"><span>Investimento</span><span>R$ 59,43</span></div>
-      <div class="aud-row"><span>Impressões</span><span>1.414</span></div>
-      <div class="aud-row"><span>Cliques</span><span>6</span></div>
-      <div class="aud-row"><span>Page Views</span><span>3</span></div>
-      <div class="aud-row"><span>Leads</span><span>2</span></div>
-      <div class="aud-cpl hot">CPL: R$ 29,72</div>
-      <div class="aud-breakdown">Audiência mais quente · base reduzida (1.414 imp).</div>
-    </div>
-
-    <div class="aud-card hot" style="border-color:#ff6b35;background:#1a1004;">
-      <div class="aud-tag hot" style="background:#ff6b35;">Quente · 365D</div>
-      <div class="aud-name">01 — ENGAJAMENTO 365D</div>
-      <div class="aud-row"><span>Investimento</span><span>R$ 122,57</span></div>
-      <div class="aud-row"><span>Impressões</span><span>6.154</span></div>
-      <div class="aud-row"><span>Cliques</span><span>24</span></div>
-      <div class="aud-row"><span>Page Views</span><span>15</span></div>
-      <div class="aud-row"><span>Leads</span><span>9</span></div>
-      <div class="aud-cpl" style="color:#ff6b35;">CPL: R$ 13,62</div>
-      <div class="aud-breakdown">Maior alcance · CPL 54% melhor que 30D.</div>
-    </div>
-
-    <div class="aud-card compare">
-      <div class="aud-tag compare">Comparativo</div>
-      <div class="aud-name">30D vs 365D</div>
-      <div class="aud-row"><span>Leads 30D</span><span>18%</span></div>
-      <div class="aud-row"><span>Leads 365D</span><span>82%</span></div>
-      <div class="aud-row"><span>Δ CPL</span><span style="color:#00c853;">-R$ 16,10</span></div>
-      <div class="aud-row"><span>Vencedor</span><span style="color:#ff6b35;">365D</span></div>
-      <div class="aud-breakdown">365D é 2,2× mais eficiente em CPL e gera 4,5× mais leads com 2× o investimento.</div>
-    </div>
-  </div>
+  <div class="section-title">Públicos — Comparativo</div>
+  <div class="audience-grid" id="audience-grid"></div>
 
   <div class="section-title">Funil de Conversão</div>
   <div class="funnel-section">
     <div class="funnel-svg-wrap">
       <svg viewBox="0 0 1200 540" width="100%" xmlns="http://www.w3.org/2000/svg">
         <defs>
-          <linearGradient id="gImp" x1="0" x2="1">
-            <stop offset="0" stop-color="#0d2447"/>
-            <stop offset=".5" stop-color="#1e5fb0"/>
-            <stop offset="1" stop-color="#0d2447"/>
-          </linearGradient>
-          <linearGradient id="gClk" x1="0" x2="1">
-            <stop offset="0" stop-color="#0a3a78"/>
-            <stop offset=".5" stop-color="#3a7fd5"/>
-            <stop offset="1" stop-color="#0a3a78"/>
-          </linearGradient>
-          <linearGradient id="gPv" x1="0" x2="1">
-            <stop offset="0" stop-color="#7a3010"/>
-            <stop offset=".5" stop-color="#ff6b35"/>
-            <stop offset="1" stop-color="#7a3010"/>
-          </linearGradient>
-          <linearGradient id="gLead" x1="0" x2="1">
-            <stop offset="0" stop-color="#005c25"/>
-            <stop offset=".5" stop-color="#00c853"/>
-            <stop offset="1" stop-color="#005c25"/>
-          </linearGradient>
+          <linearGradient id="gImp" x1="0" x2="1"><stop offset="0" stop-color="#0d2447"/><stop offset=".5" stop-color="#1e5fb0"/><stop offset="1" stop-color="#0d2447"/></linearGradient>
+          <linearGradient id="gClk" x1="0" x2="1"><stop offset="0" stop-color="#0a3a78"/><stop offset=".5" stop-color="#3a7fd5"/><stop offset="1" stop-color="#0a3a78"/></linearGradient>
+          <linearGradient id="gPv" x1="0" x2="1"><stop offset="0" stop-color="#7a3010"/><stop offset=".5" stop-color="#ff6b35"/><stop offset="1" stop-color="#7a3010"/></linearGradient>
+          <linearGradient id="gLead" x1="0" x2="1"><stop offset="0" stop-color="#005c25"/><stop offset=".5" stop-color="#00c853"/><stop offset="1" stop-color="#005c25"/></linearGradient>
           <filter id="glow"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         </defs>
-
-        <!-- IMPRESSÕES -->
         <polygon points="50,20 1150,20 1080,100 120,100" fill="url(#gImp)"/>
-        <text x="600" y="78" text-anchor="middle" font-size="56" font-weight="900" fill="#fff">7.568</text>
+        <text x="600" y="78" text-anchor="middle" font-size="56" font-weight="900" fill="#fff" id="f-imp">—</text>
         <text x="600" y="44" text-anchor="middle" font-size="13" font-weight="700" fill="#bbd6ff" letter-spacing="2">IMPRESSÕES</text>
-        <text x="600" y="125" text-anchor="middle" font-size="13" fill="#ffd600" font-weight="700">↓ CTR 0,40%</text>
+        <text x="600" y="125" text-anchor="middle" font-size="13" fill="#ffd600" font-weight="700" id="f-ctr">↓ CTR —</text>
 
-        <!-- CLIQUES -->
         <polygon points="180,140 1020,140 950,220 250,220" fill="url(#gClk)"/>
-        <text x="600" y="196" text-anchor="middle" font-size="56" font-weight="900" fill="#fff">30</text>
+        <text x="600" y="196" text-anchor="middle" font-size="56" font-weight="900" fill="#fff" id="f-clk">—</text>
         <text x="600" y="164" text-anchor="middle" font-size="13" font-weight="700" fill="#bbd6ff" letter-spacing="2">CLIQUES</text>
-        <text x="600" y="245" text-anchor="middle" font-size="13" fill="#ffd600" font-weight="700">↓ TX ENTRADA 60,0%</text>
+        <text x="600" y="245" text-anchor="middle" font-size="13" fill="#ffd600" font-weight="700" id="f-tx-entrada">↓ TX ENTRADA —</text>
 
-        <!-- PAGE VIEWS -->
         <polygon points="310,260 890,260 820,340 380,340" fill="url(#gPv)"/>
-        <text x="600" y="316" text-anchor="middle" font-size="56" font-weight="900" fill="#fff">18</text>
+        <text x="600" y="316" text-anchor="middle" font-size="56" font-weight="900" fill="#fff" id="f-pv">—</text>
         <text x="600" y="284" text-anchor="middle" font-size="13" font-weight="700" fill="#ffd0b0" letter-spacing="2">PAGE VIEWS</text>
-        <text x="600" y="365" text-anchor="middle" font-size="13" fill="#00c853" font-weight="700">↓ TX CADASTRO 61,1%</text>
+        <text x="600" y="365" text-anchor="middle" font-size="13" fill="#00c853" font-weight="700" id="f-tx-cad">↓ TX CADASTRO —</text>
 
-        <!-- LEADS -->
         <polygon points="440,380 760,380 690,500 510,500" fill="url(#gLead)" filter="url(#glow)"/>
-        <text x="600" y="455" text-anchor="middle" font-size="68" font-weight="900" fill="#fff">11</text>
+        <text x="600" y="455" text-anchor="middle" font-size="68" font-weight="900" fill="#fff" id="f-leads">—</text>
         <text x="600" y="404" text-anchor="middle" font-size="13" font-weight="700" fill="#b8ffce" letter-spacing="2">LEADS</text>
-        <text x="600" y="525" text-anchor="middle" font-size="13" fill="#fff" font-weight="700">CPL R$ 16,55</text>
+        <text x="600" y="525" text-anchor="middle" font-size="13" fill="#fff" font-weight="700" id="f-cpl">CPL —</text>
       </svg>
     </div>
-
     <div class="funnel-metrics-row">
-      <div class="funnel-metric cpc">
-        <div class="fm-label">CPC — Custo por Clique</div>
-        <div class="fm-value cpc">R$ 6,07</div>
-        <div class="fm-sub">30 cliques / R$ 182,00</div>
-      </div>
-      <div class="funnel-metric tx-entrada">
-        <div class="fm-label">TX Entrada — Cliques → Página</div>
-        <div class="fm-value tx-entrada">60,0%</div>
-        <div class="fm-sub">⚠ Abaixo de 70% (limite saudável)</div>
-      </div>
-      <div class="funnel-metric tx-cadastro">
-        <div class="fm-label">TX Cadastro — PV → Lead</div>
-        <div class="fm-value tx-cadastro">61,1%</div>
-        <div class="fm-sub">11 leads de 18 page views</div>
-      </div>
+      <div class="funnel-metric cpc"><div class="fm-label">CPC — Custo por Clique</div><div class="fm-value cpc" id="fm-cpc">—</div><div class="fm-sub" id="fm-cpc-sub">—</div></div>
+      <div class="funnel-metric tx-entrada"><div class="fm-label">TX Entrada — Cliques → Página</div><div class="fm-value tx-entrada" id="fm-txent">—</div><div class="fm-sub" id="fm-txent-sub">—</div></div>
+      <div class="funnel-metric tx-cadastro"><div class="fm-label">TX Cadastro — PV → Lead</div><div class="fm-value tx-cadastro" id="fm-txcad">—</div><div class="fm-sub" id="fm-txcad-sub">—</div></div>
     </div>
   </div>
 
   <div class="section-title">Evolução Diária</div>
   <table>
-    <thead>
-      <tr>
-        <th>Dia</th><th>Investimento</th><th>Impressões</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th><th>TX Cadastro</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr><td>04/05/2026</td><td>R$ 11,33</td><td>694</td><td>1</td><td>0</td><td>0</td><td>0,14%</td><td>R$ 11,33</td><td>—</td><td>—</td></tr>
-      <tr><td>05/05/2026</td><td>R$ 113,74</td><td>5.001</td><td>23</td><td>15</td><td>9</td><td>0,46%</td><td>R$ 4,94</td><td>R$ 12,64</td><td>60,0%</td></tr>
-      <tr><td>06/05/2026</td><td>R$ 56,93</td><td>1.873</td><td>6</td><td>3</td><td>2</td><td>0,32%</td><td>R$ 9,49</td><td>R$ 28,47</td><td>66,7%</td></tr>
-      <tr class="total"><td>TOTAL</td><td>R$ 182,00</td><td>7.568</td><td>30</td><td>18</td><td>11</td><td>0,40%</td><td>R$ 6,07</td><td>R$ 16,55</td><td>61,1%</td></tr>
-    </tbody>
+    <thead><tr><th>Dia</th><th>Investimento</th><th>Impressões</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th><th>TX Cadastro</th></tr></thead>
+    <tbody id="tbl-daily"></tbody>
   </table>
 
-  <div class="chart-wrap">
-    <canvas id="chartLeadsCpl"></canvas>
-  </div>
+  <div class="chart-wrap"><canvas id="chartLeadsCpl"></canvas></div>
 </div>
 
-<!-- ABA 2 — CRIATIVOS -->
 <div class="tab-content">
   <div class="section-title">Ranking de Criativos por CPL</div>
-  <div class="note">A campanha utilizou 1 criativo único ("Novo anúncio de Leads") veiculado em 2 conjuntos. Ranking mostra desempenho por adset de veiculação.</div>
   <table>
-    <thead>
-      <tr>
-        <th>#</th><th>Criativo</th><th>Conjunto</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th><th>TX Entrada</th><th>TX Cadastro</th><th>Status</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>1</td>
-        <td>Novo anúncio de Leads</td>
-        <td>01 — ENGAJAMENTO 365D</td>
-        <td>R$ 122,57</td>
-        <td>6.154</td>
-        <td>24</td>
-        <td>15</td>
-        <td>9</td>
-        <td>0,39%</td>
-        <td>R$ 5,11</td>
-        <td>R$ 13,62</td>
-        <td>62,5%</td>
-        <td>60,0%</td>
-        <td><span class="badge escalar">Escalar</span></td>
-      </tr>
-      <tr>
-        <td>2</td>
-        <td>Novo anúncio de Leads</td>
-        <td>00 — ENGAJAMENTO 30D</td>
-        <td>R$ 59,43</td>
-        <td>1.414</td>
-        <td>6</td>
-        <td>3</td>
-        <td>2</td>
-        <td>0,42%</td>
-        <td>R$ 9,91</td>
-        <td>R$ 29,72</td>
-        <td>50,0%</td>
-        <td>66,7%</td>
-        <td><span class="badge avaliar">Avaliar</span></td>
-      </tr>
-      <tr class="total">
-        <td colspan="3">TOTAL</td>
-        <td>R$ 182,00</td><td>7.568</td><td>30</td><td>18</td><td>11</td><td>0,40%</td><td>R$ 6,07</td><td>R$ 16,55</td><td>60,0%</td><td>61,1%</td><td>—</td>
-      </tr>
-    </tbody>
+    <thead><tr><th>#</th><th>Criativo</th><th>Conjunto</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th><th>TX Entrada</th><th>TX Cadastro</th><th>Status</th></tr></thead>
+    <tbody id="tbl-creatives"></tbody>
   </table>
 </div>
 
-<!-- ABA 3 — PÚBLICOS -->
 <div class="tab-content">
   <div class="section-title">Ranking de Públicos por CPL</div>
   <table>
-    <thead>
-      <tr>
-        <th>#</th><th>Conjunto</th><th>Temperatura</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th><th>TX Cadastro</th><th>Status</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>1</td>
-        <td>01 — ENGAJAMENTO 365D</td>
-        <td><span class="badge manter">Quente 365D</span></td>
-        <td>R$ 122,57</td>
-        <td>6.154</td>
-        <td>24</td>
-        <td>15</td>
-        <td>9</td>
-        <td>0,39%</td>
-        <td>R$ 5,11</td>
-        <td>R$ 13,62</td>
-        <td>60,0%</td>
-        <td><span class="badge escalar">Escalar</span></td>
-      </tr>
-      <tr>
-        <td>2</td>
-        <td>00 — ENGAJAMENTO 30D</td>
-        <td><span class="badge pausar">Quente 30D</span></td>
-        <td>R$ 59,43</td>
-        <td>1.414</td>
-        <td>6</td>
-        <td>3</td>
-        <td>2</td>
-        <td>0,42%</td>
-        <td>R$ 9,91</td>
-        <td>R$ 29,72</td>
-        <td>66,7%</td>
-        <td><span class="badge avaliar">Avaliar</span></td>
-      </tr>
-      <tr class="total">
-        <td colspan="3">TOTAL</td>
-        <td>R$ 182,00</td><td>7.568</td><td>30</td><td>18</td><td>11</td><td>0,40%</td><td>R$ 6,07</td><td>R$ 16,55</td><td>61,1%</td><td>—</td>
-      </tr>
-    </tbody>
+    <thead><tr><th>#</th><th>Conjunto</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th><th>TX Cadastro</th><th>Status</th></tr></thead>
+    <tbody id="tbl-audiences"></tbody>
   </table>
-
   <div class="section-title">Distribuição de Investimento por Público</div>
-  <div class="chart-wrap" style="height:300px;">
-    <canvas id="chartAud"></canvas>
-  </div>
+  <div class="chart-wrap" style="height:300px;"><canvas id="chartAud"></canvas></div>
 </div>
 
-<!-- ABA 4 — ANÁLISE DIÁRIA -->
 <div class="tab-content">
   <div class="section-title">Detalhamento Dia a Dia por Conjunto</div>
   <table>
-    <thead>
-      <tr>
-        <th>Data</th><th>Conjunto</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr><td>04/05/2026</td><td>00 — ENGAJAMENTO 30D</td><td>R$ 0,32</td><td>22</td><td>0</td><td>0</td><td>0</td><td>0,00%</td><td>—</td><td>—</td></tr>
-      <tr><td>04/05/2026</td><td>01 — ENGAJAMENTO 365D</td><td>R$ 11,01</td><td>672</td><td>1</td><td>0</td><td>0</td><td>0,15%</td><td>R$ 11,01</td><td>—</td></tr>
-      <tr><td>05/05/2026</td><td>00 — ENGAJAMENTO 30D</td><td>R$ 34,38</td><td>871</td><td>3</td><td>2</td><td>1</td><td>0,34%</td><td>R$ 11,46</td><td>R$ 34,38</td></tr>
-      <tr><td>05/05/2026</td><td>01 — ENGAJAMENTO 365D</td><td>R$ 79,36</td><td>4.130</td><td>20</td><td>13</td><td>8</td><td>0,48%</td><td>R$ 3,97</td><td>R$ 9,92</td></tr>
-      <tr><td>06/05/2026</td><td>00 — ENGAJAMENTO 30D</td><td>R$ 24,73</td><td>521</td><td>3</td><td>1</td><td>1</td><td>0,58%</td><td>R$ 8,24</td><td>R$ 24,73</td></tr>
-      <tr><td>06/05/2026</td><td>01 — ENGAJAMENTO 365D</td><td>R$ 32,20</td><td>1.352</td><td>3</td><td>2</td><td>1</td><td>0,22%</td><td>R$ 10,73</td><td>R$ 32,20</td></tr>
-      <tr class="total"><td colspan="2">TOTAL</td><td>R$ 182,00</td><td>7.568</td><td>30</td><td>18</td><td>11</td><td>0,40%</td><td>R$ 6,07</td><td>R$ 16,55</td></tr>
-    </tbody>
+    <thead><tr><th>Data</th><th>Conjunto</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th></tr></thead>
+    <tbody id="tbl-detail"></tbody>
   </table>
-
   <div class="section-title">Comparativo Diário — Investimento vs Leads</div>
-  <div class="chart-wrap">
-    <canvas id="chartDaily"></canvas>
-  </div>
+  <div class="chart-wrap"><canvas id="chartDaily"></canvas></div>
+</div>
+
 </div>
 
 <script>
+const SHEET_ID = '1dLAdeChjs4AsdrrDKjZy64y1gxlWQ_4EQ7OmiCmsQfA';
+const SHEET_GID = '0';
+const GVIZ_URL = 'https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/gviz/tq?tqx=out:json&gid='+SHEET_GID;
+
+function fmtBR(n,dec){if(dec===undefined)dec=2;if(n==null||isNaN(n))return '—';return n.toLocaleString('pt-BR',{minimumFractionDigits:dec,maximumFractionDigits:dec});}
+function fmtMoney(n){return n==null||isNaN(n)?'—':'R$ '+fmtBR(n,2);}
+function fmtInt(n){return n==null||isNaN(n)?'—':n.toLocaleString('pt-BR');}
+function fmtPct(n){return n==null||isNaN(n)?'—':fmtBR(n,2)+'%';}
+function safeDiv(a,b){return b>0?a/b:0;}
+
 function showTab(i){
   document.querySelectorAll('.tab').forEach((t,k)=>t.classList.toggle('active',k===i));
   document.querySelectorAll('.tab-content').forEach((c,k)=>c.classList.toggle('active',k===i));
 }
 
-function parseBR(s){return parseFloat(String(s).replace(/\./g,'').replace(',','.'))||0;}
-
-const days=['04/05','05/05','06/05'];
-
-const ctx1=document.getElementById('chartLeadsCpl').getContext('2d');
-new Chart(ctx1,{
-  type:'bar',
-  data:{labels:days,datasets:[
-    {label:'Leads',data:[0,9,2],backgroundColor:'#00c853',yAxisID:'y',borderRadius:6},
-    {label:'CPL (R$)',data:[0,12.64,28.47],type:'line',borderColor:'#ff6b35',backgroundColor:'#ff6b35',yAxisID:'y1',tension:.3,pointRadius:5}
-  ]},
-  options:{
-    responsive:true,maintainAspectRatio:false,
-    plugins:{legend:{labels:{color:'#fff'}},title:{display:true,text:'Leads e CPL por dia',color:'#fff',font:{size:14}}},
-    scales:{
-      y:{position:'left',ticks:{color:'#aaa'},grid:{color:'#262640'},title:{display:true,text:'Leads',color:'#00c853'}},
-      y1:{position:'right',ticks:{color:'#aaa'},grid:{display:false},title:{display:true,text:'CPL (R$)',color:'#ff6b35'}},
-      x:{ticks:{color:'#aaa'},grid:{color:'#262640'}}
-    }
+function parseGvizDate(v){
+  if(!v) return '';
+  if(typeof v==='string' && v.startsWith('Date(')){
+    const m=v.match(/Date\((\d+),(\d+),(\d+)\)/);
+    if(m){const d=new Date(+m[1],+m[2],+m[3]);return d.toISOString().slice(0,10);}
   }
-});
+  if(v instanceof Date) return v.toISOString().slice(0,10);
+  return String(v);
+}
+function fmtDate(iso){if(!iso)return '—';const p=iso.split('-');return p[2]+'/'+p[1]+'/'+p[0];}
 
-const ctx2=document.getElementById('chartAud').getContext('2d');
-new Chart(ctx2,{
-  type:'doughnut',
-  data:{labels:['365D','30D'],datasets:[{data:[122.57,59.43],backgroundColor:['#ff6b35','#ff1744'],borderColor:'#1e1e35',borderWidth:3}]},
-  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#fff'}}}}
-});
+let charts={};
 
-const ctx3=document.getElementById('chartDaily').getContext('2d');
-new Chart(ctx3,{
-  type:'bar',
-  data:{labels:days,datasets:[
-    {label:'Invest. (R$)',data:[11.33,113.74,56.93],backgroundColor:'#42a5f5',yAxisID:'y',borderRadius:6},
-    {label:'Leads',data:[0,9,2],type:'line',borderColor:'#00c853',backgroundColor:'#00c853',yAxisID:'y1',tension:.3,pointRadius:5}
-  ]},
-  options:{
-    responsive:true,maintainAspectRatio:false,
-    plugins:{legend:{labels:{color:'#fff'}}},
-    scales:{
-      y:{position:'left',ticks:{color:'#aaa'},grid:{color:'#262640'},title:{display:true,text:'Invest. (R$)',color:'#42a5f5'}},
-      y1:{position:'right',ticks:{color:'#aaa'},grid:{display:false},title:{display:true,text:'Leads',color:'#00c853'}},
-      x:{ticks:{color:'#aaa'},grid:{color:'#262640'}}
-    }
+async function fetchSheet(){
+  const res = await fetch(GVIZ_URL+'&t='+Date.now());
+  const text = await res.text();
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  return JSON.parse(text.substring(start,end+1)).table;
+}
+
+function parseRows(table){
+  const cols = table.cols.map(c=>c.label||c.id);
+  return table.rows.map(r=>{
+    const obj={};
+    r.c.forEach((cell,i)=>{obj[cols[i]] = cell ? (cell.v!=null?cell.v:null) : null;});
+    return obj;
+  });
+}
+
+function calcMetrics(rows){
+  const detail = rows.filter(r => r['Date']!=null && r['Date']!=='');
+  const summary = rows.filter(r => !r['Date']);
+
+  let totSpend=0,totImp=0,totClk=0,totPv=0,totLeadsDetail=0;
+  detail.forEach(r=>{
+    totSpend += +r['Spend (Cost, Amount Spent)']||0;
+    totImp += +r['Impressions']||0;
+    totClk += +r['Action Link Clicks']||0;
+    totPv += +r['Action Landing Page View']||0;
+    totLeadsDetail += +r['Action Leads']||0;
+  });
+
+  let totLeads = totLeadsDetail;
+  let summaryLeads = 0;
+  summary.forEach(s=>{summaryLeads += +s['Action Leads']||0;});
+  if(summaryLeads > totLeadsDetail) totLeads = summaryLeads;
+
+  const leadsRatio = totPv>0 ? totLeads/totPv : 0;
+  detail.forEach(r=>{
+    const rPv = +r['Action Landing Page View']||0;
+    const rDet = +r['Action Leads']||0;
+    r._leads = totLeadsDetail < totLeads ? Math.round(rPv*leadsRatio*10)/10 : rDet;
+  });
+
+  return {
+    detail,summary,totSpend,totImp,totClk,totPv,totLeads,
+    ctr:safeDiv(totClk,totImp)*100,cpc:safeDiv(totSpend,totClk),
+    cpm:safeDiv(totSpend,totImp)*1000,cpl:safeDiv(totSpend,totLeads),
+    txEntrada:safeDiv(totPv,totClk)*100,txCadastro:safeDiv(totLeads,totPv)*100
+  };
+}
+
+function aggBy(detail,key){
+  const map={};
+  detail.forEach(r=>{
+    const k = r[key]||'—';
+    if(!map[k]) map[k]={key:k,spend:0,imp:0,clk:0,pv:0,leads:0};
+    map[k].spend += +r['Spend (Cost, Amount Spent)']||0;
+    map[k].imp += +r['Impressions']||0;
+    map[k].clk += +r['Action Link Clicks']||0;
+    map[k].pv += +r['Action Landing Page View']||0;
+    map[k].leads += r._leads||0;
+  });
+  Object.values(map).forEach(g=>{
+    g.ctr=safeDiv(g.clk,g.imp)*100;g.cpc=safeDiv(g.spend,g.clk);
+    g.cpl=safeDiv(g.spend,g.leads);g.txEntrada=safeDiv(g.pv,g.clk)*100;
+    g.txCadastro=safeDiv(g.leads,g.pv)*100;
+  });
+  return Object.values(map);
+}
+
+function aggByDay(detail){
+  const map={};
+  detail.forEach(r=>{
+    const k = parseGvizDate(r['Date']);
+    if(!map[k]) map[k]={date:k,spend:0,imp:0,clk:0,pv:0,leads:0};
+    map[k].spend += +r['Spend (Cost, Amount Spent)']||0;
+    map[k].imp += +r['Impressions']||0;
+    map[k].clk += +r['Action Link Clicks']||0;
+    map[k].pv += +r['Action Landing Page View']||0;
+    map[k].leads += r._leads||0;
+  });
+  Object.values(map).forEach(g=>{
+    g.ctr=safeDiv(g.clk,g.imp)*100;g.cpc=safeDiv(g.spend,g.clk);
+    g.cpl=safeDiv(g.spend,g.leads);g.txCadastro=safeDiv(g.leads,g.pv)*100;
+  });
+  return Object.values(map).sort((a,b)=>a.date.localeCompare(b.date));
+}
+
+function aggByDayAdset(detail){
+  const map={};
+  detail.forEach(r=>{
+    const dt = parseGvizDate(r['Date']);
+    const ad = r['Adset Name']||'—';
+    const k = dt+'||'+ad;
+    if(!map[k]) map[k]={date:dt,adset:ad,spend:0,imp:0,clk:0,pv:0,leads:0};
+    map[k].spend += +r['Spend (Cost, Amount Spent)']||0;
+    map[k].imp += +r['Impressions']||0;
+    map[k].clk += +r['Action Link Clicks']||0;
+    map[k].pv += +r['Action Landing Page View']||0;
+    map[k].leads += r._leads||0;
+  });
+  Object.values(map).forEach(g=>{
+    g.ctr=safeDiv(g.clk,g.imp)*100;g.cpc=safeDiv(g.spend,g.clk);g.cpl=safeDiv(g.spend,g.leads);
+  });
+  return Object.values(map).sort((a,b)=>a.date.localeCompare(b.date)||a.adset.localeCompare(b.adset));
+}
+
+function statusBadge(g){
+  if(g.leads<=0) return '<span class="badge pausar">Pausar</span>';
+  if(g.cpl<=15) return '<span class="badge escalar">Escalar</span>';
+  if(g.cpl<=25) return '<span class="badge manter">Manter</span>';
+  if(g.cpl<=40) return '<span class="badge avaliar">Avaliar</span>';
+  return '<span class="badge pausar">Pausar</span>';
+}
+
+function render(m){
+  document.getElementById('kpi-spend').textContent = fmtMoney(m.totSpend);
+  const days = aggByDay(m.detail);
+  document.getElementById('kpi-spend-sub').textContent = days.length+' dia(s) de campanha';
+  document.getElementById('kpi-ctr').textContent = fmtPct(m.ctr);
+  document.getElementById('kpi-ctr-sub').textContent = fmtInt(m.totClk)+' cliques / '+fmtInt(m.totImp)+' imp.';
+  document.getElementById('kpi-cpm').textContent = fmtMoney(m.cpm);
+  document.getElementById('kpi-cpl').textContent = fmtMoney(m.cpl);
+  document.getElementById('kpi-cpl-sub').textContent = fmtBR(m.totLeads,0)+' leads gerados';
+
+  if(days.length){
+    document.getElementById('period').textContent = fmtDate(days[0].date)+' a '+fmtDate(days[days.length-1].date);
   }
-});
+  document.getElementById('last-update').textContent = '· atualizado '+new Date().toLocaleTimeString('pt-BR');
+
+  const audiences = aggBy(m.detail,'Adset Name').sort((a,b)=>(a.cpl||1e9)-(b.cpl||1e9)||b.spend-a.spend);
+  const audGrid = document.getElementById('audience-grid');
+  audGrid.innerHTML='';
+  const noteAud = document.getElementById('note-audiences');
+  const allHot = audiences.length && audiences.every(a=>/engaj|engajamento|retarget|rmkt|warm/i.test(a.key));
+  if(allHot){
+    noteAud.style.display='block';
+    noteAud.innerHTML='⚠ Campanha somente com públicos quentes (retargeting). Não há público frio nesta veiculação.';
+  } else {
+    noteAud.style.display='none';
+  }
+  audiences.slice(0,2).forEach((a,i)=>{
+    const div=document.createElement('div');
+    div.className='aud-card hot';
+    if(i===1) div.style.cssText='border-color:#ff6b35;background:#1a1004;';
+    div.innerHTML='<div class="aud-tag hot"'+(i===1?' style="background:#ff6b35;"':'')+'>'+(i===0?'Melhor CPL':'2º Lugar')+'</div>'+
+      '<div class="aud-name">'+a.key+'</div>'+
+      '<div class="aud-row"><span>Investimento</span><span>'+fmtMoney(a.spend)+'</span></div>'+
+      '<div class="aud-row"><span>Impressões</span><span>'+fmtInt(a.imp)+'</span></div>'+
+      '<div class="aud-row"><span>Cliques</span><span>'+fmtInt(a.clk)+'</span></div>'+
+      '<div class="aud-row"><span>Page Views</span><span>'+fmtInt(a.pv)+'</span></div>'+
+      '<div class="aud-row"><span>Leads</span><span>'+fmtBR(a.leads,0)+'</span></div>'+
+      '<div class="aud-cpl" style="color:'+(i===0?'#ff1744':'#ff6b35')+';">CPL: '+fmtMoney(a.cpl)+'</div>';
+    audGrid.appendChild(div);
+  });
+  if(audiences.length>=2){
+    const a0=audiences[0], a1=audiences[1];
+    const cmp=document.createElement('div');
+    cmp.className='aud-card compare';
+    const pct0=m.totLeads>0?Math.round(a0.leads/m.totLeads*100):0;
+    const pct1=m.totLeads>0?Math.round(a1.leads/m.totLeads*100):0;
+    cmp.innerHTML='<div class="aud-tag compare">Comparativo</div>'+
+      '<div class="aud-name">Top 1 vs Top 2</div>'+
+      '<div class="aud-row"><span>Leads top 1</span><span>'+pct0+'%</span></div>'+
+      '<div class="aud-row"><span>Leads top 2</span><span>'+pct1+'%</span></div>'+
+      '<div class="aud-row"><span>Δ CPL</span><span style="color:#00c853;">'+fmtMoney(a1.cpl-a0.cpl)+'</span></div>'+
+      '<div class="aud-row"><span>Vencedor</span><span style="color:#ff6b35;">'+a0.key+'</span></div>';
+    audGrid.appendChild(cmp);
+  }
+
+  document.getElementById('f-imp').textContent = fmtInt(m.totImp);
+  document.getElementById('f-clk').textContent = fmtInt(m.totClk);
+  document.getElementById('f-pv').textContent = fmtInt(m.totPv);
+  document.getElementById('f-leads').textContent = fmtBR(m.totLeads,0);
+  document.getElementById('f-ctr').textContent = '↓ CTR '+fmtPct(m.ctr);
+  document.getElementById('f-tx-entrada').textContent = '↓ TX ENTRADA '+fmtPct(m.txEntrada);
+  document.getElementById('f-tx-cad').textContent = '↓ TX CADASTRO '+fmtPct(m.txCadastro);
+  document.getElementById('f-cpl').textContent = 'CPL '+fmtMoney(m.cpl);
+
+  document.getElementById('fm-cpc').textContent = fmtMoney(m.cpc);
+  document.getElementById('fm-cpc-sub').textContent = fmtInt(m.totClk)+' cliques / '+fmtMoney(m.totSpend);
+  document.getElementById('fm-txent').textContent = fmtPct(m.txEntrada);
+  document.getElementById('fm-txent-sub').textContent = m.txEntrada<70?'⚠ Abaixo de 70% (limite saudável)':'Saudável (≥70%)';
+  document.getElementById('fm-txcad').textContent = fmtPct(m.txCadastro);
+  document.getElementById('fm-txcad-sub').textContent = fmtBR(m.totLeads,0)+' leads de '+fmtInt(m.totPv)+' page views';
+
+  const tblDaily = document.getElementById('tbl-daily');
+  tblDaily.innerHTML='';
+  days.forEach(d=>{
+    tblDaily.innerHTML += '<tr><td>'+fmtDate(d.date)+'</td><td>'+fmtMoney(d.spend)+'</td><td>'+fmtInt(d.imp)+'</td><td>'+fmtInt(d.clk)+'</td><td>'+fmtInt(d.pv)+'</td><td>'+fmtBR(d.leads,0)+'</td><td>'+fmtPct(d.ctr)+'</td><td>'+(d.clk>0?fmtMoney(d.cpc):'—')+'</td><td>'+(d.leads>0?fmtMoney(d.cpl):'—')+'</td><td>'+(d.pv>0?fmtPct(d.txCadastro):'—')+'</td></tr>';
+  });
+  tblDaily.innerHTML += '<tr class="total"><td>TOTAL</td><td>'+fmtMoney(m.totSpend)+'</td><td>'+fmtInt(m.totImp)+'</td><td>'+fmtInt(m.totClk)+'</td><td>'+fmtInt(m.totPv)+'</td><td>'+fmtBR(m.totLeads,0)+'</td><td>'+fmtPct(m.ctr)+'</td><td>'+fmtMoney(m.cpc)+'</td><td>'+fmtMoney(m.cpl)+'</td><td>'+fmtPct(m.txCadastro)+'</td></tr>';
+
+  // Criativos: agrupado por Ad+Adset
+  const creativeMap={};
+  m.detail.forEach(r=>{
+    const k=(r['Ad Name']||'—')+' / '+(r['Adset Name']||'—');
+    if(!creativeMap[k]) creativeMap[k]={key:k,spend:0,imp:0,clk:0,pv:0,leads:0};
+    creativeMap[k].spend += +r['Spend (Cost, Amount Spent)']||0;
+    creativeMap[k].imp += +r['Impressions']||0;
+    creativeMap[k].clk += +r['Action Link Clicks']||0;
+    creativeMap[k].pv += +r['Action Landing Page View']||0;
+    creativeMap[k].leads += r._leads||0;
+  });
+  const creatives = Object.values(creativeMap).map(g=>{
+    g.ctr=safeDiv(g.clk,g.imp)*100;g.cpc=safeDiv(g.spend,g.clk);
+    g.cpl=safeDiv(g.spend,g.leads);g.txEntrada=safeDiv(g.pv,g.clk)*100;
+    g.txCadastro=safeDiv(g.leads,g.pv)*100;return g;
+  }).sort((a,b)=>(a.cpl||1e9)-(b.cpl||1e9));
+
+  const tblCre = document.getElementById('tbl-creatives');
+  tblCre.innerHTML='';
+  creatives.forEach((c,i)=>{
+    const parts = c.key.split(' / ');
+    tblCre.innerHTML += '<tr><td>'+(i+1)+'</td><td>'+parts[0]+'</td><td>'+parts[1]+'</td><td>'+fmtMoney(c.spend)+'</td><td>'+fmtInt(c.imp)+'</td><td>'+fmtInt(c.clk)+'</td><td>'+fmtInt(c.pv)+'</td><td>'+fmtBR(c.leads,0)+'</td><td>'+fmtPct(c.ctr)+'</td><td>'+(c.clk>0?fmtMoney(c.cpc):'—')+'</td><td>'+(c.leads>0?fmtMoney(c.cpl):'—')+'</td><td>'+(c.clk>0?fmtPct(c.txEntrada):'—')+'</td><td>'+(c.pv>0?fmtPct(c.txCadastro):'—')+'</td><td>'+statusBadge(c)+'</td></tr>';
+  });
+
+  const tblAud = document.getElementById('tbl-audiences');
+  tblAud.innerHTML='';
+  audiences.forEach((a,i)=>{
+    tblAud.innerHTML += '<tr><td>'+(i+1)+'</td><td>'+a.key+'</td><td>'+fmtMoney(a.spend)+'</td><td>'+fmtInt(a.imp)+'</td><td>'+fmtInt(a.clk)+'</td><td>'+fmtInt(a.pv)+'</td><td>'+fmtBR(a.leads,0)+'</td><td>'+fmtPct(a.ctr)+'</td><td>'+(a.clk>0?fmtMoney(a.cpc):'—')+'</td><td>'+(a.leads>0?fmtMoney(a.cpl):'—')+'</td><td>'+(a.pv>0?fmtPct(a.txCadastro):'—')+'</td><td>'+statusBadge(a)+'</td></tr>';
+  });
+  tblAud.innerHTML += '<tr class="total"><td colspan="2">TOTAL</td><td>'+fmtMoney(m.totSpend)+'</td><td>'+fmtInt(m.totImp)+'</td><td>'+fmtInt(m.totClk)+'</td><td>'+fmtInt(m.totPv)+'</td><td>'+fmtBR(m.totLeads,0)+'</td><td>'+fmtPct(m.ctr)+'</td><td>'+fmtMoney(m.cpc)+'</td><td>'+fmtMoney(m.cpl)+'</td><td>'+fmtPct(m.txCadastro)+'</td><td>—</td></tr>';
+
+  const detail = aggByDayAdset(m.detail);
+  const tblDet = document.getElementById('tbl-detail');
+  tblDet.innerHTML='';
+  detail.forEach(d=>{
+    tblDet.innerHTML += '<tr><td>'+fmtDate(d.date)+'</td><td>'+d.adset+'</td><td>'+fmtMoney(d.spend)+'</td><td>'+fmtInt(d.imp)+'</td><td>'+fmtInt(d.clk)+'</td><td>'+fmtInt(d.pv)+'</td><td>'+fmtBR(d.leads,0)+'</td><td>'+fmtPct(d.ctr)+'</td><td>'+(d.clk>0?fmtMoney(d.cpc):'—')+'</td><td>'+(d.leads>0?fmtMoney(d.cpl):'—')+'</td></tr>';
+  });
+  tblDet.innerHTML += '<tr class="total"><td colspan="2">TOTAL</td><td>'+fmtMoney(m.totSpend)+'</td><td>'+fmtInt(m.totImp)+'</td><td>'+fmtInt(m.totClk)+'</td><td>'+fmtInt(m.totPv)+'</td><td>'+fmtBR(m.totLeads,0)+'</td><td>'+fmtPct(m.ctr)+'</td><td>'+fmtMoney(m.cpc)+'</td><td>'+fmtMoney(m.cpl)+'</td></tr>';
+
+  Object.values(charts).forEach(c=>c&&c.destroy&&c.destroy());
+  charts={};
+
+  charts.leadsCpl = new Chart(document.getElementById('chartLeadsCpl'),{
+    type:'bar',
+    data:{labels:days.map(d=>fmtDate(d.date).slice(0,5)),datasets:[
+      {label:'Leads',data:days.map(d=>d.leads),backgroundColor:'#00c853',yAxisID:'y',borderRadius:6},
+      {label:'CPL (R$)',data:days.map(d=>d.cpl||0),type:'line',borderColor:'#ff6b35',backgroundColor:'#ff6b35',yAxisID:'y1',tension:.3,pointRadius:5}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#fff'}},title:{display:true,text:'Leads e CPL por dia',color:'#fff',font:{size:14}}},
+      scales:{
+        y:{position:'left',ticks:{color:'#aaa'},grid:{color:'#262640'},title:{display:true,text:'Leads',color:'#00c853'}},
+        y1:{position:'right',ticks:{color:'#aaa'},grid:{display:false},title:{display:true,text:'CPL (R$)',color:'#ff6b35'}},
+        x:{ticks:{color:'#aaa'},grid:{color:'#262640'}}
+      }
+    }
+  });
+
+  charts.aud = new Chart(document.getElementById('chartAud'),{
+    type:'doughnut',
+    data:{labels:audiences.map(a=>a.key),datasets:[{data:audiences.map(a=>a.spend),backgroundColor:['#ff6b35','#ff1744','#42a5f5','#ffd600','#00c853','#9b59b6'],borderColor:'#1e1e35',borderWidth:3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#fff'}}}}
+  });
+
+  charts.daily = new Chart(document.getElementById('chartDaily'),{
+    type:'bar',
+    data:{labels:days.map(d=>fmtDate(d.date).slice(0,5)),datasets:[
+      {label:'Invest. (R$)',data:days.map(d=>d.spend),backgroundColor:'#42a5f5',yAxisID:'y',borderRadius:6},
+      {label:'Leads',data:days.map(d=>d.leads),type:'line',borderColor:'#00c853',backgroundColor:'#00c853',yAxisID:'y1',tension:.3,pointRadius:5}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#fff'}}},
+      scales:{
+        y:{position:'left',ticks:{color:'#aaa'},grid:{color:'#262640'},title:{display:true,text:'Invest. (R$)',color:'#42a5f5'}},
+        y1:{position:'right',ticks:{color:'#aaa'},grid:{display:false},title:{display:true,text:'Leads',color:'#00c853'}},
+        x:{ticks:{color:'#aaa'},grid:{color:'#262640'}}
+      }
+    }
+  });
+}
+
+async function loadAll(){
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = true; btn.textContent = '↻ Atualizando…';
+  document.getElementById('loadingScreen').style.display = 'flex';
+  document.getElementById('errorScreen').style.display = 'none';
+  document.getElementById('dashboardContent').style.display = 'none';
+  try{
+    const table = await fetchSheet();
+    const rows = parseRows(table);
+    const m = calcMetrics(rows);
+    render(m);
+    document.getElementById('loadingScreen').style.display = 'none';
+    document.getElementById('dashboardContent').style.display = 'block';
+  }catch(e){
+    console.error(e);
+    document.getElementById('loadingScreen').style.display = 'none';
+    document.getElementById('errorScreen').style.display = 'block';
+    document.getElementById('errorDetail').textContent = e.message || String(e);
+  }
+  btn.disabled = false; btn.textContent = '↻ Atualizar';
+}
+
+loadAll();
 </script>
 </body>
 </html>
