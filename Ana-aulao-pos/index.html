@@ -197,7 +197,7 @@ tr.total td{color:#fff;border-top:2px solid #ff6b35;}
 <div class="tab-content">
   <div class="section-title">Ranking de Criativos por CPL</div>
   <table>
-    <thead><tr><th>#</th><th>Criativo</th><th>Conjunto</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th><th>TX Entrada</th><th>TX Cadastro</th><th>Status</th></tr></thead>
+    <thead><tr><th>#</th><th>Criativo</th><th>Conjunto</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th><th>TX Entrada</th><th>TX Cadastro</th><th>Link</th><th>Status</th></tr></thead>
     <tbody id="tbl-creatives"></tbody>
   </table>
 </div>
@@ -445,16 +445,19 @@ function render(m){
   });
   tblDaily.innerHTML += '<tr class="total"><td>TOTAL</td><td>'+fmtMoney(m.totSpend)+'</td><td>'+fmtInt(m.totImp)+'</td><td>'+fmtInt(m.totClk)+'</td><td>'+fmtInt(m.totPv)+'</td><td>'+fmtBR(m.totLeads,0)+'</td><td>'+fmtPct(m.ctr)+'</td><td>'+fmtMoney(m.cpc)+'</td><td>'+fmtMoney(m.cpl)+'</td><td>'+fmtPct(m.txCadastro)+'</td></tr>';
 
-  // Criativos: agrupado por Ad+Adset
+  // Criativos: agrupado por Ad+Adset (oculta "Novo anúncio de Leads")
   const creativeMap={};
   m.detail.forEach(r=>{
-    const k=(r['Ad Name']||'—')+' / '+(r['Adset Name']||'—');
-    if(!creativeMap[k]) creativeMap[k]={key:k,spend:0,imp:0,clk:0,pv:0,leads:0};
+    const adName = r['Ad Name']||'—';
+    if(/novo an[uú]ncio de leads/i.test(adName)) return;
+    const k=adName+' / '+(r['Adset Name']||'—');
+    if(!creativeMap[k]) creativeMap[k]={key:k,spend:0,imp:0,clk:0,pv:0,leads:0,link:''};
     creativeMap[k].spend += +r['Spend (Cost, Amount Spent)']||0;
     creativeMap[k].imp += +r['Impressions']||0;
     creativeMap[k].clk += +r['Action Link Clicks']||0;
     creativeMap[k].pv += +r['Action Landing Page View']||0;
     creativeMap[k].leads += r._leads||0;
+    if(!creativeMap[k].link && r['Instagram Permalink URL']) creativeMap[k].link = r['Instagram Permalink URL'];
   });
   const creatives = Object.values(creativeMap).map(g=>{
     g.ctr=safeDiv(g.clk,g.imp)*100;g.cpc=safeDiv(g.spend,g.clk);
@@ -466,7 +469,8 @@ function render(m){
   tblCre.innerHTML='';
   creatives.forEach((c,i)=>{
     const parts = c.key.split(' / ');
-    tblCre.innerHTML += '<tr><td>'+(i+1)+'</td><td>'+parts[0]+'</td><td>'+parts[1]+'</td><td>'+fmtMoney(c.spend)+'</td><td>'+fmtInt(c.imp)+'</td><td>'+fmtInt(c.clk)+'</td><td>'+fmtInt(c.pv)+'</td><td>'+fmtBR(c.leads,0)+'</td><td>'+fmtPct(c.ctr)+'</td><td>'+(c.clk>0?fmtMoney(c.cpc):'—')+'</td><td>'+(c.leads>0?fmtMoney(c.cpl):'—')+'</td><td>'+(c.clk>0?fmtPct(c.txEntrada):'—')+'</td><td>'+(c.pv>0?fmtPct(c.txCadastro):'—')+'</td><td>'+statusBadge(c)+'</td></tr>';
+    const linkCell = c.link ? '<a href="'+c.link+'" target="_blank" rel="noopener" style="color:#ff6b35;text-decoration:none;font-weight:700;">↗ Ver</a>' : '<span style="color:#555;">—</span>';
+    tblCre.innerHTML += '<tr><td>'+(i+1)+'</td><td>'+parts[0]+'</td><td>'+parts[1]+'</td><td>'+fmtMoney(c.spend)+'</td><td>'+fmtInt(c.imp)+'</td><td>'+fmtInt(c.clk)+'</td><td>'+fmtInt(c.pv)+'</td><td>'+fmtBR(c.leads,0)+'</td><td>'+fmtPct(c.ctr)+'</td><td>'+(c.clk>0?fmtMoney(c.cpc):'—')+'</td><td>'+(c.leads>0?fmtMoney(c.cpl):'—')+'</td><td>'+(c.clk>0?fmtPct(c.txEntrada):'—')+'</td><td>'+(c.pv>0?fmtPct(c.txCadastro):'—')+'</td><td>'+linkCell+'</td><td>'+statusBadge(c)+'</td></tr>';
   });
 
   const tblAud = document.getElementById('tbl-audiences');
