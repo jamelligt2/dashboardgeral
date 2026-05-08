@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Captação — JGT PÓS 2026</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231a1a2e'/><text x='50%' y='72%' text-anchor='middle' font-size='14' font-weight='bold' fill='%23ff6b35' font-family='Arial'>JGT</text></svg>">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0f0f1a; color: #fff; font-family: 'Segoe UI', sans-serif; }
+
+  .header { background: #16213e; border-bottom: 2px solid #ff6b35; padding: 16px 24px; display: flex; align-items: center; gap: 16px; }
+  .logo-badge { background: linear-gradient(135deg, #ff6b35, #e04e1c); border-radius: 10px; width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 16px; color: #fff; flex-shrink: 0; }
+  .header-divider { width: 2px; height: 40px; background: #ff6b35; opacity: 0.3; }
+  .header-text h1 { font-size: 18px; font-weight: 700; color: #fff; }
+  .header-text p { font-size: 12px; color: #777; margin-top: 2px; }
+
+  .tabs { background: #16213e; display: flex; border-bottom: 1px solid #262640; }
+  .tab { padding: 14px 24px; cursor: pointer; font-size: 13px; font-weight: 600; color: #777; border-bottom: 3px solid transparent; transition: all 0.2s; }
+  .tab:hover { color: #ccc; }
+  .tab.active { color: #ff6b35; border-bottom: 3px solid #ff6b35; }
+
+  .tab-content { display: none; padding: 24px; }
+  .tab-content.active { display: block; }
+
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .kpi-card { background: #1e1e35; border: 1px solid #262640; border-radius: 12px; padding: 20px; }
+  .kpi-label { font-size: 11px; color: #777; text-transform: uppercase; letter-spacing: 1px; }
+  .kpi-value { font-size: 28px; font-weight: 800; color: #fff; margin: 6px 0 4px; }
+  .kpi-sub { font-size: 12px; color: #555; }
+  .kpi-card.orange .kpi-value { color: #ff6b35; }
+  .kpi-card.green .kpi-value { color: #00c853; }
+  .kpi-card.blue .kpi-value { color: #42a5f5; }
+
+  .section-title { font-size: 13px; font-weight: 700; color: #777; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; border-left: 3px solid #ff6b35; padding-left: 10px; }
+
+  .publicos-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .publico-card { border-radius: 12px; padding: 20px; }
+  .publico-card.quente30 { background: #1a0a0a; border: 2px solid #ff1744; }
+  .publico-card.quente365 { background: #061428; border: 2px solid #42a5f5; }
+  .publico-card.comparativo { background: #1e1e35; border: 1px solid #262640; }
+  .pub-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .quente30 .pub-title { color: #ff1744; }
+  .quente365 .pub-title { color: #42a5f5; }
+  .pub-cpl { font-size: 30px; font-weight: 900; margin: 8px 0 2px; }
+  .quente30 .pub-cpl { color: #ff1744; }
+  .quente365 .pub-cpl { color: #42a5f5; }
+  .pub-metrics { display: flex; gap: 20px; margin-top: 12px; }
+  .pub-metric .val { font-size: 18px; font-weight: 800; color: #fff; }
+  .pub-metric .lbl { font-size: 10px; color: #555; text-transform: uppercase; }
+
+  .funil-wrap { display: flex; gap: 16px; align-items: stretch; margin-bottom: 24px; }
+  .funnel-svg-wrap { flex: 0 0 52%; max-width: 52%; }
+  .funnel-metrics-row { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+  .metric-side-card { background: #1e1e35; border: 1px solid #262640; border-radius: 12px; padding: 16px; flex: 1; position: relative; overflow: hidden; }
+  .metric-side-card .ms-label { font-size: 11px; color: #777; text-transform: uppercase; letter-spacing: 1px; }
+  .metric-side-card .ms-value { font-size: 26px; font-weight: 800; margin: 4px 0 2px; }
+  .metric-side-card .ms-sub { font-size: 11px; color: #555; }
+  .metric-side-card .ms-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; border-radius: 0 0 12px 12px; }
+  .ms-cpc .ms-value { color: #ff6b35; } .ms-cpc .ms-bar { background: #ff6b35; }
+  .ms-txent .ms-value { color: #ffd600; } .ms-txent .ms-bar { background: #ffd600; }
+  .ms-txcad .ms-value { color: #00c853; } .ms-txcad .ms-bar { background: #00c853; }
+
+  .table-wrap { background: #1e1e35; border: 1px solid #262640; border-radius: 12px; overflow: auto; margin-bottom: 24px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { background: #16213e; padding: 10px 12px; text-align: right; color: #777; font-weight: 600; font-size: 11px; text-transform: uppercase; white-space: nowrap; }
+  th:first-child, th.left { text-align: left; }
+  td { padding: 10px 12px; text-align: right; border-bottom: 1px solid #1a1a2e; color: #ccc; white-space: nowrap; }
+  td:first-child { text-align: left; }
+  tr:last-child td { border-bottom: none; }
+  tr.total-row td { background: #ff6b35; color: #fff; font-weight: 700; }
+  tr:hover:not(.total-row) td { background: #252540; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+  .badge-escalar { background: #00c853; color: #000; }
+  .badge-manter { background: #ff6b35; color: #fff; }
+  .badge-avaliar { background: #ffd600; color: #000; }
+  .badge-pausar { background: #ff1744; color: #fff; }
+
+  .chart-wrap { background: #1e1e35; border: 1px solid #262640; border-radius: 12px; padding: 20px; margin-bottom: 24px; }
+  canvas { max-height: 260px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo-badge">JGT</div>
+  <div class="header-divider"></div>
+  <div class="header-text">
+    <h1>DASHBOARD CAPTAÇÃO — JGT PÓS 2026 Maio.26</h1>
+    <p>CAP110526 · 04/05/2026 – 07/05/2026</p>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('geral',this)">Visão Geral</div>
+  <div class="tab" onclick="showTab('criativos',this)">Criativos</div>
+  <div class="tab" onclick="showTab('publicos',this)">Públicos</div>
+  <div class="tab" onclick="showTab('diaria',this)">Análise Diária</div>
+</div>
+
+<div id="tab-geral" class="tab-content active">
+  <div class="kpi-row">
+    <div class="kpi-card orange"><div class="kpi-label">Investimento Total</div><div class="kpi-value">R$ 479,03</div><div class="kpi-sub">4 dias de campanha</div></div>
+    <div class="kpi-card"><div class="kpi-label">CTR Médio</div><div class="kpi-value">0,81%</div><div class="kpi-sub">137 cliques / 16.961 imp.</div></div>
+    <div class="kpi-card blue"><div class="kpi-label">CPM Médio</div><div class="kpi-value">R$ 28,24</div><div class="kpi-sub">por mil impressões</div></div>
+    <div class="kpi-card green"><div class="kpi-label">CPL Médio</div><div class="kpi-value">R$ 8,40</div><div class="kpi-sub">57 leads gerados</div></div>
+  </div>
+
+  <div class="section-title">Público Quente 30D vs Público Quente 365D</div>
+  <div class="publicos-grid">
+    <div class="publico-card quente30">
+      <div class="pub-title">Engajamento 30D</div>
+      <div class="pub-cpl">R$ 12,20</div>
+      <div style="font-size:11px;color:#777;">CPL médio</div>
+      <div class="pub-metrics">
+        <div class="pub-metric"><div class="val">R$ 195,14</div><div class="lbl">Investimento</div></div>
+        <div class="pub-metric"><div class="val">16</div><div class="lbl">Leads</div></div>
+      </div>
+      <div style="margin-top:12px;font-size:11px;color:#555;">Feed + Stories + Vídeos 30D</div>
+    </div>
+    <div class="publico-card quente365">
+      <div class="pub-title">Engajamento 365D</div>
+      <div class="pub-cpl">R$ 6,92</div>
+      <div style="font-size:11px;color:#777;">CPL médio</div>
+      <div class="pub-metrics">
+        <div class="pub-metric"><div class="val">R$ 283,89</div><div class="lbl">Investimento</div></div>
+        <div class="pub-metric"><div class="val">41</div><div class="lbl">Leads</div></div>
+      </div>
+      <div style="margin-top:12px;font-size:11px;color:#555;">Feed + Stories + Vídeos 365D</div>
+    </div>
+    <div class="publico-card comparativo">
+      <div class="pub-title" style="color:#ff6b35;">Comparativo</div>
+      <div style="margin-top:10px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px;"><span style="font-size:12px;color:#777;">30D — % dos leads</span><span style="font-size:14px;font-weight:700;color:#ff1744;">28%</span></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px;"><span style="font-size:12px;color:#777;">365D — % dos leads</span><span style="font-size:14px;font-weight:700;color:#42a5f5;">72%</span></div>
+        <div style="height:1px;background:#262640;margin:10px 0;"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:12px;color:#777;">Diferença de CPL</span><span style="font-size:14px;font-weight:700;color:#00c853;">R$ 5,28</span></div>
+        <div style="font-size:10px;color:#555;margin-top:4px;text-align:right;">365D é 43% mais barato</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">Funil de Conversão</div>
+  <div class="funil-wrap">
+    <div class="funnel-svg-wrap">
+      <svg viewBox="0 0 1200 540" width="100%" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" style="stop-color:#0d2247"/><stop offset="50%" style="stop-color:#1a3a6e"/><stop offset="100%" style="stop-color:#0d2247"/></linearGradient>
+          <linearGradient id="g2" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" style="stop-color:#0a1a40"/><stop offset="50%" style="stop-color:#1535a0"/><stop offset="100%" style="stop-color:#0a1a40"/></linearGradient>
+          <linearGradient id="g3" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" style="stop-color:#2a1000"/><stop offset="50%" style="stop-color:#6b3000"/><stop offset="100%" style="stop-color:#2a1000"/></linearGradient>
+          <linearGradient id="g4" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" style="stop-color:#002a00"/><stop offset="50%" style="stop-color:#004d00"/><stop offset="100%" style="stop-color:#002a00"/></linearGradient>
+          <filter id="glow"><feGaussianBlur stdDeviation="5" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        </defs>
+        <polygon points="30,8 1170,8 1090,98 110,98" fill="url(#g1)" stroke="#1a3a6e" stroke-width="1.5"/>
+        <text x="600" y="36" text-anchor="middle" font-size="14" fill="#aaa" font-weight="600" font-family="Segoe UI,sans-serif">IMPRESSÕES</text>
+        <text x="600" y="82" text-anchor="middle" font-size="54" fill="#ffffff" font-weight="900" font-family="Segoe UI,sans-serif">16.961</text>
+        <text x="600" y="118" text-anchor="middle" font-size="13" fill="#42a5f5" font-weight="700" font-family="Segoe UI,sans-serif">▼  CTR: 0,81%</text>
+        <polygon points="110,130 1090,130 970,220 230,220" fill="url(#g2)" stroke="#1535a0" stroke-width="1.5"/>
+        <text x="600" y="158" text-anchor="middle" font-size="14" fill="#aaa" font-weight="600" font-family="Segoe UI,sans-serif">CLIQUES</text>
+        <text x="600" y="204" text-anchor="middle" font-size="54" fill="#ffffff" font-weight="900" font-family="Segoe UI,sans-serif">137</text>
+        <text x="600" y="240" text-anchor="middle" font-size="13" fill="#ffd600" font-weight="700" font-family="Segoe UI,sans-serif">▼  TX Entrada: 72,26%</text>
+        <polygon points="230,252 970,252 840,342 360,342" fill="url(#g3)" stroke="#6b3000" stroke-width="1.5"/>
+        <text x="600" y="280" text-anchor="middle" font-size="14" fill="#aaa" font-weight="600" font-family="Segoe UI,sans-serif">PAGE VIEWS</text>
+        <text x="600" y="326" text-anchor="middle" font-size="54" fill="#ffffff" font-weight="900" font-family="Segoe UI,sans-serif">99</text>
+        <text x="600" y="362" text-anchor="middle" font-size="13" fill="#00c853" font-weight="700" font-family="Segoe UI,sans-serif">▼  TX Cadastro: 57,58%</text>
+        <polygon points="360,374 840,374 700,464 500,464" fill="url(#g4)" stroke="#005500" stroke-width="1.5" filter="url(#glow)"/>
+        <text x="600" y="402" text-anchor="middle" font-size="14" fill="#aaa" font-weight="600" font-family="Segoe UI,sans-serif">LEADS</text>
+        <text x="600" y="454" text-anchor="middle" font-size="68" fill="#00c853" font-weight="900" font-family="Segoe UI,sans-serif" filter="url(#glow)">57</text>
+        <polygon points="500,476 700,476 600,516" fill="#004400" opacity="0.6"/>
+      </svg>
+    </div>
+    <div class="funnel-metrics-row">
+      <div class="metric-side-card ms-cpc"><div class="ms-label">CPC</div><div class="ms-value">R$ 3,50</div><div class="ms-sub">Custo por Clique</div><div class="ms-bar"></div></div>
+      <div class="metric-side-card ms-txent"><div class="ms-label">TX Entrada</div><div class="ms-value">72,26%</div><div class="ms-sub">Cliques → Page Views</div><div class="ms-bar"></div></div>
+      <div class="metric-side-card ms-txcad"><div class="ms-label">TX Cadastro</div><div class="ms-value">57,58%</div><div class="ms-sub">Page Views → Leads</div><div class="ms-bar"></div></div>
+    </div>
+  </div>
+
+  <div class="section-title">Evolução Diária</div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Dia</th><th>Invest.</th><th>Impressões</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th><th>TX Cadastro</th></tr></thead>
+      <tbody>
+        <tr><td>04/05</td><td>R$ 11,33</td><td>694</td><td>1</td><td>0</td><td>0</td><td>0,14%</td><td>R$ 11,33</td><td>—</td><td>—</td></tr>
+        <tr><td>05/05</td><td>R$ 113,93</td><td>5.008</td><td>23</td><td>15</td><td>0</td><td>0,46%</td><td>R$ 4,95</td><td>—</td><td>—</td></tr>
+        <tr><td>06/05</td><td>R$ 235,25</td><td>8.232</td><td>71</td><td>50</td><td>29</td><td>0,86%</td><td>R$ 3,31</td><td>R$ 8,11</td><td>58,00%</td></tr>
+        <tr><td>07/05</td><td>R$ 118,52</td><td>3.027</td><td>42</td><td>34</td><td>28</td><td>1,39%</td><td>R$ 2,82</td><td>R$ 4,23</td><td>82,35%</td></tr>
+        <tr class="total-row"><td>TOTAL</td><td>R$ 479,03</td><td>16.961</td><td>137</td><td>99</td><td>57</td><td>0,81%</td><td>R$ 3,50</td><td>R$ 8,40</td><td>57,58%</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="chart-wrap"><canvas id="chartDiario"></canvas></div>
+</div>
+
+<div id="tab-criativos" class="tab-content">
+  <div class="section-title">Criativos Ranqueados por CPL</div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th class="left">Criativo</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th><th>TX Ent.</th><th>TX Cad.</th><th>Hook Rate</th><th>Link</th><th>Status</th></tr></thead>
+      <tbody id="tabCriativos"></tbody>
+    </table>
+  </div>
+</div>
+
+<div id="tab-publicos" class="tab-content">
+  <div class="section-title">Públicos Ranqueados por CPL</div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th class="left">Adset</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPL</th><th>TX Ent.</th><th>TX Cad.</th><th>Status</th></tr></thead>
+      <tbody id="tabPublicos"></tbody>
+    </table>
+  </div>
+</div>
+
+<div id="tab-diaria" class="tab-content">
+  <div class="section-title">Análise Diária por Adset / Criativo</div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Data</th><th class="left">Adset</th><th class="left">Criativo</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CPL</th><th>TX Cad.</th></tr></thead>
+      <tbody id="tabDiaria"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+function fmt(n,d=2){return n.toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d});}
+function fmtR(n){return 'R$ '+fmt(n);}
+function fmtN(n){return n.toLocaleString('pt-BR');}
+function badge(cpl){
+  if(cpl===null||isNaN(cpl))return '<span class="badge badge-avaliar">AVALIAR</span>';
+  if(cpl<=5)return '<span class="badge badge-escalar">ESCALAR</span>';
+  if(cpl<=10)return '<span class="badge badge-manter">MANTER</span>';
+  if(cpl<=20)return '<span class="badge badge-avaliar">AVALIAR</span>';
+  return '<span class="badge badge-pausar">PAUSAR</span>';
+}
+const rawData=[
+  {date:'2026-05-04',adset:'00 - ENGAJAMENTO 30D',ad:'Novo anúncio de Leads',clicks:0,pv:0,leads:0,imp:22,url:'',v3s:0,spend:0.32},
+  {date:'2026-05-04',adset:'01 - ENGAJAMENTO 365D',ad:'Novo anúncio de Leads',clicks:1,pv:0,leads:0,imp:672,url:'',v3s:0,spend:11.01},
+  {date:'2026-05-05',adset:'00 - ENGAJAMENTO 30D',ad:'Novo anúncio de Leads',clicks:3,pv:2,leads:0,imp:873,url:'',v3s:0,spend:34.4},
+  {date:'2026-05-05',adset:'01 - ENGAJAMENTO 365D',ad:'Novo anúncio de Leads',clicks:20,pv:13,leads:0,imp:4135,url:'',v3s:0,spend:79.53},
+  {date:'2026-05-06',adset:'00 - ENGAJAMENTO 30D',ad:'Novo anúncio de Leads',clicks:3,pv:1,leads:0,imp:625,url:'',v3s:0,spend:27.86},
+  {date:'2026-05-06',adset:'00 - ENGAJAMENTO 30D',ad:'[30D] Aulão',clicks:0,pv:0,leads:0,imp:30,url:'https://www.instagram.com/p/DX5jd_rAEOD/',v3s:0,spend:1.78},
+  {date:'2026-05-06',adset:'00 - ENGAJAMENTO 30D',ad:'[30D] Carrossel 01',clicks:1,pv:1,leads:0,imp:17,url:'https://www.instagram.com/p/DX5jrXwAAmp/',v3s:0,spend:1.16},
+  {date:'2026-05-06',adset:'00 - ENGAJAMENTO 30D',ad:'[30D] POS A-06',clicks:0,pv:0,leads:0,imp:69,url:'https://www.instagram.com/p/DX5jgw5gK1B/',v3s:0,spend:4.22},
+  {date:'2026-05-06',adset:'00 - ENGAJAMENTO 30D',ad:'[30D] Pós A - 03',clicks:6,pv:3,leads:4,imp:622,url:'https://www.instagram.com/p/DX5jgEcAEzV/',v3s:0,spend:34.98},
+  {date:'2026-05-06',adset:'01 - ENGAJAMENTO 365D',ad:'Novo anúncio de Leads',clicks:6,pv:5,leads:0,imp:1889,url:'',v3s:0,spend:42.7},
+  {date:'2026-05-06',adset:'01 - ENGAJAMENTO 365D',ad:'[365D] Pós A - 03',clicks:22,pv:18,leads:8,imp:3603,url:'https://www.instagram.com/p/DX5jkKaAHq5/',v3s:0,spend:86.1},
+  {date:'2026-05-06',adset:'01 - ENGAJAMENTO 365D',ad:'[365D] Pós A - 04',clicks:8,pv:6,leads:5,imp:130,url:'https://www.instagram.com/p/DX5jiYcAN3o/',v3s:0,spend:2.73},
+  {date:'2026-05-06',adset:'00 - ENGAJAMENTO 30D - VID',ad:'[30D] VID01',clicks:3,pv:3,leads:4,imp:171,url:'https://www.instagram.com/p/DYAtlwMAKxY/',v3s:50,spend:7.22},
+  {date:'2026-05-06',adset:'00 - ENGAJAMENTO 30D - VID',ad:'[30D] VID02',clicks:2,pv:0,leads:0,imp:18,url:'https://www.instagram.com/p/DYA39hugCd8/',v3s:7,spend:0.86},
+  {date:'2026-05-06',adset:'00 - ENGAJAMENTO 30D - VID',ad:'[30D] VID03',clicks:2,pv:2,leads:0,imp:76,url:'https://www.instagram.com/p/DYAtmVqAK5C/',v3s:26,spend:2.7},
+  {date:'2026-05-06',adset:'00 - ENGAJAMENTO 30D - VID',ad:'[30D] VID04',clicks:1,pv:1,leads:0,imp:19,url:'https://www.instagram.com/p/DYA398EAKDH/',v3s:8,spend:0.77},
+  {date:'2026-05-06',adset:'00 - ENGAJAMENTO 30D - VID',ad:'[30D] VID05',clicks:1,pv:3,leads:0,imp:23,url:'https://www.instagram.com/p/DYAtmu0AJTK/',v3s:5,spend:1.37},
+  {date:'2026-05-06',adset:'01 - ENGAJAMENTO 365D - VID',ad:'[365D] VID01',clicks:10,pv:4,leads:6,imp:739,url:'https://www.instagram.com/p/DYAtlwMAKxY/',v3s:165,spend:16.93},
+  {date:'2026-05-06',adset:'01 - ENGAJAMENTO 365D - VID',ad:'[365D] VID02',clicks:1,pv:0,leads:0,imp:28,url:'https://www.instagram.com/p/DYA39hugCd8/',v3s:8,spend:0.69},
+  {date:'2026-05-06',adset:'01 - ENGAJAMENTO 365D - VID',ad:'[365D] VID03',clicks:1,pv:1,leads:2,imp:60,url:'https://www.instagram.com/p/DYAtmVqAK5C/',v3s:17,spend:1.16},
+  {date:'2026-05-06',adset:'01 - ENGAJAMENTO 365D - VID',ad:'[365D] VID04',clicks:2,pv:2,leads:0,imp:30,url:'https://www.instagram.com/p/DYA398EAKDH/',v3s:14,spend:0.76},
+  {date:'2026-05-06',adset:'01 - ENGAJAMENTO 365D - VID',ad:'[365D] VID05',clicks:2,pv:0,leads:0,imp:83,url:'https://www.instagram.com/p/DYAtmu0AJTK/',v3s:10,spend:1.26},
+  {date:'2026-05-07',adset:'00 - ENGAJAMENTO 30D',ad:'Novo anúncio de Leads',clicks:0,pv:0,leads:0,imp:83,url:'',v3s:0,spend:3.49},
+  {date:'2026-05-07',adset:'00 - ENGAJAMENTO 30D',ad:'[30D] 034ff07f',clicks:4,pv:2,leads:0,imp:393,url:'https://www.instagram.com/p/DX5jh2bgLtn/',v3s:0,spend:23.78},
+  {date:'2026-05-07',adset:'00 - ENGAJAMENTO 30D',ad:'[30D] Aulão 03',clicks:4,pv:2,leads:0,imp:158,url:'https://www.instagram.com/p/DX5jhcDAM1P/',v3s:0,spend:9},
+  {date:'2026-05-07',adset:'00 - ENGAJAMENTO 30D',ad:'[30D] Pós A - 02',clicks:6,pv:5,leads:6,imp:399,url:'https://www.instagram.com/p/DX5jfhVABz2/',v3s:0,spend:20.47},
+  {date:'2026-05-07',adset:'00 - ENGAJAMENTO 30D',ad:'[30D] Pós A - 05',clicks:2,pv:1,leads:0,imp:226,url:'https://www.instagram.com/p/DX5jfEBgCsI/',v3s:0,spend:13},
+  {date:'2026-05-07',adset:'01 - ENGAJAMENTO 365D',ad:'Novo anúncio de Leads',clicks:0,pv:1,leads:0,imp:4,url:'',v3s:0,spend:0.42},
+  {date:'2026-05-07',adset:'01 - ENGAJAMENTO 365D',ad:'[365D] Pós A - 02',clicks:0,pv:0,leads:0,imp:72,url:'https://www.instagram.com/p/DX5jjwcgAaM/',v3s:0,spend:2.49},
+  {date:'2026-05-07',adset:'01 - ENGAJAMENTO 365D',ad:'[365D] Pós A - 03',clicks:0,pv:0,leads:0,imp:1,url:'https://www.instagram.com/p/DX5jkKaAHq5/',v3s:0,spend:0.08},
+  {date:'2026-05-07',adset:'01 - ENGAJAMENTO 365D',ad:'[365D] Pós A - 04',clicks:8,pv:8,leads:10,imp:309,url:'https://www.instagram.com/p/DX5jiYcAN3o/',v3s:0,spend:7.08},
+  {date:'2026-05-07',adset:'01 - ENGAJAMENTO 365D',ad:'[365D] Pós A - 05',clicks:8,pv:7,leads:6,imp:617,url:'https://www.instagram.com/p/DX5ji-zADE5/',v3s:0,spend:16.3},
+  {date:'2026-05-07',adset:'00 - ENGAJAMENTO 30D - VID',ad:'[30D] VID02',clicks:0,pv:0,leads:0,imp:24,url:'https://www.instagram.com/p/DYA39hugCd8/',v3s:4,spend:0.69},
+  {date:'2026-05-07',adset:'00 - ENGAJAMENTO 30D - VID',ad:'[30D] VID04',clicks:2,pv:2,leads:2,imp:80,url:'https://www.instagram.com/p/DYA398EAKDH/',v3s:28,spend:4.41},
+  {date:'2026-05-07',adset:'00 - ENGAJAMENTO 30D - VID',ad:'[30D] VID05',clicks:1,pv:1,leads:0,imp:71,url:'https://www.instagram.com/p/DYAtmu0AJTK/',v3s:23,spend:2.66},
+  {date:'2026-05-07',adset:'01 - ENGAJAMENTO 365D - VID',ad:'[365D] VID01',clicks:0,pv:0,leads:0,imp:138,url:'https://www.instagram.com/p/DYAtlwMAKxY/',v3s:48,spend:4.99},
+  {date:'2026-05-07',adset:'01 - ENGAJAMENTO 365D - VID',ad:'[365D] VID03',clicks:6,pv:4,leads:4,imp:447,url:'https://www.instagram.com/p/DYAtmVqAK5C/',v3s:125,spend:9.56},
+  {date:'2026-05-07',adset:'01 - ENGAJAMENTO 365D - VID',ad:'[365D] VID04',clicks:1,pv:1,leads:0,imp:3,url:'https://www.instagram.com/p/DYA398EAKDH/',v3s:1,spend:0.03},
+  {date:'2026-05-07',adset:'01 - ENGAJAMENTO 365D - VID',ad:'[365D] VID05',clicks:0,pv:0,leads:0,imp:2,url:'https://www.instagram.com/p/DYAtmu0AJTK/',v3s:1,spend:0.07},
+];
+const cMap={};
+rawData.forEach(r=>{
+  if(!cMap[r.ad])cMap[r.ad]={ad:r.ad,url:r.url,clicks:0,pv:0,leads:0,imp:0,v3s:0,spend:0};
+  const c=cMap[r.ad];c.clicks+=r.clicks;c.pv+=r.pv;c.leads+=r.leads;c.imp+=r.imp;c.v3s+=r.v3s;c.spend+=r.spend;if(r.url)c.url=r.url;
+});
+const creatives=Object.values(cMap).sort((a,b)=>{const ca=a.leads>0?a.spend/a.leads:1e9;const cb=b.leads>0?b.spend/b.leads:1e9;return ca-cb;});
+const tabC=document.getElementById('tabCriativos');
+creatives.forEach((c,i)=>{
+  const cpl=c.leads>0?c.spend/c.leads:null;const ctr=c.imp>0?c.clicks/c.imp*100:0;const cpc=c.clicks>0?c.spend/c.clicks:null;const txE=c.clicks>0?c.pv/c.clicks*100:null;const txC=c.pv>0?c.leads/c.pv*100:null;const hr=c.imp>0&&c.v3s>0?c.v3s/c.imp*100:null;const lnk=c.url?`<a href="${c.url}" target="_blank" style="color:#42a5f5;font-size:10px;">Ver</a>`:'—';
+  tabC.innerHTML+=`<tr><td style="text-align:right;color:#555;">${i+1}</td><td style="text-align:left;max-width:160px;overflow:hidden;text-overflow:ellipsis;">${c.ad}</td><td>${fmtR(c.spend)}</td><td>${fmtN(c.imp)}</td><td>${c.clicks}</td><td>${c.pv}</td><td><strong>${c.leads}</strong></td><td>${fmt(ctr)}%</td><td>${cpc?fmtR(cpc):'—'}</td><td>${cpl?'<strong>'+fmtR(cpl)+'</strong>':'—'}</td><td>${txE?fmt(txE)+'%':'—'}</td><td>${txC?fmt(txC)+'%':'—'}</td><td>${hr?fmt(hr)+'%':'—'}</td><td>${lnk}</td><td>${badge(cpl)}</td></tr>`;
+});
+const aMap={};
+rawData.forEach(r=>{
+  if(!aMap[r.adset])aMap[r.adset]={adset:r.adset,clicks:0,pv:0,leads:0,imp:0,spend:0};
+  const a=aMap[r.adset];a.clicks+=r.clicks;a.pv+=r.pv;a.leads+=r.leads;a.imp+=r.imp;a.spend+=r.spend;
+});
+const adsets=Object.values(aMap).sort((a,b)=>{const ca=a.leads>0?a.spend/a.leads:1e9;const cb=b.leads>0?b.spend/b.leads:1e9;return ca-cb;});
+const tabP=document.getElementById('tabPublicos');
+adsets.forEach((a,i)=>{
+  const cpl=a.leads>0?a.spend/a.leads:null;const ctr=a.imp>0?a.clicks/a.imp*100:0;const txE=a.clicks>0?a.pv/a.clicks*100:null;const txC=a.pv>0?a.leads/a.pv*100:null;
+  tabP.innerHTML+=`<tr><td style="text-align:right;color:#555;">${i+1}</td><td style="text-align:left;">${a.adset}</td><td>${fmtR(a.spend)}</td><td>${fmtN(a.imp)}</td><td>${a.clicks}</td><td>${a.pv}</td><td><strong>${a.leads}</strong></td><td>${fmt(ctr)}%</td><td>${cpl?'<strong>'+fmtR(cpl)+'</strong>':'—'}</td><td>${txE?fmt(txE)+'%':'—'}</td><td>${txC?fmt(txC)+'%':'—'}</td><td>${badge(cpl)}</td></tr>`;
+});
+const tabD=document.getElementById('tabDiaria');
+rawData.forEach(r=>{
+  const cpl=r.leads>0?r.spend/r.leads:null;const txC=r.pv>0?r.leads/r.pv*100:null;const d=r.date.split('-');
+  tabD.innerHTML+=`<tr><td>${d[2]}/${d[1]}</td><td style="text-align:left;font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;">${r.adset}</td><td style="text-align:left;font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;">${r.ad}</td><td>${fmtR(r.spend)}</td><td>${fmtN(r.imp)}</td><td>${r.clicks}</td><td>${r.pv}</td><td>${r.leads}</td><td>${cpl?fmtR(cpl):'—'}</td><td>${txC?fmt(txC)+'%':'—'}</td></tr>`;
+});
+const ctx=document.getElementById('chartDiario').getContext('2d');
+new Chart(ctx,{data:{labels:['04/05','05/05','06/05','07/05'],datasets:[{type:'bar',label:'Leads',data:[0,0,29,28],backgroundColor:'#00c853aa',yAxisID:'y'},{type:'line',label:'CPL (R$)',data:[null,null,8.11,4.23],borderColor:'#ff6b35',backgroundColor:'transparent',tension:0.4,pointBackgroundColor:'#ff6b35',pointRadius:5,yAxisID:'y2'}]},options:{responsive:true,plugins:{legend:{labels:{color:'#aaa'}},title:{display:true,text:'Leads e CPL por Dia',color:'#ccc',font:{size:14}}},scales:{x:{ticks:{color:'#777'},grid:{color:'#1a1a2e'}},y:{ticks:{color:'#777'},grid:{color:'#1a1a2e'},title:{display:true,text:'Leads',color:'#777'}},y2:{position:'right',ticks:{color:'#ff6b35',callback:v=>'R$'+v},grid:{display:false},title:{display:true,text:'CPL',color:'#ff6b35'}}}}});
+function showTab(name,el){document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.getElementById('tab-'+name).classList.add('active');el.classList.add('active');}
+</script>
+</body>
+</html>
