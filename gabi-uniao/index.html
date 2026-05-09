@@ -505,7 +505,8 @@ async function loadData(){
       const utmCampanha=r[W_COL.utmMedium]||'';   // ex: "[JGT] ... Pag 1 VIDEOS"
       const utmAdset=r[W_COL.utmCampaign]||'';    // ex: "ADV - MULHERES 30 A 50 a"
       const utmContent=r[W_COL.utmContent]||'';   // ex: "UEM-ADV02"
-      sales.push({data:iso, valor:val, nome:r[W_COL.buyerName]||'', campaign:utmCampanha, adset:utmAdset, content:utmContent});
+      const utmSource=(r[W_COL.utmSource]||r[W_COL.trackerUtmSource]||'').toLowerCase(); // ex: "meta_ads", "ig"
+      sales.push({data:iso, valor:val, nome:r[W_COL.buyerName]||'', campaign:utmCampanha, adset:utmAdset, content:utmContent, source:utmSource});
     }
 
     // ---- GERENCIADOR: aggregate by ad (creative) ----
@@ -696,7 +697,8 @@ async function init(){
       const utmCampanha=r[W_COL.utmMedium]||'';   // ex: "[JGT] ... Pag 1 VIDEOS"
       const utmAdset=r[W_COL.utmCampaign]||'';    // ex: "ADV - MULHERES 30 A 50 a"
       const utmContent=r[W_COL.utmContent]||'';   // ex: "UEM-ADV02"
-      sales.push({data:iso, valor:val, nome:r[W_COL.buyerName]||'', campaign:utmCampanha, adset:utmAdset, content:utmContent});
+      const utmSource=(r[W_COL.utmSource]||r[W_COL.trackerUtmSource]||'').toLowerCase(); // ex: "meta_ads", "ig"
+      sales.push({data:iso, valor:val, nome:r[W_COL.buyerName]||'', campaign:utmCampanha, adset:utmAdset, content:utmContent, source:utmSource});
     }
 
     // ---- GERENCIADOR ----
@@ -1119,7 +1121,12 @@ function renderWebhookSalesPanel(){
         <div>
           <div style="font-size:13px;font-weight:600;color:#ff9a3c">Vendas no Período (${fSales.length})</div>
           <div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px">${SALES.length} total · ${brl(totalFat)} faturamento total · ← arraste para ver mais</div>
-          <div style="font-size:10px;margin-top:4px;display:flex;gap:8px;flex-wrap:wrap">${(()=>{const f=fSales.filter(s=>{const hc=!!(s.content||'').trim(),hp=!!(s.campaign||'').trim(),ha=!!(s.adset||'').trim();return hc&&(hp||ha);});const p=fSales.filter(s=>{const hc=!!(s.content||'').trim(),hp=!!(s.campaign||'').trim(),ha=!!(s.adset||'').trim();return hc&&!hp&&!ha;});const o=fSales.filter(s=>!isTrackedSale(s));return`<span style="color:#2ecc71">✅ ${f.length} completas</span><span style="color:#ff9a3c">🎯 ${p.length} só código</span><span style="color:#f1c40f">⭐ ${o.length} orgânicas</span>`;})()}</div>
+          <div style="font-size:10px;margin-top:4px;display:flex;gap:8px;flex-wrap:wrap">${(()=>{
+            const f=fSales.filter(s=>{const hp=!!(s.campaign||'').trim(),ha=!!(s.adset||'').trim();return hp||ha;});
+            const p=fSales.filter(s=>{const hc=!!(s.content||'').trim(),hp=!!(s.campaign||'').trim(),ha=!!(s.adset||'').trim(),src=(s.source||'').toLowerCase(),isSrc=src&&(src.includes('meta')||src.includes('ig')||src.includes('facebook'));return isTrackedSale(s)&&!hp&&!ha&&(hc||isSrc);});
+            const o=fSales.filter(s=>!isTrackedSale(s));
+            return`<span style="color:#2ecc71">✅ ${f.length} completas</span><span style="color:#ff9a3c">🎯 ${p.length} só código/source</span><span style="color:#f1c40f">⭐ ${o.length} orgânicas</span>`;
+          })()}</div>
         </div>
       </div>
       <button onclick="openDebugModal()" style="background:rgba(255,107,43,.12);border:1px solid rgba(255,107,43,.3);color:#ff9a3c;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:11px;font-family:'DM Sans',sans-serif">Ver detalhes →</button>
@@ -1132,12 +1139,15 @@ function renderWebhookSalesPanel(){
       const hasContent=!!(s.content||'').trim();
       const hasPage=!!(s.campaign||'').trim();
       const hasAdset=!!(s.adset||'').trim();
+      const src=(s.source||'').toLowerCase();
+      const isPaidSource=src&&(src.includes('meta')||src.includes('ig')||src.includes('facebook')||src.includes('fb')||src.includes('instagram'));
       const partial=tracked&&hasContent&&!hasPage&&!hasAdset;
+      const sourceOnly=tracked&&!hasContent&&!hasPage&&!hasAdset&&isPaidSource; // só source, sem outros UTMs
       const full=tracked&&(hasPage||hasAdset);
-      // Cores: verde=completo, laranja=parcial(só código), amarelo=orgânica
-      const color=full?'rgba(46,204,113,.2)':partial?'rgba(255,107,43,.12)':'rgba(241,196,15,.1)';
-      const border=full?'rgba(46,204,113,.4)':partial?'rgba(255,107,43,.35)':'rgba(241,196,15,.3)';
-      const icon=full?'✅':partial?'🎯':'⭐';
+      // Cores: verde=completo, laranja=parcial(só código/source), amarelo=orgânica
+      const color=full?'rgba(46,204,113,.2)':(partial||sourceOnly)?'rgba(255,107,43,.12)':'rgba(241,196,15,.1)';
+      const border=full?'rgba(46,204,113,.4)':(partial||sourceOnly)?'rgba(255,107,43,.35)':'rgba(241,196,15,.3)';
+      const icon=full?'✅':(partial||sourceOnly)?'🎯':'⭐';
       return`<div style="flex-shrink:0;width:210px;background:${color};border:1px solid ${border};border-radius:8px;padding:10px 12px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
           <div style="font-size:11px;font-weight:600;color:#e8e6f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px">${icon} ${s.nome||'Sem nome'}</div>
@@ -1153,6 +1163,11 @@ function renderWebhookSalesPanel(){
         <div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:2px">👥 <span style="color:${s.estimatedAdset?'#ff9a3c':'rgba(255,255,255,.3)'}">${s.estimatedAdset?s.estimatedAdset.slice(0,28)+(s.estimatedAdset.length>28?'…':''):'Público: n/d'}</span></div>
         <div style="font-size:10px;color:rgba(255,255,255,.45)">📄 <span style="color:${s.estimatedPage?'#ff9a3c':'rgba(255,255,255,.3)'}">${s.estimatedPage?'~Pág '+s.estimatedPage+' (estimada)':'Pág: n/d'}</span></div>
         <div style="font-size:9px;color:rgba(255,107,43,.5);margin-top:4px">🔍 Inferido via gasto do Gerenciador</div>
+        `:sourceOnly?`
+        <div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:2px">📡 <span style="color:#ff9a3c;font-weight:600">Source: ${s.source}</span></div>
+        <div style="font-size:10px;color:rgba(255,255,255,.35);margin-bottom:2px">🎨 <span style="color:rgba(255,255,255,.3)">Criativo: n/d</span></div>
+        <div style="font-size:10px;color:rgba(255,255,255,.35)">📄 <span style="color:rgba(255,255,255,.3)">Pág: n/d</span></div>
+        <div style="font-size:9px;color:rgba(255,107,43,.5);margin-top:4px">🎯 Tráfego via ${s.source}</div>
         `:`<div style="font-size:10px;color:rgba(241,196,15,.7);margin-top:4px">⭐ Venda orgânica (sem UTM)</div>`}
       </div>`;
     }).join('')}
@@ -1221,7 +1236,13 @@ function openDebugModal(){
 }
 
 // ============ TRÁFEGO (só vendas rastreadas com UTM) ============
-function isTrackedSale(s){ return !!((s.content||'').trim()||(s.adset||'').trim()||(s.campaign||'').trim()); }
+function isTrackedSale(s){
+  // Rastreada se: qualquer UTM preenchido OU source aponta para tráfego pago (ig, meta_ads, facebook, etc.)
+  const hasUtm=!!((s.content||'').trim()||(s.adset||'').trim()||(s.campaign||'').trim());
+  const src=(s.source||'').toLowerCase();
+  const isPaidSource=src&&(src.includes('meta')||src.includes('ig')||src.includes('facebook')||src.includes('fb')||src.includes('instagram'));
+  return hasUtm||isPaidSource;
+}
 function filteredSalesInRange(trackedOnly){
   return SALES.filter(s=>{
     // Vendas orgânicas (sem UTM) sempre aparecem na Visão Geral independente do filtro de data
