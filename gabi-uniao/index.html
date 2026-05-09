@@ -106,6 +106,21 @@ tr:hover td{background:rgba(255,255,255,.025)}
 .page-kpi-label{font-size:9px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
 .page-kpi-val{font-family:'DM Mono',monospace;font-size:16px;font-weight:700}
 .winner-tag{display:inline-block;background:rgba(46,204,113,.15);color:#2ecc71;font-size:9px;padding:1px 6px;border-radius:3px;margin-left:6px;font-weight:600}
+.edition-bar{display:flex;align-items:center;gap:8px;padding:7px 28px;background:#0f0f1e;border-bottom:1px solid rgba(255,255,255,.05);flex-wrap:wrap}
+.edition-label{font-size:10px;color:rgba(255,255,255,.3);white-space:nowrap;letter-spacing:.5px;text-transform:uppercase}
+.edition-btn{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.45);padding:3px 13px;border-radius:5px;cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;transition:all .2s;white-space:nowrap}
+.edition-btn:hover{border-color:rgba(255,107,43,.4);color:rgba(255,255,255,.8)}
+.edition-btn.active{background:rgba(255,107,43,.18);border-color:#ff6b2b;color:#ff6b2b;font-weight:600}
+.comp-table-wrap{overflow-x:auto;border-radius:10px;border:1px solid rgba(255,255,255,.08)}
+.comp-table{width:100%;border-collapse:collapse;font-size:12px}
+.comp-table th{background:#0f0f1e;padding:10px 16px;text-align:center;color:rgba(255,255,255,.4);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid rgba(255,255,255,.08)}
+.comp-table th:first-child{text-align:left}
+.comp-table td{padding:9px 16px;border-bottom:1px solid rgba(255,255,255,.04);font-family:'DM Mono',monospace;font-size:12px;text-align:center}
+.comp-table td:first-child{text-align:left;font-family:'DM Sans',sans-serif;color:rgba(255,255,255,.55);font-size:11px;padding-left:20px}
+.comp-table tr:hover td{background:rgba(255,255,255,.02)}
+.comp-sep td{background:rgba(255,107,43,.05)!important;padding:6px 16px 4px!important;font-size:10px!important;font-weight:700!important;text-transform:uppercase!important;letter-spacing:.8px!important;color:rgba(255,107,43,.7)!important;font-family:'DM Sans',sans-serif!important;border-top:1px solid rgba(255,107,43,.15)!important;border-bottom:1px solid rgba(255,107,43,.08)!important}
+.comp-sep td:first-child{text-align:left!important}
+.delta-pos{color:#2ecc71}.delta-neg{color:#e74c3c}.delta-neu{color:rgba(255,255,255,.3)}
 </style>
 </head>
 <body>
@@ -155,6 +170,14 @@ tr:hover td{background:rgba(255,255,255,.025)}
   <div class="tab" onclick="showTab('semanal',this)">Semana a Semana</div>
   <div class="tab" onclick="showTab('mensal',this)">Mês a Mês</div>
   <div class="tab" onclick="showTab('debrief',this)">🏁 Debriefing</div>
+  <div class="tab" onclick="showTab('comparativo',this)">⚡ Comparativo</div>
+</div>
+
+<div class="edition-bar">
+  <span class="edition-label">🔥 Edição:</span>
+  <button class="edition-btn active" id="btn-edition-all" onclick="setEdition(null,this)">Todas</button>
+  <button class="edition-btn" id="btn-edition-A" onclick="setEdition('A',this)">União-A · Abril</button>
+  <button class="edition-btn" id="btn-edition-B" onclick="setEdition('B',this)">União-B · Maio</button>
 </div>
 
 <!-- MODAL DEBUG VENDAS -->
@@ -286,6 +309,11 @@ tr:hover td{background:rgba(255,255,255,.025)}
   <div id="debrief-content"></div>
 </div>
 
+<!-- COMPARATIVO -->
+<div id="tab-comparativo" class="content">
+  <div id="comparativo-content"></div>
+</div>
+
 <script>
 // ============ CONFIG ============
 const SHEET_ID = '1GvkAzmEHMob7R2PdAym_RZYnBj8wdcB1NJaM1CmuABQ';
@@ -323,6 +351,38 @@ const DEBRIEF_CONFIG = {
   prod2Bruto: 397,
   prod2Liquido: 381.15
 };
+
+// ============ EDIÇÕES (União-A, União-B, ...) ============
+const UNIAO_EDITIONS = {
+  A: {
+    label: 'União-A',
+    emoji: '🅰️',
+    dateFrom: null,        // será o minDate dos dados
+    dateTo: '2026-04-30',
+    color: '#ff6b2b',
+    debrief: {
+      picoPresenca: 32,
+      taxaImposto: 0.1382,
+      vendasUpsell: 3,   upsellBruto: 2997,  upsellLiquido: 2871.93,
+      vendasProd2:  2,   prod2Bruto:  397,   prod2Liquido:  381.15
+    }
+  },
+  B: {
+    label: 'União-B',
+    emoji: '🅱️',
+    dateFrom: '2026-05-01',
+    dateTo: null,          // será o maxDate dos dados
+    color: '#2ecc71',
+    debrief: {
+      picoPresenca: 0,
+      taxaImposto: 0.1382,
+      vendasUpsell: 0,   upsellBruto: 2997,  upsellLiquido: 2871.93,
+      vendasProd2:  0,   prod2Bruto:  397,   prod2Liquido:  381.15
+    }
+  }
+};
+
+let activeEdition = null; // null = todas as edições
 
 let DIAS=[], SEMANAL=[], MENSAL=[], CRIATIVOS=[], PUBLICOS=[], PAGINAS=[];
 let SALES=[]; // vendas globais do webhook para re-usar nos renders filtrados
@@ -824,14 +884,21 @@ async function init(){
 function initDatePickers(){
   const dates=DIAS.map(d=>d.data).sort();
   if(!dates.length)return;
-  // Extende o range para incluir datas de vendas do webhook (ex: venda hoje, gerenciador só tem ontem)
   const saleDates=SALES.filter(s=>s.data&&s.data.match(/^\d{4}-\d{2}-\d{2}$/)).map(s=>s.data);
   const allDates=[...dates,...saleDates].sort();
   const minDate=allDates[0];
   const maxDate=allDates[allDates.length-1];
-  document.getElementById('dateFrom').value=minDate;
-  document.getElementById('dateTo').value=maxDate;
-  dateFrom=minDate;dateTo=maxDate;updateRangeInfo();
+  // Se há edição ativa, respeita o range dela; senão usa tudo
+  if(activeEdition&&UNIAO_EDITIONS[activeEdition]){
+    const ed=UNIAO_EDITIONS[activeEdition];
+    dateFrom=ed.dateFrom||minDate;
+    dateTo=ed.dateTo||maxDate;
+  } else {
+    dateFrom=minDate;dateTo=maxDate;
+  }
+  document.getElementById('dateFrom').value=dateFrom;
+  document.getElementById('dateTo').value=dateTo;
+  updateRangeInfo();
 }
 function setPreset(days,btn){
   document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
@@ -843,9 +910,108 @@ function setPreset(days,btn){
 }
 function onDateChange(){
   document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+  // Se o usuário mudou as datas manualmente, sair do modo de edição
+  activeEdition=null;
+  document.querySelectorAll('.edition-btn').forEach(b=>b.classList.remove('active'));
+  const btnAll=document.getElementById('btn-edition-all');
+  if(btnAll)btnAll.classList.add('active');
   dateFrom=document.getElementById('dateFrom').value;dateTo=document.getElementById('dateTo').value;
-  pubPageFilter=0; // reset filtro de página ao mudar período
+  pubPageFilter=0;
   updateRangeInfo();renderAll();
+}
+
+// ============ EDITION FILTER ============
+function _allDataRange(){
+  const dates=DIAS.map(d=>d.data);
+  const saleDates=SALES.filter(s=>s.data&&s.data.match(/^\d{4}-\d{2}-\d{2}$/)).map(s=>s.data);
+  const all=[...dates,...saleDates].sort();
+  return{min:all[0]||'2026-01-01', max:all[all.length-1]||(new Date().toISOString().slice(0,10))};
+}
+
+function setEdition(id, el){
+  document.querySelectorAll('.edition-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  activeEdition=id;
+  const r=_allDataRange();
+  if(id===null){
+    // Todas: restaura o range completo
+    dateFrom=r.min; dateTo=r.max;
+  } else {
+    const ed=UNIAO_EDITIONS[id];
+    dateFrom=ed.dateFrom||r.min;
+    dateTo=ed.dateTo||r.max;
+    // Sincroniza o DEBRIEF_CONFIG com os dados da edição
+    Object.assign(DEBRIEF_CONFIG, ed.debrief);
+  }
+  document.getElementById('dateFrom').value=dateFrom;
+  document.getElementById('dateTo').value=dateTo;
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+  pubPageFilter=0;
+  updateRangeInfo();renderAll();
+}
+
+// ============ COMPUTE METRICS POR EDIÇÃO (sem alterar estado global) ============
+function computeEditionMetrics(id){
+  const ed=UNIAO_EDITIONS[id];
+  const r=_allDataRange();
+  const dF=ed.dateFrom||r.min;
+  const dT=ed.dateTo||r.max;
+
+  const dias=DIAS.filter(d=>d.data>=dF&&d.data<=dT);
+  const sales=SALES.filter(s=>{
+    if(!s.data)return true; // orgânica sem data: inclui sempre
+    return s.data>=dF&&s.data<=dT;
+  });
+  const tracked=sales.filter(s=>isTrackedSale(s));
+  const organic=sales.filter(s=>!isTrackedSale(s));
+
+  const inv=dias.reduce((s,d)=>s+d.inv,0);
+  const dc=ed.debrief;
+  const invImp=inv*(1+dc.taxaImposto);
+  const cliques=dias.reduce((s,d)=>s+d.cliques,0);
+  const pv=dias.reduce((s,d)=>s+d.pv,0);
+  const ck=dias.reduce((s,d)=>s+d.ck,0);
+  const imp=dias.reduce((s,d)=>s+d.imp,0);
+
+  const fatTotal=sales.reduce((s,v)=>s+v.valor,0);
+  const fatTraf=tracked.reduce((s,v)=>s+v.valor,0);
+  const fatOrg=organic.reduce((s,v)=>s+v.valor,0);
+
+  const totalVendas=sales.length;
+  const vendasTraf=tracked.length;
+  const vendasOrg=organic.length;
+
+  const ctr=imp>0?cliques/imp*100:0;
+  const connectRate=cliques>0?pv/cliques*100:0;
+  const taxaCk=pv>0?ck/pv*100:0;
+  const taxaCompra=pv>0?totalVendas/pv*100:0;
+  const cac=totalVendas>0?invImp/totalVendas:0;
+  const cacTraf=vendasTraf>0?invImp/vendasTraf:0;
+  const roasCapt=invImp>0?fatTotal/invImp:0;
+  const ticket=totalVendas>0?fatTotal/totalVendas:0;
+  const ticketTraf=vendasTraf>0?fatTraf/vendasTraf:0;
+
+  const liqIngressos=fatTotal;
+  const liqUpsell=dc.vendasUpsell*dc.upsellLiquido;
+  const liqProd2=dc.vendasProd2*dc.prod2Liquido;
+  const recLiq=liqIngressos+liqUpsell+liqProd2;
+  const ganhoLiq=recLiq-invImp;
+  const roasFinal=invImp>0?recLiq/invImp:0;
+  const cpm=imp>0?inv/imp*1000:0;
+  const cpc=cliques>0?inv/cliques:0;
+
+  return{
+    inv,invImp,cliques,pv,ck,imp,cpc,cpm,
+    fatTotal,fatTraf,fatOrg,
+    totalVendas,vendasTraf,vendasOrg,
+    ctr,connectRate,taxaCk,taxaCompra,
+    cac,cacTraf,roasCapt,ticket,ticketTraf,
+    liqUpsell,liqProd2,recLiq,ganhoLiq,roasFinal,
+    vendasUpsell:dc.vendasUpsell,vendasProd2:dc.vendasProd2,
+    picoPresenca:dc.picoPresenca,
+    pctPresenca:totalVendas>0?dc.picoPresenca/totalVendas*100:0,
+    hasData:dias.length>0||sales.length>0
+  };
 }
 function updateRangeInfo(){
   if(!dateFrom||!dateTo){document.getElementById('range-info').textContent='';return;}
@@ -875,6 +1041,7 @@ function renderAll(){
   renderKpiGeral(dias);
   renderCriativos();renderPublicos();renderPaginas();renderSemanal();renderMensal();
   renderDebriefing();
+  renderComparativo();
 }
 
 // ============ PAINEL VENDAS WEBHOOK ============
@@ -1723,6 +1890,175 @@ function renderDebriefing(){
     </div>
   </div>
   `;
+}
+
+// ============ COMPARATIVO ============
+function renderComparativo(){
+  const el=document.getElementById('comparativo-content');
+  if(!el)return;
+
+  const edKeys=Object.keys(UNIAO_EDITIONS);
+  const metrics=edKeys.map(id=>({id,ed:UNIAO_EDITIONS[id],m:computeEditionMetrics(id)}));
+
+  // Helper para delta entre A e B (quando houver exatamente 2 edições com dados)
+  function delta(valA,valB,lowerIsBetter){
+    if(!valA||!valB||valA===0)return'';
+    const d=((valB-valA)/Math.abs(valA))*100;
+    const up=d>0;
+    const better=lowerIsBetter?!up:up;
+    const sign=up?'▲':'▼';
+    const cls=better?'delta-pos':'delta-neg';
+    return`<span class="${cls}">${sign}${Math.abs(d).toFixed(1)}%</span>`;
+  }
+
+  function col(val,color){
+    return`<td style="color:${color||'#e8e6f0'};font-weight:${color?'700':'400'}">${val}</td>`;
+  }
+
+  function sep(label){
+    return`<tr class="comp-sep"><td colspan="${edKeys.length+2}">${label}</td></tr>`;
+  }
+
+  function row(label,vals,colors,fmt,lowerBetter,sub){
+    const hasDelta=vals.length===2&&vals[0]!=null&&vals[1]!=null;
+    const d=hasDelta?delta(vals[0],vals[1],lowerBetter):'';
+    const cells=vals.map((v,i)=>{
+      const display=v==null?'<span style="color:rgba(255,255,255,.2)">—</span>':fmt(v);
+      return`<td style="color:${colors&&colors[i]?colors[i]:'#e8e6f0'};font-weight:${colors&&colors[i]?'600':'400'}">${display}</td>`;
+    }).join('');
+    const labelHtml=`<td style="text-align:left;font-family:'DM Sans',sans-serif;color:rgba(255,255,255,.55);font-size:11px;padding:9px 9px 9px 20px">${label}${sub?`<div style="font-size:9px;color:rgba(255,255,255,.25);margin-top:1px">${sub}</div>`:''}</td>`;
+    return`<tr>${labelHtml}${cells}<td style="text-align:center;font-size:11px">${d}</td></tr>`;
+  }
+
+  // Cabeçalho de colunas
+  const thCols=edKeys.map(id=>{
+    const ed=UNIAO_EDITIONS[id];
+    const m=metrics.find(x=>x.id===id).m;
+    return`<th style="color:${ed.color};white-space:nowrap">${ed.emoji} ${ed.label}<div style="font-size:9px;color:rgba(255,255,255,.3);font-weight:400;margin-top:2px">${m.hasData?''+'Dados disponíveis':'Sem dados ainda'}</div></th>`;
+  }).join('');
+
+  const vals=key=>metrics.map(({m})=>m[key]);
+  const valsOr=key=>metrics.map(({m})=>m.hasData?m[key]:null);
+
+  const colors=(key,thresholdFn)=>metrics.map(({m})=>{
+    if(!m.hasData)return null;
+    return thresholdFn?thresholdFn(m[key]):null;
+  });
+
+  const greenIfPos=v=>v>0?'#2ecc71':v<0?'#e74c3c':'#e8e6f0';
+  const greenIfHigh=v=>v>=1?'#2ecc71':'#e74c3c';
+  const redAlways='#e74c3c';
+
+  el.innerHTML=`
+  <div style="margin-bottom:24px;background:linear-gradient(135deg,rgba(255,107,43,.1),rgba(255,107,43,.03));border:1px solid rgba(255,107,43,.2);border-radius:14px;padding:20px 24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px">
+    <div>
+      <div style="font-size:20px;font-weight:700;color:#ff6b2b;margin-bottom:4px">⚡ Comparativo de Edições</div>
+      <div style="font-size:12px;color:rgba(255,255,255,.4)">Funil completo · edição a edição · Gabi Bergo · Jamelli GT</div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      ${edKeys.map(id=>{const ed=UNIAO_EDITIONS[id];const m=metrics.find(x=>x.id===id).m;return`<div style="background:rgba(255,255,255,.04);border:1px solid ${ed.color}44;border-radius:8px;padding:10px 16px;text-align:center"><div style="font-size:11px;font-weight:700;color:${ed.color}">${ed.emoji} ${ed.label}</div><div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:3px">${m.hasData?m.totalVendas+' ingressos · '+brl(m.invImp)+' invest.':'Aguardando dados'}</div></div>`;}).join('')}
+    </div>
+  </div>
+
+  <div class="comp-table-wrap">
+    <table class="comp-table">
+      <thead><tr>
+        <th style="text-align:left;min-width:200px">Indicador</th>
+        ${thCols}
+        <th style="color:rgba(255,255,255,.3)">${edKeys.length===2?'Δ A→B':''}</th>
+      </tr></thead>
+      <tbody>
+        ${sep('📢 Tráfego')}
+        ${row('Investimento (c/ imposto)',valsOr('invImp'),metrics.map(x=>x.m.hasData?'#e74c3c':null),brl,true,'invest. bruto × 1,1382')}
+        ${row('Impressões',valsOr('imp'),null,v=>br(v,0),false)}
+        ${row('Cliques',valsOr('cliques'),null,v=>br(v,0),false)}
+        ${row('CPC',valsOr('cpc'),null,brl,true)}
+        ${row('CPM',valsOr('cpm'),null,brl,true)}
+        ${row('CTR',valsOr('ctr'),null,pct,false,'cliques ÷ impressões')}
+
+        ${sep('🛬 Funil de Conversão')}
+        ${row('PV — Landing Page Views',valsOr('pv'),null,v=>br(v,0),false)}
+        ${row('Connect Rate',valsOr('connectRate'),metrics.map(x=>x.m.hasData?(x.m.connectRate>=50?'#2ecc71':x.m.connectRate>=35?'#f1c40f':'#e74c3c'):null),pct,false,'PV ÷ cliques')}
+        ${row('CK — Iniciaram Checkout',valsOr('ck'),null,v=>br(v,0),false)}
+        ${row('Taxa CK',valsOr('taxaCk'),metrics.map(x=>x.m.hasData?(x.m.taxaCk>=8?'#2ecc71':x.m.taxaCk>=4?'#f1c40f':'#e74c3c'):null),pct,false,'CK ÷ PV · bench: 8–15%')}
+        ${row('Taxa Compra (ingressos)',valsOr('taxaCompra'),metrics.map(x=>x.m.hasData?(x.m.taxaCompra>=2?'#2ecc71':x.m.taxaCompra>=1?'#f1c40f':'#e74c3c'):null),pct,false,'compras ÷ PV')}
+
+        ${sep('🎟 Ingressos')}
+        ${row('Total de Ingressos',valsOr('totalVendas'),null,v=>br(v,0),false)}
+        ${row('└ Via Tráfego',valsOr('vendasTraf'),null,v=>br(v,0),false)}
+        ${row('└ Orgânicos',valsOr('vendasOrg'),null,v=>br(v,0),false)}
+        ${row('Faturamento Total',valsOr('fatTotal'),null,brl,false)}
+        ${row('Ticket Médio',valsOr('ticket'),null,brl,false)}
+
+        ${sep('🎯 Aquisição')}
+        ${row('CAC Total',valsOr('cac'),null,brl,true,'invest. ÷ total ingressos')}
+        ${row('CAC Tráfego',valsOr('cacTraf'),null,brl,true,'invest. ÷ ingressos tráfego')}
+        ${row('ROAS Captação',valsOr('roasCapt'),metrics.map(x=>x.m.hasData?greenIfHigh(x.m.roasCapt):null),v=>br(v,2)+'x',false,'fat. ingressos ÷ invest.')}
+
+        ${sep('🎤 Evento')}
+        ${row('Pico de Presença',edKeys.map(id=>UNIAO_EDITIONS[id].debrief.picoPresenca),null,v=>v+' pessoas',false)}
+        ${row('% Presença',edKeys.map(id=>{const m=metrics.find(x=>x.id===id).m;return m.hasData?m.pctPresenca:null;}),null,pct,false,'pico ÷ total ingressos')}
+        ${row('Vendas Upsell (2997)',edKeys.map(id=>UNIAO_EDITIONS[id].debrief.vendasUpsell),null,v=>br(v,0),false)}
+        ${row('Receita Líq. Upsell',valsOr('liqUpsell'),null,brl,false)}
+        ${row('Vendas Produto 397',edKeys.map(id=>UNIAO_EDITIONS[id].debrief.vendasProd2),null,v=>br(v,0),false)}
+        ${row('Receita Líq. Produto 397',valsOr('liqProd2'),null,brl,false)}
+
+        ${sep('💰 Resultado Final')}
+        ${row('Total Receita Líquida',valsOr('recLiq'),metrics.map(x=>x.m.hasData?'#2ecc71':null),brl,false,'ingressos + upsell + prod 397')}
+        ${row('ROAS Final',valsOr('roasFinal'),metrics.map(x=>x.m.hasData?greenIfHigh(x.m.roasFinal):null),v=>br(v,2)+'x',false,'receita líq. ÷ invest.')}
+        <tr style="background:rgba(46,204,113,.07);border-top:2px solid rgba(46,204,113,.3)">
+          <td style="padding:14px 20px;font-size:13px;font-weight:700;color:#2ecc71;font-family:'DM Sans',sans-serif;text-align:left">💰 Ganho Líquido Total</td>
+          ${metrics.map(({m})=>`<td style="padding:14px 16px;font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:${m.hasData?greenIfPos(m.ganhoLiq):'rgba(255,255,255,.2)'};text-align:center">${m.hasData?brl(m.ganhoLiq):'—'}</td>`).join('')}
+          <td style="text-align:center;padding:14px 16px">${metrics.length===2&&metrics[0].m.hasData&&metrics[1].m.hasData?delta(metrics[0].m.ganhoLiq,metrics[1].m.ganhoLiq,false):''}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  ${metrics.some(x=>x.m.hasData)?`
+  <div class="chart-grid-2x2" style="margin-top:24px">
+    <div class="chart-card"><h4>Funil de Volume (PV → CK → Compras)</h4><canvas id="chart-comp-funil"></canvas></div>
+    <div class="chart-card"><h4>Taxas de Conversão</h4><canvas id="chart-comp-taxas"></canvas></div>
+    <div class="chart-card"><h4>Resultado Financeiro</h4><canvas id="chart-comp-financ"></canvas></div>
+    <div class="chart-card"><h4>ROAS Captação vs Final</h4><canvas id="chart-comp-roas"></canvas></div>
+  </div>`:''}
+
+  <div style="margin-top:14px;font-size:10px;color:rgba(255,255,255,.2);line-height:1.7;padding:0 4px">
+    △ Δ A→B: variação percentual de A para B — verde=melhora, vermelho=piora · Benchmarks: Connect Rate ≥50% · Taxa CK ≥8% · ROAS Final ≥1x
+  </div>`;
+
+  // Charts comparativos
+  if(!metrics.some(x=>x.m.hasData))return;
+  const labels=edKeys.map(id=>UNIAO_EDITIONS[id].label);
+  const bgs=edKeys.map(id=>UNIAO_EDITIONS[id].color+'cc');
+
+  setTimeout(()=>{
+    destroyChart('chart-comp-funil');destroyChart('chart-comp-taxas');
+    destroyChart('chart-comp-financ');destroyChart('chart-comp-roas');
+
+    createChart('chart-comp-funil','bar',labels,[
+      {label:'PV',data:metrics.map(x=>x.m.pv),backgroundColor:'rgba(255,107,43,0.7)'},
+      {label:'CK',data:metrics.map(x=>x.m.ck),backgroundColor:'rgba(255,183,55,0.7)'},
+      {label:'Ingressos',data:metrics.map(x=>x.m.totalVendas),backgroundColor:'rgba(46,204,113,0.7)'}
+    ]);
+
+    createChart('chart-comp-taxas','bar',labels,[
+      {label:'CTR %',data:metrics.map(x=>x.m.ctr),backgroundColor:'rgba(255,107,43,0.8)'},
+      {label:'Connect Rate %',data:metrics.map(x=>x.m.connectRate),backgroundColor:'rgba(241,196,15,0.8)'},
+      {label:'Taxa CK %',data:metrics.map(x=>x.m.taxaCk),backgroundColor:'rgba(46,204,113,0.8)'}
+    ]);
+
+    createChart('chart-comp-financ','bar',labels,[
+      {label:'Invest. c/ Imp.',data:metrics.map(x=>x.m.invImp),backgroundColor:'rgba(231,76,60,0.75)'},
+      {label:'Fat. Ingressos',data:metrics.map(x=>x.m.fatTotal),backgroundColor:'rgba(255,107,43,0.75)'},
+      {label:'Receita Líq. Total',data:metrics.map(x=>x.m.recLiq),backgroundColor:'rgba(46,204,113,0.75)'}
+    ]);
+
+    createChart('chart-comp-roas','bar',labels,[
+      {label:'ROAS Captação',data:metrics.map(x=>x.m.roasCapt),backgroundColor:'rgba(255,107,43,0.8)'},
+      {label:'ROAS Final',data:metrics.map(x=>x.m.roasFinal),backgroundColor:'rgba(46,204,113,0.8)'}
+    ]);
+  },50);
 }
 
 // ============ INIT ============
