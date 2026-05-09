@@ -1777,126 +1777,107 @@ function createChart(id,type,labels,datasets){
   });
 }
 
-// ============ DEBRIEFING ============
+// ============ DEBRIEFING (lado a lado por edição) ============
 function renderDebriefing(){
   const el=document.getElementById('debrief-content');
   if(!el)return;
 
-  const invBruto=DIAS.reduce((s,d)=>s+d.inv,0);
-  const invComImposto=invBruto*(1+DEBRIEF_CONFIG.taxaImposto);
+  const edKeys=Object.keys(UNIAO_EDITIONS);
+  const eds=edKeys.map(id=>({id,ed:UNIAO_EDITIONS[id],m:computeEditionMetrics(id)}));
 
-  const allSales=SALES;
-  const orgSales=allSales.filter(s=>!isTrackedSale(s));
-  const trafSales=allSales.filter(s=>isTrackedSale(s));
-  const totalVendas=allSales.length;
-  const vendasOrg=orgSales.length;
-  const vendasTraf=trafSales.length;
-
-  const fatTotal=allSales.reduce((s,x)=>s+x.valor,0);
-  const fatOrg=orgSales.reduce((s,x)=>s+x.valor,0);
-  const fatTraf=trafSales.reduce((s,x)=>s+x.valor,0);
-
-  const pico=DEBRIEF_CONFIG.picoPresenca;
-  const pctPresenca=totalVendas>0?pico/totalVendas*100:0;
-
-  const cacTotal=totalVendas>0?invComImposto/totalVendas:0;
-  const cacTraf=vendasTraf>0?invComImposto/vendasTraf:0;
-
-  const roasCaptTotal=invComImposto>0?fatTotal/invComImposto:0;
-  const roasCaptTraf=invComImposto>0?fatTraf/invComImposto:0;
-
-  const ticketTotal=totalVendas>0?fatTotal/totalVendas:0;
-  const ticketTraf=vendasTraf>0?fatTraf/vendasTraf:0;
-
-  const upsell=DEBRIEF_CONFIG.vendasUpsell;
-  const prod2=DEBRIEF_CONFIG.vendasProd2;
-  const pctUpsell=totalVendas>0?upsell/totalVendas*100:0;
-
-  // Receita líquida final
-  const liqIngressos=fatTotal; // valores já vêm da planilha
-  const liqUpsell=upsell*DEBRIEF_CONFIG.upsellLiquido;
-  const liqProd2=prod2*DEBRIEF_CONFIG.prod2Liquido;
-  const receitaLiqTotal=liqIngressos+liqUpsell+liqProd2;
-  const ganhoLiquido=receitaLiqTotal-invComImposto;
-  const roasFinal=invComImposto>0?receitaLiqTotal/invComImposto:0;
-
-  // Helper: linha da tabela
-  function row(label,val,color,sub,bold){
-    return`<tr style="${bold?'border-top:1px solid rgba(255,255,255,.1)':''}">
-      <td style="padding:13px 20px;font-size:12px;color:rgba(255,255,255,.6);font-family:'DM Sans',sans-serif;${bold?'font-weight:700;color:#e8e6f0':''}">${label}${sub?`<div style="font-size:10px;color:rgba(255,255,255,.3);margin-top:2px;font-weight:400">${sub}</div>`:''}</td>
-      <td style="padding:13px 20px;font-family:'DM Mono',monospace;font-size:${bold?'17':'14'}px;font-weight:${bold?700:500};color:${color||'#e8e6f0'};text-align:right;white-space:nowrap">${val}</td>
-    </tr>`;
+  // Helpers de célula
+  function tdLabel(label,sub){
+    return`<td style="padding:11px 18px;font-size:12px;color:rgba(255,255,255,.55);font-family:'DM Sans',sans-serif;border-right:1px solid rgba(255,255,255,.04);min-width:180px">${label}${sub?`<div style="font-size:9px;color:rgba(255,255,255,.25);margin-top:1px">${sub}</div>`:''}</td>`;
   }
-  function rowSep(label){
-    return`<tr><td colspan="2" style="padding:8px 20px 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,107,43,.7);background:rgba(255,107,43,.05);border-top:1px solid rgba(255,107,43,.15);border-bottom:1px solid rgba(255,107,43,.08)">${label}</td></tr>`;
+  function tdVal(val,color,big,noData){
+    const c=noData?'rgba(255,255,255,.15)':(color||'#e8e6f0');
+    return`<td style="padding:11px 18px;font-family:'DM Mono',monospace;font-size:${big?'16':'13'}px;font-weight:${big?700:500};color:${c};text-align:center;border-right:1px solid rgba(255,255,255,.04)">${noData?'—':val}</td>`;
   }
+  function sep(label){
+    const span=edKeys.length+1;
+    return`<tr><td colspan="${span}" style="padding:7px 18px 4px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.9px;color:rgba(255,107,43,.7);background:rgba(255,107,43,.05);border-top:1px solid rgba(255,107,43,.14);border-bottom:1px solid rgba(255,107,43,.07)">${label}</td></tr>`;
+  }
+  function row(label,sub,vals){
+    // vals = [{val, color, big}]
+    return`<tr>${tdLabel(label,sub)}${vals.map((v,i)=>tdVal(v.val,v.color,v.big,!eds[i].m.hasData&&v.requireData)).join('')}</tr>`;
+  }
+
+  // Pico de presença editável por edição
+  const picoInputs=eds.map(({id,ed})=>`
+    <div style="text-align:center">
+      <div style="font-size:9px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Pico Presença</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:4px">
+        <input type="number" value="${ed.debrief.picoPresenca}" min="0"
+          style="width:52px;background:rgba(255,255,255,.07);border:1px solid rgba(255,107,43,.25);color:#ff6b2b;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;border-radius:5px;padding:3px 6px;text-align:center;outline:none"
+          oninput="UNIAO_EDITIONS['${id}'].debrief.picoPresenca=parseInt(this.value)||0;renderDebriefing()">
+        <span style="font-size:9px;color:rgba(255,255,255,.25)">pess.</span>
+      </div>
+    </div>`).join('');
+
+  // Cabeçalhos de coluna
+  const thCols=eds.map(({id,ed,m})=>`
+    <th style="padding:14px 18px;text-align:center;border-bottom:1px solid rgba(255,255,255,.08);border-right:1px solid rgba(255,255,255,.04)">
+      <div style="font-size:13px;font-weight:700;color:${ed.color}">${ed.emoji} ${ed.label}</div>
+      <div style="font-size:9px;color:rgba(255,255,255,.3);margin-top:2px">${m.hasData?m.totalVendas+' ingressos':'Aguardando dados'}</div>
+    </th>`).join('');
 
   el.innerHTML=`
-  <div style="background:linear-gradient(135deg,rgba(255,107,43,.12),rgba(255,107,43,.04));border:1px solid rgba(255,107,43,.2);border-radius:14px;padding:22px 28px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px">
+  <div style="background:linear-gradient(135deg,rgba(255,107,43,.1),rgba(255,107,43,.03));border:1px solid rgba(255,107,43,.2);border-radius:14px;padding:18px 24px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px">
     <div>
-      <div style="font-size:20px;font-weight:700;color:#ff6b2b;margin-bottom:4px">🏁 Debriefing — União em Chama</div>
-      <div style="font-size:12px;color:rgba(255,255,255,.5)">Análise completa do lançamento mensal · Gabi Bergo · 2026</div>
+      <div style="font-size:20px;font-weight:700;color:#ff6b2b;margin-bottom:3px">🏁 Debriefing — União em Chama</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.4)">Análise edição a edição · Gabi Bergo · 2026</div>
     </div>
-    <div style="display:flex;gap:20px;flex-wrap:wrap">
-      <div>
-        <div style="font-size:10px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Pico de Presença</div>
-        <div style="display:flex;align-items:center;gap:6px">
-          <input type="number" value="${DEBRIEF_CONFIG.picoPresenca}" min="0"
-            style="width:58px;background:rgba(255,255,255,.08);border:1px solid rgba(255,107,43,.3);color:#ff6b2b;font-family:'DM Mono',monospace;font-size:17px;font-weight:700;border-radius:6px;padding:4px 8px;text-align:center;outline:none"
-            oninput="DEBRIEF_CONFIG.picoPresenca=parseInt(this.value)||0;renderDebriefing()">
-          <span style="font-size:11px;color:rgba(255,255,255,.3)">pessoas</span>
-        </div>
-      </div>
-    </div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap">${picoInputs}</div>
   </div>
 
-  <div style="max-width:640px;margin:0 auto">
-    <div style="background:#12121f;border:1px solid rgba(255,255,255,.08);border-radius:12px;overflow:hidden">
-      <table style="width:100%;border-collapse:collapse">
-        <tbody>
-          ${rowSep('📦 Ingressos')}
-          ${row('Total de Ingressos',totalVendas,'#ff6b2b')}
-          ${row('└ Orgânicos',vendasOrg,'#f1c40f',`${brl(fatOrg)} faturado`)}
-          ${row('└ Tráfego',vendasTraf,'#2ecc71',`${brl(fatTraf)} faturado`)}
+  <div style="overflow-x:auto;border-radius:12px;border:1px solid rgba(255,255,255,.07)">
+    <table style="width:100%;border-collapse:collapse;background:#12121f">
+      <thead>
+        <tr>
+          <th style="padding:14px 18px;text-align:left;color:rgba(255,255,255,.3);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid rgba(255,255,255,.08);border-right:1px solid rgba(255,255,255,.04)">Indicador</th>
+          ${thCols}
+        </tr>
+      </thead>
+      <tbody>
+        ${sep('📦 Ingressos')}
+        ${row('Total de Ingressos',null,eds.map(({m})=>({val:br(m.totalVendas,0),color:'#ff6b2b',big:true,requireData:true})))}
+        ${row('└ Orgânicos','fat. orgânico',eds.map(({m})=>({val:br(m.vendasOrg,0)+' · '+brl(m.fatOrg),color:'#f1c40f',requireData:true})))}
+        ${row('└ Tráfego','fat. tráfego',eds.map(({m})=>({val:br(m.vendasTraf,0)+' · '+brl(m.fatTraf),color:'#2ecc71',requireData:true})))}
 
-          ${rowSep('💸 Investimento')}
-          ${row('Total Investido c/ Imposto*',brl(invComImposto),'#e74c3c',`Bruto ${brl(invBruto)} + 13,82%`)}
+        ${sep('💸 Investimento')}
+        ${row('Total c/ Imposto (13,82%)','invest. bruto × 1,1382',eds.map(({m})=>({val:brl(m.invImp),color:'#e74c3c',requireData:true})))}
 
-          ${rowSep('🎯 Aquisição')}
-          ${row('CAC Total',brl(cacTotal),'#e8e6f0','Invest. ÷ todos os ingressos')}
-          ${row('CAC Tráfego',brl(cacTraf),'#e8e6f0','Invest. ÷ ingressos tráfego')}
-          ${row('ROAS Captação Total',br(roasCaptTotal,2)+'x','#ff6b2b','Fat. ingressos ÷ invest.')}
-          ${row('ROAS Captação Tráfego',br(roasCaptTraf,2)+'x','#ff9a3c','Fat. tráfego ÷ invest.')}
-          ${row('Ticket Médio Total',brl(ticketTotal),'#e8e6f0')}
-          ${row('Ticket Médio Tráfego',brl(ticketTraf),'#e8e6f0')}
+        ${sep('🎯 Aquisição')}
+        ${row('CAC Total','invest. ÷ todos ingressos',eds.map(({m})=>({val:brl(m.cac),requireData:true})))}
+        ${row('CAC Tráfego','invest. ÷ ingressos tráfego',eds.map(({m})=>({val:brl(m.cacTraf),requireData:true})))}
+        ${row('ROAS Captação Total','fat. ingressos ÷ invest.',eds.map(({m})=>({val:br(m.roasCapt,2)+'x',color:m.roasCapt>=1?'#2ecc71':'#ff6b2b',requireData:true})))}
+        ${row('Ticket Médio',null,eds.map(({m})=>({val:brl(m.ticket),requireData:true})))}
 
-          ${rowSep('🎤 Evento')}
-          ${row('Pico de Presença',pico+' pessoas','#f1c40f')}
-          ${row('% de Presença',pct(pctPresenca),'#f1c40f',`${pico} ÷ ${totalVendas} ingressos`)}
-          ${row('Vendas Upsell (R$ 2.997)',upsell,'#2ecc71',`Líq. ${brl(liqUpsell)}`)}
-          ${row('Vendas Produto (R$ 397)',prod2,'#2ecc71',`Líq. ${brl(liqProd2)}`)}
-          ${row('% Conversão Upsell 2997',pct(pctUpsell),'#2ecc71',`${upsell} vendas ÷ ${totalVendas} ingressos`)}
+        ${sep('🎤 Evento')}
+        ${row('Pico de Presença',null,eds.map(({id,ed,m})=>({val:ed.debrief.picoPresenca+' pess.',color:'#f1c40f'})))}
+        ${row('% Presença','pico ÷ total ingressos',eds.map(({id,ed,m})=>({val:pct(m.totalVendas>0?ed.debrief.picoPresenca/m.totalVendas*100:0),color:'#f1c40f',requireData:true})))}
+        ${row('Vendas Upsell (2997)',null,eds.map(({ed,m})=>({val:br(ed.debrief.vendasUpsell,0),color:'#2ecc71'})))}
+        ${row('Vendas Produto (397)',null,eds.map(({ed})=>({val:br(ed.debrief.vendasProd2,0),color:'#2ecc71'})))}
+        ${row('% Conv. Upsell 2997','upsell ÷ total ingressos',eds.map(({ed,m})=>({val:pct(m.totalVendas>0?ed.debrief.vendasUpsell/m.totalVendas*100:0),color:'#2ecc71',requireData:true})))}
 
-          ${rowSep('💰 Resultado Final')}
-          ${row('Receita Líq. Ingressos',brl(liqIngressos),'#e8e6f0',`${totalVendas} ingressos (valor da planilha)`)}
-          ${row('Receita Líq. Upsell 2997',brl(liqUpsell),'#e8e6f0',`${upsell} × ${brl(DEBRIEF_CONFIG.upsellLiquido)}`)}
-          ${row('Receita Líq. Produto 397',brl(liqProd2),'#e8e6f0',`${prod2} × ${brl(DEBRIEF_CONFIG.prod2Liquido)}`)}
-          ${row('Total Receita Líquida',brl(receitaLiqTotal),'#2ecc71')}
-          ${row('Investimento c/ Imposto','− '+brl(invComImposto),'#e74c3c')}
-          ${row('ROAS Final',br(roasFinal,2)+'x',roasFinal>=1?'#2ecc71':'#e74c3c','Receita líq. total ÷ invest.',true)}
+        ${sep('💰 Resultado Final')}
+        ${row('Receita Líq. Ingressos',null,eds.map(({m})=>({val:brl(m.fatTotal),requireData:true})))}
+        ${row('Receita Líq. Upsell 2997',null,eds.map(({ed,m})=>({val:brl(ed.debrief.vendasUpsell*ed.debrief.upsellLiquido)})))}
+        ${row('Receita Líq. Produto 397',null,eds.map(({ed})=>({val:brl(ed.debrief.vendasProd2*ed.debrief.prod2Liquido)})))}
+        ${row('Total Receita Líquida',null,eds.map(({m})=>({val:brl(m.recLiq),color:'#2ecc71',big:true,requireData:true})))}
+        ${row('Investimento c/ Imposto (−)',null,eds.map(({m})=>({val:'− '+brl(m.invImp),color:'#e74c3c',requireData:true})))}
+        ${row('ROAS Final','receita líq. ÷ invest.',eds.map(({m})=>({val:br(m.roasFinal,2)+'x',color:m.roasFinal>=1?'#2ecc71':'#e74c3c',requireData:true})))}
 
-          <tr style="background:rgba(46,204,113,${ganhoLiquido>=0?'.1':'.05'});border-top:2px solid rgba(46,204,113,.4)">
-            <td style="padding:18px 20px;font-size:14px;font-weight:700;color:#2ecc71;font-family:'DM Sans',sans-serif">💰 Ganho Líquido Total</td>
-            <td style="padding:18px 20px;font-family:'DM Mono',monospace;font-size:22px;font-weight:700;color:${ganhoLiquido>=0?'#2ecc71':'#e74c3c'};text-align:right">${brl(ganhoLiquido)}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <div style="margin-top:12px;font-size:10px;color:rgba(255,255,255,.25);line-height:1.7;padding:0 4px">
-      * Investimento com imposto = bruto do Gerenciador × 1,1382 · Receita de ingressos = valores reais da planilha Webhook · Upsell e produto 397 são valores fixos configurados no código.
-    </div>
+        <tr style="background:rgba(46,204,113,.08);border-top:2px solid rgba(46,204,113,.3)">
+          <td style="padding:16px 18px;font-size:13px;font-weight:700;color:#2ecc71;font-family:'DM Sans',sans-serif;border-right:1px solid rgba(255,255,255,.04)">💰 Ganho Líquido Total</td>
+          ${eds.map(({m})=>`<td style="padding:16px 18px;font-family:'DM Mono',monospace;font-size:20px;font-weight:700;color:${!m.hasData?'rgba(255,255,255,.15)':m.ganhoLiq>=0?'#2ecc71':'#e74c3c'};text-align:center;border-right:1px solid rgba(255,255,255,.04)">${m.hasData?brl(m.ganhoLiq):'—'}</td>`).join('')}
+        </tr>
+      </tbody>
+    </table>
   </div>
-  `;
+  <div style="margin-top:10px;font-size:10px;color:rgba(255,255,255,.2);line-height:1.7;padding:0 4px">
+    * Invest. c/ imposto = bruto × 1,1382 · Receita de ingressos = valores reais do Webhook · Upsell e produto 397 = valores fixos por edição · Pico de presença editável acima.
+  </div>`;
 }
 
 // ============ COMPARATIVO ============
