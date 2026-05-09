@@ -500,7 +500,7 @@ async function loadData(){
       }
 
       // Valor já em reais (não centavos) no formato antigo
-      const val=pNum(r[W_COL.paidValue])||pNum(r[W_COL.priceValue]);
+      const val=pNum(r[W_COL.priceValue])||pNum(r[W_COL.paidValue]); // priceValue = preço do produto sem juros de parcelamento
       // No Kiwify: utm_medium = nome da campanha (com "Pag X"), utm_campaign = adset
       const utmCampanha=r[W_COL.utmMedium]||'';   // ex: "[JGT] ... Pag 1 VIDEOS"
       const utmAdset=r[W_COL.utmCampaign]||'';    // ex: "ADV - MULHERES 30 A 50 a"
@@ -691,7 +691,7 @@ async function init(){
       }
 
       // Valor já em reais no formato antigo Kiwify (não centavos)
-      const val=pNum(r[W_COL.paidValue])||pNum(r[W_COL.priceValue]);
+      const val=pNum(r[W_COL.priceValue])||pNum(r[W_COL.paidValue]); // priceValue = preço do produto sem juros de parcelamento
       // No Kiwify: utm_medium = nome da campanha (com "Pag X"), utm_campaign = adset
       const utmCampanha=r[W_COL.utmMedium]||'';   // ex: "[JGT] ... Pag 1 VIDEOS"
       const utmAdset=r[W_COL.utmCampaign]||'';    // ex: "ADV - MULHERES 30 A 50 a"
@@ -750,6 +750,46 @@ async function init(){
         const pg=pageMap[pk];pg.inv+=inv;pg.cliques+=cliq;pg.imp+=imp;pg.pv+=pv;pg.ck+=ck;
       }
     }
+
+    // ---- LOOKUP: ad+data → melhor página estimada (via gasto) ----
+    // Para vendas "somente código": utm_content chegou mas utm_medium/utm_campaign não.
+    // Cruzamos com o Gerenciador: no dia da venda, qual página teve mais gasto com aquele criativo?
+    const adDatePageSpend={}; // adDatePageSpend[adName][date][pageNum] = spend
+    RAW_ROWS.forEach(row=>{
+      if(!row.ad||row.pageNum<1)return;
+      const key=row.ad;
+      if(!adDatePageSpend[key])adDatePageSpend[key]={};
+      if(!adDatePageSpend[key][row.data])adDatePageSpend[key][row.data]={};
+      adDatePageSpend[key][row.data][row.pageNum]=(adDatePageSpend[key][row.data][row.pageNum]||0)+row.inv;
+    });
+
+    // Enriquecer vendas parciais (tem content, sem campaign/adset)
+    sales.forEach(s=>{
+      const hasContent=!!(s.content||'').trim();
+      const hasPage=!!(s.campaign||'').trim();
+      const hasAdset=!!(s.adset||'').trim();
+      if(hasContent&&!hasPage&&!hasAdset&&s.data){
+        // Busca o dia da venda no Gerenciador para aquele criativo
+        const dayMap=(adDatePageSpend[s.content.trim()]||{})[s.data]||null;
+        if(dayMap){
+          // Pega a página com maior gasto naquele dia
+          let bestPage=0,bestSpend=-1;
+          Object.entries(dayMap).forEach(([pg,sp])=>{if(sp>bestSpend){bestSpend=sp;bestPage=+pg;}});
+          if(bestPage>0){
+            s.estimatedPage=bestPage;
+            console.log(`[Atrib. estimada] ${s.nome} | ${s.content} | ${s.data} → Pág ${bestPage} (R$${bestSpend.toFixed(2)} gasto)`);
+          }
+        }
+        // Também infere o público (adset) mais provável para aquele criativo naquele dia
+        const adsetSpend={};
+        RAW_ROWS.forEach(row=>{
+          if(row.ad!==s.content.trim()||row.data!==s.data||!row.adset)return;
+          adsetSpend[row.adset]=(adsetSpend[row.adset]||0)+row.inv;
+        });
+        const bestAdset=Object.entries(adsetSpend).sort((a,b)=>b[1]-a[1])[0];
+        if(bestAdset)s.estimatedAdset=bestAdset[0];
+      }
+    });
 
     // Salva vendas globalmente para re-usar nos renders filtrados
     SALES = sales;
@@ -1079,6 +1119,7 @@ function renderWebhookSalesPanel(){
         <div>
           <div style="font-size:13px;font-weight:600;color:#ff9a3c">Vendas no Período (${fSales.length})</div>
           <div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px">${SALES.length} total · ${brl(totalFat)} faturamento total · ← arraste para ver mais</div>
+          <div style="font-size:10px;margin-top:4px;display:flex;gap:8px;flex-wrap:wrap">${(()=>{const f=fSales.filter(s=>{const hc=!!(s.content||'').trim(),hp=!!(s.campaign||'').trim(),ha=!!(s.adset||'').trim();return hc&&(hp||ha);});const p=fSales.filter(s=>{const hc=!!(s.content||'').trim(),hp=!!(s.campaign||'').trim(),ha=!!(s.adset||'').trim();return hc&&!hp&&!ha;});const o=fSales.filter(s=>!isTrackedSale(s));return`<span style="color:#2ecc71">✅ ${f.length} completas</span><span style="color:#ff9a3c">🎯 ${p.length} só código</span><span style="color:#f1c40f">⭐ ${o.length} orgânicas</span>`;})()}</div>
         </div>
       </div>
       <button onclick="openDebugModal()" style="background:rgba(255,107,43,.12);border:1px solid rgba(255,107,43,.3);color:#ff9a3c;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:11px;font-family:'DM Sans',sans-serif">Ver detalhes →</button>
@@ -1087,20 +1128,32 @@ function renderWebhookSalesPanel(){
     ${sortedSales.map(s=>{
       const st=getSalesStatus(s);
       const tracked=isTrackedSale(s);
-      const color=!tracked?'rgba(241,196,15,.1)':'rgba(46,204,113,.2)';
-      const border=!tracked?'rgba(241,196,15,.3)':'rgba(46,204,113,.4)';
-      const icon=!tracked?'⭐':'✅';
+      // Partial = tem código de criativo mas sem página/público
+      const hasContent=!!(s.content||'').trim();
+      const hasPage=!!(s.campaign||'').trim();
+      const hasAdset=!!(s.adset||'').trim();
+      const partial=tracked&&hasContent&&!hasPage&&!hasAdset;
+      const full=tracked&&(hasPage||hasAdset);
+      // Cores: verde=completo, laranja=parcial(só código), amarelo=orgânica
+      const color=full?'rgba(46,204,113,.2)':partial?'rgba(255,107,43,.12)':'rgba(241,196,15,.1)';
+      const border=full?'rgba(46,204,113,.4)':partial?'rgba(255,107,43,.35)':'rgba(241,196,15,.3)';
+      const icon=full?'✅':partial?'🎯':'⭐';
       return`<div style="flex-shrink:0;width:210px;background:${color};border:1px solid ${border};border-radius:8px;padding:10px 12px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
           <div style="font-size:11px;font-weight:600;color:#e8e6f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px">${icon} ${s.nome||'Sem nome'}</div>
           <div style="font-size:13px;font-weight:700;color:#2ecc71;font-family:'DM Mono',monospace;flex-shrink:0">${brl(s.valor)}</div>
         </div>
         <div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:4px">📅 ${s.data||'<span style="color:#e74c3c">sem data</span>'}</div>
-        ${tracked?`
+        ${full?`
         <div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:2px">🎨 <span style="color:#2ecc71">${s.content||'—'}</span></div>
         <div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:2px">👥 <span style="color:#2ecc71">${s.adset?s.adset.slice(0,30)+(s.adset.length>30?'…':''):'—'}</span></div>
         <div style="font-size:10px;color:rgba(255,255,255,.45)">📄 <span style="color:#2ecc71">${st.pagMatch?'Pág '+extractPage(s.campaign||''):s.campaign?s.campaign.slice(0,20):'—'}</span></div>
-        `:`<div style="font-size:10px;color:rgba(241,196,15,.7);margin-top:4px">⭐ Venda orgânica</div>`}
+        `:partial?`
+        <div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:2px">🎨 <span style="color:#ff9a3c;font-weight:600">${s.content}</span></div>
+        <div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:2px">👥 <span style="color:${s.estimatedAdset?'#ff9a3c':'rgba(255,255,255,.3)'}">${s.estimatedAdset?s.estimatedAdset.slice(0,28)+(s.estimatedAdset.length>28?'…':''):'Público: n/d'}</span></div>
+        <div style="font-size:10px;color:rgba(255,255,255,.45)">📄 <span style="color:${s.estimatedPage?'#ff9a3c':'rgba(255,255,255,.3)'}">${s.estimatedPage?'~Pág '+s.estimatedPage+' (estimada)':'Pág: n/d'}</span></div>
+        <div style="font-size:9px;color:rgba(255,107,43,.5);margin-top:4px">🔍 Inferido via gasto do Gerenciador</div>
+        `:`<div style="font-size:10px;color:rgba(241,196,15,.7);margin-top:4px">⭐ Venda orgânica (sem UTM)</div>`}
       </div>`;
     }).join('')}
     ${sortedSales.length===0?'<div style="color:rgba(255,255,255,.3);font-size:12px;padding:10px">Nenhuma venda no período</div>':''}
@@ -1135,6 +1188,8 @@ function openDebugModal(){
         <th style="padding:8px 10px;text-align:center;color:rgba(255,255,255,.4);border-bottom:1px solid rgba(255,255,255,.07)">Cri</th>
         <th style="padding:8px 10px;text-align:center;color:rgba(255,255,255,.4);border-bottom:1px solid rgba(255,255,255,.07)">Pub</th>
         <th style="padding:8px 10px;text-align:center;color:rgba(255,255,255,.4);border-bottom:1px solid rgba(255,255,255,.07)">Pag</th>
+        <th style="padding:8px 10px;text-align:center;color:rgba(255,107,43,.5);border-bottom:1px solid rgba(255,255,255,.07)">Pág inf.</th>
+        <th style="padding:8px 10px;text-align:left;color:rgba(255,107,43,.5);border-bottom:1px solid rgba(255,255,255,.07)">Público inf.</th>
       </tr></thead>
       <tbody>${SALES.map(s=>{
         const criMatch=allCriNames.some(n=>n.trim()===s.content.trim());
@@ -1151,11 +1206,16 @@ function openDebugModal(){
           <td style="padding:7px 10px;text-align:center">${s.content?criMatch?'✅':'❌':'➖'}</td>
           <td style="padding:7px 10px;text-align:center">${s.adset?pubMatch?'✅':'⚠️':'➖'}</td>
           <td style="padding:7px 10px;text-align:center">${s.campaign?pagMatch?'✅ Pág '+pg:'⚠️':'➖'}</td>
+          <td style="padding:7px 10px;text-align:center;color:#ff9a3c;font-size:10px">${s.estimatedPage?'~Pág '+s.estimatedPage:'—'}</td>
+          <td style="padding:7px 10px;font-size:10px;color:#ff9a3c;max-width:160px;word-break:break-all">${s.estimatedAdset?s.estimatedAdset.slice(0,30):'—'}</td>
         </tr>`;
       }).join('')}</tbody>
     </table></div>
     <div style="margin-top:12px;padding:10px;background:rgba(255,255,255,.03);border-radius:6px;font-size:10px;color:rgba(255,255,255,.4)">
       ✅ Verde = match encontrado · ❌ Vermelho = utm preenchido mas nome não bate com gerenciador · ⚠️ Amarelo = nome diferente · ➖ Campo vazio
+      <div style="margin-top:8px;border-top:1px solid rgba(255,255,255,.07);padding-top:8px">
+        🎯 <b style="color:#ff9a3c">Somente código</b>: venda veio com utm_content (criativo) mas sem página/público. O mesmo criativo rodou em múltiplas páginas (Pag 1, 2, 4…) e públicos simultaneamente, portanto <b>página e público são indetermináveis</b> sem cruzamento manual com a Kiwify ou Meta Events Manager.
+      </div>
     </div>`;
   modal.style.display='block';
 }
@@ -1944,7 +2004,7 @@ function renderComparativo(){
       <div style="font-size:12px;color:rgba(255,255,255,.4)">Funil completo · edição a edição · Gabi Bergo · Jamelli GT</div>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
-      ${edKeys.map(id=>{const ed=UNIAO_EDITIONS[id];const m=metrics.find(x=>x.id===id).m;return`<div style="background:rgba(255,255,255,.04);border:1px solid ${ed.color}44;border-radius:8px;padding:10px 16px;text-align:center"><div style="font-size:11px;font-weight:700;color:${ed.color}">${ed.emoji} ${ed.label}</div><div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:3px">${m.hasData?m.totalVendas+' ingressos · '+brl(m.invImp)+' invest.':'Aguardando dados'}</div></div>`;}).join('')}
+      ${edKeys.map(id=>{const ed=UNIAO_EDITIONS[id];const m=metrics.find(x=>x.id===id).m;return`<div style="background:rgba(255,255,255,.04);border:1px solid ${ed.color}44;border-radius:8px;padding:10px 16px;text-align:center"><div style="font-size:11px;font-weight:700;color:${ed.color}">${ed.emoji} ${ed.label}</div><div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:3px">${m.hasData?m.vendasTraf+' ing. tráfego · '+brl(m.invImp)+' invest.':'Aguardando dados'}</div></div>`;}).join('')}
     </div>
   </div>
 
@@ -1971,17 +2031,15 @@ function renderComparativo(){
         ${row('Taxa CK',valsOr('taxaCk'),metrics.map(x=>x.m.hasData?(x.m.taxaCk>=8?'#2ecc71':x.m.taxaCk>=4?'#f1c40f':'#e74c3c'):null),pct,false,'CK ÷ PV · bench: 8–15%')}
         ${row('Taxa Compra (ingressos)',valsOr('taxaCompra'),metrics.map(x=>x.m.hasData?(x.m.taxaCompra>=2?'#2ecc71':x.m.taxaCompra>=1?'#f1c40f':'#e74c3c'):null),pct,false,'compras ÷ PV')}
 
-        ${sep('🎟 Ingressos')}
-        ${row('Total de Ingressos',valsOr('totalVendas'),null,v=>br(v,0),false)}
-        ${row('└ Via Tráfego',valsOr('vendasTraf'),null,v=>br(v,0),false)}
-        ${row('└ Orgânicos',valsOr('vendasOrg'),null,v=>br(v,0),false)}
-        ${row('Faturamento Total',valsOr('fatTotal'),null,brl,false)}
-        ${row('Ticket Médio',valsOr('ticket'),null,brl,false)}
+        ${sep('🎟 Ingressos via Tráfego')}
+        ${row('Ingressos (Tráfego)',valsOr('vendasTraf'),metrics.map(x=>x.m.hasData?'#2ecc71':null),v=>br(v,0),false,'somente vendas rastreadas')}
+        ${row('└ Orgânicos (info)',valsOr('vendasOrg'),null,v=>br(v,0),false,'não entram nas métricas abaixo')}
+        ${row('Faturamento Tráfego',valsOr('fatTraf'),metrics.map(x=>x.m.hasData?'#2ecc71':null),brl,false,'receita somente de vendas rastreadas')}
+        ${row('Ticket Médio (Tráfego)',valsOr('ticketTraf'),null,brl,false,'fat. tráfego ÷ ingressos tráfego')}
 
         ${sep('🎯 Aquisição')}
-        ${row('CAC Total',valsOr('cac'),null,brl,true,'invest. ÷ total ingressos')}
         ${row('CAC Tráfego',valsOr('cacTraf'),null,brl,true,'invest. ÷ ingressos tráfego')}
-        ${row('ROAS Captação',valsOr('roasCapt'),metrics.map(x=>x.m.hasData?greenIfHigh(x.m.roasCapt):null),v=>br(v,2)+'x',false,'fat. ingressos ÷ invest.')}
+        ${row('ROAS Captação (Tráfego)',metrics.map(({m})=>m.hasData&&m.invImp>0?m.fatTraf/m.invImp:null),metrics.map(x=>x.m.hasData?(x.m.invImp>0&&x.m.fatTraf/x.m.invImp>=1?'#2ecc71':'#e74c3c'):null),v=>br(v,2)+'x',false,'fat. tráfego ÷ invest.')}
 
         ${sep('🎤 Evento')}
         ${row('Pico de Presença',edKeys.map(id=>UNIAO_EDITIONS[id].debrief.picoPresenca),null,v=>v+' pessoas',false)}
@@ -2012,7 +2070,8 @@ function renderComparativo(){
   </div>`:''}
 
   <div style="margin-top:14px;font-size:10px;color:rgba(255,255,255,.2);line-height:1.7;padding:0 4px">
-    △ Δ A→B: variação percentual de A para B — verde=melhora, vermelho=piora · Benchmarks: Connect Rate ≥50% · Taxa CK ≥8% · ROAS Final ≥1x
+    △ Δ A→B: variação percentual de A para B — verde=melhora, vermelho=piora · Benchmarks: Connect Rate ≥50% · Taxa CK ≥8% · ROAS Final ≥1x<br>
+    ⚡ Ingressos, faturamento, ticket e ROAS de captação são baseados 100% em tráfego pago (vendas rastreadas com UTM). Orgânicos aparecem apenas como informação.
   </div>`;
 
   // Charts comparativos
