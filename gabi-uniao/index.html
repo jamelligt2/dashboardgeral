@@ -338,6 +338,57 @@ const G_COL = { date:0, inv:1, cliques:2, pv:3, ck:4, comprasG:5, campaign:6, ad
 // trans_status: "3" = pago, "1" = pendente, "2" = cancelado
 const W_COL = { status:12, buyerName:42, utmSource:73, trackerUtmSource:69, utmCampaign:76, utmContent:74, utmMedium:75, createdAt:15, priceValue:10, paidValue:11 };
 
+// ============ META ID → NOME ============
+// Mapeamento de IDs numéricos do Meta (Ad IDs e Campaign IDs) para nomes legíveis.
+// Usado para traduzir vendas cujo webhook armazenou IDs em vez de textos UTM.
+const META_ID_MAP = {
+  // --- ADS (utm_content) ---
+  "120245643336630551":"UEM-ADV02","120245643331140551":"UEM-ADV02","120245643334770551":"UEM-ADV02",
+  "120245643335180551":"UEM-ADV05","120245643335520551":"UEM-ADV08","120245643337060551":"UEM-ADV08",
+  "120245643333250551":"UEM-ADV08","120245643332130551":"UEM-ADV05",
+  "120245643311730551":"UEM-EST08","120245643310960551":"UEM-EST07","120245643314410551":"UEM-EST07",
+  "120245643315760551":"UEM-EST08","120245643312470551":"UEM-EST07","120245643313800551":"UEM-EST08",
+  "120245643176530551":"UEM-ADV08","120245643178290551":"UEM-ADV08",
+  "120245643141920551":"UEM-EST08","120245643140970551":"UEM-EST07",
+  "120245643140130551":"UEM-EST08","120245643137290551":"UEM-EST07",
+  "120245643063060551":"UEM-EST07","120245643060840551":"UEM-EST08",
+  "120245643065030551":"UEM-EST08","120245643056310551":"UEM-EST07",
+  "120245642542750551":"UEM-ADV06","120245642545280551":"UEM-ADV06",
+  "120245642541580551":"UEM-ADV03","120245642544310551":"UEM-ADV03",
+  "120245642531230551":"UEM-ADV05","120245642538030551":"UEM-ADV05",
+  "120245642536060551":"UEM-ADV02","120245642533720551":"UEM-ADV08",
+  "120245642539300551":"UEM-ADV08","120245642529670551":"UEM-ADV02",
+  "120245799051350551":"UEM-ADV08","120245799051410551":"UEM-EST07",
+  "120245799051430551":"UEM-ADV06","120245799051440551":"UEM-ADV03","120245799051400551":"UEM-EST08",
+  "120245328278500551":"UEM-ADV05","120245328272530551":"UEM-ADV02","120245328279450551":"UEM-ADV06",
+  "120245328273450551":"UEM-ADV03","120245328277830551":"UEM-ADV02","120245328274300551":"UEM-ADV06",
+  "120245328270650551":"UEM-ADV03","120245328271640551":"UEM-ADV06","120245328269880551":"UEM-ADV02",
+  "120245436564480551":"UEM-ADV05","120245436559250551":"UEM-ADV05","120245436561990551":"UEM-ADV03",
+  "120245436565340551":"UEM-ADV06","120245436558040551":"UEM-ADV02","120245436559790551":"UEM-ADV06",
+  "120245436564040551":"UEM-ADV02","120245436560220551":"UEM-ADV02","120245436563150551":"UEM-ADV06",
+  // --- CAMPAIGNS (utm_campaign ou utm_medium quando numérico) ---
+  "120245642330000551":"[JGT] [UNIAO EM MISSÃO] UEM250426 Pag 8 REFORMULADA",
+  "120245642519600551":"[JGT] [UNIAO EM MISSÃO] UEM250426 Pag 6 VIDEOS",
+  "120245642519050551":"[JGT] [UNIAO EM MISSÃO] UEM250426 Pag 4 VIDEOS",
+  "120245799051340551":"[JGT] [UNIAO EM MISSÃO] UEM250426 Pag 6 - Morno",
+  "120245436520900551":"[JGT] [UNIAO EM MISSÃO] UEM250426 Pag 8 FRIO NOVOS PUBLICOS",
+  "120245436520260551":"[JGT] [UNIAO EM MISSÃO] UEM250426 Pag 8 VIDEOS",
+  "120245328274800551":"[JGT] [UNIAO EM MISSÃO] UEM250426 Pag 7 FRIO NOVOS PUBLICOS",
+  "120245328268030551":"[JGT] [UNIAO EM MISSÃO] UEM250426 Pag 6 VIDEOS",
+  "120244420719850551":"[JGT] [UNIAO EM MISSÃO] UEM250426 Pag 7 FRIO NOVOS PUBLICOS",
+  "120244334635260551":"[JGT] [UNIAO EM MISSÃO] UEM250426 Pag 7 VIDEOS",
+  "120244333609760551":"[JGT] [UNIAO EM MISSÃO] UEM250426 Pag 6 ESTATICOS",
+  "120244333607990551":"[JGT] [UNIAO EM MISSÃO] UEM250426 Pag 1 ESTATICOS",
+  "120244175098460551":"[JGT] [UNIAO EM MISSÃO] UEM250426 Pag 6 VIDEOS",
+  "120244121657970551":"[JGT] [UNIAO EM MISSÃO] UEM250426 Pag 3 VIDEOS",
+  "120244040072780551":"[JGT] [UNIAO EM MISSÃO] UEM250426 Pag 4 VIDEOS",
+  "120243956233340551":"[JGT] [UNIAO EM MISSÃO] UEM250426 Pag 2 VIDEOS",
+  "120243944663380551":"[JGT] [UNIAO EM MISSÃO] UEM250426 Pag 1 VIDEOS",
+  "120243971070770551":"[JGT] [UNIAO EM MISSÃO] UEM250426 Pag 2 estatico",
+  "120243970757540551":"[JGT] [UNIAO EM MISSÃO] UEM250426 Pag 1 estatico",
+  "120245642402990551":"[JGT] [UNIAO EM MISSÃO] UEM250523 MELHORES PAGINAS",
+};
+
 // ============ DEBRIEF CONFIG ============
 const DEBRIEF_CONFIG = {
   picoPresenca: 32,
@@ -502,10 +553,24 @@ async function loadData(){
       // Valor já em reais (não centavos) no formato antigo
       const val=pNum(r[W_COL.priceValue])||pNum(r[W_COL.paidValue]); // priceValue = preço do produto sem juros de parcelamento
       // No Kiwify: utm_medium = nome da campanha (com "Pag X"), utm_campaign = adset
-      const utmCampanha=r[W_COL.utmMedium]||'';   // ex: "[JGT] ... Pag 1 VIDEOS"
-      const utmAdset=r[W_COL.utmCampaign]||'';    // ex: "ADV - MULHERES 30 A 50 a"
-      const utmContent=r[W_COL.utmContent]||'';   // ex: "UEM-ADV02"
-      const utmSource=(r[W_COL.utmSource]||r[W_COL.trackerUtmSource]||'').toLowerCase(); // ex: "meta_ads", "ig"
+      // Traduz IDs numéricos do Meta para nomes legíveis via META_ID_MAP
+      const translateUtm=v=>{const s=(v||'').trim();if(!s)return'';return/^\d+$/.test(s)?(META_ID_MAP[s]||''):s;};
+      const rawContent=translateUtm(r[W_COL.utmContent]);   // ex: "UEM-ADV02" ou traduzido
+      const rawMedium=translateUtm(r[W_COL.utmMedium]);     // ex: "[JGT]...Pag 1" ou "paid"
+      const rawCampAds=translateUtm(r[W_COL.utmCampaign]);  // ex: adset "ADV -..." ou camp "...Pag 8"
+      // Se o campo utm_campaign virou um nome de campanha com "Pag X", ele É a campanha (não adset)
+      let utmCampanha, utmAdset;
+      if(extractPage(rawCampAds)>0){
+        utmCampanha=rawCampAds; // campo continha campaign ID → nome da campanha com página
+        utmAdset='';
+      } else {
+        utmCampanha=rawMedium;  // medium = nome da campanha
+        utmAdset=rawCampAds;    // campaign = nome do adset
+      }
+      // "paid" em medium não identifica página; neste caso manter vazio
+      if(utmCampanha.toLowerCase()==='paid'||utmCampanha.toLowerCase()==='cpc')utmCampanha='';
+      const utmContent=rawContent;
+      const utmSource=(r[W_COL.utmSource]||r[W_COL.trackerUtmSource]||'').toLowerCase();
       sales.push({data:iso, valor:val, nome:r[W_COL.buyerName]||'', campaign:utmCampanha, adset:utmAdset, content:utmContent, source:utmSource});
     }
 
@@ -694,10 +759,24 @@ async function init(){
       // Valor já em reais no formato antigo Kiwify (não centavos)
       const val=pNum(r[W_COL.priceValue])||pNum(r[W_COL.paidValue]); // priceValue = preço do produto sem juros de parcelamento
       // No Kiwify: utm_medium = nome da campanha (com "Pag X"), utm_campaign = adset
-      const utmCampanha=r[W_COL.utmMedium]||'';   // ex: "[JGT] ... Pag 1 VIDEOS"
-      const utmAdset=r[W_COL.utmCampaign]||'';    // ex: "ADV - MULHERES 30 A 50 a"
-      const utmContent=r[W_COL.utmContent]||'';   // ex: "UEM-ADV02"
-      const utmSource=(r[W_COL.utmSource]||r[W_COL.trackerUtmSource]||'').toLowerCase(); // ex: "meta_ads", "ig"
+      // Traduz IDs numéricos do Meta para nomes legíveis via META_ID_MAP
+      const translateUtm=v=>{const s=(v||'').trim();if(!s)return'';return/^\d+$/.test(s)?(META_ID_MAP[s]||''):s;};
+      const rawContent=translateUtm(r[W_COL.utmContent]);   // ex: "UEM-ADV02" ou traduzido
+      const rawMedium=translateUtm(r[W_COL.utmMedium]);     // ex: "[JGT]...Pag 1" ou "paid"
+      const rawCampAds=translateUtm(r[W_COL.utmCampaign]);  // ex: adset "ADV -..." ou camp "...Pag 8"
+      // Se o campo utm_campaign virou um nome de campanha com "Pag X", ele É a campanha (não adset)
+      let utmCampanha, utmAdset;
+      if(extractPage(rawCampAds)>0){
+        utmCampanha=rawCampAds; // campo continha campaign ID → nome da campanha com página
+        utmAdset='';
+      } else {
+        utmCampanha=rawMedium;  // medium = nome da campanha
+        utmAdset=rawCampAds;    // campaign = nome do adset
+      }
+      // "paid" em medium não identifica página; neste caso manter vazio
+      if(utmCampanha.toLowerCase()==='paid'||utmCampanha.toLowerCase()==='cpc')utmCampanha='';
+      const utmContent=rawContent;
+      const utmSource=(r[W_COL.utmSource]||r[W_COL.trackerUtmSource]||'').toLowerCase();
       sales.push({data:iso, valor:val, nome:r[W_COL.buyerName]||'', campaign:utmCampanha, adset:utmAdset, content:utmContent, source:utmSource});
     }
 
@@ -1026,7 +1105,7 @@ function computeEditionMetrics(id){
   const ctr=imp>0?cliques/imp*100:0;
   const connectRate=cliques>0?pv/cliques*100:0;
   const taxaCk=pv>0?ck/pv*100:0;
-  const taxaCompra=pv>0?totalVendas/pv*100:0;
+  const taxaCompra=pv>0?vendasTraf/pv*100:0; // só ingressos de tráfego pago ÷ PV
   const cac=totalVendas>0?invImp/totalVendas:0;
   const cacTraf=vendasTraf>0?invImp/vendasTraf:0;
   const roasCapt=invImp>0?fatTotal/invImp:0;
