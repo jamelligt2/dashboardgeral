@@ -453,13 +453,64 @@ function csvToRows(text, type){
   }).filter(r=>r.date);
 }
 
-async function fetchSheet(name, type){
-  const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(name)}&_=${Date.now()}`;
-  const r=await fetch(url,{cache:'no-store'});
-  if(!r.ok)throw new Error('HTTP '+r.status);
-  const text=await r.text();
-  if(text.includes('<!DOCTYPE html>')||text.includes('<html'))throw new Error('resposta HTML (não logado no Google)');
-  return csvToRows(text,type);
+// JSONP via gviz — funciona em file:// porque carrega <script> em vez de fetch
+function fetchSheet(name, type){
+  return new Promise((resolve,reject)=>{
+    const cbName='__gviz_cb_'+Math.random().toString(36).slice(2);
+    const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=responseHandler:${cbName}&sheet=${encodeURIComponent(name)}&_=${Date.now()}`;
+    const script=document.createElement('script');
+    let done=false;
+    const cleanup=()=>{try{document.head.removeChild(script)}catch(e){};delete window[cbName]};
+    window[cbName]=(resp)=>{
+      done=true;
+      try{
+        if(!resp||resp.status==='error'){throw new Error((resp&&resp.errors&&resp.errors[0]&&resp.errors[0].detailed_message)||'gviz error')}
+        const table=resp.table;
+        if(!table)return resolve([]);
+        const cols=table.cols.map(c=>(c.label||c.id||'').trim());
+        const find=(...needles)=>{for(const n of needles){const i=cols.findIndex(x=>new RegExp(n,'i').test(x));if(i>=0)return i}return -1};
+        const col={
+          date:find('^Date','Data'),
+          campaign:find('Campaign Name','Campanha'),
+          clicks:find('^Clicks$','Cliques'),
+          conv:find('Conversions','Conversões','Conversoes'),
+          imp:find('Impressions','Impressões','Impressoes'),
+          cost:find('Cost','Spend','Investimento','Valor'),
+          age:find('^Age','Idade'),
+          keyword:find('Keyword','Palavra')
+        };
+        const getCell=(row,i)=>{if(i<0)return null;const c=row.c&&row.c[i];return c?(c.f!=null?c.f:c.v):null};
+        const fmtDate=v=>{
+          if(!v)return '';
+          if(typeof v==='string'){
+            const m=v.match(/Date\((\d+),(\d+),(\d+)/);
+            if(m)return `${m[1]}-${String(+m[2]+1).padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+            if(/^\d{4}-\d{2}-\d{2}/.test(v))return v.slice(0,10);
+            const d=new Date(v);if(!isNaN(d))return d.toISOString().slice(0,10);
+          }
+          return String(v);
+        };
+        const rows=table.rows.map(r=>{
+          const o={
+            date:fmtDate(getCell(r,col.date)),
+            campaign:String(getCell(r,col.campaign)||'').trim(),
+            clicks:parseNum(getCell(r,col.clicks)),
+            conversions:parseNum(getCell(r,col.conv)),
+            impressions:parseNum(getCell(r,col.imp)),
+            cost:parseCost(getCell(r,col.cost))
+          };
+          if(type==='age'&&col.age>=0)o.age=normalizeAge(getCell(r,col.age));
+          if(type==='kw'&&col.keyword>=0)o.keyword=String(getCell(r,col.keyword)||'').trim();
+          return o;
+        }).filter(r=>r.date);
+        resolve(rows);
+      }catch(e){reject(e)}finally{cleanup()}
+    };
+    script.onerror=()=>{if(!done){cleanup();reject(new Error('falha ao carregar script gviz'))}};
+    script.src=url;
+    document.head.appendChild(script);
+    setTimeout(()=>{if(!done){cleanup();reject(new Error('timeout gviz'))}},15000);
+  });
 }
 
 function autoExpandDateRange(){
