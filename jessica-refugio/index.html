@@ -455,11 +455,25 @@ function csvToRows(text, type){
 
 async function fetchSheet(name, type){
   const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(name)}&_=${Date.now()}`;
-  const r=await fetch(url,{credentials:'include',cache:'no-store'});
+  const r=await fetch(url,{cache:'no-store'});
   if(!r.ok)throw new Error('HTTP '+r.status);
   const text=await r.text();
   if(text.includes('<!DOCTYPE html>')||text.includes('<html'))throw new Error('resposta HTML (não logado no Google)');
   return csvToRows(text,type);
+}
+
+function autoExpandDateRange(){
+  const dates=DATA_GOOGLE.map(r=>r.date).filter(Boolean).sort();
+  if(!dates.length)return;
+  const minD=dates[0], maxD=dates[dates.length-1];
+  const fromEl=document.getElementById('dateFrom');
+  const toEl=document.getElementById('dateTo');
+  // só expande automaticamente — se o usuário restringiu manualmente, respeita
+  if(!fromEl.dataset.userSet || fromEl.value > minD) fromEl.value = minD;
+  if(!toEl.dataset.userSet || toEl.value < maxD) toEl.value = maxD;
+  const fmt=d=>d.split('-').reverse().join('/');
+  document.getElementById('periodDisplay').textContent=`${fmt(fromEl.value)} a ${fmt(toEl.value)}`;
+  document.getElementById('headerPeriod').textContent=`${fmt(fromEl.value)} a ${fmt(toEl.value)}`;
 }
 
 async function loadAndRender(manual){
@@ -480,6 +494,7 @@ async function loadAndRender(manual){
     if(g.length)DATA_GOOGLE=g;
     if(a.length)DATA_AGE=a;
     if(k.length)DATA_KW=k;
+    autoExpandDateRange();
     renderAll();
     badge.className='live-badge live';
     badgeTxt.textContent='AO VIVO';
@@ -758,6 +773,8 @@ function renderAll(){
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('dateFrom').addEventListener('change',e=>e.target.dataset.userSet='1');
+  document.getElementById('dateTo').addEventListener('change',e=>e.target.dataset.userSet='1');
   loadAndRender(false);
   setInterval(()=>loadAndRender(false), AUTO_REFRESH_MINUTES*60*1000);
 });
