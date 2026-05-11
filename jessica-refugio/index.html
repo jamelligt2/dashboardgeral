@@ -200,6 +200,17 @@ th.sortable.sort-desc::after{content:' \2193';opacity:1;color:#f5a623}
   </div>
 </div>
 
+<div class="content-grid" style="margin-bottom:30px">
+  <div class="card">
+    <div class="card-title">Comparativo PAGINA NEW vs PAGINA WIX</div>
+    <div class="chart-wrapper" style="height:340px"><canvas id="compareRadar"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Comparativo de Custo (R$)</div>
+    <div class="chart-wrapper" style="height:340px"><canvas id="compareCost"></canvas></div>
+  </div>
+</div>
+
 <div class="card keywords-section">
   <div class="card-title">Performance das Palavras-Chave</div>
   <div class="keywords-table-wrapper">
@@ -537,6 +548,74 @@ function renderAll(){
     '<td class="text-right">'+(TOT.conversions?BRL(TOT.costPerConv):TRACO)+'</td>';
   campBody.appendChild(totalTr);
 
+  // Comparativo NEW vs WIX (radar normalizado + custos)
+  const newStats = agg(filtered.filter(r => r.campaign.includes('NEW')));
+  const wixStats = agg(filtered.filter(r => r.campaign.includes('WIX')));
+  const dims = [
+    { label: 'Cliques',     new: newStats.clicks,      wix: wixStats.clicks },
+    { label: 'Conversões',  new: newStats.conversions, wix: wixStats.conversions },
+    { label: 'Impressões',  new: newStats.impressions, wix: wixStats.impressions },
+    { label: 'CTR (%)',     new: newStats.ctr,         wix: wixStats.ctr },
+    { label: 'CVR (%)',     new: newStats.convRate,    wix: wixStats.convRate }
+  ];
+  // Normaliza cada dimensão 0–100 baseado no maior valor entre as duas
+  const radarLabels = dims.map(d => d.label);
+  const dataNew = dims.map(d => { const m = Math.max(d.new, d.wix); return m > 0 ? (d.new / m * 100) : 0; });
+  const dataWix = dims.map(d => { const m = Math.max(d.new, d.wix); return m > 0 ? (d.wix / m * 100) : 0; });
+  const rawNew = dims.map(d => d.new);
+  const rawWix = dims.map(d => d.wix);
+  charts.compareRadar = new Chart(document.getElementById('compareRadar'), {
+    type: 'radar',
+    data: { labels: radarLabels, datasets: [
+      { label: 'PAGINA NEW', data: dataNew, backgroundColor: 'rgba(74,222,128,.25)', borderColor: '#4ade80', borderWidth: 2, pointBackgroundColor: '#4ade80', pointRadius: 4 },
+      { label: 'PAGINA WIX', data: dataWix, backgroundColor: 'rgba(245,166,35,.25)', borderColor: '#f5a623', borderWidth: 2, pointBackgroundColor: '#f5a623', pointRadius: 4 }
+    ]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#e0e0e0', font: { size: 11 } } },
+        tooltip: { callbacks: { label: function(c){
+          const i = c.dataIndex;
+          const rawVal = c.datasetIndex === 0 ? rawNew[i] : rawWix[i];
+          const isPct = radarLabels[i].includes('%');
+          return c.dataset.label + ': ' + (isPct ? rawVal.toFixed(2).replace('.',',') + '%' : rawVal.toLocaleString('pt-BR'));
+        } } }
+      },
+      scales: {
+        r: {
+          angleLines: { color: 'rgba(245,166,35,.15)' },
+          grid: { color: 'rgba(245,166,35,.15)' },
+          pointLabels: { color: '#e0e0e0', font: { size: 11, weight: 'bold' } },
+          ticks: { display: false, beginAtZero: true, max: 100 },
+          suggestedMin: 0, suggestedMax: 100
+        }
+      }
+    }
+  });
+
+  // Comparativo de custo: bars com CPC e CPL
+  charts.compareCost = new Chart(document.getElementById('compareCost'), {
+    type: 'bar',
+    data: {
+      labels: ['CPC (R$)', 'Custo por Conversão (R$)', 'CPM (R$)'],
+      datasets: [
+        { label: 'PAGINA NEW', data: [newStats.cpc, newStats.conversions ? newStats.costPerConv : 0, newStats.cpm], backgroundColor: 'rgba(74,222,128,.7)',  borderColor: '#4ade80', borderWidth: 1, borderRadius: 4 },
+        { label: 'PAGINA WIX', data: [wixStats.cpc, wixStats.conversions ? wixStats.costPerConv : 0, wixStats.cpm], backgroundColor: 'rgba(245,166,35,.7)', borderColor: '#f5a623', borderWidth: 1, borderRadius: 4 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#e0e0e0', font: { size: 11 } } },
+        tooltip: { callbacks: { label: c => c.dataset.label + ': ' + (c.parsed.y > 0 ? BRL(c.parsed.y) : TRACO) } }
+      },
+      scales: {
+        x: { ticks: { color: '#b0b0b0', font: { size: 11 } }, grid: { color: 'rgba(245,166,35,.05)' } },
+        y: { ticks: { color: '#b0b0b0', callback: v => 'R$ ' + v }, grid: { color: 'rgba(245,166,35,.05)' }, beginAtZero: true }
+      }
+    }
+  });
+
   // Daily aggregation
   const byDay = groupBy(filtered,'date');
   const days = Array.from(byDay.keys()).sort();
@@ -759,3 +838,4 @@ document.addEventListener('DOMContentLoaded', function(){
 </script>
 </body>
 </html>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
