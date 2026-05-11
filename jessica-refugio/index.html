@@ -83,6 +83,21 @@ th.sortable.sort-desc::after{content:' \2193';opacity:1;color:#f5a623}
 .badge-warn{background:rgba(239,68,68,.2);color:#ef4444}
 .insight{background:linear-gradient(90deg,rgba(245,166,35,.12),rgba(245,166,35,.02));border:1px solid rgba(245,166,35,.3);border-left:4px solid #f5a623;border-radius:8px;padding:12px 18px;font-size:13px;color:#e0e0e0;margin-bottom:20px;line-height:1.6}
 .insight b{color:#f5a623}
+.live-badge{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:14px;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase}
+.live-badge.live{background:rgba(74,222,128,.15);color:#4ade80;border:1px solid rgba(74,222,128,.4)}
+.live-badge.cached{background:rgba(245,166,35,.15);color:#f5a623;border:1px solid rgba(245,166,35,.4)}
+.live-badge.loading{background:rgba(176,176,176,.15);color:#b0b0b0;border:1px solid rgba(176,176,176,.4)}
+.live-badge .dot{width:7px;height:7px;border-radius:50%;background:currentColor;animation:pulse 2s infinite}
+.live-badge.cached .dot{animation:none;opacity:.6}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.refresh-row{display:flex;align-items:center;gap:10px;justify-content:flex-end}
+.refresh-btn{background:transparent;border:1px solid rgba(245,166,35,.4);color:#f5a623;padding:5px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.4px;transition:all .2s}
+.refresh-btn:hover{background:rgba(245,166,35,.1);border-color:#f5a623}
+.refresh-btn:disabled{opacity:.5;cursor:wait}
+.refresh-meta{font-size:10px;color:#b0b0b0;margin-top:6px;text-align:right}
+.err-banner{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-left:4px solid #ef4444;border-radius:8px;padding:10px 16px;font-size:12px;color:#fca5a5;margin-bottom:20px;line-height:1.5;display:none}
+.err-banner.show{display:block}
+.err-banner b{color:#fff}
 @media(max-width:768px){.container{padding:15px}.header-content,.header-info{flex-direction:column;align-items:flex-start;gap:15px}.header-info-item{text-align:left}.kpi-grid{grid-template-columns:1fr}.kpi-cards{grid-template-columns:repeat(3,1fr)}th,td{padding:8px;font-size:12px}th{font-size:10px}}
 </style>
 </head>
@@ -101,6 +116,13 @@ th.sortable.sort-desc::after{content:' \2193';opacity:1;color:#f5a623}
       <div class="header-info-item"><div class="header-info-label">Cliente</div><div class="header-info-value">CL40 — Jessica · Refúgio</div></div>
       <div class="header-info-item"><div class="header-info-label">Campanha</div><div class="header-info-value">[JGT] CAP050526</div></div>
       <div class="header-info-item"><div class="header-info-label">Período</div><div class="header-info-value" id="headerPeriod">05/05/2026 a 08/05/2026</div></div>
+      <div class="header-info-item">
+        <div class="refresh-row">
+          <div class="live-badge loading" id="liveBadge"><span class="dot"></span><span id="liveBadgeText">CARREGANDO…</span></div>
+          <button class="refresh-btn" id="refreshBtn" onclick="loadAndRender(true)">↻ Atualizar</button>
+        </div>
+        <div class="refresh-meta" id="updatedAt">—</div>
+      </div>
     </div>
   </div>
 </div>
@@ -124,6 +146,8 @@ th.sortable.sort-desc::after{content:' \2193';opacity:1;color:#f5a623}
 </div>
 
 <div class="container">
+
+<div class="err-banner" id="errBanner"></div>
 
 <div class="insight">
   <b>Leitura rápida:</b> CTR forte (4,10%) mostra que o anúncio atrai o público certo, mas só 1 conversão em 11 cliques sinaliza que <b>a dor está na landing</b>. PAGINA NEW converteu (CVR 16,67%, CPL R$ 31,73) — PAGINA WIX trouxe cliques (CTR 5,62%) mas zero conversão. Foco da semana: validar PAGINA NEW e revisar copy/headline da WIX.
@@ -201,6 +225,17 @@ th.sortable.sort-desc::after{content:' \2193';opacity:1;color:#f5a623}
   </div>
 </div>
 
+<div class="content-grid" style="margin-top:30px">
+  <div class="card">
+    <div class="card-title">Custo por Clique (CPC) por dia</div>
+    <div class="chart-wrapper"><canvas id="cpcChart"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Custo por Conversão (CPL) por dia</div>
+    <div class="chart-wrapper"><canvas id="cplChart"></canvas></div>
+  </div>
+</div>
+
 <div style="margin-top:20px" class="card">
   <div class="card-title">Performance Diária (detalhe)</div>
   <div class="table-container">
@@ -263,7 +298,11 @@ th.sortable.sort-desc::after{content:' \2193';opacity:1;color:#f5a623}
 </div>
 
 <script>
-const RAW_GOOGLE = [
+const SHEET_ID = '1x8AItDay8sRhbvI2P0zN5fQelpeb7Uc6VCuir1LdVZM';
+const SHEETS = { google: 'Google', age: 'idade', keywords: 'Palavras' };
+const AUTO_REFRESH_MINUTES = 5;
+
+const FALLBACK_GOOGLE = [
   {date:"2026-05-05",campaign:"[JGT] [PAGINA WIX] CAP050526",clicks:0,conversions:0,impressions:1,cost:0},
   {date:"2026-05-06",campaign:"[JGT] [PAGINA NEW] CAP050526 #2",clicks:2,conversions:1,impressions:13,cost:9.81},
   {date:"2026-05-06",campaign:"[JGT] [PAGINA WIX] CAP050526",clicks:2,conversions:0,impressions:47,cost:11.60},
@@ -273,7 +312,7 @@ const RAW_GOOGLE = [
   {date:"2026-05-08",campaign:"[JGT] [PAGINA WIX] CAP050526",clicks:2,conversions:0,impressions:19,cost:10.09}
 ];
 
-const RAW_AGE = [
+const FALLBACK_AGE = [
   {date:"2026-05-05",campaign:"[JGT] [PAGINA WIX] CAP050526",clicks:0,conversions:0,impressions:1,cost:0,age:"35-44"},
   {date:"2026-05-06",campaign:"[JGT] [PAGINA NEW] CAP050526 #2",clicks:0,conversions:0,impressions:7,cost:0,age:"25-34"},
   {date:"2026-05-06",campaign:"[JGT] [PAGINA NEW] CAP050526 #2",clicks:1,conversions:0,impressions:4,cost:2.72,age:"45-54"},
@@ -296,7 +335,7 @@ const RAW_AGE = [
   {date:"2026-05-08",campaign:"[JGT] [PAGINA WIX] CAP050526",clicks:2,conversions:0,impressions:10,cost:10.09,age:"35-44"}
 ];
 
-const RAW_KW = [
+const FALLBACK_KW = [
   {date:"2026-05-05",campaign:"[JGT] [PAGINA WIX] CAP050526",clicks:0,conversions:0,impressions:1,cost:0,keyword:"pos parto"},
   {date:"2026-05-06",campaign:"[JGT] [PAGINA NEW] CAP050526 #2",clicks:0,conversions:0,impressions:1,cost:0,keyword:"apoio emocional maternidade"},
   {date:"2026-05-06",campaign:"[JGT] [PAGINA NEW] CAP050526 #2",clicks:0,conversions:0,impressions:1,cost:0,keyword:"depressão pós-parto ajuda"},
@@ -342,8 +381,120 @@ const RAW_KW = [
   {date:"2026-05-08",campaign:"[JGT] [PAGINA WIX] CAP050526",clicks:2,conversions:0,impressions:12,cost:10.09,keyword:"pós maternidade"}
 ];
 
+let DATA_GOOGLE = FALLBACK_GOOGLE;
+let DATA_AGE = FALLBACK_AGE;
+let DATA_KW = FALLBACK_KW;
 let charts = {};
 let sortState = {};
+
+function parseCSV(text){
+  const rows=[];let cur=[],f='',q=false;
+  for(let i=0;i<text.length;i++){const c=text[i];
+    if(q){if(c==='"'&&text[i+1]==='"'){f+='"';i++}else if(c==='"')q=false;else f+=c}
+    else{if(c==='"')q=true;else if(c===','){cur.push(f);f=''}
+      else if(c==='\n'){cur.push(f);rows.push(cur);cur=[];f=''}
+      else if(c!=='\r')f+=c}}
+  if(f.length||cur.length){cur.push(f);rows.push(cur)}
+  return rows;
+}
+
+function parseCost(v){
+  if(v==null)return 0;
+  const s=String(v).trim().replace(/R\$\s?/g,'').replace(/\./g,'').replace(',','.');
+  const n=parseFloat(s);return isNaN(n)?0:n;
+}
+function parseNum(v){
+  if(v==null)return 0;
+  const s=String(v).trim().replace(/\./g,'').replace(',','.');
+  const n=parseFloat(s);return isNaN(n)?0:n;
+}
+
+function normalizeAge(raw){
+  if(!raw)return 'Indeterminado';
+  const s=String(raw).toUpperCase();
+  if(s.includes('UNDETERMINED')||s.includes('UNKNOWN'))return 'Indeterminado';
+  if(s.includes('18_24'))return '18-24';
+  if(s.includes('25_34'))return '25-34';
+  if(s.includes('35_44'))return '35-44';
+  if(s.includes('45_54'))return '45-54';
+  if(s.includes('55_64'))return '55-64';
+  if(s.includes('65'))return '65+';
+  return raw;
+}
+
+function csvToRows(text, type){
+  const lines=parseCSV(text).filter(l=>l.length>1&&l.some(c=>c!==''));
+  if(lines.length<2)return [];
+  const h=lines[0].map(x=>x.trim());
+  const find=(...needles)=>{for(const n of needles){const i=h.findIndex(x=>new RegExp(n,'i').test(x));if(i>=0)return i}return -1};
+  const col={
+    date:find('^Date','Data'),
+    campaign:find('Campaign Name','Campanha'),
+    adgroup:find('Ad Group Name','Grupo'),
+    clicks:find('^Clicks$','Cliques'),
+    conv:find('Conversions','Conversões','Conversoes'),
+    imp:find('Impressions','Impressões','Impressoes'),
+    cost:find('Cost','Spend','Investimento','Valor'),
+    age:find('^Age','Idade'),
+    keyword:find('Keyword','Palavra')
+  };
+  return lines.slice(1).filter(l=>l[col.date]).map(l=>{
+    const row={
+      date:(l[col.date]||'').trim(),
+      campaign:(l[col.campaign]||'').trim(),
+      clicks:parseNum(l[col.clicks]),
+      conversions:parseNum(l[col.conv]),
+      impressions:parseNum(l[col.imp]),
+      cost:parseCost(l[col.cost])
+    };
+    if(type==='age'&&col.age>=0)row.age=normalizeAge(l[col.age]);
+    if(type==='kw'&&col.keyword>=0)row.keyword=(l[col.keyword]||'').trim();
+    return row;
+  }).filter(r=>r.date);
+}
+
+async function fetchSheet(name, type){
+  const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(name)}&_=${Date.now()}`;
+  const r=await fetch(url,{credentials:'include',cache:'no-store'});
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  const text=await r.text();
+  if(text.includes('<!DOCTYPE html>')||text.includes('<html'))throw new Error('resposta HTML (não logado no Google)');
+  return csvToRows(text,type);
+}
+
+async function loadAndRender(manual){
+  const badge=document.getElementById('liveBadge');
+  const badgeTxt=document.getElementById('liveBadgeText');
+  const btn=document.getElementById('refreshBtn');
+  const err=document.getElementById('errBanner');
+  const stamp=document.getElementById('updatedAt');
+  badge.className='live-badge loading';
+  badgeTxt.textContent=manual?'ATUALIZANDO…':'CARREGANDO…';
+  btn.disabled=true;err.classList.remove('show');
+  try{
+    const [g,a,k]=await Promise.all([
+      fetchSheet(SHEETS.google,'google'),
+      fetchSheet(SHEETS.age,'age'),
+      fetchSheet(SHEETS.keywords,'kw')
+    ]);
+    if(g.length)DATA_GOOGLE=g;
+    if(a.length)DATA_AGE=a;
+    if(k.length)DATA_KW=k;
+    renderAll();
+    badge.className='live-badge live';
+    badgeTxt.textContent='AO VIVO';
+    const now=new Date();
+    stamp.textContent=`Atualizado ${now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} · ${g.length} linhas`;
+  }catch(e){
+    DATA_GOOGLE=FALLBACK_GOOGLE;DATA_AGE=FALLBACK_AGE;DATA_KW=FALLBACK_KW;
+    renderAll();
+    badge.className='live-badge cached';
+    badgeTxt.textContent='SNAPSHOT';
+    stamp.textContent=`Dados salvos · ${FALLBACK_GOOGLE.length} linhas`;
+    err.innerHTML=`<b>Usando snapshot local.</b> Não consegui puxar a planilha ao vivo (${e.message}). Abra este arquivo no Chrome logado na conta Google que tem acesso à planilha e clique em <b>↻ Atualizar</b>.`;
+    err.classList.add('show');
+  }finally{btn.disabled=false}
+}
 
 const fmtBR = (v,d=2)=>(v||0).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d});
 const BRL = v=>'R$ '+fmtBR(v||0,2);
@@ -417,9 +568,9 @@ function applySort(arr,table,defaultKey){
 
 function renderAll(){
   destroyCharts();
-  const filtered=filterRows(RAW_GOOGLE);
-  const filteredAge=filterRows(RAW_AGE);
-  const filteredKW=filterRows(RAW_KW);
+  const filtered=filterRows(DATA_GOOGLE);
+  const filteredAge=filterRows(DATA_AGE);
+  const filteredKW=filterRows(DATA_KW);
   const TOT=agg(filtered);
 
   document.getElementById('totalCost').textContent=BRL(TOT.cost);
@@ -478,6 +629,39 @@ function renderAll(){
         y1:{position:'right',ticks:{color:'#b0b0b0',precision:0},grid:{display:false},beginAtZero:true}
       }
     }
+  });
+
+  // CPC chart
+  const cpcOpts={responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:'#e0e0e0',font:{size:11}}},
+      tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL(c.parsed.y)}}},
+    scales:{
+      x:{ticks:{color:'#b0b0b0'},grid:{color:'rgba(245,166,35,.05)'}},
+      y:{ticks:{color:'#b0b0b0',callback:v=>'R$ '+v},grid:{color:'rgba(245,166,35,.05)'},beginAtZero:true}
+    }};
+  charts.cpc=new Chart(document.getElementById('cpcChart'),{
+    type:'line',
+    data:{labels,datasets:[{
+      label:'CPC (R$)',
+      data:dayStats.map(s=>s.clicks?s.cpc:null),
+      borderColor:'#f5a623',backgroundColor:'rgba(245,166,35,.15)',
+      tension:.35,fill:true,pointRadius:5,pointBackgroundColor:'#f5a623',
+      pointBorderColor:'#1a1a2e',pointBorderWidth:2,spanGaps:true
+    }]},
+    options:cpcOpts
+  });
+
+  // CPL chart
+  charts.cpl=new Chart(document.getElementById('cplChart'),{
+    type:'line',
+    data:{labels,datasets:[{
+      label:'Custo por Conversão (R$)',
+      data:dayStats.map(s=>s.conversions?s.costPerConv:null),
+      borderColor:'#e94560',backgroundColor:'rgba(233,69,96,.15)',
+      tension:.35,fill:true,pointRadius:6,pointBackgroundColor:'#e94560',
+      pointBorderColor:'#1a1a2e',pointBorderWidth:2,spanGaps:true
+    }]},
+    options:cpcOpts
   });
 
   // Daily detail table
@@ -573,7 +757,10 @@ function renderAll(){
   });
 }
 
-document.addEventListener('DOMContentLoaded',()=>{renderAll();});
+document.addEventListener('DOMContentLoaded',()=>{
+  loadAndRender(false);
+  setInterval(()=>loadAndRender(false), AUTO_REFRESH_MINUTES*60*1000);
+});
 </script>
 </body>
 </html>
