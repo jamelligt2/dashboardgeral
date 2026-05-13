@@ -153,7 +153,6 @@ tr:hover td{background:rgba(255,255,255,.025)}
 </div>
 
 <div id="tab-visao" class="content active">
-  <div class="banner">&#9888;&#65039; Webhook nao configurado — faturamento, compras e ROAS indisponiveis.</div>
   <div class="kpi-grid" id="kpi-visao"></div>
   <div class="funil-section">
     <div>
@@ -174,8 +173,8 @@ tr:hover td{background:rgba(255,255,255,.025)}
     <table>
       <thead>
         <tr>
-          <th>Data</th><th>Invest.</th><th>Imp.</th><th>Cliques</th>
-          <th>CTR</th><th>CPC</th><th>CPM</th><th>PV</th><th>CK</th><th>Connect Rate</th>
+          <th>Data</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th>
+          <th>Imp.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>CPM</th><th>PV</th><th>CK</th><th>Connect Rate</th>
         </tr>
       </thead>
       <tbody id="tb-dias"></tbody>
@@ -248,8 +247,8 @@ tr:hover td{background:rgba(255,255,255,.025)}
     <table>
       <thead>
         <tr>
-          <th>Semana</th><th>Invest.</th><th>Imp.</th><th>Cliques</th>
-          <th>CTR</th><th>CPC</th><th>CPM</th><th>PV</th><th>CK</th><th>Connect Rate</th>
+          <th>Semana</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th>
+          <th>Imp.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>CPM</th><th>PV</th><th>CK</th><th>Connect Rate</th>
         </tr>
       </thead>
       <tbody id="tb-wk"></tbody>
@@ -264,8 +263,8 @@ tr:hover td{background:rgba(255,255,255,.025)}
     <table>
       <thead>
         <tr>
-          <th>Mes</th><th>Invest.</th><th>Imp.</th><th>Cliques</th>
-          <th>CTR</th><th>CPC</th><th>CPM</th><th>PV</th><th>CK</th><th>Connect Rate</th>
+          <th>Mes</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th>
+          <th>Imp.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>CPM</th><th>PV</th><th>CK</th><th>Connect Rate</th>
         </tr>
       </thead>
       <tbody id="tb-mo"></tbody>
@@ -276,6 +275,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
 <script>
 var SHEET_ID = '1b1oW1ra6yvpIK8_QPhTlNAXk1IE2U5-e2oseZUKoqjs';
 var GER_SHEET = 'Gerenciador';
+var WH_SHEET  = 'Webhook';
 
 var DIAS = [];
 var SEMANAL = [];
@@ -525,6 +525,71 @@ function processGer(csv) {
   });
 }
 
+function processWebhook(csv) {
+  var rows = parseCSV(csv);
+  if (rows.length < 2) return;
+  var h = rows[0].map(function(c) { return c.toLowerCase().trim(); });
+  var ci = {
+    status: h.findIndex(function(c) { return c === 'data.status'; }),
+    amount: h.findIndex(function(c) { return c === 'data.amount'; }),
+    paidAt: h.findIndex(function(c) { return c === 'data.paidat'; }),
+    utmSrc: h.findIndex(function(c) { return c === 'data.utm_source'; }),
+    fbc:    h.findIndex(function(c) { return c === 'data.fbc'; })
+  };
+  var whMap = {};
+  rows.slice(1).forEach(function(r) {
+    if (ci.status < 0) return;
+    var status = (r[ci.status] || '').toLowerCase().trim();
+    if (status !== 'paid') return;
+    var utmSrc = ci.utmSrc >= 0 ? (r[ci.utmSrc] || '').toLowerCase().replace(/[\s_\-]/g, '') : '';
+    var fbc    = ci.fbc    >= 0 ? (r[ci.fbc]    || '').trim() : '';
+    var isMeta = utmSrc === 'metaads' || utmSrc.indexOf('facebook') >= 0 || utmSrc.indexOf('meta') >= 0 || fbc !== '';
+    if (!isMeta) return;
+    var paidAt = ci.paidAt >= 0 ? (r[ci.paidAt] || '').trim() : '';
+    if (!paidAt) return;
+    var dateISO = paidAt.slice(0, 10);
+    var p = dateISO.split('-');
+    var dataBR = p[2] + '/' + p[1] + '/' + p[0];
+    var amount = ci.amount >= 0 ? parseMoney(r[ci.amount] || '0') : 0;
+    if (!whMap[dataBR]) whMap[dataBR] = { fat: 0, compras: 0 };
+    whMap[dataBR].fat     += amount;
+    whMap[dataBR].compras += 1;
+  });
+  DIAS.forEach(function(d) {
+    var wh = whMap[d.data] || { fat: 0, compras: 0 };
+    d.fat     = wh.fat;
+    d.compras = wh.compras;
+  });
+  var wkFat = {}, wkCo = {};
+  DIAS.forEach(function(d) {
+    var k = weekKey(d.data);
+    wkFat[k] = (wkFat[k] || 0) + (d.fat || 0);
+    wkCo[k]  = (wkCo[k]  || 0) + (d.compras || 0);
+  });
+  SEMANAL.forEach(function(w) {
+    w.fat     = wkFat[w.semana] || 0;
+    w.compras = wkCo[w.semana]  || 0;
+    w.roas    = w.inv > 0 ? w.fat / w.inv : 0;
+    w.ticket  = w.compras > 0 ? w.fat / w.compras : 0;
+    w.retorno = w.fat - w.inv;
+    w.cac     = w.compras > 0 ? w.inv / w.compras : 0;
+  });
+  var moFat = {}, moCo = {};
+  DIAS.forEach(function(d) {
+    var k = monthKey(d.data);
+    moFat[k] = (moFat[k] || 0) + (d.fat || 0);
+    moCo[k]  = (moCo[k]  || 0) + (d.compras || 0);
+  });
+  MENSAL.forEach(function(m) {
+    m.fat     = moFat[m.mes] || 0;
+    m.compras = moCo[m.mes]  || 0;
+    m.roas    = m.inv > 0 ? m.fat / m.inv : 0;
+    m.ticket  = m.compras > 0 ? m.fat / m.compras : 0;
+    m.retorno = m.fat - m.inv;
+    m.cac     = m.compras > 0 ? m.inv / m.compras : 0;
+  });
+}
+
 function filteredDias() {
   return DIAS.filter(function(d) {
     var iso = d.dataISO || toISO(d.data);
@@ -612,56 +677,71 @@ function mkChart(id, labels, data, label, type) {
 }
 
 function renderVisao(dias) {
-  var inv = 0, imp = 0, cl = 0, pv = 0, ck = 0;
-  dias.forEach(function(d) { inv += d.inv; imp += d.imp; cl += d.cliques; pv += d.pv; ck += d.ck; });
-  var ctr = imp > 0 ? cl / imp * 100 : 0;
-  var cpc = cl  > 0 ? inv / cl      : 0;
-  var cpm = imp > 0 ? inv / imp * 1000 : 0;
-  var cr  = cl  > 0 ? pv  / cl  * 100 : 0;
-  var txck = pv > 0 ? ck  / pv  * 100 : 0;
+  var inv = 0, imp = 0, cl = 0, pv = 0, ck = 0, fat = 0, compras = 0;
+  dias.forEach(function(d) {
+    inv += d.inv; imp += d.imp; cl += d.cliques; pv += d.pv; ck += d.ck;
+    fat += (d.fat || 0); compras += (d.compras || 0);
+  });
+  var ctr    = imp > 0 ? cl / imp * 100 : 0;
+  var cpc    = cl  > 0 ? inv / cl       : 0;
+  var cpm    = imp > 0 ? inv / imp * 1000 : 0;
+  var cr     = cl  > 0 ? pv  / cl  * 100 : 0;
+  var txck   = pv  > 0 ? ck  / pv  * 100 : 0;
+  var roas   = inv > 0 ? fat / inv        : 0;
+  var cac    = compras > 0 ? inv / compras : 0;
+  var ticket = compras > 0 ? fat / compras : 0;
+  var txComp = pv  > 0 ? compras / pv * 100 : 0;
 
   document.getElementById('kpi-visao').innerHTML =
     kpiCard('Investimento',  brl(inv),    'orange') +
-    kpiCard('Impressoes',    brInt(imp),  '') +
+    kpiCard('Faturamento',   brl(fat),    'green') +
+    kpiCard('ROAS',          br(roas,2) + 'x', roas >= 1.7 ? 'green' : roas >= 1 ? 'yellow' : 'red') +
+    kpiCard('Compras',       brInt(compras), 'green') +
+    kpiCard('Ticket Medio',  brl(ticket), '') +
+    kpiCard('CAC',           brl(cac),    '') +
     kpiCard('Cliques',       brInt(cl),   '') +
+    kpiCard('Impressoes',    brInt(imp),  '') +
     kpiCard('CPC',           brl(cpc),    'orange') +
     kpiCard('CPM',           brl(cpm),    '') +
     kpiCard('CTR',           pct(ctr),    ctrColor(ctr)) +
-    kpiCard('Page Views',    brInt(pv),   '') +
-    kpiCard('Checkouts',     brInt(ck),   '');
+    kpiCard('Page Views',    brInt(pv),   '');
 
   document.getElementById('funil-bars').innerHTML =
-    funilBar('Cliques',        brInt(cl), 100) +
-    funilBar('Page Views',     brInt(pv), cl > 0 ? pv / cl * 100 : 0) +
-    funilBar('Checkouts',      brInt(ck), cl > 0 ? ck / cl * 100 : 0) +
-    funilBar('Compras',        '&#8212; webhook', 0);
+    funilBar('Cliques',    brInt(cl),      100) +
+    funilBar('Page Views', brInt(pv),      cl > 0 ? pv      / cl * 100 : 0) +
+    funilBar('Checkouts',  brInt(ck),      cl > 0 ? ck      / cl * 100 : 0) +
+    funilBar('Compras',    brInt(compras), cl > 0 ? compras / cl * 100 : 0);
 
   document.getElementById('taxa-grid').innerHTML =
-    taxaItem('CTR (Clique/Imp.)',        pct(ctr)) +
-    taxaItem('Connect Rate (PV/Clique)', pct(cr)) +
-    taxaItem('Taxa Checkout (CK/PV)',    pct(txck)) +
-    '<div class="taxa-item"><span>Taxa Compra</span><span class="taxa-val muted">&#8212; webhook</span></div>';
+    taxaItem('CTR (Clique/Imp.)',         pct(ctr)) +
+    taxaItem('Connect Rate (PV/Clique)',  pct(cr)) +
+    taxaItem('Taxa Checkout (CK/PV)',     pct(txck)) +
+    taxaItem('Taxa Compra (Comp./PV)',    pct(txComp));
 
   var labels = dias.map(function(d) { return d.data.slice(0, 5); });
   mkChart('ch-inv', labels, dias.map(function(d) { return d.inv; }),     'Investimento');
   mkChart('ch-cli', labels, dias.map(function(d) { return d.cliques; }), 'Cliques');
 
   document.getElementById('tb-dias').innerHTML = dias.map(function(d) {
-    var c  = d.imp > 0     ? d.cliques / d.imp     * 100 : 0;
-    var cp = d.cliques > 0 ? d.inv     / d.cliques       : 0;
-    var cm = d.imp > 0     ? d.inv     / d.imp     * 1000: 0;
-    var cr2= d.cliques > 0 ? d.pv      / d.cliques * 100 : 0;
+    var c   = d.imp > 0     ? d.cliques / d.imp     * 100 : 0;
+    var cp  = d.cliques > 0 ? d.inv     / d.cliques       : 0;
+    var cm  = d.imp > 0     ? d.inv     / d.imp     * 1000: 0;
+    var cr2 = d.cliques > 0 ? d.pv      / d.cliques * 100 : 0;
+    var dr  = d.inv > 0     ? (d.fat||0) / d.inv          : 0;
     return '<tr>' +
-      '<td>' + d.data.slice(0,5) + '</td>' +
-      '<td>' + brl(d.inv)        + '</td>' +
-      '<td>' + brInt(d.imp)      + '</td>' +
-      '<td>' + brInt(d.cliques)  + '</td>' +
-      '<td>' + pct(c)            + '</td>' +
-      '<td>' + brl(cp)           + '</td>' +
-      '<td>' + brl(cm)           + '</td>' +
-      '<td>' + brInt(d.pv)       + '</td>' +
-      '<td>' + brInt(d.ck)       + '</td>' +
-      '<td>' + pct(cr2)          + '</td>' +
+      '<td>' + d.data.slice(0,5)               + '</td>' +
+      '<td>' + brl(d.inv)                      + '</td>' +
+      '<td>' + brl(d.fat||0)                   + '</td>' +
+      '<td>' + (dr > 0 ? br(dr,2)+'x' : '&#8212;') + '</td>' +
+      '<td>' + brInt(d.compras||0)             + '</td>' +
+      '<td>' + brInt(d.imp)                    + '</td>' +
+      '<td>' + brInt(d.cliques)                + '</td>' +
+      '<td>' + pct(c)                          + '</td>' +
+      '<td>' + brl(cp)                         + '</td>' +
+      '<td>' + brl(cm)                         + '</td>' +
+      '<td>' + brInt(d.pv)                     + '</td>' +
+      '<td>' + brInt(d.ck)                     + '</td>' +
+      '<td>' + pct(cr2)                        + '</td>' +
       '</tr>';
   }).join('');
 }
@@ -818,57 +898,72 @@ function renderPub() {
 }
 
 function renderSemanal() {
-  var inv = 0, cl = 0, imp = 0;
-  SEMANAL.forEach(function(w) { inv += w.inv; cl += w.cliques; imp += w.imp; });
-  var ctr = imp > 0 ? cl / imp * 100 : 0;
+  var inv = 0, cl = 0, imp = 0, fat = 0, compras = 0;
+  SEMANAL.forEach(function(w) { inv += w.inv; cl += w.cliques; imp += w.imp; fat += (w.fat||0); compras += (w.compras||0); });
+  var ctr  = imp > 0 ? cl  / imp * 100 : 0;
+  var roas = inv > 0 ? fat / inv       : 0;
 
   document.getElementById('kpi-wk').innerHTML =
-    kpiCard('Investimento Total', brl(inv), 'orange') +
-    kpiCard('Cliques Total',      brInt(cl), '') +
-    kpiCard('Impressoes Total',   brInt(imp), '') +
-    kpiCard('CTR Medio',          pct(ctr), ctrColor(ctr));
+    kpiCard('Investimento Total', brl(inv),       'orange') +
+    kpiCard('Faturamento Total',  brl(fat),       'green') +
+    kpiCard('ROAS Medio',         br(roas,2)+'x', roas >= 1.7 ? 'green' : roas >= 1 ? 'yellow' : 'red') +
+    kpiCard('Compras Total',      brInt(compras), '') +
+    kpiCard('Cliques Total',      brInt(cl),      '') +
+    kpiCard('CTR Medio',          pct(ctr),       ctrColor(ctr));
 
   var labels = SEMANAL.map(function(w) { return 'Sem ' + w.semana.slice(2); });
   mkChart('ch-inv-wk', labels, SEMANAL.map(function(w) { return w.inv; }), 'Investimento', 'bar');
   mkChart('ch-ctr-wk', labels, SEMANAL.map(function(w) { return w.ctr; }), 'CTR', 'line');
 
   document.getElementById('tb-wk').innerHTML = SEMANAL.map(function(w) {
+    var wr = w.inv > 0 ? (w.fat||0) / w.inv : 0;
     return '<tr>' +
       '<td>Sem ' + w.semana.slice(2) + ' / 20' + w.semana.slice(0,2) + '</td>' +
-      '<td>' + brl(w.inv)       + '</td>' +
-      '<td>' + brInt(w.imp)     + '</td>' +
-      '<td>' + brInt(w.cliques) + '</td>' +
-      '<td>' + pct(w.ctr)       + '</td>' +
-      '<td>' + brl(w.cpc)       + '</td>' +
-      '<td>' + brl(w.cpm)       + '</td>' +
-      '<td>' + brInt(w.pv)      + '</td>' +
-      '<td>' + brInt(w.ck)      + '</td>' +
-      '<td>' + pct(w.connectRate) + '</td>' +
+      '<td>' + brl(w.inv)                          + '</td>' +
+      '<td>' + brl(w.fat||0)                       + '</td>' +
+      '<td>' + (wr > 0 ? br(wr,2)+'x' : '&#8212;') + '</td>' +
+      '<td>' + brInt(w.compras||0)                 + '</td>' +
+      '<td>' + brInt(w.imp)                        + '</td>' +
+      '<td>' + brInt(w.cliques)                    + '</td>' +
+      '<td>' + pct(w.ctr)                          + '</td>' +
+      '<td>' + brl(w.cpc)                          + '</td>' +
+      '<td>' + brl(w.cpm)                          + '</td>' +
+      '<td>' + brInt(w.pv)                         + '</td>' +
+      '<td>' + brInt(w.ck)                         + '</td>' +
+      '<td>' + pct(w.connectRate)                  + '</td>' +
       '</tr>';
   }).join('');
 }
 
 function renderMensal() {
-  var inv = 0, cl = 0;
-  MENSAL.forEach(function(m) { inv += m.inv; cl += m.cliques; });
+  var inv = 0, cl = 0, fat = 0, compras = 0;
+  MENSAL.forEach(function(m) { inv += m.inv; cl += m.cliques; fat += (m.fat||0); compras += (m.compras||0); });
+  var roas = inv > 0 ? fat / inv : 0;
 
   document.getElementById('kpi-mo').innerHTML =
-    kpiCard('Investimento Total', brl(inv),      'orange') +
-    kpiCard('Cliques Total',      brInt(cl),     '') +
-    kpiCard('Meses Ativos',       MENSAL.length, '');
+    kpiCard('Investimento Total', brl(inv),       'orange') +
+    kpiCard('Faturamento Total',  brl(fat),       'green') +
+    kpiCard('ROAS Medio',         br(roas,2)+'x', roas >= 1.7 ? 'green' : roas >= 1 ? 'yellow' : 'red') +
+    kpiCard('Compras Total',      brInt(compras), '') +
+    kpiCard('Cliques Total',      brInt(cl),      '') +
+    kpiCard('Meses Ativos',       MENSAL.length,  '');
 
   document.getElementById('tb-mo').innerHTML = MENSAL.map(function(m) {
+    var mr = m.inv > 0 ? (m.fat||0) / m.inv : 0;
     return '<tr>' +
-      '<td>' + m.mes            + '</td>' +
-      '<td>' + brl(m.inv)       + '</td>' +
-      '<td>' + brInt(m.imp)     + '</td>' +
-      '<td>' + brInt(m.cliques) + '</td>' +
-      '<td>' + pct(m.ctr)       + '</td>' +
-      '<td>' + brl(m.cpc)       + '</td>' +
-      '<td>' + brl(m.cpm)       + '</td>' +
-      '<td>' + brInt(m.pv)      + '</td>' +
-      '<td>' + brInt(m.ck)      + '</td>' +
-      '<td>' + pct(m.connectRate) + '</td>' +
+      '<td>' + m.mes                               + '</td>' +
+      '<td>' + brl(m.inv)                          + '</td>' +
+      '<td>' + brl(m.fat||0)                       + '</td>' +
+      '<td>' + (mr > 0 ? br(mr,2)+'x' : '&#8212;') + '</td>' +
+      '<td>' + brInt(m.compras||0)                 + '</td>' +
+      '<td>' + brInt(m.imp)                        + '</td>' +
+      '<td>' + brInt(m.cliques)                    + '</td>' +
+      '<td>' + pct(m.ctr)                          + '</td>' +
+      '<td>' + brl(m.cpc)                          + '</td>' +
+      '<td>' + brl(m.cpm)                          + '</td>' +
+      '<td>' + brInt(m.pv)                         + '</td>' +
+      '<td>' + brInt(m.ck)                         + '</td>' +
+      '<td>' + pct(m.connectRate)                  + '</td>' +
       '</tr>';
   }).join('');
 }
@@ -892,8 +987,11 @@ function showTab(id, el) {
 async function loadData() {
   try {
     document.getElementById('load-msg').textContent = 'Carregando Gerenciador...';
-    var csv = await fetchCSV(GER_SHEET);
-    processGer(csv);
+    var gCsv = await fetchCSV(GER_SHEET);
+    processGer(gCsv);
+    document.getElementById('load-msg').textContent = 'Carregando Webhook...';
+    var wCsv = await fetchCSV(WH_SHEET);
+    processWebhook(wCsv);
     document.getElementById('overlay').style.display = 'none';
     initPickers();
     renderAll();
