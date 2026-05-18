@@ -1388,8 +1388,9 @@ var DESAFIOS_RANGES = [
   {nome:"Desafio A", de:"2026-02-17", ate:"2026-03-01", cor:"#ff6b2b", useLive:true, upsellQtd:14, upsellTicket:997},
   {nome:"Desafio B", de:"2026-03-02", ate:"2026-03-15", cor:"#3b82f6", useLive:true, upsellQtd:3, upsellTicket:997},
   {nome:"Desafio C", de:"2026-03-16", ate:"2026-04-05", cor:"#2ecc71", useLive:true, upsellQtd:6, upsellTicket:997},
-  {nome:"Desafio D", de:"2026-04-06", ate:"2026-04-26", cor:"#e74c3c", useLive:true, upsellQtd:11, upsellTicket:997},
-  {nome:"Desafio E", de:"2026-04-27", ate:"2026-05-18", cor:"#f59e0b", useLive:true, upsellQtd:0, upsellTicket:997}
+  {nome:"Desafio D", de:"2026-04-06", ate:"2026-04-26", cor:"#e74c3c", useLive:true, upsellQtd:13, upsellTicket:997},
+  {nome:"Desafio E", de:"2026-04-27", ate:"2026-05-17", cor:"#f59e0b", useLive:true, upsellQtd:0, upsellTicket:997},
+  {nome:"Desafio F", de:"2026-05-18", ate:"2026-06-14", cor:"#8b5cf6", useLive:true, upsellQtd:0, upsellTicket:997}
 ];
 var OB_LIVE={}; // populated by Vendas fetch: {desafioNome: {qtd, fat}}
 
@@ -2072,6 +2073,38 @@ function fetchLiveData(){
 
     // Sort DIAS by date
     DIAS.sort(function(a,b){return toISO(a.data).localeCompare(toISO(b.data))});
+
+    // === AJUSTE MANUAL: transição E→F em 17/05 às 21h ===
+    // Mover R$50 de investimento e 3 vendas (ingressos) de 17/05 para 18/05
+    (function(){
+      var d17=null,d18=null;
+      DIAS.forEach(function(d){
+        if(toISO(d.data)==='2026-05-17') d17=d;
+        if(toISO(d.data)==='2026-05-18') d18=d;
+      });
+      if(d17){
+        d17.inv=Math.round((d17.inv-50)*100)/100;
+      }
+      if(!d18){
+        d18={data:'18/05/2026',inv:50,fat:0,compras:0,cliques:0,pv:0,ck:0,imp:0};
+        DIAS.push(d18);
+      } else {
+        d18.inv=Math.round((d18.inv+50)*100)/100;
+      }
+      // Mover 3 vendas do SALE_LOG de 17/05 para 18/05 (as últimas 3 do dia)
+      var salesOn17=[];
+      SALE_LOG.forEach(function(s,i){if(s.d==='2026-05-17') salesOn17.push(i);});
+      var toMove=salesOn17.slice(-3); // últimas 3
+      toMove.forEach(function(i){SALE_LOG[i].d='2026-05-18';});
+      // Recalc compras/fat nos DIAS para esses dias
+      var fat17=0,comp17=0,fat18=0,comp18=0;
+      SALE_LOG.forEach(function(s){
+        if(s.d==='2026-05-17'){comp17++;fat17+=s.pr;}
+        if(s.d==='2026-05-18'){comp18++;fat18+=s.pr;}
+      });
+      if(d17){d17.compras=comp17;d17.fat=Math.round(fat17*100)/100;}
+      if(d18){d18.compras=comp18;d18.fat=Math.round(fat18*100)/100;}
+    })();
 
     // Recalculate SEMANAL and MENSAL
     fixFatFromDias();
