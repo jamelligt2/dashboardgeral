@@ -276,7 +276,8 @@ tr:hover td{background:rgba(255,255,255,.025)}
 <script>
 var SHEET_ID = '1b1oW1ra6yvpIK8_QPhTlNAXk1IE2U5-e2oseZUKoqjs';
 var GER_SHEET = 'Gerenciador';
-var WH_SHEET  = 'Webhook';
+var ORDERS_CSV_URL = 'https://raw.githubusercontent.com/jamelligt2/dashboardgeral/main/nathaliasuzigan/orders_report.csv';
+var DATA_MINIMA = '2026-05-13';
 
 var DIAS = [];
 var SEMANAL = [];
@@ -399,6 +400,12 @@ async function fetchCSV(sheetName) {
     '/gviz/tq?tqx=out:csv&sheet=' + encodeURIComponent(sheetName);
   var r = await fetch(url);
   if (!r.ok) throw new Error('Erro ao carregar ' + sheetName + ': ' + r.status);
+  return r.text();
+}
+
+async function fetchOrdersCSV() {
+  var r = await fetch(ORDERS_CSV_URL + '?t=' + Date.now());
+  if (!r.ok) throw new Error('Erro ao carregar orders_report.csv: ' + r.status);
   return r.text();
 }
 
@@ -560,131 +567,40 @@ function processGer(csv) {
 function processWebhook(csv) {
   var rows = parseCSV(csv);
   if (rows.length < 2) return;
-  var h = rows[0].map(function(c) { return c.toLowerCase().trim(); });
 
-  function findAll(test) {
-    var idxs = [];
-    h.forEach(function(c, i) { if (test(c)) idxs.push(i); });
-    return idxs;
-  }
-  function firstNonEmpty(r, idxs) {
-    for (var i = 0; i < idxs.length; i++) {
-      var v = (r[idxs[i]] || '').trim();
-      if (v) return v;
-    }
-    return '';
-  }
-
-  var ci = {
-    status:      h.findIndex(function(c) { return c === 'data.status'; }),
-    amount:      h.findIndex(function(c) { return c === 'data.amount'; }),
-    // Cakto/Kiwify pode exportar como "data.offer_type" ou "data_offer_type"
-    offerType:   h.findIndex(function(c) { return c === 'data.offer_type' || c === 'data_offer_type'; }),
-    parentOrder: h.findIndex(function(c) { return c === 'data.parent_order'; }),
-    paidAts:     findAll(function(c) { return c === 'data.paidat'; }),
-    createdAts:  findAll(function(c) { return c === 'data.createdat'; }),
-    utmSrcs:     findAll(function(c) { return c === 'data.utm_source'; }),
-    fbcs:        findAll(function(c) { return c === 'data.fbc'; })
-  };
-
-  // Validação: verifica se as colunas detectadas pelo header batem com os dados reais.
-  // O Cakto às vezes envia um schema de 94 colunas no header mas escreve os dados em
-  // posições diferentes (campos de assinatura omitidos causam desalinhamento).
-  // Se nenhuma linha tiver 'paid' na coluna esperada, usa detecção por conteúdo.
-  var dataRows = rows.slice(1);
-  var statusAligned = ci.status >= 0 && dataRows.some(function(r) {
-    return (r[ci.status] || '').toLowerCase().trim() === 'paid';
-  });
-  if (!statusAligned) {
-    // Encontra coluna de status por conteúdo: coluna com valor "paid" em alguma linha
-    var detectedStatus = -1;
-    if (dataRows.length > 0) {
-      var colCount = dataRows[0].length;
-      for (var col = 0; col < colCount; col++) {
-        if (dataRows.some(function(r) { return (r[col] || '').toLowerCase().trim() === 'paid'; })) {
-          detectedStatus = col;
-          break;
-        }
-      }
-    }
-    if (detectedStatus >= 0) {
-      ci.status = detectedStatus;
-      // Encontra coluna de amount: número decimal com vírgula próximo ao status
-      if (ci.amount < 0 || !dataRows.some(function(r) { return /^\d+,\d{2}$/.test((r[ci.amount] || '').trim()); })) {
-        var detectedAmount = -1;
-        var reAmt = /^\d+[,\.]\d{2}$/;
-        for (var col2 = 0; col2 < colCount; col2++) {
-          if (dataRows.some(function(r) { return reAmt.test((r[col2] || '').trim()); })) {
-            detectedAmount = col2;
-            break;
-          }
-        }
-        if (detectedAmount >= 0) ci.amount = detectedAmount;
-      }
-      // Encontra coluna de paidAt: ISO datetime (YYYY-MM-DDTHH:MM)
-      var reDateISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
-      var detectedPaidAt = -1;
-      for (var col3 = 0; col3 < colCount; col3++) {
-        if (dataRows.some(function(r) { return reDateISO.test((r[col3] || '').trim()); })) {
-          detectedPaidAt = col3;
-          break;
-        }
-      }
-      if (detectedPaidAt >= 0) {
-        ci.paidAts = [detectedPaidAt];
-        if (ci.createdAts.length === 0) ci.createdAts = [detectedPaidAt];
-      }
-      // Encontra coluna de offerType: contém "main" ou "order_bump"
-      if (ci.offerType < 0) {
-        for (var col4 = 0; col4 < colCount; col4++) {
-          if (dataRows.some(function(r) {
-            var v = (r[col4] || '').toLowerCase().trim();
-            return v === 'main' || v === 'order_bump';
-          })) {
-            ci.offerType = col4;
-            break;
-          }
-        }
-      }
-      // Encontra colunas de utmSource e fbc por conteúdo
-      if (ci.utmSrcs.length === 0) {
-        var reUtm = /^(meta_?ads?|facebook|insta|organic|manychat|whatsapp|email)/i;
-        for (var col5 = 0; col5 < colCount; col5++) {
-          if (dataRows.some(function(r) { return reUtm.test((r[col5] || '').trim()); })) {
-            ci.utmSrcs = [col5];
-            break;
-          }
-        }
-      }
-    }
-  }
-
-  var nonMeta = ['instabio','manychat','gruposantigos','organico','organic','whatsapp','email','sms','youtube'];
+  // Colunas do orders_report.csv (Cakto — exportação de pedidos, 0-based):
+  // 0  ID da Venda
+  // 1  Produto
+  // 5  Status da Venda  → "paid"
+  // 6  Comissão         → valor líquido para o produtor
+  // 25 Tipo da Venda    → "main" | "orderbump"
+  // 27 Data de Pagamento → ISO datetime com fuso (usa como data da venda)
+  // 33 fbc - Pixel Facebook
+  // 35 utm_source
+  // 36 utm_medium
+  // 37 utm_campaign
+  // 39 utm_content
 
   var whMap = {};
   rows.slice(1).forEach(function(r) {
-    var status = ci.status >= 0 ? (r[ci.status] || '').toLowerCase().trim() : '';
-    if (status !== 'paid') return;
+    if ((r[5] || '').toLowerCase().trim() !== 'paid') return;
 
-    var utmSrc = firstNonEmpty(r, ci.utmSrcs).toLowerCase().replace(/[\s_\-]/g, '');
-    var fbc    = firstNonEmpty(r, ci.fbcs);
-    // Exclui apenas fontes explicitamente não-Meta; sem fonte = não-atribuída, conta no total
-    var isExplicitNonMeta = utmSrc !== '' && nonMeta.some(function(s) { return utmSrc.indexOf(s) >= 0; });
-    if (isExplicitNonMeta) return;
+    var dataPagto = (r[27] || '').trim();
+    if (!dataPagto) return;
+    var dateISO = dataPagto.slice(0, 10);
 
-    // Usa o primeiro paidAt não-vazio entre colunas duplicadas; cai em createdAt se necessário
-    var paidAt = firstNonEmpty(r, ci.paidAts) || firstNonEmpty(r, ci.createdAts);
-    if (!paidAt) return;
+    // Só vendas a partir de DATA_MINIMA (início do lançamento)
+    if (dateISO < DATA_MINIMA) return;
 
-    var dateISO = paidAt.slice(0, 10);
+    var tipoVenda = (r[25] || '').toLowerCase().trim();
+    var produto   = (r[1]  || '').toLowerCase();
+    var isOB   = tipoVenda === 'orderbump';
+    var isMain = tipoVenda === 'main' && produto.indexOf('roteiro') >= 0;
+    if (!isOB && !isMain) return;
+
     var p = dateISO.split('-');
     var dataBR = p[2] + '/' + p[1] + '/' + p[0];
-    var amount = ci.amount >= 0 ? parseMoney(r[ci.amount] || '0') : 0;
-
-    // OB: offer_type = 'order_bump' ou parent_order preenchido
-    var offerType   = ci.offerType   >= 0 ? (r[ci.offerType]   || '').toLowerCase().trim() : '';
-    var parentOrder = ci.parentOrder >= 0 ? (r[ci.parentOrder] || '').trim() : '';
-    var isOB = offerType === 'order_bump' || parentOrder !== '';
+    var amount = parseMoney(r[6] || '0');
 
     if (!whMap[dataBR]) whMap[dataBR] = { fat: 0, compras: 0, fat_ob: 0, compras_ob: 0 };
     if (isOB) {
@@ -1177,8 +1093,8 @@ async function loadData() {
     document.getElementById('load-msg').textContent = 'Carregando Gerenciador...';
     var gCsv = await fetchCSV(GER_SHEET);
     processGer(gCsv);
-    document.getElementById('load-msg').textContent = 'Carregando Webhook...';
-    var wCsv = await fetchCSV(WH_SHEET);
+    document.getElementById('load-msg').textContent = 'Carregando vendas...';
+    var wCsv = await fetchOrdersCSV();
     processWebhook(wCsv);
     document.getElementById('overlay').style.display = 'none';
     initPickers();
