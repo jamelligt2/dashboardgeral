@@ -401,20 +401,38 @@ async function fetchCSV(sheetName) {
   return r.text();
 }
 
+function cleanStatus(s) {
+  if (!s) return '—';
+  var u = s.toUpperCase().trim();
+  if (u === 'ACTIVE' || u === 'ENABLED')  return 'Ativo';
+  if (u === 'PAUSED')                      return 'Pausado';
+  if (u === 'CAMPAIGN_PAUSED')             return 'Camp. Pausada';
+  if (u === 'ADSET_PAUSED')               return 'Conj. Pausado';
+  if (u.indexOf('PAUSED') >= 0)           return 'Pausado';
+  return u;
+}
+
 function processGer(csv) {
   var rows = parseCSV(csv);
   if (rows.length < 2) return;
   var h = rows[0].map(function(c) { return c.toLowerCase().trim(); });
+
+  function fi(test, fallback) {
+    var i = h.findIndex(test);
+    return i >= 0 ? i : (fallback !== undefined ? fallback : -1);
+  }
+
   var ci = {
-    data:    h.findIndex(function(c) { return c === 'data'; }),
-    adset:   h.findIndex(function(c) { return c.indexOf('conjunto') >= 0; }),
-    anuncio: h.findIndex(function(c) { return c === 'anúncio' || c === 'anuncio'; }),
-    inv:     h.findIndex(function(c) { return c.indexOf('investimento') >= 0; }),
-    imp:     h.findIndex(function(c) { return c.indexOf('impres') >= 0; }),
-    cliques: h.findIndex(function(c) { return c === 'cliques'; }),
-    pv:      h.findIndex(function(c) { return c.indexOf('page view') >= 0 || c.indexOf('pageview') >= 0; }),
-    ck:      h.findIndex(function(c) { return c === 'checkout'; }),
-    link:    h.findIndex(function(c) { return c.indexOf('link') >= 0; })
+    data:    fi(function(c) { return c === 'data'; },                                          0),
+    adset:   fi(function(c) { return c.indexOf('conjunto') >= 0; },                           2),
+    anuncio: fi(function(c) { return c === 'anúncio' || c === 'anuncio' || c === 'anúncio'; },3),
+    inv:     fi(function(c) { return c.indexOf('investimento') >= 0; },                       4),
+    imp:     fi(function(c) { return c.indexOf('impres') >= 0; },                             5),
+    cliques: fi(function(c) { return c === 'cliques'; },                                      7),
+    pv:      fi(function(c) { return c.indexOf('page view') >= 0 || c.indexOf('pageview') >= 0; }, 8),
+    ck:      fi(function(c) { return c === 'checkout'; },                                     9),
+    link:    fi(function(c) { return c.indexOf('link') >= 0; },                               11),
+    status:  fi(function(c) { return c.indexOf('status') >= 0; },                             12)
   };
 
   var byDate = {};
@@ -432,7 +450,8 @@ function processGer(csv) {
     var cliques = parseInt(r[ci.cliques])|| 0;
     var pv      = parseInt(r[ci.pv])     || 0;
     var ck      = parseInt(r[ci.ck])     || 0;
-    var link    = (r[ci.link] || '').trim();
+    var link    = (r[ci.link]   || '').trim();
+    var status  = (ci.status >= 0 ? (r[ci.status] || '') : '').trim().toUpperCase();
 
     if (!byDate[data]) byDate[data] = { data: data, dataISO: dataISO, inv: 0, imp: 0, cliques: 0, pv: 0, ck: 0 };
     byDate[data].inv     += inv;
@@ -441,21 +460,21 @@ function processGer(csv) {
     byDate[data].pv      += pv;
     byDate[data].ck      += ck;
 
-    if (!byCri[anuncio]) byCri[anuncio] = { nome: anuncio, link: link, inv: 0, imp: 0, cliques: 0, pv: 0, ck: 0, lastDate: '' };
+    if (!byCri[anuncio]) byCri[anuncio] = { nome: anuncio, link: link, inv: 0, imp: 0, cliques: 0, pv: 0, ck: 0, lastDate: '', lastStatus: '' };
     byCri[anuncio].inv     += inv;
     byCri[anuncio].imp     += imp;
     byCri[anuncio].cliques += cliques;
     byCri[anuncio].pv      += pv;
     byCri[anuncio].ck      += ck;
-    if (dataISO > byCri[anuncio].lastDate) byCri[anuncio].lastDate = dataISO;
+    if (dataISO > byCri[anuncio].lastDate) { byCri[anuncio].lastDate = dataISO; byCri[anuncio].lastStatus = status; }
 
-    if (!byAds[adset]) byAds[adset] = { nome: adset, inv: 0, imp: 0, cliques: 0, pv: 0, ck: 0, lastDate: '' };
+    if (!byAds[adset]) byAds[adset] = { nome: adset, inv: 0, imp: 0, cliques: 0, pv: 0, ck: 0, lastDate: '', lastStatus: '' };
     byAds[adset].inv     += inv;
     byAds[adset].imp     += imp;
     byAds[adset].cliques += cliques;
     byAds[adset].pv      += pv;
     byAds[adset].ck      += ck;
-    if (dataISO > byAds[adset].lastDate) byAds[adset].lastDate = dataISO;
+    if (dataISO > byAds[adset].lastDate) { byAds[adset].lastDate = dataISO; byAds[adset].lastStatus = status; }
   });
 
   var allDates = Object.values(byDate).map(function(d) { return d.dataISO; }).sort();
@@ -466,13 +485,24 @@ function processGer(csv) {
 
   DIAS = Object.values(byDate).sort(function(a, b) { return a.dataISO.localeCompare(b.dataISO); });
 
+  function isAtivo(lastStatus, lastDate) {
+    // Qualquer variante de PAUSED = não está ativo → usa recência de dados
+    // Ativo = tem dados depois do cutoff (estritamente >)
+    if (lastStatus && lastStatus.toUpperCase().indexOf('PAUSED') < 0 &&
+        (lastStatus.toUpperCase() === 'ACTIVE' || lastStatus.toUpperCase() === 'ENABLED')) {
+      return true;
+    }
+    return lastDate > cutISO;
+  }
+
   CRIATIVOS = Object.values(byCri).map(function(c) {
     return Object.assign({}, c, {
       ctr:         c.imp     > 0 ? c.cliques / c.imp     * 100 : 0,
       cpc:         c.cliques > 0 ? c.inv     / c.cliques       : 0,
       cpm:         c.imp     > 0 ? c.inv     / c.imp     * 1000: 0,
       connectRate: c.cliques > 0 ? c.pv      / c.cliques * 100 : 0,
-      ativo:       c.lastDate >= cutISO
+      ativo:       isAtivo(c.lastStatus, c.lastDate),
+      statusLabel: cleanStatus(c.lastStatus)
     });
   });
 
@@ -482,7 +512,8 @@ function processGer(csv) {
       cpc:         p.cliques > 0 ? p.inv     / p.cliques       : 0,
       cpm:         p.imp     > 0 ? p.inv     / p.imp     * 1000: 0,
       connectRate: p.cliques > 0 ? p.pv      / p.cliques * 100 : 0,
-      ativo:       p.lastDate >= cutISO
+      ativo:       isAtivo(p.lastStatus, p.lastDate),
+      statusLabel: cleanStatus(p.lastStatus)
     });
   });
 
@@ -529,24 +560,44 @@ function processWebhook(csv) {
   var rows = parseCSV(csv);
   if (rows.length < 2) return;
   var h = rows[0].map(function(c) { return c.toLowerCase().trim(); });
+
+  function findAll(test) {
+    var idxs = [];
+    h.forEach(function(c, i) { if (test(c)) idxs.push(i); });
+    return idxs;
+  }
+  function firstNonEmpty(r, idxs) {
+    for (var i = 0; i < idxs.length; i++) {
+      var v = (r[idxs[i]] || '').trim();
+      if (v) return v;
+    }
+    return '';
+  }
+
   var ci = {
-    status: h.findIndex(function(c) { return c === 'data.status'; }),
-    amount: h.findIndex(function(c) { return c === 'data.amount'; }),
-    paidAt: h.findIndex(function(c) { return c === 'data.paidat'; }),
-    utmSrc: h.findIndex(function(c) { return c === 'data.utm_source'; }),
-    fbc:    h.findIndex(function(c) { return c === 'data.fbc'; })
+    status:     h.findIndex(function(c) { return c === 'data.status'; }),
+    amount:     h.findIndex(function(c) { return c === 'data.amount'; }),
+    paidAts:    findAll(function(c) { return c === 'data.paidat'; }),
+    createdAts: findAll(function(c) { return c === 'data.createdat'; }),
+    utmSrcs:    findAll(function(c) { return c === 'data.utm_source'; }),
+    fbcs:       findAll(function(c) { return c === 'data.fbc'; })
   };
+
   var whMap = {};
   rows.slice(1).forEach(function(r) {
     if (ci.status < 0) return;
     var status = (r[ci.status] || '').toLowerCase().trim();
     if (status !== 'paid') return;
-    var utmSrc = ci.utmSrc >= 0 ? (r[ci.utmSrc] || '').toLowerCase().replace(/[\s_\-]/g, '') : '';
-    var fbc    = ci.fbc    >= 0 ? (r[ci.fbc]    || '').trim() : '';
+
+    var utmSrc = firstNonEmpty(r, ci.utmSrcs).toLowerCase().replace(/[\s_\-]/g, '');
+    var fbc    = firstNonEmpty(r, ci.fbcs);
     var isMeta = utmSrc === 'metaads' || utmSrc.indexOf('facebook') >= 0 || utmSrc.indexOf('meta') >= 0 || fbc !== '';
     if (!isMeta) return;
-    var paidAt = ci.paidAt >= 0 ? (r[ci.paidAt] || '').trim() : '';
+
+    // Usa o primeiro paidAt não-vazio entre as colunas duplicadas; cai em createdAt se necessário
+    var paidAt = firstNonEmpty(r, ci.paidAts) || firstNonEmpty(r, ci.createdAts);
     if (!paidAt) return;
+
     var dateISO = paidAt.slice(0, 10);
     var p = dateISO.split('-');
     var dataBR = p[2] + '/' + p[1] + '/' + p[0];
@@ -794,7 +845,7 @@ function renderCri() {
     return '<div class="cri-card ' + (c.ativo ? 'ativo' : '') + '">' +
       '<div class="cri-card-header">' +
         '<div class="cri-name">' + c.nome + '</div>' +
-        '<div class="cbadge ' + (c.ativo ? 'ativo' : 'inativo') + '">' + (c.ativo ? 'Ativo' : 'Inativo') + '</div>' +
+        '<div class="cbadge ' + (c.ativo ? 'ativo' : 'inativo') + '">' + c.statusLabel + '</div>' +
       '</div>' +
       '<div class="cri-metrics">' +
         criM('Investimento', brl(c.inv), 'hl') +
@@ -820,7 +871,7 @@ function renderCri() {
       '<td>' + brInt(c.pv)      + '</td>' +
       '<td>' + brInt(c.ck)      + '</td>' +
       '<td>' + pct(c.connectRate) + '</td>' +
-      '<td><span class="cbadge ' + (c.ativo ? 'ativo' : 'inativo') + '">' + (c.ativo ? 'Ativo' : 'Inativo') + '</span></td>' +
+      '<td><span class="cbadge ' + (c.ativo ? 'ativo' : 'inativo') + '">' + c.statusLabel + '</span></td>' +
       '</tr>';
   }).join('');
 }
@@ -864,7 +915,7 @@ function renderPub() {
     return '<div class="pub-card ' + (p.ativo ? 'ativo' : '') + '">' +
       '<div class="pub-card-header">' +
         '<div class="pub-name">' + p.nome + '</div>' +
-        '<div class="cbadge ' + (p.ativo ? 'ativo' : 'inativo') + '">' + (p.ativo ? 'Ativo' : 'Inativo') + '</div>' +
+        '<div class="cbadge ' + (p.ativo ? 'ativo' : 'inativo') + '">' + p.statusLabel + '</div>' +
       '</div>' +
       '<div class="pub-metrics">' +
         '<div class="pub-metric"><div class="pub-metric-val">' + brl(p.inv) + '</div><div class="pub-metric-lbl">Invest.</div></div>' +
@@ -892,7 +943,7 @@ function renderPub() {
       '<td>' + brl(p.cpc)       + '</td>' +
       '<td>' + brl(p.cpm)       + '</td>' +
       '<td>' + pct(p.connectRate) + '</td>' +
-      '<td><span class="cbadge ' + (p.ativo ? 'ativo' : 'inativo') + '">' + (p.ativo ? 'Ativo' : 'Inativo') + '</span></td>' +
+      '<td><span class="cbadge ' + (p.ativo ? 'ativo' : 'inativo') + '">' + p.statusLabel + '</span></td>' +
       '</tr>';
   }).join('');
 }
