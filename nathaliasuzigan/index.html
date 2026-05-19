@@ -154,6 +154,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
 
 <div id="tab-visao" class="content active">
   <div class="kpi-grid" id="kpi-visao"></div>
+  <div id="ob-section"></div>
   <div class="funil-section">
     <div>
       <div class="sec-title">Funil de Conversao</div>
@@ -247,7 +248,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
     <table>
       <thead>
         <tr>
-          <th>Semana</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th>
+          <th>Semana</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>OB</th>
           <th>Imp.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>CPM</th><th>PV</th><th>CK</th><th>Connect Rate</th>
         </tr>
       </thead>
@@ -263,7 +264,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
     <table>
       <thead>
         <tr>
-          <th>Mes</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th>
+          <th>Mes</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>OB</th>
           <th>Imp.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>CPM</th><th>PV</th><th>CK</th><th>Connect Rate</th>
         </tr>
       </thead>
@@ -575,12 +576,14 @@ function processWebhook(csv) {
   }
 
   var ci = {
-    status:     h.findIndex(function(c) { return c === 'data.status'; }),
-    amount:     h.findIndex(function(c) { return c === 'data.amount'; }),
-    paidAts:    findAll(function(c) { return c === 'data.paidat'; }),
-    createdAts: findAll(function(c) { return c === 'data.createdat'; }),
-    utmSrcs:    findAll(function(c) { return c === 'data.utm_source'; }),
-    fbcs:       findAll(function(c) { return c === 'data.fbc'; })
+    status:      h.findIndex(function(c) { return c === 'data.status'; }),
+    amount:      h.findIndex(function(c) { return c === 'data.amount'; }),
+    offerType:   h.findIndex(function(c) { return c === 'data.offer_type'; }),
+    parentOrder: h.findIndex(function(c) { return c === 'data.parent_order'; }),
+    paidAts:     findAll(function(c) { return c === 'data.paidat'; }),
+    createdAts:  findAll(function(c) { return c === 'data.createdat'; }),
+    utmSrcs:     findAll(function(c) { return c === 'data.utm_source'; }),
+    fbcs:        findAll(function(c) { return c === 'data.fbc'; })
   };
 
   var whMap = {};
@@ -604,41 +607,64 @@ function processWebhook(csv) {
     var p = dateISO.split('-');
     var dataBR = p[2] + '/' + p[1] + '/' + p[0];
     var amount = ci.amount >= 0 ? parseMoney(r[ci.amount] || '0') : 0;
-    if (!whMap[dataBR]) whMap[dataBR] = { fat: 0, compras: 0 };
-    whMap[dataBR].fat     += amount;
-    whMap[dataBR].compras += 1;
+
+    // Detecta order bump: offer_type = 'order_bump' ou parent_order preenchido
+    var offerType   = ci.offerType   >= 0 ? (r[ci.offerType]   || '').toLowerCase().trim() : '';
+    var parentOrder = ci.parentOrder >= 0 ? (r[ci.parentOrder] || '').trim() : '';
+    var isOB = offerType === 'order_bump' || parentOrder !== '';
+
+    if (!whMap[dataBR]) whMap[dataBR] = { fat: 0, compras: 0, fat_ob: 0, compras_ob: 0 };
+    if (isOB) {
+      whMap[dataBR].fat_ob     += amount;
+      whMap[dataBR].compras_ob += 1;
+    } else {
+      whMap[dataBR].fat     += amount;
+      whMap[dataBR].compras += 1;
+    }
   });
   DIAS.forEach(function(d) {
-    var wh = whMap[d.data] || { fat: 0, compras: 0 };
-    d.fat     = wh.fat;
-    d.compras = wh.compras;
+    var wh = whMap[d.data] || { fat: 0, compras: 0, fat_ob: 0, compras_ob: 0 };
+    d.fat        = wh.fat;
+    d.compras    = wh.compras;
+    d.fat_ob     = wh.fat_ob;
+    d.compras_ob = wh.compras_ob;
   });
-  var wkFat = {}, wkCo = {};
+  var wkFat = {}, wkCo = {}, wkFatOB = {}, wkCoOB = {};
   DIAS.forEach(function(d) {
     var k = weekKey(d.data);
-    wkFat[k] = (wkFat[k] || 0) + (d.fat || 0);
-    wkCo[k]  = (wkCo[k]  || 0) + (d.compras || 0);
+    wkFat[k]   = (wkFat[k]   || 0) + (d.fat        || 0);
+    wkCo[k]    = (wkCo[k]    || 0) + (d.compras    || 0);
+    wkFatOB[k] = (wkFatOB[k] || 0) + (d.fat_ob     || 0);
+    wkCoOB[k]  = (wkCoOB[k]  || 0) + (d.compras_ob || 0);
   });
   SEMANAL.forEach(function(w) {
-    w.fat     = wkFat[w.semana] || 0;
-    w.compras = wkCo[w.semana]  || 0;
-    w.roas    = w.inv > 0 ? w.fat / w.inv : 0;
+    w.fat        = wkFat[w.semana]   || 0;
+    w.compras    = wkCo[w.semana]    || 0;
+    w.fat_ob     = wkFatOB[w.semana] || 0;
+    w.compras_ob = wkCoOB[w.semana]  || 0;
+    var fatTotal = w.fat + w.fat_ob;
+    w.roas    = w.inv > 0 ? fatTotal / w.inv : 0;
     w.ticket  = w.compras > 0 ? w.fat / w.compras : 0;
-    w.retorno = w.fat - w.inv;
+    w.retorno = fatTotal - w.inv;
     w.cac     = w.compras > 0 ? w.inv / w.compras : 0;
   });
-  var moFat = {}, moCo = {};
+  var moFat = {}, moCo = {}, moFatOB = {}, moCoOB = {};
   DIAS.forEach(function(d) {
     var k = monthKey(d.data);
-    moFat[k] = (moFat[k] || 0) + (d.fat || 0);
-    moCo[k]  = (moCo[k]  || 0) + (d.compras || 0);
+    moFat[k]   = (moFat[k]   || 0) + (d.fat        || 0);
+    moCo[k]    = (moCo[k]    || 0) + (d.compras    || 0);
+    moFatOB[k] = (moFatOB[k] || 0) + (d.fat_ob     || 0);
+    moCoOB[k]  = (moCoOB[k]  || 0) + (d.compras_ob || 0);
   });
   MENSAL.forEach(function(m) {
-    m.fat     = moFat[m.mes] || 0;
-    m.compras = moCo[m.mes]  || 0;
-    m.roas    = m.inv > 0 ? m.fat / m.inv : 0;
+    m.fat        = moFat[m.mes]   || 0;
+    m.compras    = moCo[m.mes]    || 0;
+    m.fat_ob     = moFatOB[m.mes] || 0;
+    m.compras_ob = moCoOB[m.mes]  || 0;
+    var fatTotalM = m.fat + m.fat_ob;
+    m.roas    = m.inv > 0 ? fatTotalM / m.inv : 0;
     m.ticket  = m.compras > 0 ? m.fat / m.compras : 0;
-    m.retorno = m.fat - m.inv;
+    m.retorno = fatTotalM - m.inv;
     m.cac     = m.compras > 0 ? m.inv / m.compras : 0;
   });
 }
@@ -730,34 +756,53 @@ function mkChart(id, labels, data, label, type) {
 }
 
 function renderVisao(dias) {
-  var inv = 0, imp = 0, cl = 0, pv = 0, ck = 0, fat = 0, compras = 0;
+  var inv = 0, imp = 0, cl = 0, pv = 0, ck = 0, fat = 0, compras = 0, fat_ob = 0, compras_ob = 0;
   dias.forEach(function(d) {
     inv += d.inv; imp += d.imp; cl += d.cliques; pv += d.pv; ck += d.ck;
     fat += (d.fat || 0); compras += (d.compras || 0);
+    fat_ob += (d.fat_ob || 0); compras_ob += (d.compras_ob || 0);
   });
+  var fatTotal = fat + fat_ob;
   var ctr    = imp > 0 ? cl / imp * 100 : 0;
   var cpc    = cl  > 0 ? inv / cl       : 0;
   var cpm    = imp > 0 ? inv / imp * 1000 : 0;
   var cr     = cl  > 0 ? pv  / cl  * 100 : 0;
   var txck   = pv  > 0 ? ck  / pv  * 100 : 0;
-  var roas   = inv > 0 ? fat / inv        : 0;
+  var roas   = inv > 0 ? fatTotal / inv   : 0;
   var cac    = compras > 0 ? inv / compras : 0;
   var ticket = compras > 0 ? fat / compras : 0;
   var txComp = pv  > 0 ? compras / pv * 100 : 0;
+  var txOB   = compras > 0 ? compras_ob / compras * 100 : 0;
+  var ticketOB = compras_ob > 0 ? fat_ob / compras_ob : 0;
+
+  var obSection = compras_ob > 0 || fat_ob > 0
+    ? '<div class="sec-title">Order Bumps</div>' +
+      '<div class="kpi-grid">' +
+        kpiCard('Fat. com OB',    brl(fatTotal),       'green') +
+        kpiCard('Fat. Principal', brl(fat),            '') +
+        kpiCard('Fat. OB',        brl(fat_ob),         'orange') +
+        kpiCard('Vendas OB',      brInt(compras_ob),   '') +
+        kpiCard('Taxa OB',        pct(txOB),           txOB >= 20 ? 'green' : 'yellow') +
+        kpiCard('Ticket OB',      brl(ticketOB),       '') +
+      '</div>'
+    : '';
 
   document.getElementById('kpi-visao').innerHTML =
-    kpiCard('Investimento',  brl(inv),    'orange') +
-    kpiCard('Faturamento',   brl(fat),    'green') +
+    kpiCard('Investimento',  brl(inv),         'orange') +
+    kpiCard('Faturamento',   brl(fatTotal),    'green') +
     kpiCard('ROAS',          br(roas,2) + 'x', roas >= 1.7 ? 'green' : roas >= 1 ? 'yellow' : 'red') +
-    kpiCard('Compras',       brInt(compras), 'green') +
-    kpiCard('Ticket Medio',  brl(ticket), '') +
-    kpiCard('CAC',           brl(cac),    '') +
-    kpiCard('Cliques',       brInt(cl),   '') +
-    kpiCard('Impressoes',    brInt(imp),  '') +
-    kpiCard('CPC',           brl(cpc),    'orange') +
-    kpiCard('CPM',           brl(cpm),    '') +
-    kpiCard('CTR',           pct(ctr),    ctrColor(ctr)) +
-    kpiCard('Page Views',    brInt(pv),   '');
+    kpiCard('Compras',       brInt(compras),   'green') +
+    kpiCard('Ticket Medio',  brl(ticket),      '') +
+    kpiCard('CAC',           brl(cac),         '') +
+    kpiCard('Cliques',       brInt(cl),        '') +
+    kpiCard('Impressoes',    brInt(imp),       '') +
+    kpiCard('CPC',           brl(cpc),         'orange') +
+    kpiCard('CPM',           brl(cpm),         '') +
+    kpiCard('CTR',           pct(ctr),         ctrColor(ctr)) +
+    kpiCard('Page Views',    brInt(pv),        '');
+
+  var obEl = document.getElementById('ob-section');
+  if (obEl) obEl.innerHTML = obSection;
 
   document.getElementById('funil-bars').innerHTML =
     funilBar('Cliques',    brInt(cl),      100) +
@@ -951,64 +996,80 @@ function renderPub() {
 }
 
 function renderSemanal() {
-  var inv = 0, cl = 0, imp = 0, fat = 0, compras = 0;
-  SEMANAL.forEach(function(w) { inv += w.inv; cl += w.cliques; imp += w.imp; fat += (w.fat||0); compras += (w.compras||0); });
-  var ctr  = imp > 0 ? cl  / imp * 100 : 0;
-  var roas = inv > 0 ? fat / inv       : 0;
+  var inv = 0, cl = 0, imp = 0, fat = 0, compras = 0, fat_ob = 0, compras_ob = 0;
+  SEMANAL.forEach(function(w) {
+    inv += w.inv; cl += w.cliques; imp += w.imp;
+    fat += (w.fat||0); compras += (w.compras||0);
+    fat_ob += (w.fat_ob||0); compras_ob += (w.compras_ob||0);
+  });
+  var fatTotal = fat + fat_ob;
+  var ctr  = imp > 0 ? cl / imp * 100 : 0;
+  var roas = inv > 0 ? fatTotal / inv  : 0;
 
   document.getElementById('kpi-wk').innerHTML =
-    kpiCard('Investimento Total', brl(inv),       'orange') +
-    kpiCard('Faturamento Total',  brl(fat),       'green') +
-    kpiCard('ROAS Medio',         br(roas,2)+'x', roas >= 1.7 ? 'green' : roas >= 1 ? 'yellow' : 'red') +
-    kpiCard('Compras Total',      brInt(compras), '') +
-    kpiCard('Cliques Total',      brInt(cl),      '') +
-    kpiCard('CTR Medio',          pct(ctr),       ctrColor(ctr));
+    kpiCard('Investimento Total', brl(inv),         'orange') +
+    kpiCard('Faturamento Total',  brl(fatTotal),    'green') +
+    kpiCard('ROAS Medio',         br(roas,2)+'x',  roas >= 1.7 ? 'green' : roas >= 1 ? 'yellow' : 'red') +
+    kpiCard('Compras Total',      brInt(compras),   '') +
+    (compras_ob > 0 ? kpiCard('OB Total', brInt(compras_ob) + ' · ' + brl(fat_ob), 'orange') : '') +
+    kpiCard('Cliques Total',      brInt(cl),        '') +
+    kpiCard('CTR Medio',          pct(ctr),         ctrColor(ctr));
 
   var labels = SEMANAL.map(function(w) { return 'Sem ' + w.semana.slice(2); });
   mkChart('ch-inv-wk', labels, SEMANAL.map(function(w) { return w.inv; }), 'Investimento', 'bar');
   mkChart('ch-ctr-wk', labels, SEMANAL.map(function(w) { return w.ctr; }), 'CTR', 'line');
 
   document.getElementById('tb-wk').innerHTML = SEMANAL.map(function(w) {
-    var wr = w.inv > 0 ? (w.fat||0) / w.inv : 0;
+    var wFatTotal = (w.fat||0) + (w.fat_ob||0);
+    var wr = w.inv > 0 ? wFatTotal / w.inv : 0;
     return '<tr>' +
       '<td>Sem ' + w.semana.slice(2) + ' / 20' + w.semana.slice(0,2) + '</td>' +
-      '<td>' + brl(w.inv)                          + '</td>' +
-      '<td>' + brl(w.fat||0)                       + '</td>' +
-      '<td>' + (wr > 0 ? br(wr,2)+'x' : '&#8212;') + '</td>' +
-      '<td>' + brInt(w.compras||0)                 + '</td>' +
-      '<td>' + brInt(w.imp)                        + '</td>' +
-      '<td>' + brInt(w.cliques)                    + '</td>' +
-      '<td>' + pct(w.ctr)                          + '</td>' +
-      '<td>' + brl(w.cpc)                          + '</td>' +
-      '<td>' + brl(w.cpm)                          + '</td>' +
-      '<td>' + brInt(w.pv)                         + '</td>' +
-      '<td>' + brInt(w.ck)                         + '</td>' +
-      '<td>' + pct(w.connectRate)                  + '</td>' +
+      '<td>' + brl(w.inv)                           + '</td>' +
+      '<td>' + brl(wFatTotal)                        + '</td>' +
+      '<td>' + (wr > 0 ? br(wr,2)+'x' : '&#8212;')  + '</td>' +
+      '<td>' + brInt(w.compras||0)                  + '</td>' +
+      '<td>' + (w.compras_ob ? brInt(w.compras_ob) + ' OB' : '&#8212;') + '</td>' +
+      '<td>' + brInt(w.imp)                         + '</td>' +
+      '<td>' + brInt(w.cliques)                     + '</td>' +
+      '<td>' + pct(w.ctr)                           + '</td>' +
+      '<td>' + brl(w.cpc)                           + '</td>' +
+      '<td>' + brl(w.cpm)                           + '</td>' +
+      '<td>' + brInt(w.pv)                          + '</td>' +
+      '<td>' + brInt(w.ck)                          + '</td>' +
+      '<td>' + pct(w.connectRate)                   + '</td>' +
       '</tr>';
   }).join('');
 }
 
 function renderMensal() {
-  var inv = 0, cl = 0, fat = 0, compras = 0;
-  MENSAL.forEach(function(m) { inv += m.inv; cl += m.cliques; fat += (m.fat||0); compras += (m.compras||0); });
-  var roas = inv > 0 ? fat / inv : 0;
+  var inv = 0, cl = 0, fat = 0, compras = 0, fat_ob = 0, compras_ob = 0;
+  MENSAL.forEach(function(m) {
+    inv += m.inv; cl += m.cliques;
+    fat += (m.fat||0); compras += (m.compras||0);
+    fat_ob += (m.fat_ob||0); compras_ob += (m.compras_ob||0);
+  });
+  var fatTotal = fat + fat_ob;
+  var roas = inv > 0 ? fatTotal / inv : 0;
 
   document.getElementById('kpi-mo').innerHTML =
-    kpiCard('Investimento Total', brl(inv),       'orange') +
-    kpiCard('Faturamento Total',  brl(fat),       'green') +
-    kpiCard('ROAS Medio',         br(roas,2)+'x', roas >= 1.7 ? 'green' : roas >= 1 ? 'yellow' : 'red') +
-    kpiCard('Compras Total',      brInt(compras), '') +
-    kpiCard('Cliques Total',      brInt(cl),      '') +
-    kpiCard('Meses Ativos',       MENSAL.length,  '');
+    kpiCard('Investimento Total', brl(inv),         'orange') +
+    kpiCard('Faturamento Total',  brl(fatTotal),    'green') +
+    kpiCard('ROAS Medio',         br(roas,2)+'x',  roas >= 1.7 ? 'green' : roas >= 1 ? 'yellow' : 'red') +
+    kpiCard('Compras Total',      brInt(compras),   '') +
+    (compras_ob > 0 ? kpiCard('OB Total', brInt(compras_ob) + ' · ' + brl(fat_ob), 'orange') : '') +
+    kpiCard('Cliques Total',      brInt(cl),        '') +
+    kpiCard('Meses Ativos',       MENSAL.length,    '');
 
   document.getElementById('tb-mo').innerHTML = MENSAL.map(function(m) {
-    var mr = m.inv > 0 ? (m.fat||0) / m.inv : 0;
+    var mFatTotal = (m.fat||0) + (m.fat_ob||0);
+    var mr = m.inv > 0 ? mFatTotal / m.inv : 0;
     return '<tr>' +
       '<td>' + m.mes                               + '</td>' +
       '<td>' + brl(m.inv)                          + '</td>' +
-      '<td>' + brl(m.fat||0)                       + '</td>' +
+      '<td>' + brl(mFatTotal)                      + '</td>' +
       '<td>' + (mr > 0 ? br(mr,2)+'x' : '&#8212;') + '</td>' +
       '<td>' + brInt(m.compras||0)                 + '</td>' +
+      '<td>' + (m.compras_ob ? brInt(m.compras_ob) + ' OB' : '&#8212;') + '</td>' +
       '<td>' + brInt(m.imp)                        + '</td>' +
       '<td>' + brInt(m.cliques)                    + '</td>' +
       '<td>' + pct(m.ctr)                          + '</td>' +
