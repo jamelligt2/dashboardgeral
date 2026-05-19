@@ -562,13 +562,29 @@ function processWebhook(csv) {
   if (rows.length < 2) return;
   var h = rows[0].map(function(c) { return c.toLowerCase().trim(); });
 
+  function findAll(test) {
+    var idxs = [];
+    h.forEach(function(c, i) { if (test(c)) idxs.push(i); });
+    return idxs;
+  }
+  function firstNonEmpty(r, idxs) {
+    for (var i = 0; i < idxs.length; i++) {
+      var v = (r[idxs[i]] || '').trim();
+      if (v) return v;
+    }
+    return '';
+  }
+
   var ci = {
-    data:     h.findIndex(function(c) { return c === 'data'; }),
-    status:   h.findIndex(function(c) { return c === 'status'; }),
-    fatTotal: h.findIndex(function(c) { return c === 'faturado total'; }),
-    tipo:     h.findIndex(function(c) { return c === 'tipo'; }),
-    utmSrc:   h.findIndex(function(c) { return c === 'utm_source'; }),
-    src:      h.findIndex(function(c) { return c === 'src'; })
+    status:      h.findIndex(function(c) { return c === 'data.status'; }),
+    amount:      h.findIndex(function(c) { return c === 'data.amount'; }),
+    // Cakto/Kiwify pode exportar como "data.offer_type" ou "data_offer_type"
+    offerType:   h.findIndex(function(c) { return c === 'data.offer_type' || c === 'data_offer_type'; }),
+    parentOrder: h.findIndex(function(c) { return c === 'data.parent_order'; }),
+    paidAts:     findAll(function(c) { return c === 'data.paidat'; }),
+    createdAts:  findAll(function(c) { return c === 'data.createdat'; }),
+    utmSrcs:     findAll(function(c) { return c === 'data.utm_source'; }),
+    fbcs:        findAll(function(c) { return c === 'data.fbc'; })
   };
 
   var nonMeta = ['instabio','manychat','gruposantigos','organico','organic','whatsapp','email','sms','youtube'];
@@ -576,25 +592,27 @@ function processWebhook(csv) {
   var whMap = {};
   rows.slice(1).forEach(function(r) {
     var status = ci.status >= 0 ? (r[ci.status] || '').toLowerCase().trim() : '';
-    if (status !== 'approved' && status !== 'paid') return;
+    if (status !== 'paid') return;
 
-    var utmSrc = ci.utmSrc >= 0 ? (r[ci.utmSrc] || '').toLowerCase().replace(/[\s_\-]/g, '') : '';
-    var src    = ci.src    >= 0 ? (r[ci.src]    || '').toLowerCase() : '';
+    var utmSrc = firstNonEmpty(r, ci.utmSrcs).toLowerCase().replace(/[\s_\-]/g, '');
+    var fbc    = firstNonEmpty(r, ci.fbcs);
     // Exclui apenas fontes explicitamente não-Meta; sem fonte = não-atribuída, conta no total
     var isExplicitNonMeta = utmSrc !== '' && nonMeta.some(function(s) { return utmSrc.indexOf(s) >= 0; });
     if (isExplicitNonMeta) return;
 
-    // Data no formato DD-MM-YYYY HH:MM → converte para DD/MM/YYYY
-    var rawData = ci.data >= 0 ? (r[ci.data] || '').trim() : '';
-    if (!rawData) return;
-    var datePart = rawData.split(' ')[0]; // DD-MM-YYYY
-    var dp = datePart.split('-');
-    if (dp.length < 3) return;
-    var dataBR = dp[0] + '/' + dp[1] + '/' + dp[2]; // DD/MM/YYYY
+    // Usa o primeiro paidAt não-vazio entre colunas duplicadas; cai em createdAt se necessário
+    var paidAt = firstNonEmpty(r, ci.paidAts) || firstNonEmpty(r, ci.createdAts);
+    if (!paidAt) return;
 
-    var amount = ci.fatTotal >= 0 ? parseMoney(r[ci.fatTotal] || '0') : 0;
-    var tipo   = ci.tipo >= 0 ? (r[ci.tipo] || '').toLowerCase().trim() : 'principal';
-    var isOB   = tipo === 'order_bump';
+    var dateISO = paidAt.slice(0, 10);
+    var p = dateISO.split('-');
+    var dataBR = p[2] + '/' + p[1] + '/' + p[0];
+    var amount = ci.amount >= 0 ? parseMoney(r[ci.amount] || '0') : 0;
+
+    // OB: offer_type = 'order_bump' ou parent_order preenchido
+    var offerType   = ci.offerType   >= 0 ? (r[ci.offerType]   || '').toLowerCase().trim() : '';
+    var parentOrder = ci.parentOrder >= 0 ? (r[ci.parentOrder] || '').trim() : '';
+    var isOB = offerType === 'order_bump' || parentOrder !== '';
 
     if (!whMap[dataBR]) whMap[dataBR] = { fat: 0, compras: 0, fat_ob: 0, compras_ob: 0 };
     if (isOB) {
