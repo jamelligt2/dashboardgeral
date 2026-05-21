@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>O Grande Salto · Caio Hernandez — Jamelli GT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#1a1a2e;color:#e8e6f0;font-family:'DM Sans',sans-serif;min-height:100vh}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:#12121f}
+::-webkit-scrollbar-thumb{background:#ff6b2b55;border-radius:3px}
+.topbar{background:#12121f;padding:12px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.07);position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:10px}
+.brand{font-size:17px;font-weight:700;color:#ff6b2b}
+.subtitle{font-size:11px;color:rgba(255,255,255,0.4);margin-top:2px}
+.logo-jgt{display:flex;align-items:center;gap:10px}
+.logo-jgt svg{width:36px;height:36px;flex-shrink:0}
+.logo-text{display:flex;flex-direction:column}
+.logo-text strong{font-size:13px;font-weight:700;color:#ff6b2b;letter-spacing:.3px}
+.logo-text span{font-size:10px;color:rgba(255,255,255,.35);margin-top:1px}
+.period-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.period-bar label{font-size:11px;color:rgba(255,255,255,.45);white-space:nowrap}
+.date-input{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:#e8e6f0;padding:5px 10px;border-radius:6px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;outline:none;min-width:118px}
+.date-input:focus{border-color:#ff6b2b}
+.date-input::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;cursor:pointer}
+.period-sep{color:rgba(255,255,255,.2);font-size:13px;padding:0 2px}
+.preset-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;transition:all .2s;white-space:nowrap}
+.preset-btn:hover,.preset-btn.active{background:rgba(255,107,43,.2);border-color:#ff6b2b;color:#ff6b2b;font-weight:600}
+.range-info{font-size:11px;color:rgba(255,107,43,.75);font-family:'DM Mono',monospace;white-space:nowrap;padding-left:4px}
+.tabs{display:flex;border-bottom:1px solid rgba(255,255,255,0.07);background:#12121f;padding:0 28px;overflow-x:auto}
+.tab{padding:12px 20px;cursor:pointer;font-size:13px;color:rgba(255,255,255,0.5);border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
+.tab:hover{color:#e8e6f0}
+.tab.active{color:#ff6b2b;border-bottom-color:#ff6b2b;font-weight:600}
+.content{padding:24px 28px;display:none}
+.content.active{display:block}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:20px}
+.kpi-card{background:#12121f;border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:16px 18px}
+.kpi-label{font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.kpi-value{font-size:20px;font-weight:700;font-family:'DM Mono',monospace}
+.kpi-sub{font-size:10px;color:rgba(255,255,255,.4);margin-top:4px}
+.orange{color:#ff6b2b}.green{color:#2ecc71}.red{color:#e74c3c}.yellow{color:#f1c40f}.blue{color:#3498db}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#12121f;color:rgba(255,255,255,.45);padding:8px 10px;text-align:right;font-weight:500;border-bottom:1px solid rgba(255,255,255,.07);white-space:nowrap;font-size:10px;text-transform:uppercase;letter-spacing:.4px}
+th:first-child{text-align:left}
+td{padding:7px 10px;text-align:right;border-bottom:1px solid rgba(255,255,255,.04);font-family:'DM Mono',monospace;font-size:11px;color:#e8e6f0}
+td:first-child{text-align:left;font-family:'DM Sans',sans-serif;font-size:12px}
+tr:hover td{background:rgba(255,255,255,.025)}
+.funil-section{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:16px 0}
+.funil-bar-wrap{margin-bottom:12px}
+.funil-label{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;color:rgba(255,255,255,.7)}
+.funil-bar-bg{background:rgba(255,255,255,.05);border-radius:4px;height:14px;overflow:hidden}
+.funil-bar-fill{background:linear-gradient(90deg,#ff6b2b,#ff9a3c);height:100%;border-radius:4px;transition:width .4s}
+.taxa-grid{display:grid;gap:8px}
+.taxa-item{background:rgba(255,255,255,.04);border-radius:8px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;font-size:12px;color:rgba(255,255,255,.7)}
+.taxa-val{font-family:'DM Mono',monospace;font-size:15px;font-weight:600;color:#ff6b2b}
+.chart-grid-2x2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0}
+.chart-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:16px}
+.chart-card h4{font-size:11px;color:rgba(255,255,255,.45);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
+.chart-card canvas{max-height:190px}
+.sec-title{font-size:13px;font-weight:600;color:rgba(255,255,255,.65);margin:20px 0 10px;border-left:3px solid #ff6b2b;padding-left:10px}
+.cri-filterbar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.cri-filter-btn,.cri-status-btn,.cri-sort-btn,.pub-filter-btn,.pub-sort-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 12px;border-radius:5px;cursor:pointer;font-size:12px;transition:all .2s;font-family:'DM Sans',sans-serif}
+.cri-filter-btn.active,.cri-status-btn.active,.cri-sort-btn.active,.pub-filter-btn.active,.pub-sort-btn.active{background:rgba(255,107,43,.2);border-color:#ff6b2b;color:#ff6b2b}
+.cri-sort-label{font-size:11px;color:rgba(255,255,255,.4);white-space:nowrap}
+.cri-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
+.cri-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:14px;display:flex;flex-direction:column}
+.cri-card.ativo{border-color:rgba(46,204,113,.25)}
+.cri-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:6px}
+.cri-name{font-size:11px;font-weight:600;word-break:break-all;flex:1;color:#e8e6f0;line-height:1.4}
+.cri-badge{font-size:9px;padding:2px 6px;border-radius:4px;white-space:nowrap}
+.cri-badge.ativo{background:rgba(46,204,113,.15);color:#2ecc71}
+.cri-badge.inativo{background:rgba(255,255,255,.08);color:rgba(255,255,255,.4)}
+.cri-metrics{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px}
+.cri-metric{display:flex;flex-direction:column}
+.cri-metric-label{color:rgba(255,255,255,.4);font-size:9px;margin-bottom:2px;text-transform:uppercase}
+.cri-metric-val{font-family:'DM Mono',monospace;font-size:12px;font-weight:600;color:#e8e6f0}
+.cri-metric-val.hl{color:#ff6b2b;font-size:14px}
+.cri-metric-val.good{color:#2ecc71}
+.cri-metric-val.warn{color:#f1c40f}
+.cri-link{display:block;margin-top:auto;padding-top:8px;font-size:10px;color:rgba(255,107,43,.8);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-top:1px solid rgba(255,255,255,.05)}
+.cri-link:hover{color:#ff6b2b}
+.tbl-wrap{overflow-x:auto;border-radius:8px;border:1px solid rgba(255,255,255,.07)}
+.pub-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-bottom:24px}
+.pub-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:16px}
+.pub-card.ativo{border-color:rgba(46,204,113,.2)}
+.pub-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+.pub-name{font-size:12px;font-weight:600;flex:1;margin-right:8px;color:#e8e6f0;line-height:1.4}
+.pub-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.pub-metric{text-align:center;padding:8px 6px;background:rgba(255,255,255,.03);border-radius:6px}
+.pub-metric-val{font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:#ff6b2b}
+.pub-metric-val.neutral{color:#e8e6f0}
+.pub-metric-lbl{font-size:9px;color:rgba(255,255,255,.35);margin-top:2px;text-transform:uppercase;letter-spacing:.4px}
+.info-box{background:rgba(255,107,43,.07);border:1px solid rgba(255,107,43,.2);border-radius:8px;padding:10px 14px;font-size:11px;color:rgba(255,255,255,.6);margin-bottom:16px;line-height:1.5}
+.empty-state{padding:40px 20px;text-align:center;color:rgba(255,255,255,.4);font-size:13px;background:rgba(255,255,255,.02);border-radius:10px;border:1px dashed rgba(255,255,255,.08)}
+.empty-state strong{color:#ff6b2b;display:block;margin-bottom:6px;font-size:14px}
+@media(max-width:900px){.cri-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.cri-grid{grid-template-columns:1fr}.chart-grid-2x2{grid-template-columns:1fr}.funil-section{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div id="loading-overlay" style="position:fixed;inset:0;background:#1a1a2e;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px">
+  <div style="width:40px;height:40px;border:3px solid rgba(255,107,43,.2);border-top-color:#ff6b2b;border-radius:50%;animation:spin 1s linear infinite"></div>
+  <div style="color:rgba(255,255,255,.5);font-size:13px" id="loading-msg">Conectando com a planilha...</div>
+  <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+</div>
+
+<div class="topbar">
+  <div class="logo-jgt">
+    <svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+      <rect width="36" height="36" rx="8" fill="#ff6b2b" fill-opacity="0.9"/>
+      <text x="18" y="25" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="13" fill="white">JGT</text>
+    </svg>
+    <div class="logo-text">
+      <strong>Jamelli GT</strong>
+      <span>Tráfego Pago</span>
+    </div>
+  </div>
+  <div class="period-bar">
+    <label>De</label>
+    <input type="date" id="dateFrom" class="date-input" onchange="onDateChange()">
+    <span class="period-sep">→</span>
+    <input type="date" id="dateTo" class="date-input" onchange="onDateChange()">
+    <button class="preset-btn" onclick="setPreset(7,this)">7d</button>
+    <button class="preset-btn" onclick="setPreset(14,this)">14d</button>
+    <button class="preset-btn" onclick="setPreset(30,this)">30d</button>
+    <button class="preset-btn active" id="btn-all" onclick="setPreset('all',this)">Tudo</button>
+    <span class="range-info" id="range-info"></span>
+    <button class="preset-btn" onclick="loadData()" style="margin-left:4px">🔄 Atualizar</button>
+  </div>
+  <div>
+    <div class="brand" id="brand-title">📦 O Grande Salto · Caio Hernandez</div>
+    <div class="subtitle" id="brand-subtitle">Dashboard de Performance — Lançamento · Jamelli GT · 2026</div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('trafego',this)">📊 Tráfego</div>
+  <div class="tab" onclick="showTab('visao',this)">🌐 Visão Geral</div>
+  <div class="tab" onclick="showTab('criativos',this)">🎬 Criativos</div>
+  <div class="tab" onclick="showTab('publicos',this)">👥 Públicos</div>
+  <div class="tab" onclick="showTab('semanal',this)">📅 Semana a Semana</div>
+  <div class="tab" onclick="showTab('mensal',this)">🗓️ Mês a Mês</div>
+</div>
+
+<div class="content active" id="content-trafego">
+  <div id="kpi-trafego" class="kpi-grid"></div>
+  <div class="funil-section">
+    <div class="chart-card">
+      <h4>Funil de conversão (Meta)</h4>
+      <div id="funil-bars"></div>
+    </div>
+    <div class="chart-card">
+      <h4>Taxas-chave</h4>
+      <div id="taxas" class="taxa-grid"></div>
+    </div>
+  </div>
+  <div class="chart-grid-2x2">
+    <div class="chart-card"><h4>Investimento diário</h4><canvas id="chart-inv-dia"></canvas></div>
+    <div class="chart-card"><h4>CPC diário (R$)</h4><canvas id="chart-cpc-dia"></canvas></div>
+    <div class="chart-card"><h4>CTR diário (%)</h4><canvas id="chart-ctr-dia"></canvas></div>
+    <div class="chart-card"><h4>Hook Rate diário (%)</h4><canvas id="chart-hook-dia"></canvas></div>
+    <div class="chart-card"><h4>Hold Rate diário (%)</h4><canvas id="chart-hold-dia"></canvas></div>
+  </div>
+</div>
+
+<div class="content" id="content-visao">
+  <div id="kpi-visao" class="kpi-grid"></div>
+  <div class="sec-title">Performance dia a dia</div>
+  <div class="tbl-wrap"><table id="tbl-visao"></table></div>
+</div>
+
+<div class="content" id="content-criativos">
+  <div class="info-box">
+    💡 <strong>Hook Rate</strong> = 3s Video Views / Impressões (atenção dos primeiros 3 segundos) · <strong>Hold Rate</strong> = 75% Video Views / 3s Video Views (retenção até 75% do vídeo)
+  </div>
+  <div class="cri-filterbar">
+    <span class="cri-sort-label">Status:</span>
+    <button class="cri-status-btn active" data-status="todos" onclick="setCriStatus('todos',this)">Todos</button>
+    <button class="cri-status-btn" data-status="ativos" onclick="setCriStatus('ativos',this)">Ativos</button>
+    <button class="cri-status-btn" data-status="inativos" onclick="setCriStatus('inativos',this)">Inativos</button>
+    <span class="cri-sort-label" style="margin-left:12px">Ordenar:</span>
+    <button class="cri-sort-btn active" data-sort="inv" onclick="setCriSort('inv',this)">Investimento</button>
+    <button class="cri-sort-btn" data-sort="hook" onclick="setCriSort('hook',this)">Hook Rate</button>
+    <button class="cri-sort-btn" data-sort="hold" onclick="setCriSort('hold',this)">Hold Rate</button>
+    <button class="cri-sort-btn" data-sort="ctr" onclick="setCriSort('ctr',this)">CTR</button>
+    <button class="cri-sort-btn" data-sort="cpc" onclick="setCriSort('cpc',this)">CPC</button>
+    <button class="cri-sort-btn" data-sort="cpa" onclick="setCriSort('cpa',this)">CPA</button>
+    <button class="cri-sort-btn" data-sort="compras" onclick="setCriSort('compras',this)">Compras</button>
+  </div>
+  <div id="cri-grid" class="cri-grid"></div>
+  <div class="sec-title">Tabela completa de criativos</div>
+  <div class="tbl-wrap"><table id="tbl-criativos"></table></div>
+</div>
+
+<div class="content" id="content-publicos">
+  <div class="cri-filterbar">
+    <span class="cri-sort-label">Status:</span>
+    <button class="pub-filter-btn active" data-status="todos" onclick="setPubStatus('todos',this)">Todos</button>
+    <button class="pub-filter-btn" data-status="ativos" onclick="setPubStatus('ativos',this)">Ativos</button>
+    <button class="pub-filter-btn" data-status="inativos" onclick="setPubStatus('inativos',this)">Inativos</button>
+    <span class="cri-sort-label" style="margin-left:12px">Ordenar:</span>
+    <button class="pub-sort-btn active" data-sort="inv" onclick="setPubSort('inv',this)">Investimento</button>
+    <button class="pub-sort-btn" data-sort="ctr" onclick="setPubSort('ctr',this)">CTR</button>
+    <button class="pub-sort-btn" data-sort="cpc" onclick="setPubSort('cpc',this)">CPC</button>
+    <button class="pub-sort-btn" data-sort="cpa" onclick="setPubSort('cpa',this)">CPA</button>
+    <button class="pub-sort-btn" data-sort="compras" onclick="setPubSort('compras',this)">Compras</button>
+  </div>
+  <div id="pub-grid" class="pub-grid"></div>
+  <div class="sec-title">Tabela completa de públicos</div>
+  <div class="tbl-wrap"><table id="tbl-publicos"></table></div>
+</div>
+
+<div class="content" id="content-semanal">
+  <div class="sec-title">Performance semana a semana</div>
+  <div class="tbl-wrap"><table id="tbl-semanal"></table></div>
+  <div class="chart-grid-2x2" style="margin-top:20px">
+    <div class="chart-card"><h4>Investimento por semana</h4><canvas id="chart-sem-inv"></canvas></div>
+    <div class="chart-card"><h4>CTR por semana (%)</h4><canvas id="chart-sem-ctr"></canvas></div>
+  </div>
+</div>
+
+<div class="content" id="content-mensal">
+  <div class="sec-title">Performance mês a mês</div>
+  <div class="tbl-wrap"><table id="tbl-mensal"></table></div>
+  <div class="chart-grid-2x2" style="margin-top:20px">
+    <div class="chart-card"><h4>Investimento por mês</h4><canvas id="chart-mes-inv"></canvas></div>
+    <div class="chart-card"><h4>CTR por mês (%)</h4><canvas id="chart-mes-ctr"></canvas></div>
+  </div>
+</div>
+
+<script>
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║           CONFIGURAÇÃO DO CLIENTE — EDITE APENAS AQUI           ║
+// ╚══════════════════════════════════════════════════════════════════╝
+const CONFIG = {
+  CLIENTE:    'Caio Hernandez',
+  PRODUTO:    'O Grande Salto',
+  ANO:        '2026',
+  SHEET_ID:   '1gQnsIucFQKHlbPQwVRLYoopH40aU8qQRP8ugn4-Px-U',
+  SHEET_NAME: 'Page1',  // primeira aba (Stract export)
+  DATA_MINIMA:'2026-05-17',
+  // Mapeamento de colunas (Stract Meta Ads)
+  C: {
+    date:        0,
+    spend:       1,
+    clicks:      2,
+    pageView:    3,
+    checkout:    4,
+    purchase:    5,
+    campaign:    6,
+    adset:       7,
+    ad:          8,
+    reach:       9,
+    link:        10,
+    impressions: 11,
+    video3s:     12,
+    video75:     13,
+  },
+  // Janela de "ativo": criativo com gasto nos últimos N dias
+  ATIVO_JANELA_DIAS: 3,
+};
+
+// Estado global
+let ROWS = [];                 // linhas brutas filtradas (status data >= mínima)
+let DIAS = [];                 // agregados por dia
+let CHARTS = {};
+let CRI_STATUS = 'todos';
+let CRI_SORT = 'inv';
+let PUB_STATUS = 'todos';
+let PUB_SORT = 'inv';
+let CUR_FROM = '';
+let CUR_TO = '';
+
+// ── Utils ──────────────────────────────────────────────────────────
+const fmtBRL = v => isFinite(v) && v !== 0
+  ? 'R$ ' + Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2})
+  : '—';
+const fmtNum = v => isFinite(v) && v !== 0
+  ? Number(v).toLocaleString('pt-BR',{maximumFractionDigits:0})
+  : '—';
+const fmtPct = v => isFinite(v) && v !== 0
+  ? v.toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2}) + '%'
+  : '—';
+const fmtPct1 = v => isFinite(v) && v !== 0
+  ? v.toLocaleString('pt-BR',{minimumFractionDigits:1, maximumFractionDigits:1}) + '%'
+  : '—';
+
+function parseBRNum(s){
+  if (s === undefined || s === null) return 0;
+  s = String(s).trim();
+  if (!s) return 0;
+  // remove milhar (.) e troca decimal (,) por (.)
+  s = s.replace(/\./g,'').replace(',','.');
+  const n = parseFloat(s);
+  return isFinite(n) ? n : 0;
+}
+
+function parseCSV(text){
+  const rows = [];
+  let cur = '', row = [], inQ = false;
+  for (let i = 0; i < text.length; i++){
+    const c = text[i];
+    if (inQ){
+      if (c === '"'){
+        if (text[i+1] === '"'){ cur += '"'; i++; }
+        else inQ = false;
+      } else cur += c;
+    } else {
+      if (c === '"') inQ = true;
+      else if (c === ','){ row.push(cur); cur = ''; }
+      else if (c === '\n'){ row.push(cur); rows.push(row); row = []; cur = ''; }
+      else if (c === '\r'){ /* ignore */ }
+      else cur += c;
+    }
+  }
+  if (cur.length || row.length){ row.push(cur); rows.push(row); }
+  return rows;
+}
+
+async function fetchSheetCSV(){
+  // gid=0 garante a primeira aba mesmo se nome mudar
+  const url = `https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/export?format=csv&gid=0`;
+  const controller = new AbortController();
+  const timeout = setTimeout(()=>controller.abort(), 20000);
+  try {
+    const resp = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}. Verifique se a planilha está pública.`);
+    const text = await resp.text();
+    if (text.includes('Signin') || text.includes('accounts.google'))
+      throw new Error('Planilha requer login. Defina compartilhamento como "Qualquer pessoa com o link".');
+    return text;
+  } catch(e){
+    clearTimeout(timeout);
+    if (e.name === 'AbortError') throw new Error('Timeout ao carregar planilha.');
+    throw e;
+  }
+}
+
+// ── Processamento ──────────────────────────────────────────────────
+function processRows(rows){
+  const C = CONFIG.C;
+  const out = [];
+  // Pula cabeçalho
+  for (let i = 1; i < rows.length; i++){
+    const r = rows[i];
+    if (!r || !r[C.date]) continue;
+    const data = String(r[C.date]).trim();
+    if (!data || data < CONFIG.DATA_MINIMA) continue;
+    out.push({
+      data,
+      spend:       parseBRNum(r[C.spend]),
+      clicks:      parseBRNum(r[C.clicks]),
+      pageView:    parseBRNum(r[C.pageView]),
+      checkout:    parseBRNum(r[C.checkout]),
+      purchase:    parseBRNum(r[C.purchase]),
+      campaign:    String(r[C.campaign]||'').trim(),
+      adset:       String(r[C.adset]||'').trim(),
+      ad:          String(r[C.ad]||'').trim(),
+      reach:       parseBRNum(r[C.reach]),
+      link:        String(r[C.link]||'').trim(),
+      impressions: parseBRNum(r[C.impressions]),
+      video3s:     parseBRNum(r[C.video3s]),
+      video75:     parseBRNum(r[C.video75]),
+    });
+  }
+  return out;
+}
+
+function aggregateDays(rows){
+  const map = new Map();
+  for (const r of rows){
+    if (!map.has(r.data)) map.set(r.data, {
+      data:r.data, spend:0, clicks:0, pageView:0, checkout:0, purchase:0,
+      reach:0, impressions:0, video3s:0, video75:0
+    });
+    const d = map.get(r.data);
+    d.spend += r.spend;
+    d.clicks += r.clicks;
+    d.pageView += r.pageView;
+    d.checkout += r.checkout;
+    d.purchase += r.purchase;
+    d.reach += r.reach;
+    d.impressions += r.impressions;
+    d.video3s += r.video3s;
+    d.video75 += r.video75;
+  }
+  return Array.from(map.values()).sort((a,b)=>a.data.localeCompare(b.data));
+}
+
+function filterByDate(rows, from, to){
+  return rows.filter(r =>
+    (!from || r.data >= from) && (!to || r.data <= to)
+  );
+}
+
+function sumMetrics(rows){
+  const t = { spend:0, clicks:0, pageView:0, checkout:0, purchase:0,
+              reach:0, impressions:0, video3s:0, video75:0 };
+  for (const r of rows){
+    t.spend += r.spend;
+    t.clicks += r.clicks;
+    t.pageView += r.pageView;
+    t.checkout += r.checkout;
+    t.purchase += r.purchase;
+    t.reach += r.reach;
+    t.impressions += r.impressions;
+    t.video3s += r.video3s;
+    t.video75 += r.video75;
+  }
+  return t;
+}
+
+// ── Render KPIs Tráfego ────────────────────────────────────────────
+function renderTrafego(rows){
+  const t = sumMetrics(rows);
+  const ctr  = t.impressions ? (t.clicks/t.impressions)*100 : 0;
+  const cpc  = t.clicks ? t.spend/t.clicks : 0;
+  const cpm  = t.impressions ? (t.spend/t.impressions)*1000 : 0;
+  const cpa  = t.purchase ? t.spend/t.purchase : 0;
+  const hook = t.impressions ? (t.video3s/t.impressions)*100 : 0;
+  const hold = t.video3s ? (t.video75/t.video3s)*100 : 0;
+
+  document.getElementById('kpi-trafego').innerHTML = `
+    <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${fmtBRL(t.spend)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Impressões</div><div class="kpi-value">${fmtNum(t.impressions)}</div><div class="kpi-sub">Alcance: ${fmtNum(t.reach)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Cliques</div><div class="kpi-value">${fmtNum(t.clicks)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CTR</div><div class="kpi-value ${ctr>=1?'green':(ctr>=0.5?'yellow':'red')}">${fmtPct(ctr)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CPC</div><div class="kpi-value">${fmtBRL(cpc)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CPM</div><div class="kpi-value">${fmtBRL(cpm)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Hook Rate</div><div class="kpi-value ${hook>=25?'green':(hook>=15?'yellow':'red')}">${fmtPct(hook)}</div><div class="kpi-sub">3s views / impressões</div></div>
+    <div class="kpi-card"><div class="kpi-label">Hold Rate</div><div class="kpi-value ${hold>=15?'green':(hold>=8?'yellow':'red')}">${fmtPct(hold)}</div><div class="kpi-sub">75% / 3s views</div></div>
+    <div class="kpi-card"><div class="kpi-label">Page Views</div><div class="kpi-value">${fmtNum(t.pageView)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Checkouts</div><div class="kpi-value">${fmtNum(t.checkout)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Compras (Meta)</div><div class="kpi-value ${t.purchase>0?'green':''}">${fmtNum(t.purchase)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CPA</div><div class="kpi-value">${fmtBRL(cpa)}</div></div>
+  `;
+
+  // Funil
+  const max = Math.max(t.impressions, 1);
+  const stages = [
+    {label:'Impressões', val:t.impressions},
+    {label:'Cliques',    val:t.clicks},
+    {label:'Page Views', val:t.pageView},
+    {label:'Checkouts',  val:t.checkout},
+    {label:'Compras',    val:t.purchase},
+  ];
+  document.getElementById('funil-bars').innerHTML = stages.map(s => `
+    <div class="funil-bar-wrap">
+      <div class="funil-label"><span>${s.label}</span><span>${fmtNum(s.val)}</span></div>
+      <div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${(s.val/max*100).toFixed(2)}%"></div></div>
+    </div>
+  `).join('');
+
+  // Taxas
+  const trClick  = t.impressions ? (t.clicks/t.impressions)*100 : 0;
+  const trPv     = t.clicks ? (t.pageView/t.clicks)*100 : 0;
+  const trCk     = t.pageView ? (t.checkout/t.pageView)*100 : 0;
+  const trCompra = t.checkout ? (t.purchase/t.checkout)*100 : 0;
+  document.getElementById('taxas').innerHTML = `
+    <div class="taxa-item"><span>CTR (Cliques/Impressões)</span><span class="taxa-val">${fmtPct(trClick)}</span></div>
+    <div class="taxa-item"><span>PV / Cliques</span><span class="taxa-val">${fmtPct(trPv)}</span></div>
+    <div class="taxa-item"><span>Checkout / PV</span><span class="taxa-val">${fmtPct(trCk)}</span></div>
+    <div class="taxa-item"><span>Compras / Checkout</span><span class="taxa-val">${fmtPct(trCompra)}</span></div>
+    <div class="taxa-item"><span>Hook Rate</span><span class="taxa-val">${fmtPct(hook)}</span></div>
+    <div class="taxa-item"><span>Hold Rate</span><span class="taxa-val">${fmtPct(hold)}</span></div>
+  `;
+
+  // Gráficos diários
+  const dias = aggregateDays(rows);
+  const labels = dias.map(d => d.data.slice(5));
+  drawLine('chart-inv-dia', labels, dias.map(d=>d.spend), 'R$', 'rgba(255,107,43,0.85)');
+  drawLine('chart-cpc-dia', labels, dias.map(d=>d.clicks?d.spend/d.clicks:0), 'R$', 'rgba(255,183,55,0.85)');
+  drawLine('chart-ctr-dia', labels, dias.map(d=>d.impressions?(d.clicks/d.impressions)*100:0), '%', 'rgba(255,183,55,0.85)');
+  drawLine('chart-hook-dia', labels, dias.map(d=>d.impressions?(d.video3s/d.impressions)*100:0), '%', 'rgba(255,107,43,0.85)');
+  drawLine('chart-hold-dia', labels, dias.map(d=>d.video3s?(d.video75/d.video3s)*100:0), '%', 'rgba(255,183,55,0.85)');
+}
+
+function drawLine(canvasId, labels, data, suffix, color){
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+  if (CHARTS[canvasId]) CHARTS[canvasId].destroy();
+  CHARTS[canvasId] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data, borderColor: color, backgroundColor: color.replace('0.85','0.15'),
+        fill: true, tension: 0.35, borderWidth: 2, pointRadius: 2, pointBackgroundColor: color
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: { label: c => suffix === 'R$'
+          ? fmtBRL(c.parsed.y)
+          : c.parsed.y.toLocaleString('pt-BR',{maximumFractionDigits:2}) + (suffix||'') } } },
+      scales: {
+        x: { ticks: { color: 'rgba(255,255,255,.4)', font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { color: 'rgba(255,255,255,.4)', font: { size: 10 },
+              callback: v => suffix === 'R$' ? 'R$ '+v.toLocaleString('pt-BR',{maximumFractionDigits:0}) : v.toLocaleString('pt-BR',{maximumFractionDigits:1})+(suffix||'') },
+             grid: { color: 'rgba(255,255,255,.05)' } }
+      }
+    }
+  });
+}
+
+function drawBar(canvasId, labels, data, suffix, color){
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+  if (CHARTS[canvasId]) CHARTS[canvasId].destroy();
+  CHARTS[canvasId] = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ data, backgroundColor: color, borderRadius: 4 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: { label: c => suffix === 'R$' ? fmtBRL(c.parsed.y)
+          : c.parsed.y.toLocaleString('pt-BR',{maximumFractionDigits:2}) + (suffix||'') } } },
+      scales: {
+        x: { ticks: { color: 'rgba(255,255,255,.4)', font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { color: 'rgba(255,255,255,.4)', font: { size: 10 },
+              callback: v => suffix === 'R$' ? 'R$ '+v.toLocaleString('pt-BR',{maximumFractionDigits:0}) : v.toLocaleString('pt-BR',{maximumFractionDigits:1})+(suffix||'') },
+             grid: { color: 'rgba(255,255,255,.05)' } }
+      }
+    }
+  });
+}
+
+// ── Aba Visão Geral ─────────────────────────────────────────────────
+function renderVisao(rows){
+  const t = sumMetrics(rows);
+  const ctr  = t.impressions ? (t.clicks/t.impressions)*100 : 0;
+  const cpc  = t.clicks ? t.spend/t.clicks : 0;
+  const cpa  = t.purchase ? t.spend/t.purchase : 0;
+  const hook = t.impressions ? (t.video3s/t.impressions)*100 : 0;
+  const hold = t.video3s ? (t.video75/t.video3s)*100 : 0;
+
+  document.getElementById('kpi-visao').innerHTML = `
+    <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${fmtBRL(t.spend)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Impressões</div><div class="kpi-value">${fmtNum(t.impressions)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Cliques</div><div class="kpi-value">${fmtNum(t.clicks)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CTR</div><div class="kpi-value">${fmtPct(ctr)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CPC</div><div class="kpi-value">${fmtBRL(cpc)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Hook Rate</div><div class="kpi-value">${fmtPct(hook)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Hold Rate</div><div class="kpi-value">${fmtPct(hold)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Compras</div><div class="kpi-value">${fmtNum(t.purchase)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CPA</div><div class="kpi-value">${fmtBRL(cpa)}</div></div>
+  `;
+
+  const dias = aggregateDays(rows);
+  const head = `<thead><tr>
+    <th>Data</th><th>Invest.</th><th>Impressões</th><th>Cliques</th><th>CTR</th><th>CPC</th>
+    <th>Hook</th><th>Hold</th><th>PV</th><th>Checkout</th><th>Compras</th><th>CPA</th>
+  </tr></thead>`;
+  const body = dias.length ? dias.map(d => {
+    const c = d.impressions ? (d.clicks/d.impressions)*100 : 0;
+    const cpcD = d.clicks ? d.spend/d.clicks : 0;
+    const cpaD = d.purchase ? d.spend/d.purchase : 0;
+    const hk = d.impressions ? (d.video3s/d.impressions)*100 : 0;
+    const hd = d.video3s ? (d.video75/d.video3s)*100 : 0;
+    return `<tr>
+      <td>${d.data.split('-').reverse().join('/')}</td>
+      <td>${fmtBRL(d.spend)}</td>
+      <td>${fmtNum(d.impressions)}</td>
+      <td>${fmtNum(d.clicks)}</td>
+      <td>${fmtPct(c)}</td>
+      <td>${fmtBRL(cpcD)}</td>
+      <td>${fmtPct(hk)}</td>
+      <td>${fmtPct(hd)}</td>
+      <td>${fmtNum(d.pageView)}</td>
+      <td>${fmtNum(d.checkout)}</td>
+      <td>${fmtNum(d.purchase)}</td>
+      <td>${fmtBRL(cpaD)}</td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="12" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados no período</td></tr>`;
+  document.getElementById('tbl-visao').innerHTML = head + '<tbody>'+body+'</tbody>';
+}
+
+// ── Criativos ───────────────────────────────────────────────────────
+function aggregateBy(rows, keyFn, extraFields){
+  const map = new Map();
+  for (const r of rows){
+    const k = keyFn(r);
+    if (!k) continue;
+    if (!map.has(k)){
+      const base = { key:k, spend:0, clicks:0, pageView:0, checkout:0, purchase:0,
+                     reach:0, impressions:0, video3s:0, video75:0,
+                     link:'', ad:'', adset:'', campaign:'', lastDate:'' };
+      if (extraFields) Object.assign(base, extraFields(r));
+      map.set(k, base);
+    }
+    const m = map.get(k);
+    m.spend += r.spend;
+    m.clicks += r.clicks;
+    m.pageView += r.pageView;
+    m.checkout += r.checkout;
+    m.purchase += r.purchase;
+    m.reach += r.reach;
+    m.impressions += r.impressions;
+    m.video3s += r.video3s;
+    m.video75 += r.video75;
+    if (r.link && !m.link) m.link = r.link;
+    if (r.ad && !m.ad) m.ad = r.ad;
+    if (r.adset && !m.adset) m.adset = r.adset;
+    if (r.campaign && !m.campaign) m.campaign = r.campaign;
+    if (r.data > m.lastDate) m.lastDate = r.data;
+  }
+  return Array.from(map.values());
+}
+
+function isActiveByRecency(item, allRowsForKey){
+  // ativo se teve gasto nos últimos N dias do dataset
+  if (!ROWS.length) return false;
+  const maxData = ROWS.reduce((a,r)=> r.data > a ? r.data : a, '');
+  if (!maxData) return false;
+  const d = new Date(maxData + 'T00:00:00');
+  d.setDate(d.getDate() - CONFIG.ATIVO_JANELA_DIAS);
+  const cutoff = d.toISOString().slice(0,10);
+  return item.lastDate >= cutoff && item.spend > 0;
+}
+
+function renderCriativos(rows){
+  const criativos = aggregateBy(rows, r => r.ad);
+  // anexar derivadas
+  for (const c of criativos){
+    c.ctr  = c.impressions ? (c.clicks/c.impressions)*100 : 0;
+    c.cpc  = c.clicks ? c.spend/c.clicks : 0;
+    c.cpa  = c.purchase ? c.spend/c.purchase : 0;
+    c.hook = c.impressions ? (c.video3s/c.impressions)*100 : 0;
+    c.hold = c.video3s ? (c.video75/c.video3s)*100 : 0;
+    c.ativo = isActiveByRecency(c);
+  }
+  // filtro status
+  let list = criativos;
+  if (CRI_STATUS === 'ativos')   list = list.filter(c => c.ativo);
+  if (CRI_STATUS === 'inativos') list = list.filter(c => !c.ativo);
+  // ordenação
+  const sortKey = { inv:'spend', hook:'hook', hold:'hold', ctr:'ctr', cpc:'cpc', cpa:'cpa', compras:'purchase' }[CRI_SORT] || 'spend';
+  const asc = (sortKey === 'cpc' || sortKey === 'cpa');
+  list.sort((a,b)=> asc ? (a[sortKey]||Infinity) - (b[sortKey]||Infinity)
+                        : (b[sortKey]||0) - (a[sortKey]||0));
+
+  // Cards
+  const grid = document.getElementById('cri-grid');
+  if (!list.length){
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><strong>Sem criativos no período</strong>Ajuste o filtro de data ou status.</div>`;
+  } else {
+    grid.innerHTML = list.map(c => `
+      <div class="cri-card ${c.ativo?'ativo':''}">
+        <div class="cri-card-header">
+          <div class="cri-name">${escapeHtml(c.key)}</div>
+          <span class="cri-badge ${c.ativo?'ativo':'inativo'}">${c.ativo?'ATIVO':'PAUSADO'}</span>
+        </div>
+        <div class="cri-metrics">
+          <div class="cri-metric"><span class="cri-metric-label">Invest.</span><span class="cri-metric-val hl">${fmtBRL(c.spend)}</span></div>
+          <div class="cri-metric"><span class="cri-metric-label">Impressões</span><span class="cri-metric-val">${fmtNum(c.impressions)}</span></div>
+          <div class="cri-metric"><span class="cri-metric-label">Hook Rate</span><span class="cri-metric-val ${c.hook>=25?'good':(c.hook<15?'warn':'')}">${fmtPct(c.hook)}</span></div>
+          <div class="cri-metric"><span class="cri-metric-label">Hold Rate</span><span class="cri-metric-val ${c.hold>=15?'good':(c.hold<8?'warn':'')}">${fmtPct(c.hold)}</span></div>
+          <div class="cri-metric"><span class="cri-metric-label">CTR</span><span class="cri-metric-val">${fmtPct(c.ctr)}</span></div>
+          <div class="cri-metric"><span class="cri-metric-label">CPC</span><span class="cri-metric-val">${fmtBRL(c.cpc)}</span></div>
+          <div class="cri-metric"><span class="cri-metric-label">Compras</span><span class="cri-metric-val">${fmtNum(c.purchase)}</span></div>
+          <div class="cri-metric"><span class="cri-metric-label">CPA</span><span class="cri-metric-val">${fmtBRL(c.cpa)}</span></div>
+        </div>
+        ${c.link ? `<a href="${escapeAttr(c.link)}" target="_blank" rel="noopener" class="cri-link" title="${escapeAttr(c.link)}">🔗 Ver criativo no Instagram</a>` : ''}
+      </div>
+    `).join('');
+  }
+
+  // Tabela
+  const head = `<thead><tr>
+    <th>Criativo</th><th>Status</th><th>Invest.</th><th>Impressões</th><th>Cliques</th>
+    <th>CTR</th><th>CPC</th><th>Hook</th><th>Hold</th><th>Compras</th><th>CPA</th><th>Link</th>
+  </tr></thead>`;
+  const body = list.length ? list.map(c => `
+    <tr>
+      <td>${escapeHtml(c.key)}</td>
+      <td><span class="cri-badge ${c.ativo?'ativo':'inativo'}">${c.ativo?'ATIVO':'PAUSADO'}</span></td>
+      <td>${fmtBRL(c.spend)}</td>
+      <td>${fmtNum(c.impressions)}</td>
+      <td>${fmtNum(c.clicks)}</td>
+      <td>${fmtPct(c.ctr)}</td>
+      <td>${fmtBRL(c.cpc)}</td>
+      <td>${fmtPct(c.hook)}</td>
+      <td>${fmtPct(c.hold)}</td>
+      <td>${fmtNum(c.purchase)}</td>
+      <td>${fmtBRL(c.cpa)}</td>
+      <td>${c.link ? `<a href="${escapeAttr(c.link)}" target="_blank" rel="noopener" style="color:#ff6b2b">🔗 abrir</a>` : '—'}</td>
+    </tr>
+  `).join('') : `<tr><td colspan="12" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados</td></tr>`;
+  document.getElementById('tbl-criativos').innerHTML = head + '<tbody>'+body+'</tbody>';
+}
+
+// ── Públicos ────────────────────────────────────────────────────────
+function renderPublicos(rows){
+  // chave = adset + " · " + campanha (para diferenciar adsets com mesmo nome em campanhas diferentes)
+  const pubs = aggregateBy(rows, r => r.adset ? `${r.adset}` : '');
+  for (const p of pubs){
+    p.ctr  = p.impressions ? (p.clicks/p.impressions)*100 : 0;
+    p.cpc  = p.clicks ? p.spend/p.clicks : 0;
+    p.cpa  = p.purchase ? p.spend/p.purchase : 0;
+    p.hook = p.impressions ? (p.video3s/p.impressions)*100 : 0;
+    p.hold = p.video3s ? (p.video75/p.video3s)*100 : 0;
+    p.ativo = isActiveByRecency(p);
+  }
+  let list = pubs;
+  if (PUB_STATUS === 'ativos')   list = list.filter(p => p.ativo);
+  if (PUB_STATUS === 'inativos') list = list.filter(p => !p.ativo);
+  const sortKey = { inv:'spend', ctr:'ctr', cpc:'cpc', cpa:'cpa', compras:'purchase' }[PUB_SORT] || 'spend';
+  const asc = (sortKey === 'cpc' || sortKey === 'cpa');
+  list.sort((a,b)=> asc ? (a[sortKey]||Infinity) - (b[sortKey]||Infinity)
+                        : (b[sortKey]||0) - (a[sortKey]||0));
+
+  const grid = document.getElementById('pub-grid');
+  if (!list.length){
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><strong>Sem públicos no período</strong>Ajuste o filtro de data ou status.</div>`;
+  } else {
+    grid.innerHTML = list.map(p => `
+      <div class="pub-card ${p.ativo?'ativo':''}">
+        <div class="pub-card-header">
+          <div class="pub-name">${escapeHtml(p.key)}<div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:3px">${escapeHtml(p.campaign)}</div></div>
+          <span class="cri-badge ${p.ativo?'ativo':'inativo'}">${p.ativo?'ATIVO':'PAUSADO'}</span>
+        </div>
+        <div class="pub-metrics">
+          <div class="pub-metric"><div class="pub-metric-val">${fmtBRL(p.spend)}</div><div class="pub-metric-lbl">Invest.</div></div>
+          <div class="pub-metric"><div class="pub-metric-val neutral">${fmtNum(p.impressions)}</div><div class="pub-metric-lbl">Impressões</div></div>
+          <div class="pub-metric"><div class="pub-metric-val neutral">${fmtNum(p.clicks)}</div><div class="pub-metric-lbl">Cliques</div></div>
+          <div class="pub-metric"><div class="pub-metric-val neutral">${fmtPct(p.ctr)}</div><div class="pub-metric-lbl">CTR</div></div>
+          <div class="pub-metric"><div class="pub-metric-val neutral">${fmtBRL(p.cpc)}</div><div class="pub-metric-lbl">CPC</div></div>
+          <div class="pub-metric"><div class="pub-metric-val neutral">${fmtNum(p.purchase)}</div><div class="pub-metric-lbl">Compras</div></div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  const head = `<thead><tr>
+    <th>Público (Adset)</th><th>Campanha</th><th>Status</th><th>Invest.</th>
+    <th>Impressões</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Hook</th><th>Hold</th><th>Compras</th><th>CPA</th>
+  </tr></thead>`;
+  const body = list.length ? list.map(p => `
+    <tr>
+      <td>${escapeHtml(p.key)}</td>
+      <td style="font-size:10px;color:rgba(255,255,255,.5)">${escapeHtml(p.campaign)}</td>
+      <td><span class="cri-badge ${p.ativo?'ativo':'inativo'}">${p.ativo?'ATIVO':'PAUSADO'}</span></td>
+      <td>${fmtBRL(p.spend)}</td>
+      <td>${fmtNum(p.impressions)}</td>
+      <td>${fmtNum(p.clicks)}</td>
+      <td>${fmtPct(p.ctr)}</td>
+      <td>${fmtBRL(p.cpc)}</td>
+      <td>${fmtPct(p.hook)}</td>
+      <td>${fmtPct(p.hold)}</td>
+      <td>${fmtNum(p.purchase)}</td>
+      <td>${fmtBRL(p.cpa)}</td>
+    </tr>
+  `).join('') : `<tr><td colspan="12" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados</td></tr>`;
+  document.getElementById('tbl-publicos').innerHTML = head + '<tbody>'+body+'</tbody>';
+}
+
+// ── Semana / Mês ───────────────────────────────────────────────────
+function weekKey(d){
+  const dt = new Date(d + 'T00:00:00');
+  const day = dt.getUTCDay();
+  const diff = dt.getUTCDate() - day + (day === 0 ? -6 : 1); // segunda
+  const monday = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), diff));
+  return monday.toISOString().slice(0,10);
+}
+function monthKey(d){ return d.slice(0,7); }
+
+function renderPeriodo(rows, keyFn, tblId, chartInvId, chartCtrId, label){
+  const map = new Map();
+  for (const r of rows){
+    const k = keyFn(r.data);
+    if (!map.has(k)) map.set(k, { key:k, spend:0, clicks:0, pageView:0, checkout:0, purchase:0,
+                                  reach:0, impressions:0, video3s:0, video75:0 });
+    const m = map.get(k);
+    m.spend += r.spend; m.clicks += r.clicks; m.pageView += r.pageView;
+    m.checkout += r.checkout; m.purchase += r.purchase; m.reach += r.reach;
+    m.impressions += r.impressions; m.video3s += r.video3s; m.video75 += r.video75;
+  }
+  const list = Array.from(map.values()).sort((a,b)=>a.key.localeCompare(b.key));
+
+  const head = `<thead><tr>
+    <th>${label}</th><th>Invest.</th><th>Impressões</th><th>Cliques</th>
+    <th>CTR</th><th>CPC</th><th>Hook</th><th>Hold</th><th>Compras</th><th>CPA</th>
+  </tr></thead>`;
+  const body = list.length ? list.map(p => {
+    const c = p.impressions ? (p.clicks/p.impressions)*100 : 0;
+    const cpc = p.clicks ? p.spend/p.clicks : 0;
+    const cpa = p.purchase ? p.spend/p.purchase : 0;
+    const hk = p.impressions ? (p.video3s/p.impressions)*100 : 0;
+    const hd = p.video3s ? (p.video75/p.video3s)*100 : 0;
+    const lbl = label==='Semana' ? `Semana de ${p.key.split('-').reverse().join('/')}` : p.key;
+    return `<tr>
+      <td>${lbl}</td>
+      <td>${fmtBRL(p.spend)}</td>
+      <td>${fmtNum(p.impressions)}</td>
+      <td>${fmtNum(p.clicks)}</td>
+      <td>${fmtPct(c)}</td>
+      <td>${fmtBRL(cpc)}</td>
+      <td>${fmtPct(hk)}</td>
+      <td>${fmtPct(hd)}</td>
+      <td>${fmtNum(p.purchase)}</td>
+      <td>${fmtBRL(cpa)}</td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="10" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados</td></tr>`;
+  document.getElementById(tblId).innerHTML = head + '<tbody>'+body+'</tbody>';
+
+  const labels = list.map(p => label==='Semana' ? p.key.split('-').slice(1).reverse().join('/') : p.key);
+  drawBar(chartInvId, labels, list.map(p=>p.spend), 'R$', 'rgba(255,107,43,0.85)');
+  drawBar(chartCtrId, labels, list.map(p=>p.impressions?(p.clicks/p.impressions)*100:0), '%', 'rgba(255,183,55,0.85)');
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────
+function escapeHtml(s){
+  return String(s||'').replace(/[&<>"']/g, m =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function escapeAttr(s){ return escapeHtml(s); }
+
+function showTab(id, el){
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('content-'+id).classList.add('active');
+  // Recalcular gráficos da aba ao mostrar (para resize)
+  setTimeout(()=> { Object.values(CHARTS).forEach(c => c && c.resize && c.resize()); }, 50);
+}
+
+function setCriStatus(s, el){
+  CRI_STATUS = s;
+  document.querySelectorAll('.cri-status-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  renderCriativos(filterByDate(ROWS, CUR_FROM, CUR_TO));
+}
+function setCriSort(s, el){
+  CRI_SORT = s;
+  document.querySelectorAll('.cri-sort-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  renderCriativos(filterByDate(ROWS, CUR_FROM, CUR_TO));
+}
+function setPubStatus(s, el){
+  PUB_STATUS = s;
+  document.querySelectorAll('.pub-filter-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  renderPublicos(filterByDate(ROWS, CUR_FROM, CUR_TO));
+}
+function setPubSort(s, el){
+  PUB_SORT = s;
+  document.querySelectorAll('.pub-sort-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  renderPublicos(filterByDate(ROWS, CUR_FROM, CUR_TO));
+}
+
+function setPreset(days, btn){
+  document.querySelectorAll('.preset-btn').forEach(b => {
+    if (b.textContent.includes('d') || b.textContent.includes('Tudo')) b.classList.remove('active');
+  });
+  btn.classList.add('active');
+  const allDates = ROWS.map(r=>r.data).filter(Boolean).sort();
+  if (!allDates.length) return;
+  const first = allDates[0], last = allDates[allDates.length-1];
+  let from = first;
+  if (days !== 'all'){
+    const d = new Date(last + 'T00:00:00');
+    d.setDate(d.getDate() - days + 1);
+    from = d.toISOString().slice(0,10);
+    if (from < first) from = first;
+  }
+  document.getElementById('dateFrom').value = from;
+  document.getElementById('dateTo').value = last;
+  CUR_FROM = from; CUR_TO = last;
+  applyFilter();
+}
+
+function onDateChange(){
+  CUR_FROM = document.getElementById('dateFrom').value;
+  CUR_TO   = document.getElementById('dateTo').value;
+  document.querySelectorAll('.preset-btn').forEach(b => {
+    if (b.textContent.includes('d') || b.textContent.includes('Tudo')) b.classList.remove('active');
+  });
+  applyFilter();
+}
+
+function applyFilter(){
+  const filtered = filterByDate(ROWS, CUR_FROM, CUR_TO);
+  document.getElementById('range-info').textContent =
+    (CUR_FROM && CUR_TO) ? `${CUR_FROM.split('-').reverse().join('/')} → ${CUR_TO.split('-').reverse().join('/')}` : '';
+  renderTrafego(filtered);
+  renderVisao(filtered);
+  renderCriativos(filtered);
+  renderPublicos(filtered);
+  renderPeriodo(filtered, weekKey, 'tbl-semanal', 'chart-sem-inv', 'chart-sem-ctr', 'Semana');
+  renderPeriodo(filtered, monthKey, 'tbl-mensal', 'chart-mes-inv', 'chart-mes-ctr', 'Mês');
+}
+
+async function loadData(){
+  const overlay = document.getElementById('loading-overlay');
+  const msg = document.getElementById('loading-msg');
+  overlay.style.display = 'flex';
+  try {
+    msg.textContent = 'Conectando com a planilha...';
+    const text = await fetchSheetCSV();
+    msg.textContent = 'Processando dados...';
+    const rows = parseCSV(text);
+    ROWS = processRows(rows);
+    if (!ROWS.length){
+      msg.textContent = 'Nenhum dado encontrado a partir de ' + CONFIG.DATA_MINIMA;
+      setTimeout(()=> overlay.style.display='none', 1500);
+      return;
+    }
+    DIAS = aggregateDays(ROWS);
+    // Período padrão = tudo
+    const allDates = ROWS.map(r=>r.data).sort();
+    CUR_FROM = allDates[0];
+    CUR_TO   = allDates[allDates.length-1];
+    document.getElementById('dateFrom').value = CUR_FROM;
+    document.getElementById('dateTo').value   = CUR_TO;
+    applyFilter();
+    overlay.style.display = 'none';
+  } catch(e){
+    msg.innerHTML = `<div style="color:#e74c3c;text-align:center;max-width:500px">❌ ${escapeHtml(e.message)}<br><br><button class="preset-btn" onclick="loadData()" style="margin-top:8px">Tentar novamente</button></div>`;
+  }
+}
+
+// Atualiza títulos
+document.addEventListener('DOMContentLoaded', ()=>{
+  document.title = CONFIG.PRODUTO + ' · ' + CONFIG.CLIENTE + ' — Jamelli GT';
+  const b = document.getElementById('brand-title');
+  if (b) b.textContent = '📦 ' + CONFIG.PRODUTO + ' · ' + CONFIG.CLIENTE;
+  const s = document.getElementById('brand-subtitle');
+  if (s) s.textContent = 'Dashboard de Performance — Lançamento · Jamelli GT · ' + CONFIG.ANO;
+  loadData();
+});
+</script>
+</body>
+</html>
