@@ -451,7 +451,8 @@ const UNIAO_EDITIONS = {
       picoPresenca: 32,
       taxaImposto: 0.1382,
       vendasUpsell: 3,   upsellBruto: 2997,  upsellLiquido: 2871.93,
-      vendasProd2:  2,   prod2Bruto:  397,   prod2Liquido:  381.15
+      vendasProd2:  2,   prod2Bruto:  397,   prod2Liquido:  381.15,
+      vendasOrderbump: 0
     }
   },
   B: {
@@ -461,10 +462,11 @@ const UNIAO_EDITIONS = {
     dateTo: null,          // será o maxDate dos dados
     color: '#2ecc71',
     debrief: {
-      picoPresenca: 0,
+      picoPresenca: 54,
       taxaImposto: 0.1382,
       vendasUpsell: 0,   upsellBruto: 2997,  upsellLiquido: 2871.93,
-      vendasProd2:  0,   prod2Bruto:  397,   prod2Liquido:  381.15
+      vendasProd2:  0,   prod2Bruto:  397,   prod2Liquido:  381.15,
+      vendasOrderbump: 0
     }
   }
 };
@@ -1148,6 +1150,9 @@ function computeEditionMetrics(id){
   const ticket=totalVendas>0?fatTotal/totalVendas:0;
   const ticketTraf=vendasTraf>0?fatTraf/vendasTraf:0;
 
+  const custoPorLead=cacTraf-ticketTraf; // exposição de caixa por ingresso (CAC - ticket)
+  const pctOrderbump=totalVendas>0?(dc.vendasOrderbump||0)/totalVendas*100:0;
+
   const liqIngressos=fatTotal;
   const liqUpsell=dc.vendasUpsell*dc.upsellLiquido;
   const liqProd2=dc.vendasProd2*dc.prod2Liquido;
@@ -1162,9 +1167,10 @@ function computeEditionMetrics(id){
     fatTotal,fatTraf,fatOrg,
     totalVendas,vendasTraf,vendasOrg,
     ctr,connectRate,taxaCk,taxaCompra,
-    cac,cacTraf,roasCapt,ticket,ticketTraf,
+    cac,cacTraf,roasCapt,ticket,ticketTraf,custoPorLead,
     liqUpsell,liqProd2,recLiq,ganhoLiq,roasFinal,
     vendasUpsell:dc.vendasUpsell,vendasProd2:dc.vendasProd2,
+    vendasOrderbump:dc.vendasOrderbump||0,pctOrderbump,
     picoPresenca:dc.picoPresenca,
     pctPresenca:totalVendas>0?dc.picoPresenca/totalVendas*100:0,
     hasData:dias.length>0||sales.length>0
@@ -2046,6 +2052,7 @@ function renderDebriefing(){
         ${sep('🎯 Aquisição')}
         ${row('CAC Total','invest. ÷ todos ingressos',eds.map(({m})=>({val:brl(m.cac),requireData:true})))}
         ${row('CAC Tráfego','invest. ÷ ingressos tráfego',eds.map(({m})=>({val:brl(m.cacTraf),requireData:true})))}
+        ${row('Custo por Lead (Exposição)','CAC − ticket médio · negativo = positivo',eds.map(({m})=>({val:brl(m.custoPorLead),color:m.custoPorLead<=0?'#2ecc71':m.custoPorLead<=50?'#f1c40f':'#e74c3c',requireData:true})))}
         ${row('ROAS Captação Total','fat. ingressos ÷ invest.',eds.map(({m})=>({val:br(m.roasCapt,2)+'x',color:m.roasCapt>=1?'#2ecc71':'#ff6b2b',requireData:true})))}
         ${row('Ticket Médio',null,eds.map(({m})=>({val:brl(m.ticket),requireData:true})))}
 
@@ -2054,6 +2061,8 @@ function renderDebriefing(){
         ${row('% Presença','pico ÷ total ingressos',eds.map(({id,ed,m})=>({val:pct(m.totalVendas>0?ed.debrief.picoPresenca/m.totalVendas*100:0),color:'#f1c40f',requireData:true})))}
         ${row('Vendas Upsell (2997)',null,eds.map(({ed,m})=>({val:br(ed.debrief.vendasUpsell,0),color:'#2ecc71'})))}
         ${row('Vendas Produto (397)',null,eds.map(({ed})=>({val:br(ed.debrief.vendasProd2,0),color:'#2ecc71'})))}
+        ${row('Vendas Orderbump',null,eds.map(({ed})=>({val:br(ed.debrief.vendasOrderbump||0,0),color:'#2ecc71'})))}
+        ${row('% Vendas c/ Orderbump','orderbumps ÷ total ingressos',eds.map(({ed,m})=>({val:pct(m.totalVendas>0?(ed.debrief.vendasOrderbump||0)/m.totalVendas*100:0),color:m.totalVendas>0&&(ed.debrief.vendasOrderbump||0)/m.totalVendas>=0.2?'#2ecc71':m.totalVendas>0&&(ed.debrief.vendasOrderbump||0)/m.totalVendas>=0.1?'#f1c40f':'#e74c3c',requireData:true})))}
         ${row('% Conv. Upsell 2997','upsell ÷ total ingressos',eds.map(({ed,m})=>({val:pct(m.totalVendas>0?ed.debrief.vendasUpsell/m.totalVendas*100:0),color:'#2ecc71',requireData:true})))}
 
         ${sep('💰 Resultado Final')}
@@ -2174,11 +2183,14 @@ function renderComparativo(){
 
         ${sep('🎯 Aquisição')}
         ${row('CAC Tráfego',valsOr('cacTraf'),null,brl,true,'invest. ÷ ingressos tráfego')}
+        ${row('Custo por Lead (Exposição)',valsOr('custoPorLead'),metrics.map(x=>x.m.hasData?(x.m.custoPorLead<=0?'#2ecc71':x.m.custoPorLead<=50?'#f1c40f':'#e74c3c'):null),brl,true,'CAC − ticket médio · negativo = positivo')}
         ${row('ROAS Captação (Tráfego)',metrics.map(({m})=>m.hasData&&m.invImp>0?m.fatTraf/m.invImp:null),metrics.map(x=>x.m.hasData?(x.m.invImp>0&&x.m.fatTraf/x.m.invImp>=1?'#2ecc71':'#e74c3c'):null),v=>br(v,2)+'x',false,'fat. tráfego ÷ invest.')}
 
         ${sep('🎤 Evento')}
         ${row('Pico de Presença',edKeys.map(id=>UNIAO_EDITIONS[id].debrief.picoPresenca),null,v=>v+' pessoas',false)}
         ${row('% Presença',edKeys.map(id=>{const m=metrics.find(x=>x.id===id).m;return m.hasData?m.pctPresenca:null;}),null,pct,false,'pico ÷ total ingressos')}
+        ${row('Vendas Orderbump',valsOr('vendasOrderbump'),null,v=>br(v,0),false)}
+        ${row('% Vendas c/ Orderbump',valsOr('pctOrderbump'),metrics.map(x=>x.m.hasData?(x.m.pctOrderbump>=20?'#2ecc71':x.m.pctOrderbump>=10?'#f1c40f':'#e74c3c'):null),pct,false,'orderbumps ÷ total ingressos')}
         ${row('Vendas Upsell (2997)',edKeys.map(id=>UNIAO_EDITIONS[id].debrief.vendasUpsell),null,v=>br(v,0),false)}
         ${row('Receita Líq. Upsell',valsOr('liqUpsell'),null,brl,false)}
         ${row('Vendas Produto 397',edKeys.map(id=>UNIAO_EDITIONS[id].debrief.vendasProd2),null,v=>br(v,0),false)}
