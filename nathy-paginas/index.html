@@ -425,6 +425,16 @@ async function fetchSheetCSV(sheetName){
 
 const isTrafego = s => (s.utmSource||'').toLowerCase().replace(/[\s_-]/g,'') === 'metaads';
 
+// Acha a coluna pelo NOME do cabeçalho (robusto a mudanças de ordem/qtd de
+// colunas no export do Eduzz). Cai no índice padrão se não encontrar o nome.
+function headIdx(head, name, def){
+  const norm = x => String(x||'').toLowerCase().replace(/\s+/g,' ').trim();
+  const t = norm(name);
+  let i = (head||[]).findIndex(h => norm(h) === t);
+  if(i < 0) i = (head||[]).findIndex(h => norm(h).includes(t));
+  return i >= 0 ? i : (def==null ? -1 : def);
+}
+
 function setLoading(msg){
   const m = document.getElementById('loading-msg');
   if(m) m.textContent = msg;
@@ -450,8 +460,26 @@ async function loadData(){
     try { wCSV = await fetchSheetCSV(WEBHOOK_SHEET); } catch(e){ console.warn('Aba Webhook indisponível:', e.message); }
 
     const gRows = parseCSV(gCSV).slice(1).filter(r => r[G.date]);
-    const vRows = vCSV ? parseCSV(vCSV).slice(1).filter(r => r && r.length > 8) : [];
+    const vAll  = vCSV ? parseCSV(vCSV) : [];
+    const vHead = vAll[0] || [];
+    const vRows = vAll.slice(1).filter(r => r && r.length > 8);
     const wRows = wCSV ? parseCSV(wCSV).slice(1).filter(r => r && r.length > 8) : [];
+
+    // Colunas da aba Vendas localizadas POR NOME (o export do Eduzz mudou de
+    // layout, então índice fixo lia a UTM na coluna errada -> tudo "sem atrib.")
+    const VI = {
+      invoice:     headIdx(vHead,'Fatura',            VV.invoice),
+      status:      headIdx(vHead,'Status',            VV.status),
+      data:        headIdx(vHead,'Data de Pagamento', VV.data),
+      produto:     headIdx(vHead,'Produto',           VV.produto),
+      valor:       headIdx(vHead,'Valor da Venda',    VV.valor),
+      nome:        headIdx(vHead,'Cliente / Nome',    VV.nome),
+      email:       headIdx(vHead,'Cliente / E-mail',  VV.email),
+      utmSource:   headIdx(vHead,'UTM Source',        VV.utmSource),
+      utmCampaign: headIdx(vHead,'UTM Campaign',      VV.utmCampaign),
+      utmMedium:   headIdx(vHead,'UTM Medium',        VV.utmMedium),
+      utmContent:  headIdx(vHead,'UTM Content',       VV.utmContent),
+    };
 
     setLoading('Processando dados...');
 
@@ -493,19 +521,19 @@ async function loadData(){
 
     // --- Fonte 1: aba "Vendas" (export manual, colunas fixas, UTM limpo) ---
     const vendasVendas = vRows.map(r => {
-      const v = num(r[VV.valor])/divisor;
+      const v = num(r[VI.valor])/divisor;
       return {
-        fatura:  (r[VV.invoice]||'').trim(),
-        data:    parseDate(r[VV.data]),
-        nome:    (r[VV.nome]||'').trim(),
-        email:   (r[VV.email]||'').trim(),
-        status:  (r[VV.status]||'').toUpperCase().trim(),
-        produto: (r[VV.produto]||'').toLowerCase(),
+        fatura:  (r[VI.invoice]||'').trim(),
+        data:    parseDate(r[VI.data]),
+        nome:    (r[VI.nome]||'').trim(),
+        email:   (r[VI.email]||'').trim(),
+        status:  (r[VI.status]||'').toUpperCase().trim(),
+        produto: (r[VI.produto]||'').toLowerCase(),
         fatTotal: v, fatPrincipal: v, fatOB: 0,
-        utmSource:  (r[VV.utmSource]||'').trim(),
-        utmCampaign:(r[VV.utmCampaign]||'').trim(),
-        utmMedium:  (r[VV.utmMedium]||'').trim(),
-        utmContent: (r[VV.utmContent]||'').trim(),
+        utmSource:  (r[VI.utmSource]||'').trim(),
+        utmCampaign:(r[VI.utmCampaign]||'').trim(),
+        utmMedium:  (r[VI.utmMedium]||'').trim(),
+        utmContent: (r[VI.utmContent]||'').trim(),
         _src: 'vendas',
       };
     }).filter(okVenda);
@@ -544,7 +572,16 @@ async function loadData(){
     vendasVendas.forEach(s => { vendaMap[s.fatura || (s.email+'|'+s.data)] = s; });
     vendasWebhook.forEach(s => {
       const k = s.fatura || (s.email+'|'+s.data);
-      if(!vendaMap[k]) vendaMap[k] = s;
+      if(!vendaMap[k]){ vendaMap[k] = s; return; }
+      // mesma fatura nas duas fontes: completa a UTM que faltar na Vendas
+      // com a do Webhook (assim nenhuma venda perde a atribuição)
+      const v = vendaMap[k];
+      if(!v.utmSource && s.utmSource){
+        v.utmSource   = s.utmSource;
+        v.utmCampaign = v.utmCampaign || s.utmCampaign;
+        v.utmMedium   = v.utmMedium   || s.utmMedium;
+        v.utmContent  = v.utmContent  || s.utmContent;
+      }
     });
     SALES = Object.values(vendaMap);
 
@@ -691,7 +728,7 @@ function renderTrafego(dias, sales){
 
   // Gráficos
   drawDailyCharts(dias, sales);
-  drawFunil(cliques,pvs,cks,metaPurch);  // funil Meta = dados do pixel (não da UTM)
+  drawFunil(imps,cliques,pvs,cks,metaPurch);  // funil Meta = dados do pixel (não da UTM)
 }
 
 function drawDailyCharts(dias, sales){
@@ -723,9 +760,10 @@ function drawDailyCharts(dias, sales){
   });
 }
 
-function drawFunil(cliques,pvs,cks,vendas){
-  const max = Math.max(cliques,1);
+function drawFunil(imps,cliques,pvs,cks,vendas){
+  const max = Math.max(imps,cliques,1);
   const steps = [
+    {label:'Impressões', val:imps},
     {label:'Cliques', val:cliques},
     {label:'Page View', val:pvs},
     {label:'Checkout', val:cks},
@@ -739,11 +777,12 @@ function drawFunil(cliques,pvs,cks,vendas){
     </div>`;
   }).join('');
 
+  // CTR = cliques/impressões (padrão da Meta). As demais são etapas do funil.
   const taxas = [
-    {label:'CTR (Cliques/PV)', val: pvs>0 ? cliques/pvs : (cliques>0?1:0), inv:true},
-    {label:'PV → Checkout', val: pvs>0 ? cks/pvs : 0},
-    {label:'Checkout → Compra', val: cks>0 ? vendas/cks : 0},
-    {label:'Cliques → Compra', val: cliques>0 ? vendas/cliques : 0},
+    {label:'CTR (Cliques/Impr.)', val: imps>0 ? cliques/imps : 0},
+    {label:'Clique → Page View',  val: cliques>0 ? pvs/cliques : 0},
+    {label:'Page View → Checkout',val: pvs>0 ? cks/pvs : 0},
+    {label:'Checkout → Compra',   val: cks>0 ? vendas/cks : 0},
   ];
   document.getElementById('taxa-grid').innerHTML = taxas.map(t =>
     `<div class="taxa-item"><span>${t.label}</span><span class="taxa-val">${fmtP(t.val)}</span></div>`
