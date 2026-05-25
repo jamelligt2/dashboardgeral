@@ -521,19 +521,24 @@ async function loadData(){
 
     // --- Fonte 1: aba "Vendas" (export manual, colunas fixas, UTM limpo) ---
     const vendasVendas = vRows.map(r => {
-      const v = num(r[VI.valor])/divisor;
+      // Campos do início alinham com o cabeçalho (Fatura..Valor da Venda).
+      const v       = num(r[VI.valor])/divisor;
+      const fatura  = (r[VI.invoice]||'').trim();
+      const data    = parseDate(r[VI.data]);
+      const status  = (r[VI.status]||'').toUpperCase().trim();
+      const produto = (r[VI.produto]||'').toLowerCase();
+      // O export do Eduzz insere colunas de taxa/valor no meio e desloca os
+      // campos do fim -> achamos nome/e-mail/UTM por VALOR, não por posição.
+      const eIdx = r.findIndex(c => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(c||'').trim()));
+      const email = eIdx>=0 ? String(r[eIdx]).trim()   : (r[VI.email]||'').trim();
+      const nome  = eIdx>0  ? String(r[eIdx-1]).trim() : (r[VI.nome]||'').trim();
+      let us='', uc='', um='', uco='';
+      const sIdx = r.findIndex(c => /^(meta[_ ]?ads|facebook|fb|instagram|ig[_ ]?ads|google|google[_ ]?ads|tiktok|tiktok[_ ]?ads)$/i.test(String(c||'').trim()));
+      if(sIdx>=0){ us=String(r[sIdx]||'').trim(); uc=String(r[sIdx+1]||'').trim(); um=String(r[sIdx+2]||'').trim(); uco=String(r[sIdx+3]||'').trim(); }
       return {
-        fatura:  (r[VI.invoice]||'').trim(),
-        data:    parseDate(r[VI.data]),
-        nome:    (r[VI.nome]||'').trim(),
-        email:   (r[VI.email]||'').trim(),
-        status:  (r[VI.status]||'').toUpperCase().trim(),
-        produto: (r[VI.produto]||'').toLowerCase(),
+        fatura, data, nome, email, status, produto,
         fatTotal: v, fatPrincipal: v, fatOB: 0,
-        utmSource:  (r[VI.utmSource]||'').trim(),
-        utmCampaign:(r[VI.utmCampaign]||'').trim(),
-        utmMedium:  (r[VI.utmMedium]||'').trim(),
-        utmContent: (r[VI.utmContent]||'').trim(),
+        utmSource: us, utmCampaign: uc, utmMedium: um, utmContent: uco,
         _src: 'vendas',
       };
     }).filter(okVenda);
