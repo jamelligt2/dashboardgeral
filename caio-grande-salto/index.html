@@ -318,6 +318,10 @@ const CONFIG = {
   VENDA_ATRIBUICAO: {
     'kassicasagrande@gmail.com': 'GS-ADV11 - CEO',
   },
+  // Atribuição manual de público (conjunto/adset) — mesma lógica, por email do comprador
+  VENDA_ATRIBUICAO_PUBLICO: {
+    'kassicasagrande@gmail.com': 'Advantage - LP-V2',
+  },
   STATUS_APROVADO: ['paid','approved','aprovado','pago','complete','completed'],
   W: {
     orderId:    0,
@@ -463,6 +467,7 @@ function processSales(rows){
       email:   String(r[W.email]||'').trim(),
       produto, valor, src,
       utmContent: String(r[W.utmContent]||'').trim(),
+      utmMedium:  String(r[W.utmMedium]||'').trim(),
       ob: isOB(produto),
     });
   }
@@ -474,12 +479,12 @@ function processSales(rows){
     if (!byCust.has(key)) byCust.set(key, {
       data:o.data, nome:o.nome, email:o.email,
       fatPrincipal:0, fatOB:0, produtos:[], produtosOB:[],
-      src:'', utmContent:'',
+      src:'', utmContent:'', utmMedium:'',
     });
     const c = byCust.get(key);
     if (o.ob){ c.fatOB += o.valor; c.produtosOB.push(o.produto); }
     else     { c.fatPrincipal += o.valor; c.produtos.push(o.produto);
-               if (!c.src) { c.src = o.src; c.utmContent = o.utmContent; } }
+               if (!c.src) { c.src = o.src; c.utmContent = o.utmContent; c.utmMedium = o.utmMedium; } }
     if (o.data > c.data) c.data = o.data;
   }
 
@@ -490,7 +495,8 @@ function processSales(rows){
     const emailKey = (c.email||'').toLowerCase();
     const atribManual = CONFIG.VENDA_ATRIBUICAO[emailKey];   // anúncio atribuído manualmente
     const ad = atribManual || c.utmContent || '';            // anúncio que recebe o crédito
-    const isTrafego = atribManual
+    const publico = CONFIG.VENDA_ATRIBUICAO_PUBLICO[emailKey] || c.utmMedium || ''; // conjunto
+    const isTrafego = (atribManual || CONFIG.VENDA_ATRIBUICAO_PUBLICO[emailKey])
       ? true
       : (c.src||'').toLowerCase().replace(/[\s_-]/g,'') === 'metaads';
     sales.push({
@@ -499,8 +505,9 @@ function processSales(rows){
       produto: c.produtos[0] || c.produtosOB[0] || '—',
       produtosOB: c.produtosOB,
       temOB: c.fatOB > 0,
-      utmSource: c.src, utmContent: c.utmContent,
+      utmSource: c.src, utmContent: c.utmContent, utmMedium: c.utmMedium,
       adAtribuido: ad,
+      publicoAtribuido: publico,
       isTrafego,
     });
   }
@@ -649,11 +656,13 @@ function renderTrafego(rows, sales){
   const trPv     = t.clicks ? (t.pageView/t.clicks)*100 : 0;
   const trCk     = t.pageView ? (t.checkout/t.pageView)*100 : 0;
   const trCompra = t.checkout ? (st.n/t.checkout)*100 : 0;
+  const trVendaPV = t.pageView ? (st.n/t.pageView)*100 : 0;   // taxa de venda da página
   document.getElementById('taxas').innerHTML = `
     <div class="taxa-item"><span>CTR (Cliques/Impressões)</span><span class="taxa-val">${fmtPct(trClick)}</span></div>
     <div class="taxa-item"><span>PV / Cliques</span><span class="taxa-val">${fmtPct(trPv)}</span></div>
     <div class="taxa-item"><span>Checkout / PV</span><span class="taxa-val">${fmtPct(trCk)}</span></div>
     <div class="taxa-item"><span>Compras / Checkout</span><span class="taxa-val">${fmtPct(trCompra)}</span></div>
+    <div class="taxa-item"><span>Taxa de venda (Vendas / PV)</span><span class="taxa-val">${fmtPct(trVendaPV)}</span></div>
     <div class="taxa-item"><span>Hook Rate</span><span class="taxa-val">${fmtPct(hook)}</span></div>
     <div class="taxa-item"><span>Hold Rate</span><span class="taxa-val">${fmtPct(hold)}</span></div>
   `;
@@ -850,6 +859,7 @@ function renderCriativos(rows, sales){
     c.vendas = cr.n;                                       // vendas atribuídas (webhook)
     c.faturamento = cr.fat;
     c.roas = c.spend ? c.faturamento/c.spend : 0;
+    c.taxaVenda = c.pageView ? (c.vendas/c.pageView)*100 : 0;  // vendas / page views
     c.ativo = isActiveByRecency(c);
   }
   // filtro status
@@ -885,6 +895,7 @@ function renderCriativos(rows, sales){
           <div class="cri-metric"><span class="cri-metric-label">Vendas</span><span class="cri-metric-val ${c.vendas>0?'good':''}">${fmtNum(c.vendas)}</span></div>
           <div class="cri-metric"><span class="cri-metric-label">Faturamento</span><span class="cri-metric-val ${c.faturamento>0?'good':''}">${fmtBRL(c.faturamento)}</span></div>
           <div class="cri-metric"><span class="cri-metric-label">ROAS</span><span class="cri-metric-val">${c.roas>0?c.roas.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—'}</span></div>
+          <div class="cri-metric"><span class="cri-metric-label">Taxa de venda</span><span class="cri-metric-val ${c.taxaVenda>0?'good':''}">${fmtPct(c.taxaVenda)}</span></div>
           <div class="cri-metric"><span class="cri-metric-label">CPA</span><span class="cri-metric-val">${fmtBRL(c.cpa)}</span></div>
         </div>
         ${c.link ? `<a href="${escapeAttr(c.link)}" target="_blank" rel="noopener" class="cri-link" title="${escapeAttr(c.link)}">🔗 Ver criativo no Instagram</a>` : ''}
@@ -895,7 +906,7 @@ function renderCriativos(rows, sales){
   // Tabela
   const head = `<thead><tr>
     <th>Criativo</th><th>Status</th><th>Invest.</th><th>Impressões</th><th>Cliques</th>
-    <th>CTR</th><th>CPC</th><th>Hook</th><th>Hold</th><th>Finaliz.</th><th>Custo/Final.</th><th>Vendas</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>CPA</th><th>Link</th>
+    <th>CTR</th><th>CPC</th><th>Hook</th><th>Hold</th><th>Finaliz.</th><th>Custo/Final.</th><th>Vendas</th><th>Fat.</th><th>ROAS</th><th>Tx venda</th><th>Compras</th><th>CPA</th><th>Link</th>
   </tr></thead>`;
   const body = list.length ? list.map(c => `
     <tr>
@@ -913,18 +924,27 @@ function renderCriativos(rows, sales){
       <td class="${c.vendas>0?'green':''}">${fmtNum(c.vendas)}</td>
       <td class="${c.faturamento>0?'green':''}">${fmtBRL(c.faturamento)}</td>
       <td>${c.roas>0?c.roas.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—'}</td>
+      <td>${fmtPct(c.taxaVenda)}</td>
       <td>${fmtNum(c.purchase)}</td>
       <td>${fmtBRL(c.cpa)}</td>
       <td>${c.link ? `<a href="${escapeAttr(c.link)}" target="_blank" rel="noopener" style="color:#ff6b2b">🔗 abrir</a>` : '—'}</td>
     </tr>
-  `).join('') : `<tr><td colspan="17" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados</td></tr>`;
+  `).join('') : `<tr><td colspan="18" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados</td></tr>`;
   document.getElementById('tbl-criativos').innerHTML = head + '<tbody>'+body+'</tbody>';
 }
 
 // ── Públicos ────────────────────────────────────────────────────────
-function renderPublicos(rows){
+function renderPublicos(rows, sales){
   // chave = adset + " · " + campanha (para diferenciar adsets com mesmo nome em campanhas diferentes)
   const pubs = aggregateBy(rows, r => r.adset ? `${r.adset}` : '');
+  // crédito de vendas por público (webhook): publicoAtribuido -> {fat, n}
+  const credito = {};
+  for (const s of (sales||[])){
+    const k = s.publicoAtribuido;
+    if (!k) continue;
+    if (!credito[k]) credito[k] = { fat:0, n:0 };
+    credito[k].fat += s.valor; credito[k].n++;
+  }
   for (const p of pubs){
     p.ctr  = p.impressions ? (p.clicks/p.impressions)*100 : 0;
     p.cpc  = p.clicks ? p.spend/p.clicks : 0;
@@ -932,6 +952,11 @@ function renderPublicos(rows){
     p.custoFinal = p.checkout ? p.spend/p.checkout : 0;   // custo por finalização
     p.hook = p.impressions ? (p.video3s/p.impressions)*100 : 0;
     p.hold = p.video3s ? (p.video75/p.video3s)*100 : 0;
+    const cr = credito[p.key] || { fat:0, n:0 };
+    p.vendas = cr.n;
+    p.faturamento = cr.fat;
+    p.roas = p.spend ? p.faturamento/p.spend : 0;
+    p.taxaVenda = p.pageView ? (p.vendas/p.pageView)*100 : 0;  // vendas / page views
     p.ativo = isActiveByRecency(p);
   }
   let list = pubs;
@@ -960,6 +985,9 @@ function renderPublicos(rows){
           <div class="pub-metric"><div class="pub-metric-val neutral">${fmtBRL(p.cpc)}</div><div class="pub-metric-lbl">CPC</div></div>
           <div class="pub-metric"><div class="pub-metric-val neutral">${fmtNum(p.checkout)}</div><div class="pub-metric-lbl">Finalizações</div></div>
           <div class="pub-metric"><div class="pub-metric-val neutral">${fmtBRL(p.custoFinal)}</div><div class="pub-metric-lbl">Custo/Final.</div></div>
+          <div class="pub-metric"><div class="pub-metric-val ${p.vendas>0?'':'neutral'}">${fmtNum(p.vendas)}</div><div class="pub-metric-lbl">Vendas</div></div>
+          <div class="pub-metric"><div class="pub-metric-val ${p.faturamento>0?'':'neutral'}">${fmtBRL(p.faturamento)}</div><div class="pub-metric-lbl">Faturamento</div></div>
+          <div class="pub-metric"><div class="pub-metric-val ${p.taxaVenda>0?'':'neutral'}">${fmtPct(p.taxaVenda)}</div><div class="pub-metric-lbl">Taxa de venda</div></div>
           <div class="pub-metric"><div class="pub-metric-val neutral">${fmtNum(p.purchase)}</div><div class="pub-metric-lbl">Compras</div></div>
         </div>
       </div>
@@ -968,7 +996,7 @@ function renderPublicos(rows){
 
   const head = `<thead><tr>
     <th>Público (Adset)</th><th>Campanha</th><th>Status</th><th>Invest.</th>
-    <th>Impressões</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Hook</th><th>Hold</th><th>Finaliz.</th><th>Custo/Final.</th><th>Compras</th><th>CPA</th>
+    <th>Impressões</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Hook</th><th>Hold</th><th>Finaliz.</th><th>Custo/Final.</th><th>Vendas</th><th>Fat.</th><th>ROAS</th><th>Tx venda</th><th>Compras</th><th>CPA</th>
   </tr></thead>`;
   const body = list.length ? list.map(p => `
     <tr>
@@ -984,10 +1012,14 @@ function renderPublicos(rows){
       <td>${fmtPct(p.hold)}</td>
       <td>${fmtNum(p.checkout)}</td>
       <td>${fmtBRL(p.custoFinal)}</td>
+      <td class="${p.vendas>0?'green':''}">${fmtNum(p.vendas)}</td>
+      <td class="${p.faturamento>0?'green':''}">${fmtBRL(p.faturamento)}</td>
+      <td>${p.roas>0?p.roas.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—'}</td>
+      <td>${fmtPct(p.taxaVenda)}</td>
       <td>${fmtNum(p.purchase)}</td>
       <td>${fmtBRL(p.cpa)}</td>
     </tr>
-  `).join('') : `<tr><td colspan="14" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados</td></tr>`;
+  `).join('') : `<tr><td colspan="18" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados</td></tr>`;
   document.getElementById('tbl-publicos').innerHTML = head + '<tbody>'+body+'</tbody>';
 }
 
@@ -1077,13 +1109,13 @@ function setPubStatus(s, el){
   PUB_STATUS = s;
   document.querySelectorAll('.pub-filter-btn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
-  renderPublicos(filterByDate(ROWS, CUR_FROM, CUR_TO));
+  renderPublicos(filterByDate(ROWS, CUR_FROM, CUR_TO), filterSalesByDate(SALES, CUR_FROM, CUR_TO));
 }
 function setPubSort(s, el){
   PUB_SORT = s;
   document.querySelectorAll('.pub-sort-btn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
-  renderPublicos(filterByDate(ROWS, CUR_FROM, CUR_TO));
+  renderPublicos(filterByDate(ROWS, CUR_FROM, CUR_TO), filterSalesByDate(SALES, CUR_FROM, CUR_TO));
 }
 
 function setPreset(days, btn){
@@ -1125,7 +1157,7 @@ function applyFilter(){
   renderVendas(fsales);
   renderVisao(filtered, fsales);
   renderCriativos(filtered, fsales);
-  renderPublicos(filtered);
+  renderPublicos(filtered, fsales);
   renderPeriodo(filtered, weekKey, 'tbl-semanal', 'chart-sem-inv', 'chart-sem-ctr', 'Semana');
   renderPeriodo(filtered, monthKey, 'tbl-mensal', 'chart-mes-inv', 'chart-mes-ctr', 'Mês');
 }
