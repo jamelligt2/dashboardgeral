@@ -2030,42 +2030,56 @@ function renderDebriefing(){
     return`<tr>${tdLabel(label,sub)}${vals.map((v,i)=>tdVal(v.val,v.color,v.big,!eds[i].m.hasData&&v.requireData)).join('')}</tr>`;
   }
 
-  // Pico de presença editável por edição
-  const picoInputs=eds.map(({id,ed})=>`
-    <div style="text-align:center">
-      <div style="font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Pico Presença</div>
-      <div style="display:flex;align-items:center;justify-content:center;gap:4px">
-        <input type="number" value="${ed.debrief.picoPresenca}" min="0"
-          style="width:52px;background:#fff3ea;border:1px solid rgba(255,107,43,.4);color:#ff6b2b;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;border-radius:5px;padding:3px 6px;text-align:center;outline:none"
-          oninput="UNIAO_EDITIONS['${id}'].debrief.picoPresenca=parseInt(this.value)||0;renderDebriefing()">
-        <span style="font-size:9px;color:#aaa">pess.</span>
+  // Inputs editáveis por edição (pico, upsell, prod2, orderbump)
+  const manualInputs=eds.map(({id,ed})=>{
+    const inp=(field,val,cor,label,unit)=>`
+      <div>
+        <div style="font-size:8px;color:#888;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">${label}</div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <input type="number" value="${val}" min="0"
+            style="width:54px;background:#141414;border:1px solid ${cor}55;color:${cor};font-family:'DM Mono',monospace;font-size:13px;font-weight:700;border-radius:5px;padding:3px 6px;text-align:center;outline:none;-moz-appearance:textfield"
+            oninput="UNIAO_EDITIONS['${id}'].debrief.${field}=parseInt(this.value)||0;renderDebriefing()">
+          <span style="font-size:9px;color:#555">${unit}</span>
+        </div>
+      </div>`;
+    return`<div style="background:#1e1e1e;border:1px solid #333;border-top:2px solid ${ed.color};border-radius:8px;padding:10px 12px;min-width:140px">
+      <div style="font-size:10px;font-weight:700;color:${ed.color};margin-bottom:8px;letter-spacing:.3px">${ed.emoji} ${ed.label}</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${inp('picoPresenca',ed.debrief.picoPresenca,'#ff6b2b','Pico Presença','pess.')}
+        ${inp('vendasUpsell',ed.debrief.vendasUpsell,'#2ecc71','Upsell 2997','vend.')}
+        ${inp('vendasProd2',ed.debrief.vendasProd2,'#2ecc71','Produto 397','vend.')}
+        ${inp('vendasOrderbump',ed.debrief.vendasOrderbump||0,'#f1c40f','Orderbumps','vend.')}
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   // Cabeçalhos de coluna
   const thCols=eds.map(({id,ed,m})=>`
-    <th style="padding:14px 18px;text-align:center;border-bottom:1px solid #444444;border-right:1px solid #1a1a1a">
+    <th style="padding:14px 18px;text-align:center;border-bottom:1px solid #444444;border-right:1px solid #333">
       <div style="font-size:13px;font-weight:700;color:${ed.color}">${ed.emoji} ${ed.label}</div>
       <div style="font-size:9px;color:#aaa;margin-top:2px">${m.hasData?m.totalVendas+' ingressos':'Aguardando dados'}</div>
     </th>`).join('');
 
   el.innerHTML=`
-  <div style="background:linear-gradient(135deg,#fff8f4,#fff3ea);border:1px solid rgba(255,107,43,.3);border-radius:14px;padding:18px 24px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px">
+  <div style="background:#141414;border:1px solid rgba(255,107,43,.25);border-radius:14px;padding:18px 24px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px">
     <div>
       <div style="font-size:20px;font-weight:700;color:#ff6b2b;margin-bottom:3px">🏁 Debriefing — União em Chama</div>
-      <div style="font-size:11px;color:#888">Análise edição a edição · Gabi Bergo · 2026</div>
+      <div style="font-size:11px;color:#888;margin-bottom:14px">Análise edição a edição · Gabi Bergo · 2026</div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap">
+        ${eds.map(({id,ed,m})=>`
+          <div style="text-align:center">
+            <div style="font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Fat. Bruto ${ed.label}</div>
+            <div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:#ff6b2b">${m.hasData?brl(m.recBruta):'—'}</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Fat. Líq. ${ed.label}</div>
+            <div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:#2ecc71">${m.hasData?brl(m.recLiq):'—'}</div>
+          </div>`).join('<div style="width:1px;background:#333;margin:0 4px"></div>')}
+      </div>
     </div>
-    <div style="display:flex;gap:20px;flex-wrap:wrap">
-      ${picoInputs}
-      ${eds.map(({id,ed,m})=>`
-        <div style="text-align:center">
-          <div style="font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Fat. Bruto Total</div>
-          <div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:#ff6b2b">${m.hasData?brl(m.recBruta):'—'}</div>
-        </div>
-        <div style="text-align:center">
-          <div style="font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Fat. Líq. Total</div>
-          <div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:#2ecc71">${m.hasData?brl(m.recLiq):'—'}</div>
-        </div>`).join('<div style="width:1px;background:rgba(255,107,43,.2);margin:0 4px"></div>')}
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start">
+      <div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.4px;align-self:center;writing-mode:vertical-lr;transform:rotate(180deg);margin-right:4px">✏️ Editar</div>
+      ${manualInputs}
     </div>
   </div>
 
@@ -2123,8 +2137,8 @@ function renderDebriefing(){
       </tbody>
     </table>
   </div>
-  <div style="margin-top:10px;font-size:10px;color:#c0bbb4;line-height:1.7;padding:0 4px">
-    * Invest. c/ imposto = bruto × 1,1382 · Receita de ingressos = valores reais do Webhook · Upsell e produto 397 = valores fixos por edição · Pico de presença editável acima.
+  <div style="margin-top:10px;font-size:10px;color:#555;line-height:1.7;padding:0 4px">
+    ✏️ Pico de presença, Upsell 2997, Produto 397 e Orderbumps são editáveis no painel acima — os totais recalculam automaticamente sem precisar de deploy.
   </div>`;
 }
 
