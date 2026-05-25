@@ -232,6 +232,8 @@ tr:hover td{background:rgba(255,255,255,.025)}
     <button class="cri-sort-btn" data-sort="ctr" onclick="setCriSort('ctr',this)">CTR</button>
     <button class="cri-sort-btn" data-sort="cpc" onclick="setCriSort('cpc',this)">CPC</button>
     <button class="cri-sort-btn" data-sort="cpa" onclick="setCriSort('cpa',this)">CPA</button>
+    <button class="cri-sort-btn" data-sort="final" onclick="setCriSort('final',this)">Finalizações</button>
+    <button class="cri-sort-btn" data-sort="custofinal" onclick="setCriSort('custofinal',this)">Custo/Final.</button>
     <button class="cri-sort-btn" data-sort="compras" onclick="setCriSort('compras',this)">Compras</button>
   </div>
   <div id="cri-grid" class="cri-grid"></div>
@@ -250,6 +252,8 @@ tr:hover td{background:rgba(255,255,255,.025)}
     <button class="pub-sort-btn" data-sort="ctr" onclick="setPubSort('ctr',this)">CTR</button>
     <button class="pub-sort-btn" data-sort="cpc" onclick="setPubSort('cpc',this)">CPC</button>
     <button class="pub-sort-btn" data-sort="cpa" onclick="setPubSort('cpa',this)">CPA</button>
+    <button class="pub-sort-btn" data-sort="final" onclick="setPubSort('final',this)">Finalizações</button>
+    <button class="pub-sort-btn" data-sort="custofinal" onclick="setPubSort('custofinal',this)">Custo/Final.</button>
     <button class="pub-sort-btn" data-sort="compras" onclick="setPubSort('compras',this)">Compras</button>
   </div>
   <div id="pub-grid" class="pub-grid"></div>
@@ -611,14 +615,14 @@ function renderTrafego(rows, sales){
     <div class="kpi-card"><div class="kpi-label">Compras (Meta)</div><div class="kpi-value ${t.purchase>0?'green':''}">${fmtNum(t.purchase)}</div></div>
   `;
 
-  // Funil
+  // Funil — Compras usa a venda real do webhook (contada como tráfego)
   const max = Math.max(t.impressions, 1);
   const stages = [
     {label:'Impressões', val:t.impressions},
     {label:'Cliques',    val:t.clicks},
     {label:'Page Views', val:t.pageView},
     {label:'Checkouts',  val:t.checkout},
-    {label:'Compras',    val:t.purchase},
+    {label:'Compras',    val:st.n},
   ];
   document.getElementById('funil-bars').innerHTML = stages.map(s => `
     <div class="funil-bar-wrap">
@@ -631,7 +635,7 @@ function renderTrafego(rows, sales){
   const trClick  = t.impressions ? (t.clicks/t.impressions)*100 : 0;
   const trPv     = t.clicks ? (t.pageView/t.clicks)*100 : 0;
   const trCk     = t.pageView ? (t.checkout/t.pageView)*100 : 0;
-  const trCompra = t.checkout ? (t.purchase/t.checkout)*100 : 0;
+  const trCompra = t.checkout ? (st.n/t.checkout)*100 : 0;
   document.getElementById('taxas').innerHTML = `
     <div class="taxa-item"><span>CTR (Cliques/Impressões)</span><span class="taxa-val">${fmtPct(trClick)}</span></div>
     <div class="taxa-item"><span>PV / Cliques</span><span class="taxa-val">${fmtPct(trPv)}</span></div>
@@ -818,6 +822,7 @@ function renderCriativos(rows){
     c.ctr  = c.impressions ? (c.clicks/c.impressions)*100 : 0;
     c.cpc  = c.clicks ? c.spend/c.clicks : 0;
     c.cpa  = c.purchase ? c.spend/c.purchase : 0;
+    c.custoFinal = c.checkout ? c.spend/c.checkout : 0;   // custo por finalização
     c.hook = c.impressions ? (c.video3s/c.impressions)*100 : 0;
     c.hold = c.video3s ? (c.video75/c.video3s)*100 : 0;
     c.ativo = isActiveByRecency(c);
@@ -827,8 +832,8 @@ function renderCriativos(rows){
   if (CRI_STATUS === 'ativos')   list = list.filter(c => c.ativo);
   if (CRI_STATUS === 'inativos') list = list.filter(c => !c.ativo);
   // ordenação
-  const sortKey = { inv:'spend', hook:'hook', hold:'hold', ctr:'ctr', cpc:'cpc', cpa:'cpa', compras:'purchase' }[CRI_SORT] || 'spend';
-  const asc = (sortKey === 'cpc' || sortKey === 'cpa');
+  const sortKey = { inv:'spend', hook:'hook', hold:'hold', ctr:'ctr', cpc:'cpc', cpa:'cpa', compras:'purchase', final:'checkout', custofinal:'custoFinal' }[CRI_SORT] || 'spend';
+  const asc = (sortKey === 'cpc' || sortKey === 'cpa' || sortKey === 'custoFinal');
   list.sort((a,b)=> asc ? (a[sortKey]||Infinity) - (b[sortKey]||Infinity)
                         : (b[sortKey]||0) - (a[sortKey]||0));
 
@@ -850,6 +855,8 @@ function renderCriativos(rows){
           <div class="cri-metric"><span class="cri-metric-label">Hold Rate</span><span class="cri-metric-val ${c.hold>=15?'good':(c.hold<8?'warn':'')}">${fmtPct(c.hold)}</span></div>
           <div class="cri-metric"><span class="cri-metric-label">CTR</span><span class="cri-metric-val">${fmtPct(c.ctr)}</span></div>
           <div class="cri-metric"><span class="cri-metric-label">CPC</span><span class="cri-metric-val">${fmtBRL(c.cpc)}</span></div>
+          <div class="cri-metric"><span class="cri-metric-label">Finalizações</span><span class="cri-metric-val">${fmtNum(c.checkout)}</span></div>
+          <div class="cri-metric"><span class="cri-metric-label">Custo/Final.</span><span class="cri-metric-val">${fmtBRL(c.custoFinal)}</span></div>
           <div class="cri-metric"><span class="cri-metric-label">Compras</span><span class="cri-metric-val">${fmtNum(c.purchase)}</span></div>
           <div class="cri-metric"><span class="cri-metric-label">CPA</span><span class="cri-metric-val">${fmtBRL(c.cpa)}</span></div>
         </div>
@@ -861,7 +868,7 @@ function renderCriativos(rows){
   // Tabela
   const head = `<thead><tr>
     <th>Criativo</th><th>Status</th><th>Invest.</th><th>Impressões</th><th>Cliques</th>
-    <th>CTR</th><th>CPC</th><th>Hook</th><th>Hold</th><th>Compras</th><th>CPA</th><th>Link</th>
+    <th>CTR</th><th>CPC</th><th>Hook</th><th>Hold</th><th>Finaliz.</th><th>Custo/Final.</th><th>Compras</th><th>CPA</th><th>Link</th>
   </tr></thead>`;
   const body = list.length ? list.map(c => `
     <tr>
@@ -874,11 +881,13 @@ function renderCriativos(rows){
       <td>${fmtBRL(c.cpc)}</td>
       <td>${fmtPct(c.hook)}</td>
       <td>${fmtPct(c.hold)}</td>
+      <td>${fmtNum(c.checkout)}</td>
+      <td>${fmtBRL(c.custoFinal)}</td>
       <td>${fmtNum(c.purchase)}</td>
       <td>${fmtBRL(c.cpa)}</td>
       <td>${c.link ? `<a href="${escapeAttr(c.link)}" target="_blank" rel="noopener" style="color:#ff6b2b">🔗 abrir</a>` : '—'}</td>
     </tr>
-  `).join('') : `<tr><td colspan="12" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados</td></tr>`;
+  `).join('') : `<tr><td colspan="14" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados</td></tr>`;
   document.getElementById('tbl-criativos').innerHTML = head + '<tbody>'+body+'</tbody>';
 }
 
@@ -890,6 +899,7 @@ function renderPublicos(rows){
     p.ctr  = p.impressions ? (p.clicks/p.impressions)*100 : 0;
     p.cpc  = p.clicks ? p.spend/p.clicks : 0;
     p.cpa  = p.purchase ? p.spend/p.purchase : 0;
+    p.custoFinal = p.checkout ? p.spend/p.checkout : 0;   // custo por finalização
     p.hook = p.impressions ? (p.video3s/p.impressions)*100 : 0;
     p.hold = p.video3s ? (p.video75/p.video3s)*100 : 0;
     p.ativo = isActiveByRecency(p);
@@ -897,8 +907,8 @@ function renderPublicos(rows){
   let list = pubs;
   if (PUB_STATUS === 'ativos')   list = list.filter(p => p.ativo);
   if (PUB_STATUS === 'inativos') list = list.filter(p => !p.ativo);
-  const sortKey = { inv:'spend', ctr:'ctr', cpc:'cpc', cpa:'cpa', compras:'purchase' }[PUB_SORT] || 'spend';
-  const asc = (sortKey === 'cpc' || sortKey === 'cpa');
+  const sortKey = { inv:'spend', ctr:'ctr', cpc:'cpc', cpa:'cpa', compras:'purchase', final:'checkout', custofinal:'custoFinal' }[PUB_SORT] || 'spend';
+  const asc = (sortKey === 'cpc' || sortKey === 'cpa' || sortKey === 'custoFinal');
   list.sort((a,b)=> asc ? (a[sortKey]||Infinity) - (b[sortKey]||Infinity)
                         : (b[sortKey]||0) - (a[sortKey]||0));
 
@@ -918,6 +928,8 @@ function renderPublicos(rows){
           <div class="pub-metric"><div class="pub-metric-val neutral">${fmtNum(p.clicks)}</div><div class="pub-metric-lbl">Cliques</div></div>
           <div class="pub-metric"><div class="pub-metric-val neutral">${fmtPct(p.ctr)}</div><div class="pub-metric-lbl">CTR</div></div>
           <div class="pub-metric"><div class="pub-metric-val neutral">${fmtBRL(p.cpc)}</div><div class="pub-metric-lbl">CPC</div></div>
+          <div class="pub-metric"><div class="pub-metric-val neutral">${fmtNum(p.checkout)}</div><div class="pub-metric-lbl">Finalizações</div></div>
+          <div class="pub-metric"><div class="pub-metric-val neutral">${fmtBRL(p.custoFinal)}</div><div class="pub-metric-lbl">Custo/Final.</div></div>
           <div class="pub-metric"><div class="pub-metric-val neutral">${fmtNum(p.purchase)}</div><div class="pub-metric-lbl">Compras</div></div>
         </div>
       </div>
@@ -926,7 +938,7 @@ function renderPublicos(rows){
 
   const head = `<thead><tr>
     <th>Público (Adset)</th><th>Campanha</th><th>Status</th><th>Invest.</th>
-    <th>Impressões</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Hook</th><th>Hold</th><th>Compras</th><th>CPA</th>
+    <th>Impressões</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Hook</th><th>Hold</th><th>Finaliz.</th><th>Custo/Final.</th><th>Compras</th><th>CPA</th>
   </tr></thead>`;
   const body = list.length ? list.map(p => `
     <tr>
@@ -940,10 +952,12 @@ function renderPublicos(rows){
       <td>${fmtBRL(p.cpc)}</td>
       <td>${fmtPct(p.hook)}</td>
       <td>${fmtPct(p.hold)}</td>
+      <td>${fmtNum(p.checkout)}</td>
+      <td>${fmtBRL(p.custoFinal)}</td>
       <td>${fmtNum(p.purchase)}</td>
       <td>${fmtBRL(p.cpa)}</td>
     </tr>
-  `).join('') : `<tr><td colspan="12" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados</td></tr>`;
+  `).join('') : `<tr><td colspan="14" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados</td></tr>`;
   document.getElementById('tbl-publicos').innerHTML = head + '<tbody>'+body+'</tbody>';
 }
 
