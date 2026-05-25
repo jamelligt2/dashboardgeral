@@ -188,6 +188,8 @@ tr:hover td{background:rgba(255,255,255,.025)}
 
 <div class="content active" id="content-trafego">
   <div id="kpi-trafego" class="kpi-grid"></div>
+  <div class="sec-title">💰 Vendas (Webhook) <span id="vendas-count" style="font-weight:400;color:rgba(255,255,255,.4);font-size:11px"></span></div>
+  <div id="vendas-panel" style="display:flex;gap:12px;overflow-x:auto;padding-bottom:10px;margin-bottom:18px"></div>
   <div class="funil-section">
     <div class="chart-card">
       <h4>Funil de conversão (Meta)</h4>
@@ -301,12 +303,34 @@ const CONFIG = {
     video3s:     12,
     video75:     13,
   },
+  // ── Webhook de vendas (Kiwify) ────────────────────────────────────
+  WEBHOOK_SHEET: 'Webhook',
+  PRODUTO_NOME:  'o grande salto',   // identifica venda do produto (case-insensitive)
+  VALORES_EM_CENTAVOS: true,         // Kiwify envia em centavos
+  STATUS_APROVADO: ['paid','approved','aprovado','pago','complete','completed'],
+  W: {
+    orderId:    0,
+    orderRef:   1,
+    status:     2,
+    productType:3,
+    createdAt:  16,
+    approvedAt: 18,
+    produto:    22,
+    nome:       25,
+    email:      27,
+    charge:     34,   // Commissions.charge_amount (centavos)
+    utmSource:  56,
+    utmMedium:  57,
+    utmCampaign:58,
+    utmContent: 59,
+  },
   // Janela de "ativo": criativo com gasto nos últimos N dias
   ATIVO_JANELA_DIAS: 3,
 };
 
 // Estado global
 let ROWS = [];                 // linhas brutas filtradas (status data >= mínima)
+let SALES = [];                // vendas do webhook (deduplicadas por pedido)
 let DIAS = [];                 // agregados por dia
 let CHARTS = {};
 let CRI_STATUS = 'todos';
@@ -382,7 +406,72 @@ async function fetchSheetCSV(){
   }
 }
 
+async function fetchWebhookCSV(){
+  // Webhook é opcional: se falhar, segue sem vendas
+  const url = `https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(CONFIG.WEBHOOK_SHEET)}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(()=>controller.abort(), 20000);
+  try {
+    const resp = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!resp.ok) return '';
+    const text = await resp.text();
+    if (text.includes('accounts.google') || text.includes('Signin')) return '';
+    return text;
+  } catch(e){ clearTimeout(timeout); return ''; }
+}
+
 // ── Processamento ──────────────────────────────────────────────────
+// Vendas do webhook: deduplica por pedido (order_id), conta produto principal
+function processSales(rows){
+  if (!rows || rows.length < 2) return [];
+  const W = CONFIG.W;
+  const byOrder = new Map();
+  for (let i = 1; i < rows.length; i++){
+    const r = rows[i];
+    if (!r || !r[W.orderId]) continue;
+    const status = String(r[W.status]||'').toLowerCase().trim();
+    if (CONFIG.STATUS_APROVADO.indexOf(status) === -1) continue;
+    const appr = String(r[W.approvedAt]||r[W.createdAt]||'').trim();
+    const data = appr.slice(0,10);                  // "2026-05-24"
+    if (!data || data < CONFIG.DATA_MINIMA) continue;
+    const produto = String(r[W.produto]||'').trim();
+    if (CONFIG.PRODUTO_NOME && produto.toLowerCase().indexOf(CONFIG.PRODUTO_NOME) === -1) continue;
+    const oid = String(r[W.orderId]).trim();
+    if (byOrder.has(oid)) continue;                 // dedupe club/membership do mesmo pedido
+    let valor = parseBRNum(r[W.charge]);
+    if (CONFIG.VALORES_EM_CENTAVOS) valor = valor/100;
+    const src = String(r[W.utmSource]||'').trim();
+    byOrder.set(oid, {
+      data,
+      nome:        String(r[W.nome]||'').trim(),
+      email:       String(r[W.email]||'').trim(),
+      produto,
+      valor,
+      utmSource:   src,
+      utmMedium:   String(r[W.utmMedium]||'').trim(),
+      utmCampaign: String(r[W.utmCampaign]||'').trim(),
+      utmContent:  String(r[W.utmContent]||'').trim(),
+      isTrafego:   src.toLowerCase().replace(/[\s_-]/g,'') === 'metaads',
+    });
+  }
+  return Array.from(byOrder.values()).sort((a,b)=> b.data.localeCompare(a.data));
+}
+
+function filterSalesByDate(sales, from, to){
+  return sales.filter(s => (!from || s.data >= from) && (!to || s.data <= to));
+}
+
+function sumSales(sales){
+  const t = { fat:0, n:0, fatTraf:0, nTraf:0, fatOrg:0, nOrg:0 };
+  for (const s of sales){
+    t.fat += s.valor; t.n++;
+    if (s.isTrafego){ t.fatTraf += s.valor; t.nTraf++; }
+    else            { t.fatOrg  += s.valor; t.nOrg++;  }
+  }
+  return t;
+}
+
 function processRows(rows){
   const C = CONFIG.C;
   const out = [];
@@ -457,17 +546,26 @@ function sumMetrics(rows){
 }
 
 // ── Render KPIs Tráfego ────────────────────────────────────────────
-function renderTrafego(rows){
+function renderTrafego(rows, sales){
   const t = sumMetrics(rows);
+  const st = sumSales(sales || []);
   const ctr  = t.impressions ? (t.clicks/t.impressions)*100 : 0;
   const cpc  = t.clicks ? t.spend/t.clicks : 0;
   const cpm  = t.impressions ? (t.spend/t.impressions)*1000 : 0;
-  const cpa  = t.purchase ? t.spend/t.purchase : 0;
   const hook = t.impressions ? (t.video3s/t.impressions)*100 : 0;
   const hold = t.video3s ? (t.video75/t.video3s)*100 : 0;
+  // Vendas reais (webhook)
+  const roas   = t.spend ? st.fat / t.spend : 0;
+  const ticket = st.n ? st.fat / st.n : 0;
+  const cac    = st.n ? t.spend / st.n : 0;
 
   document.getElementById('kpi-trafego').innerHTML = `
     <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${fmtBRL(t.spend)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Faturamento</div><div class="kpi-value ${st.fat>0?'green':''}">${fmtBRL(st.fat)}</div><div class="kpi-sub">Tráf.: ${fmtBRL(st.fatTraf)} · Org.: ${fmtBRL(st.fatOrg)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">ROAS</div><div class="kpi-value ${roas>=1?'green':(roas>0?'yellow':'')}">${roas>0?roas.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—'}</div><div class="kpi-sub">faturamento / investimento</div></div>
+    <div class="kpi-card"><div class="kpi-label">Vendas</div><div class="kpi-value ${st.n>0?'green':''}">${fmtNum(st.n)}</div><div class="kpi-sub">${st.nTraf} tráfego · ${st.nOrg} orgânico</div></div>
+    <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value">${fmtBRL(ticket)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CAC</div><div class="kpi-value">${fmtBRL(cac)}</div><div class="kpi-sub">investimento / vendas</div></div>
     <div class="kpi-card"><div class="kpi-label">Impressões</div><div class="kpi-value">${fmtNum(t.impressions)}</div><div class="kpi-sub">Alcance: ${fmtNum(t.reach)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Cliques</div><div class="kpi-value">${fmtNum(t.clicks)}</div></div>
     <div class="kpi-card"><div class="kpi-label">CTR</div><div class="kpi-value ${ctr>=1?'green':(ctr>=0.5?'yellow':'red')}">${fmtPct(ctr)}</div></div>
@@ -478,7 +576,6 @@ function renderTrafego(rows){
     <div class="kpi-card"><div class="kpi-label">Page Views</div><div class="kpi-value">${fmtNum(t.pageView)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Checkouts</div><div class="kpi-value">${fmtNum(t.checkout)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Compras (Meta)</div><div class="kpi-value ${t.purchase>0?'green':''}">${fmtNum(t.purchase)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">CPA</div><div class="kpi-value">${fmtBRL(cpa)}</div></div>
   `;
 
   // Funil
@@ -574,40 +671,57 @@ function drawBar(canvasId, labels, data, suffix, color){
 }
 
 // ── Aba Visão Geral ─────────────────────────────────────────────────
-function renderVisao(rows){
+function renderVisao(rows, sales){
   const t = sumMetrics(rows);
+  const st = sumSales(sales || []);
   const ctr  = t.impressions ? (t.clicks/t.impressions)*100 : 0;
   const cpc  = t.clicks ? t.spend/t.clicks : 0;
-  const cpa  = t.purchase ? t.spend/t.purchase : 0;
   const hook = t.impressions ? (t.video3s/t.impressions)*100 : 0;
   const hold = t.video3s ? (t.video75/t.video3s)*100 : 0;
+  const roas   = t.spend ? st.fat / t.spend : 0;
+  const ticket = st.n ? st.fat / st.n : 0;
+  const cac    = st.n ? t.spend / st.n : 0;
 
   document.getElementById('kpi-visao').innerHTML = `
     <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${fmtBRL(t.spend)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Faturamento</div><div class="kpi-value ${st.fat>0?'green':''}">${fmtBRL(st.fat)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">ROAS</div><div class="kpi-value ${roas>=1?'green':(roas>0?'yellow':'')}">${roas>0?roas.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—'}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Vendas</div><div class="kpi-value ${st.n>0?'green':''}">${fmtNum(st.n)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value">${fmtBRL(ticket)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CAC</div><div class="kpi-value">${fmtBRL(cac)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Impressões</div><div class="kpi-value">${fmtNum(t.impressions)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Cliques</div><div class="kpi-value">${fmtNum(t.clicks)}</div></div>
     <div class="kpi-card"><div class="kpi-label">CTR</div><div class="kpi-value">${fmtPct(ctr)}</div></div>
     <div class="kpi-card"><div class="kpi-label">CPC</div><div class="kpi-value">${fmtBRL(cpc)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Hook Rate</div><div class="kpi-value">${fmtPct(hook)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Hold Rate</div><div class="kpi-value">${fmtPct(hold)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Compras</div><div class="kpi-value">${fmtNum(t.purchase)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">CPA</div><div class="kpi-value">${fmtBRL(cpa)}</div></div>
   `;
+
+  // Vendas agregadas por dia
+  const salesByDay = {};
+  for (const s of (sales||[])){
+    if (!salesByDay[s.data]) salesByDay[s.data] = { fat:0, n:0 };
+    salesByDay[s.data].fat += s.valor; salesByDay[s.data].n++;
+  }
 
   const dias = aggregateDays(rows);
   const head = `<thead><tr>
-    <th>Data</th><th>Invest.</th><th>Impressões</th><th>Cliques</th><th>CTR</th><th>CPC</th>
-    <th>Hook</th><th>Hold</th><th>PV</th><th>Checkout</th><th>Compras</th><th>CPA</th>
+    <th>Data</th><th>Invest.</th><th>Faturamento</th><th>Vendas</th><th>ROAS</th><th>Impressões</th><th>Cliques</th><th>CTR</th><th>CPC</th>
+    <th>Hook</th><th>Hold</th><th>PV</th><th>Checkout</th>
   </tr></thead>`;
   const body = dias.length ? dias.map(d => {
     const c = d.impressions ? (d.clicks/d.impressions)*100 : 0;
     const cpcD = d.clicks ? d.spend/d.clicks : 0;
-    const cpaD = d.purchase ? d.spend/d.purchase : 0;
     const hk = d.impressions ? (d.video3s/d.impressions)*100 : 0;
     const hd = d.video3s ? (d.video75/d.video3s)*100 : 0;
+    const sd = salesByDay[d.data] || { fat:0, n:0 };
+    const roasD = d.spend ? sd.fat/d.spend : 0;
     return `<tr>
       <td>${d.data.split('-').reverse().join('/')}</td>
       <td>${fmtBRL(d.spend)}</td>
+      <td class="${sd.fat>0?'green':''}">${fmtBRL(sd.fat)}</td>
+      <td>${fmtNum(sd.n)}</td>
+      <td>${roasD>0?roasD.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—'}</td>
       <td>${fmtNum(d.impressions)}</td>
       <td>${fmtNum(d.clicks)}</td>
       <td>${fmtPct(c)}</td>
@@ -616,10 +730,8 @@ function renderVisao(rows){
       <td>${fmtPct(hd)}</td>
       <td>${fmtNum(d.pageView)}</td>
       <td>${fmtNum(d.checkout)}</td>
-      <td>${fmtNum(d.purchase)}</td>
-      <td>${fmtBRL(cpaD)}</td>
     </tr>`;
-  }).join('') : `<tr><td colspan="12" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados no período</td></tr>`;
+  }).join('') : `<tr><td colspan="13" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados no período</td></tr>`;
   document.getElementById('tbl-visao').innerHTML = head + '<tbody>'+body+'</tbody>';
 }
 
@@ -902,7 +1014,7 @@ function setPreset(days, btn){
     if (b.textContent.includes('d') || b.textContent.includes('Tudo')) b.classList.remove('active');
   });
   btn.classList.add('active');
-  const allDates = ROWS.map(r=>r.data).filter(Boolean).sort();
+  const allDates = [...ROWS.map(r=>r.data), ...SALES.map(s=>s.data)].filter(Boolean).sort();
   if (!allDates.length) return;
   const first = allDates[0], last = allDates[allDates.length-1];
   let from = first;
@@ -931,12 +1043,35 @@ function applyFilter(){
   const filtered = filterByDate(ROWS, CUR_FROM, CUR_TO);
   document.getElementById('range-info').textContent =
     (CUR_FROM && CUR_TO) ? `${CUR_FROM.split('-').reverse().join('/')} → ${CUR_TO.split('-').reverse().join('/')}` : '';
-  renderTrafego(filtered);
-  renderVisao(filtered);
+  const fsales = filterSalesByDate(SALES, CUR_FROM, CUR_TO);
+  renderTrafego(filtered, fsales);
+  renderVendas(fsales);
+  renderVisao(filtered, fsales);
   renderCriativos(filtered);
   renderPublicos(filtered);
   renderPeriodo(filtered, weekKey, 'tbl-semanal', 'chart-sem-inv', 'chart-sem-ctr', 'Semana');
   renderPeriodo(filtered, monthKey, 'tbl-mensal', 'chart-mes-inv', 'chart-mes-ctr', 'Mês');
+}
+
+function renderVendas(sales){
+  const panel = document.getElementById('vendas-panel');
+  const count = document.getElementById('vendas-count');
+  const st = sumSales(sales);
+  if (count) count.textContent = sales.length
+    ? `— ${st.n} venda(s) · ${fmtBRL(st.fat)} · ${st.nTraf} tráfego · ${st.nOrg} orgânico`
+    : '';
+  if (!sales.length){
+    panel.innerHTML = `<div class="empty-state" style="width:100%"><strong>Nenhuma venda no período</strong>As vendas aprovadas da aba Webhook aparecerão aqui.</div>`;
+    return;
+  }
+  panel.innerHTML = sales.map(s => `
+    <div style="min-width:230px;background:#12121f;border:1px solid rgba(255,255,255,.07);border-left:3px solid ${s.isTrafego?'#2ecc71':'#f1c40f'};border-radius:10px;padding:14px">
+      <div style="font-size:12px;font-weight:600;color:#e8e6f0;margin-bottom:6px">${s.isTrafego?'✅':'⭐'} ${escapeHtml(s.nome||'—')}</div>
+      <div style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:#ff6b2b">${fmtBRL(s.valor)}</div>
+      <div style="font-size:10px;color:rgba(255,255,255,.5);margin-top:6px">${escapeHtml(s.produto)}</div>
+      <div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:6px">${s.data.split('-').reverse().join('/')} · ${s.isTrafego?'Tráfego pago':'Orgânico'}${s.utmContent?(' · '+escapeHtml(s.utmContent)):''}</div>
+    </div>
+  `).join('');
 }
 
 async function loadData(){
@@ -945,18 +1080,19 @@ async function loadData(){
   overlay.style.display = 'flex';
   try {
     msg.textContent = 'Conectando com a planilha...';
-    const text = await fetchSheetCSV();
+    const [text, whText] = await Promise.all([fetchSheetCSV(), fetchWebhookCSV()]);
     msg.textContent = 'Processando dados...';
     const rows = parseCSV(text);
     ROWS = processRows(rows);
+    SALES = whText ? processSales(parseCSV(whText)) : [];
     if (!ROWS.length){
       msg.textContent = 'Nenhum dado encontrado a partir de ' + CONFIG.DATA_MINIMA;
       setTimeout(()=> overlay.style.display='none', 1500);
       return;
     }
     DIAS = aggregateDays(ROWS);
-    // Período padrão = tudo
-    const allDates = ROWS.map(r=>r.data).sort();
+    // Período padrão = tudo (maior intervalo entre Gerenciador e Vendas)
+    const allDates = [...ROWS.map(r=>r.data), ...SALES.map(s=>s.data)].filter(Boolean).sort();
     CUR_FROM = allDates[0];
     CUR_TO   = allDates[allDates.length-1];
     document.getElementById('dateFrom').value = CUR_FROM;
