@@ -380,13 +380,26 @@ function normalizeDateBR(s) {
   if (brd) return `${brd[1]}/${brd[2]}/${brd[3]}`;
   const isoSlash = s.match(/^(\d{4})\/(\d{2})\/(\d{2})/);
   if (isoSlash) return `${isoSlash[3]}/${isoSlash[2]}/${isoSlash[1]}`;
+  // Unix timestamp (exatamente 10 ou 13 dígitos)
   if (/^\d{10}$/.test(s) || /^\d{13}$/.test(s)) {
     const ms = s.length === 10 ? Number(s) * 1000 : Number(s);
     const d = new Date(ms);
-    if (!isNaN(d.getTime())) return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();
+    if (!isNaN(d.getTime())) {
+      const yr = d.getFullYear();
+      if (yr >= 2020 && yr <= 2035) return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+yr;
+    }
   }
-  const parsed = new Date(s);
-  if (!isNaN(parsed.getTime())) return String(parsed.getDate()).padStart(2,'0')+'/'+String(parsed.getMonth()+1).padStart(2,'0')+'/'+parsed.getFullYear();
+  // Última tentativa: SÓ se parecer data (tem separador de data e dígitos, OU mês textual).
+  // Evita que números puros (código, preço, qtd) sejam interpretados como data.
+  const pareceData = /\d{1,4}[-/]\d{1,2}[-/]\d{1,4}/.test(s) || /\d{4}-\d{2}-\d{2}/.test(s) ||
+                     /(jan|feb|fev|mar|apr|abr|may|mai|jun|jul|aug|ago|sep|set|oct|out|nov|dec|dez)/i.test(s);
+  if (pareceData) {
+    const parsed = new Date(s);
+    if (!isNaN(parsed.getTime())) {
+      const yr = parsed.getFullYear();
+      if (yr >= 2020 && yr <= 2035) return String(parsed.getDate()).padStart(2,'0')+'/'+String(parsed.getMonth()+1).padStart(2,'0')+'/'+yr;
+    }
+  }
   return '';
 }
 
@@ -395,6 +408,37 @@ function saleIsoFromBR(dataBR, raw){
   const isoDate = toISO(dataBR);
   const t = String(raw||'').match(/(\d{2}):(\d{2})(?::(\d{2}))?/);
   return isoDate + (t ? `T${t[1]}:${t[2]}:${t[3]||'00'}` : 'T00:00:00');
+}
+
+// Procura a melhor data numa linha de webhook varrendo TODAS as colunas.
+// Prioridade: colunas com "paid/pago" > "create/criacao" > qualquer "date/data".
+// Retorna { dataBR, raw } ou { dataBR:'', raw:'' } se nada parsear.
+function findBestDate(r, header){
+  const lh = header.map(h => String(h||'').toLowerCase());
+  const candidatos = [];
+  lh.forEach((name, i) => {
+    const val = r[i];
+    if (!val || !String(val).trim()) return;
+    const parsed = normalizeDateBR(val);
+    if (!parsed) return;
+    // pontuação por relevância do nome da coluna
+    let score = 0;
+    if (name.includes('paid') || name.includes('pago') || name.includes('pagamento') || name.includes('approv')) score = 100;
+    else if (name.includes('create') || name.includes('criac') || name.includes('criaç') || name.includes('created')) score = 80;
+    else if (name.includes('date') || name.includes('data')) score = 60;
+    else if (name.includes('time') || name.includes('hora')) score = -50; // hora pura não serve como data
+    else score = 10; // qualquer outra coluna que parseie como data
+    candidatos.push({ score, raw: String(val), i, name });
+  });
+  if (!candidatos.length) return { dataBR: '', raw: '' };
+  candidatos.sort((a,b) => b.score - a.score);
+  const best = candidatos[0];
+  // tenta achar a coluna de hora correspondente (mesmo prefixo trocando date→time)
+  let raw = best.raw;
+  const horaCol = lh.findIndex(n => (n.includes('time') || n.includes('hora')) &&
+    (best.name.includes('paid')? n.includes('paid') : best.name.includes('create')? n.includes('create') : true));
+  if (horaCol >= 0 && r[horaCol] && /\d{2}:\d{2}/.test(r[horaCol])) raw = best.raw + ' ' + r[horaCol];
+  return { dataBR: normalizeDateBR(best.raw), raw };
 }
 
 // =================== DATA LOADER ===================
@@ -619,16 +663,24 @@ function processWebhookEduzz(csv) {
     if (orderId && SEEN_ORDER_IDS.has(orderId)) return;
     if (orderId) SEEN_ORDER_IDS.add(orderId);
     const valor = parseEduzzValue(r[idx.valor]);
-    const dataRaw = ((r[idx.dataPag]||'') + ' ' + (r[idx.horaPag]||'')).trim();
-    const dataRawFb = ((r[idx.dataCri]||'') + ' ' + (r[idx.horaCri]||'')).trim();
-    let dataBR = normalizeDateBR(dataRaw) || normalizeDateBR(dataRawFb);
-    let iso = saleIsoFromBR(dataBR, dataRaw || dataRawFb);
+    // 1) tenta colunas conhecidas; 2) varre a linha inteira procurando a melhor data
+    let dataRaw = ((r[idx.dataPag]||'') + ' ' + (r[idx.horaPag]||'')).trim();
+    let dataBR = normalizeDateBR(dataRaw);
     if (!dataBR) {
-      const hoje = new Date();
-      dataBR = String(hoje.getDate()).padStart(2,'0')+'/'+String(hoje.getMonth()+1).padStart(2,'0')+'/'+hoje.getFullYear();
-      iso = hoje.toISOString();
-      console.warn('[webhook_eduzz] sem data parseável p/', r[idx.nome], '— usando hoje');
+      const dataCriRaw = ((r[idx.dataCri]||'') + ' ' + (r[idx.horaCri]||'')).trim();
+      dataBR = normalizeDateBR(dataCriRaw);
+      if (dataBR) dataRaw = dataCriRaw;
     }
+    if (!dataBR) {
+      const best = findBestDate(r, header);
+      if (best.dataBR) { dataBR = best.dataBR; dataRaw = best.raw; }
+    }
+    // Se MESMO ASSIM não achou data, descarta a venda (não joga pra hoje)
+    if (!dataBR) {
+      console.warn('[webhook_eduzz] descartada — sem data parseável:', r[idx.nome], '| valor', r[idx.valor]);
+      return;
+    }
+    const iso = saleIsoFromBR(dataBR, dataRaw);
     RAW_SALES_ITEMS.push({
       cliente: r[idx.nome] || 'Cliente', email: (r[idx.email]||'').toLowerCase().trim(),
       valor, dataBR, iso, produto: r[idx.produto] || '',
