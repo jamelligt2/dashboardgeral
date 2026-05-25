@@ -276,7 +276,8 @@ const CONFIG = {
   ANO:              '2026',
   SHEET_ID:         '1-QUyDaEEUb8J-igDbXDU7XEx2sPTBXIpDDyDeYKHk04',
   GERENCIADOR_SHEET:'Gerenciador',
-  WEBHOOK_SHEET:    'Webhook',   // <- vendas chegam aqui (webhook Eduzz), NÃO na aba "Vendas"
+  VENDAS_SHEET:     'Vendas',    // export manual do Eduzz: histórico completo + UTM em colunas limpas
+  WEBHOOK_SHEET:    'Webhook',   // webhook Eduzz em tempo real (vendas a partir de 16/05)
   DATA_MINIMA:      '2026-05-13',
   PRODUTO_NOME:         'páginas maternas',
   PRODUTO_PRECO_MINIMO: 0,
@@ -292,11 +293,26 @@ const CONFIG = {
   // campaign, medium, content, id). Por isso o parsing usa o 1º timestamp
   // ISO da linha (createdAt) como âncora — ver bloco "VENDAS" em loadData().
   W: {
+    invoice: 2,   // data.id (nº da fatura) — usado p/ deduplicar com a aba Vendas
     event:   1,   // tipo do evento (myeduzz.invoice_paid / ping)
     status:  3,   // data.status (paid)
     nome:    5,   // data.buyer.name
     email:   7,   // data.buyer.email
     utmIni:  23,  // 1ª coluna de UTM (logo após offer.name)
+  },
+  // ===== Aba "Vendas" do Eduzz (export manual, colunas fixas) =====
+  VV: {
+    invoice: 0,   // Fatura
+    status:  1,   // Status (Paga)
+    data:    10,  // Data de Pagamento (DD/MM/YYYY)
+    produto: 17,  // Produto
+    valor:   22,  // Valor da Venda
+    nome:    34,  // Cliente / Nome
+    email:   35,  // Cliente / E-mail
+    utmSource:   47,
+    utmCampaign: 48,
+    utmMedium:   49,
+    utmContent:  50,
   },
   // Gerenciador desta planilha (não-Stract padrão)
   G: {
@@ -318,10 +334,12 @@ const CONFIG = {
 
 const SHEET_ID          = CONFIG.SHEET_ID;
 const GERENCIADOR_SHEET = CONFIG.GERENCIADOR_SHEET;
+const VENDAS_SHEET      = CONFIG.VENDAS_SHEET;
 const WEBHOOK_SHEET     = CONFIG.WEBHOOK_SHEET;
 const DATA_MINIMA       = CONFIG.DATA_MINIMA;
 const G                 = CONFIG.G;
 const W                 = CONFIG.W;
+const VV                = CONFIG.VV;
 
 document.addEventListener('DOMContentLoaded', ()=>{
   document.title = CONFIG.PRODUTO + ' · ' + CONFIG.CLIENTE + ' — Jamelli GT';
@@ -427,10 +445,13 @@ async function loadData(){
     setLoading('Carregando dados do Gerenciador...');
     const gCSV = await fetchSheetCSV(GERENCIADOR_SHEET);
     setLoading('Carregando vendas...');
-    const wCSV = await fetchSheetCSV(WEBHOOK_SHEET);
+    let vCSV = '', wCSV = '';
+    try { vCSV = await fetchSheetCSV(VENDAS_SHEET);  } catch(e){ console.warn('Aba Vendas indisponível:', e.message); }
+    try { wCSV = await fetchSheetCSV(WEBHOOK_SHEET); } catch(e){ console.warn('Aba Webhook indisponível:', e.message); }
 
     const gRows = parseCSV(gCSV).slice(1).filter(r => r[G.date]);
-    const wRows = parseCSV(wCSV).slice(1).filter(r => r && r.length > 8);
+    const vRows = vCSV ? parseCSV(vCSV).slice(1).filter(r => r && r.length > 8) : [];
+    const wRows = wCSV ? parseCSV(wCSV).slice(1).filter(r => r && r.length > 8) : [];
 
     setLoading('Processando dados...');
 
@@ -460,53 +481,72 @@ async function loadData(){
     });
     DIAS = Object.values(diaMap).sort((a,b)=>a.data.localeCompare(b.data));
 
-    // ========== VENDAS (aba Webhook do Eduzz) ==========
+    // ========== VENDAS (Vendas + Webhook, deduplicadas pela Fatura) ==========
     const aprovStatus = CONFIG.STATUS_APROVADO.map(s=>s.toUpperCase());
     const prodLow = CONFIG.PRODUTO_NOME.toLowerCase();
     const divisor = CONFIG.VALORES_EM_CENTAVOS ? 100 : 1;
     const ISO = /^\d{4}-\d{2}-\d{2}T/;  // timestamp do webhook (createdAt/paidAt)
+    const okVenda = s => s.data >= DATA_MINIMA
+                      && aprovStatus.includes(s.status)
+                      && s.produto.includes(prodLow)
+                      && s.fatTotal >= CONFIG.PRODUTO_PRECO_MINIMO;
 
-    SALES = wRows.map(r => {
+    // --- Fonte 1: aba "Vendas" (export manual, colunas fixas, UTM limpo) ---
+    const vendasVendas = vRows.map(r => {
+      const v = num(r[VV.valor])/divisor;
+      return {
+        fatura:  (r[VV.invoice]||'').trim(),
+        data:    parseDate(r[VV.data]),
+        nome:    (r[VV.nome]||'').trim(),
+        email:   (r[VV.email]||'').trim(),
+        status:  (r[VV.status]||'').toUpperCase().trim(),
+        produto: (r[VV.produto]||'').toLowerCase(),
+        fatTotal: v, fatPrincipal: v, fatOB: 0,
+        utmSource:  (r[VV.utmSource]||'').trim(),
+        utmCampaign:(r[VV.utmCampaign]||'').trim(),
+        utmMedium:  (r[VV.utmMedium]||'').trim(),
+        utmContent: (r[VV.utmContent]||'').trim(),
+        _src: 'vendas',
+      };
+    }).filter(okVenda);
+
+    // --- Fonte 2: aba "Webhook" (tempo real; UTM em nº variável de colunas) ---
+    const vendasWebhook = wRows.map(r => {
       const event  = (r[W.event] ||'').toLowerCase().trim();
       const status = (r[W.status]||'').toUpperCase().trim();
-      const nome   = (r[W.nome]  ||'').trim();
-      const email  = (r[W.email] ||'').trim();
-
-      // Âncora: 1º timestamp ISO da linha = createdAt. Estável mesmo quando
-      // o campo UTM ocupa nº variável de colunas (1 célula ou 5 células).
+      // Âncora: 1º timestamp ISO da linha = createdAt (estável)
       let iso = -1;
       for(let i=W.utmIni; i<r.length; i++){
         if(ISO.test(String(r[i]||'').trim())){ iso = i; break; }
       }
-
-      // UTM = colunas entre offer.name e o createdAt
       let utm = (iso > W.utmIni) ? r.slice(W.utmIni, iso) : [];
-      if(utm.length === 1) utm = String(utm[0]).split(',');  // veio tudo numa célula só
-      const utmSource   = (utm[0]||'').trim();
-      const utmCampaign = (utm[1]||'').trim();   // = nome do adset/público
-      const utmMedium   = (utm[2]||'').trim();
-      const utmContent  = (utm[3]||'').trim();   // = nome do criativo (PAG-ADExx)
-
-      const data = (iso>=0) ? parseDate(r[iso]) : '';
-      // ordem após o createdAt: dueDate(+1) currency(+2) price.value(+3)
-      const fat  = (iso>=0) ? num(r[iso+3])/divisor : 0;
-      const rowText = r.join(' | ').toLowerCase();  // usado p/ filtrar o produto
-
+      if(utm.length === 1) utm = String(utm[0]).split(',');
+      const fat = (iso>=0) ? num(r[iso+3])/divisor : 0;  // price.value
       return {
-        data, nome, email, status, event,
-        produto: rowText,
-        fatTotal: fat,
-        fatPrincipal: fat,
-        fatOB: 0,
-        utmSource, utmMedium, utmCampaign, utmContent,
+        fatura:  (r[W.invoice]||'').trim(),
+        data:    (iso>=0) ? parseDate(r[iso]) : '',
+        nome:    (r[W.nome]||'').trim(),
+        email:   (r[W.email]||'').trim(),
+        status, event,
+        produto: r.join(' | ').toLowerCase(),
+        fatTotal: fat, fatPrincipal: fat, fatOB: 0,
+        utmSource:  (utm[0]||'').trim(),
+        utmCampaign:(utm[1]||'').trim(),
+        utmMedium:  (utm[2]||'').trim(),
+        utmContent: (utm[3]||'').trim(),
+        _src: 'webhook',
       };
-    }).filter(s =>
-      s.event === 'myeduzz.invoice_paid' &&
-      s.data >= DATA_MINIMA &&
-      aprovStatus.includes(s.status) &&
-      s.produto.includes(prodLow) &&
-      s.fatTotal >= CONFIG.PRODUTO_PRECO_MINIMO
-    );
+    }).filter(s => s.event === 'myeduzz.invoice_paid' && okVenda(s));
+
+    // --- Merge: a aba Vendas tem prioridade; o Webhook só acrescenta
+    //     faturas que ainda não estão na Vendas (vendas novas em tempo real) ---
+    const vendaMap = {};
+    vendasVendas.forEach(s => { vendaMap[s.fatura || (s.email+'|'+s.data)] = s; });
+    vendasWebhook.forEach(s => {
+      const k = s.fatura || (s.email+'|'+s.data);
+      if(!vendaMap[k]) vendaMap[k] = s;
+    });
+    SALES = Object.values(vendaMap);
 
     SALES.sort((a,b)=> b.data.localeCompare(a.data));
 
