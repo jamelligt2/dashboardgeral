@@ -276,27 +276,27 @@ const CONFIG = {
   ANO:              '2026',
   SHEET_ID:         '1-QUyDaEEUb8J-igDbXDU7XEx2sPTBXIpDDyDeYKHk04',
   GERENCIADOR_SHEET:'Gerenciador',
-  WEBHOOK_SHEET:    'Vendas',
+  WEBHOOK_SHEET:    'Webhook',   // <- vendas chegam aqui (webhook Eduzz), NÃO na aba "Vendas"
   DATA_MINIMA:      '2026-05-13',
   PRODUTO_NOME:         'páginas maternas',
   PRODUTO_PRECO_MINIMO: 0,
   USA_TX_ROOT: false,
   VALORES_EM_CENTAVOS: false,
-  // Webhook = aba "Vendas" do Eduzz
+  // ===== Aba "Webhook" do Eduzz =====
+  // O webhook grava as colunas nesta ordem fixa no início da linha:
+  //  0 id | 1 event | 2 data.id | 3 status | 4 buyer.id | 5 buyer.name
+  //  6 buyer.document | 7 buyer.email | 8 phone | 9 phone2 | 10 cellphone
+  //  ...endereço... | 22 offer.name | 23+ UTM | depois createdAt, dueDate,
+  //  price.currency, price.value, ...
+  // OBS: o campo data.utm às vezes ocupa 1 célula e às vezes 5 (source,
+  // campaign, medium, content, id). Por isso o parsing usa o 1º timestamp
+  // ISO da linha (createdAt) como âncora — ver bloco "VENDAS" em loadData().
   W: {
-    data:         10,  // Data de Pagamento
-    produto:      17,  // Produto
-    status:       1,   // Status
-    cliente:      34,  // Cliente / Nome
-    email:        35,  // Cliente / E-mail
-    fatTotal:     22,  // Valor da Venda
-    fatPrincipal: 22,  // mesmo que fatTotal
-    fatOB:        -1,  // não tem OB separado nesta planilha
-    txRoot:       -1,
-    utmSource:    47,  // UTM Source
-    utmMedium:    49,  // UTM Medium
-    utmCampaign:  48,  // UTM Campaign
-    utmContent:   50,  // UTM Content
+    event:   1,   // tipo do evento (myeduzz.invoice_paid / ping)
+    status:  3,   // data.status (paid)
+    nome:    5,   // data.buyer.name
+    email:   7,   // data.buyer.email
+    utmIni:  23,  // 1ª coluna de UTM (logo após offer.name)
   },
   // Gerenciador desta planilha (não-Stract padrão)
   G: {
@@ -313,7 +313,7 @@ const CONFIG = {
     campaign:10,
     imp:    11,
   },
-  STATUS_APROVADO: ['APPROVED','COMPLETE','CONFIRMED','PAGO','PAGA'],
+  STATUS_APROVADO: ['APPROVED','COMPLETE','CONFIRMED','PAGO','PAGA','PAID'],
 };
 
 const SHEET_ID          = CONFIG.SHEET_ID;
@@ -430,7 +430,7 @@ async function loadData(){
     const wCSV = await fetchSheetCSV(WEBHOOK_SHEET);
 
     const gRows = parseCSV(gCSV).slice(1).filter(r => r[G.date]);
-    const wRows = parseCSV(wCSV).slice(1).filter(r => r[W.data]);
+    const wRows = parseCSV(wCSV).slice(1).filter(r => r && r.length > 8);
 
     setLoading('Processando dados...');
 
@@ -460,32 +460,48 @@ async function loadData(){
     });
     DIAS = Object.values(diaMap).sort((a,b)=>a.data.localeCompare(b.data));
 
-    // ========== VENDAS ==========
+    // ========== VENDAS (aba Webhook do Eduzz) ==========
     const aprovStatus = CONFIG.STATUS_APROVADO.map(s=>s.toUpperCase());
     const prodLow = CONFIG.PRODUTO_NOME.toLowerCase();
     const divisor = CONFIG.VALORES_EM_CENTAVOS ? 100 : 1;
+    const ISO = /^\d{4}-\d{2}-\d{2}T/;  // timestamp do webhook (createdAt/paidAt)
 
     SALES = wRows.map(r => {
+      const event  = (r[W.event] ||'').toLowerCase().trim();
       const status = (r[W.status]||'').toUpperCase().trim();
-      const produto = (r[W.produto]||'').toLowerCase();
-      const data = parseDate(r[W.data]);
-      const fat = num(r[W.fatTotal])/divisor;
-      const fatOB = (W.fatOB>=0) ? num(r[W.fatOB])/divisor : 0;
+      const nome   = (r[W.nome]  ||'').trim();
+      const email  = (r[W.email] ||'').trim();
+
+      // Âncora: 1º timestamp ISO da linha = createdAt. Estável mesmo quando
+      // o campo UTM ocupa nº variável de colunas (1 célula ou 5 células).
+      let iso = -1;
+      for(let i=W.utmIni; i<r.length; i++){
+        if(ISO.test(String(r[i]||'').trim())){ iso = i; break; }
+      }
+
+      // UTM = colunas entre offer.name e o createdAt
+      let utm = (iso > W.utmIni) ? r.slice(W.utmIni, iso) : [];
+      if(utm.length === 1) utm = String(utm[0]).split(',');  // veio tudo numa célula só
+      const utmSource   = (utm[0]||'').trim();
+      const utmCampaign = (utm[1]||'').trim();   // = nome do adset/público
+      const utmMedium   = (utm[2]||'').trim();
+      const utmContent  = (utm[3]||'').trim();   // = nome do criativo (PAG-ADExx)
+
+      const data = (iso>=0) ? parseDate(r[iso]) : '';
+      // ordem após o createdAt: dueDate(+1) currency(+2) price.value(+3)
+      const fat  = (iso>=0) ? num(r[iso+3])/divisor : 0;
+      const rowText = r.join(' | ').toLowerCase();  // usado p/ filtrar o produto
+
       return {
-        data,
-        nome:(r[W.cliente]||'').trim(),
-        email:(r[W.email]||'').trim(),
-        produto,
-        status,
+        data, nome, email, status, event,
+        produto: rowText,
         fatTotal: fat,
-        fatPrincipal: (W.fatPrincipal>=0)? num(r[W.fatPrincipal])/divisor : fat,
-        fatOB,
-        utmSource:(r[W.utmSource]||'').trim(),
-        utmMedium:(r[W.utmMedium]||'').trim(),
-        utmCampaign:(r[W.utmCampaign]||'').trim(),
-        utmContent:(r[W.utmContent]||'').trim(),
+        fatPrincipal: fat,
+        fatOB: 0,
+        utmSource, utmMedium, utmCampaign, utmContent,
       };
     }).filter(s =>
+      s.event === 'myeduzz.invoice_paid' &&
       s.data >= DATA_MINIMA &&
       aprovStatus.includes(s.status) &&
       s.produto.includes(prodLow) &&
@@ -757,7 +773,8 @@ function buildCriPubMaps(from, to){
   });
   sales.forEach(s => {
     const k = s.utmContent;
-    if(k && criMap[k]){ criMap[k].vendas++; criMap[k].fat+=s.fatTotal; }
+    let key = (k && criMap[k]) ? k : Object.keys(criMap).find(x => x.toLowerCase()===String(k||'').toLowerCase());
+    if(key){ criMap[key].vendas++; criMap[key].fat+=s.fatTotal; }
   });
   // Ativo = teve gasto nos últimos 2 dias do range
   const allDates = gRows.map(r=>r.date).sort();
@@ -790,10 +807,11 @@ function buildCriPubMaps(from, to){
     p.inv+=r.inv; p.imp+=r.imp; p.cliques+=r.cliques; p.pv+=r.pv; p.ck+=r.ck;
     if(r.date > p.lastDate) p.lastDate = r.date;
   });
+  const normK = x => String(x||'').toLowerCase().replace(/\s+/g,' ').trim();
   sales.forEach(s => {
-    const k = s.utmMedium;
-    // tentar match exato, depois case-insensitive
-    let key = k && pubMap[k] ? k : Object.keys(pubMap).find(x => x.toLowerCase()===String(k||'').toLowerCase());
+    const k = s.utmCampaign || s.utmMedium;  // o nome do adset vem no utm_campaign
+    // tentar match exato, depois normalizado (espaços duplos/maiúsculas)
+    let key = k && pubMap[k] ? k : Object.keys(pubMap).find(x => normK(x)===normK(k));
     if(!key){
       // distribui proporcionalmente entre os adsets se não bater
       const total = Object.values(pubMap).reduce((a,p)=>a+p.inv,0);
