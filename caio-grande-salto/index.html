@@ -306,6 +306,7 @@ const CONFIG = {
   // ── Webhook de vendas (Kiwify) ────────────────────────────────────
   WEBHOOK_SHEET: 'Webhook',
   PRODUTO_NOME:  'o grande salto',   // identifica venda do produto (case-insensitive)
+  OB_KEYWORDS:   ['gravaç','gravac'],// produtos com esses termos = order bump (ex.: Gravação)
   VALORES_EM_CENTAVOS: true,         // Kiwify envia em centavos
   STATUS_APROVADO: ['paid','approved','aprovado','pago','complete','completed'],
   W: {
@@ -422,10 +423,14 @@ async function fetchWebhookCSV(){
 }
 
 // ── Processamento ──────────────────────────────────────────────────
-// Vendas do webhook: deduplica por pedido (order_id), conta produto principal
+// Vendas do webhook: 1) deduplica por pedido (order_id)
+//                    2) agrupa por cliente (principal + order bump)
 function processSales(rows){
   if (!rows || rows.length < 2) return [];
   const W = CONFIG.W;
+  const isOB = nome => CONFIG.OB_KEYWORDS.some(k => nome.toLowerCase().indexOf(k) !== -1);
+
+  // 1) pedidos únicos (dedupe club/membership do mesmo order_id)
   const byOrder = new Map();
   for (let i = 1; i < rows.length; i++){
     const r = rows[i];
@@ -438,24 +443,51 @@ function processSales(rows){
     const produto = String(r[W.produto]||'').trim();
     if (CONFIG.PRODUTO_NOME && produto.toLowerCase().indexOf(CONFIG.PRODUTO_NOME) === -1) continue;
     const oid = String(r[W.orderId]).trim();
-    if (byOrder.has(oid)) continue;                 // dedupe club/membership do mesmo pedido
+    if (byOrder.has(oid)) continue;
     let valor = parseBRNum(r[W.charge]);
     if (CONFIG.VALORES_EM_CENTAVOS) valor = valor/100;
     const src = String(r[W.utmSource]||'').trim();
     byOrder.set(oid, {
       data,
-      nome:        String(r[W.nome]||'').trim(),
-      email:       String(r[W.email]||'').trim(),
-      produto,
-      valor,
-      utmSource:   src,
-      utmMedium:   String(r[W.utmMedium]||'').trim(),
-      utmCampaign: String(r[W.utmCampaign]||'').trim(),
-      utmContent:  String(r[W.utmContent]||'').trim(),
-      isTrafego:   src.toLowerCase().replace(/[\s_-]/g,'') === 'metaads',
+      nome:    String(r[W.nome]||'').trim(),
+      email:   String(r[W.email]||'').trim(),
+      produto, valor, src,
+      utmContent: String(r[W.utmContent]||'').trim(),
+      ob: isOB(produto),
     });
   }
-  return Array.from(byOrder.values()).sort((a,b)=> b.data.localeCompare(a.data));
+
+  // 2) agrupa por cliente (email) — principal + order bumps numa venda só
+  const byCust = new Map();
+  for (const o of byOrder.values()){
+    const key = (o.email || o.nome || '').toLowerCase() + '|' + o.data;
+    if (!byCust.has(key)) byCust.set(key, {
+      data:o.data, nome:o.nome, email:o.email,
+      fatPrincipal:0, fatOB:0, produtos:[], produtosOB:[],
+      src:'', utmContent:'',
+    });
+    const c = byCust.get(key);
+    if (o.ob){ c.fatOB += o.valor; c.produtosOB.push(o.produto); }
+    else     { c.fatPrincipal += o.valor; c.produtos.push(o.produto);
+               if (!c.src) { c.src = o.src; c.utmContent = o.utmContent; } }
+    if (o.data > c.data) c.data = o.data;
+  }
+
+  const sales = [];
+  for (const c of byCust.values()){
+    const valor = c.fatPrincipal + c.fatOB;
+    if (valor <= 0) continue;
+    sales.push({
+      data: c.data, nome: c.nome, email: c.email,
+      valor, fatPrincipal: c.fatPrincipal, fatOB: c.fatOB,
+      produto: c.produtos[0] || c.produtosOB[0] || '—',
+      produtosOB: c.produtosOB,
+      temOB: c.fatOB > 0,
+      utmSource: c.src, utmContent: c.utmContent,
+      isTrafego: (c.src||'').toLowerCase().replace(/[\s_-]/g,'') === 'metaads',
+    });
+  }
+  return sales.sort((a,b)=> b.data.localeCompare(a.data));
 }
 
 function filterSalesByDate(sales, from, to){
@@ -463,9 +495,10 @@ function filterSalesByDate(sales, from, to){
 }
 
 function sumSales(sales){
-  const t = { fat:0, n:0, fatTraf:0, nTraf:0, fatOrg:0, nOrg:0 };
+  const t = { fat:0, n:0, fatTraf:0, nTraf:0, fatOrg:0, nOrg:0, fatOB:0, nOB:0 };
   for (const s of sales){
     t.fat += s.valor; t.n++;
+    if (s.fatOB > 0){ t.fatOB += s.fatOB; t.nOB++; }
     if (s.isTrafego){ t.fatTraf += s.valor; t.nTraf++; }
     else            { t.fatOrg  += s.valor; t.nOrg++;  }
   }
@@ -561,9 +594,9 @@ function renderTrafego(rows, sales){
 
   document.getElementById('kpi-trafego').innerHTML = `
     <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${fmtBRL(t.spend)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Faturamento</div><div class="kpi-value ${st.fat>0?'green':''}">${fmtBRL(st.fat)}</div><div class="kpi-sub">Tráf.: ${fmtBRL(st.fatTraf)} · Org.: ${fmtBRL(st.fatOrg)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Faturamento</div><div class="kpi-value ${st.fat>0?'green':''}">${fmtBRL(st.fat)}</div><div class="kpi-sub">Princ.: ${fmtBRL(st.fat-st.fatOB)}${st.fatOB>0?(' · OB: '+fmtBRL(st.fatOB)):''}</div></div>
     <div class="kpi-card"><div class="kpi-label">ROAS</div><div class="kpi-value ${roas>=1?'green':(roas>0?'yellow':'')}">${roas>0?roas.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—'}</div><div class="kpi-sub">faturamento / investimento</div></div>
-    <div class="kpi-card"><div class="kpi-label">Vendas</div><div class="kpi-value ${st.n>0?'green':''}">${fmtNum(st.n)}</div><div class="kpi-sub">${st.nTraf} tráfego · ${st.nOrg} orgânico</div></div>
+    <div class="kpi-card"><div class="kpi-label">Vendas</div><div class="kpi-value ${st.n>0?'green':''}">${fmtNum(st.n)}${st.nOB?` <span style="font-size:12px;color:#ff9a3c">+${st.nOB} OB</span>`:''}</div><div class="kpi-sub">${st.nTraf} tráfego · ${st.nOrg} orgânico</div></div>
     <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value">${fmtBRL(ticket)}</div></div>
     <div class="kpi-card"><div class="kpi-label">CAC</div><div class="kpi-value">${fmtBRL(cac)}</div><div class="kpi-sub">investimento / vendas</div></div>
     <div class="kpi-card"><div class="kpi-label">Impressões</div><div class="kpi-value">${fmtNum(t.impressions)}</div><div class="kpi-sub">Alcance: ${fmtNum(t.reach)}</div></div>
@@ -1058,17 +1091,18 @@ function renderVendas(sales){
   const count = document.getElementById('vendas-count');
   const st = sumSales(sales);
   if (count) count.textContent = sales.length
-    ? `— ${st.n} venda(s) · ${fmtBRL(st.fat)} · ${st.nTraf} tráfego · ${st.nOrg} orgânico`
+    ? `— ${st.n} venda(s)${st.nOB?(' + '+st.nOB+' OB'):''} · ${fmtBRL(st.fat)} · ${st.nTraf} tráfego · ${st.nOrg} orgânico`
     : '';
   if (!sales.length){
     panel.innerHTML = `<div class="empty-state" style="width:100%"><strong>Nenhuma venda no período</strong>As vendas aprovadas da aba Webhook aparecerão aqui.</div>`;
     return;
   }
   panel.innerHTML = sales.map(s => `
-    <div style="min-width:230px;background:#12121f;border:1px solid rgba(255,255,255,.07);border-left:3px solid ${s.isTrafego?'#2ecc71':'#f1c40f'};border-radius:10px;padding:14px">
+    <div style="min-width:240px;background:#12121f;border:1px solid rgba(255,255,255,.07);border-left:3px solid ${s.isTrafego?'#2ecc71':'#f1c40f'};border-radius:10px;padding:14px">
       <div style="font-size:12px;font-weight:600;color:#e8e6f0;margin-bottom:6px">${s.isTrafego?'✅':'⭐'} ${escapeHtml(s.nome||'—')}</div>
       <div style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:#ff6b2b">${fmtBRL(s.valor)}</div>
       <div style="font-size:10px;color:rgba(255,255,255,.5);margin-top:6px">${escapeHtml(s.produto)}</div>
+      ${s.temOB?`<div style="font-size:10px;color:#ff9a3c;margin-top:4px">🛒 OB: ${fmtBRL(s.fatOB)}${s.produtosOB.length?(' · '+escapeHtml(s.produtosOB.join(', '))):''}</div>`:''}
       <div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:6px">${s.data.split('-').reverse().join('/')} · ${s.isTrafego?'Tráfego pago':'Orgânico'}${s.utmContent?(' · '+escapeHtml(s.utmContent)):''}</div>
     </div>
   `).join('');
