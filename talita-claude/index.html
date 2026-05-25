@@ -380,6 +380,13 @@ function normalizeDateBR(s) {
   if (brd) return `${brd[1]}/${brd[2]}/${brd[3]}`;
   const isoSlash = s.match(/^(\d{4})\/(\d{2})\/(\d{2})/);
   if (isoSlash) return `${isoSlash[3]}/${isoSlash[2]}/${isoSlash[1]}`;
+  // YYYYMMDD numérico (Eduzz manda assim: 20260503 ou "20260503.0")
+  const ymdRaw = s.split(/[.,]/)[0].replace(/\D/g,'');
+  if (/^\d{8}$/.test(ymdRaw)) {
+    const y=+ymdRaw.slice(0,4), m=+ymdRaw.slice(4,6), dd=+ymdRaw.slice(6,8);
+    if (y>=2020 && y<=2035 && m>=1 && m<=12 && dd>=1 && dd<=31)
+      return String(dd).padStart(2,'0')+'/'+String(m).padStart(2,'0')+'/'+y;
+  }
   // Unix timestamp (exatamente 10 ou 13 dígitos)
   if (/^\d{10}$/.test(s) || /^\d{13}$/.test(s)) {
     const ms = s.length === 10 ? Number(s) * 1000 : Number(s);
@@ -621,6 +628,9 @@ function processVendasEduzz(csv) {
     const dataRaw = r[idx.dataPag] || r[idx.dataCri] || '';
     const dataBR = normalizeDateBR(dataRaw);
     if (!dataBR) return;
+    // registra chave composta pra dedupe cruzada com webhook_eduzz
+    const compositeKey = (r[idx.email]||'').toLowerCase().trim()+'|'+dataBR+'|'+Math.round(valor);
+    SEEN_ORDER_IDS.add(compositeKey);
     RAW_SALES_ITEMS.push({
       cliente: r[idx.cliente] || 'Cliente', email: (r[idx.email]||'').toLowerCase().trim(),
       valor, dataBR, iso: saleIsoFromBR(dataBR, dataRaw), produto: r[idx.produto] || '',
@@ -645,41 +655,52 @@ function processWebhookEduzz(csv) {
     dataCri:I('trans_createdate'), horaCri:I('trans_createtime'), valor:I('trans_value'), produto:I('product_name'),
     nome:I('cus_name'), email:I('cus_email'), src:utmSrcIdx, medium:utmMedIdx, camp:utmCampIdx, content:utmContIdx };
 
-  const isCancelled = (statusVal) => {
-    const v = String(statusVal||'').toLowerCase().replace(/"/g,'').trim();
-    return ['3','8','9','cancelled','canceled','cancelada','refunded','refund','reembolsada','chargeback','contestado','estornada'].includes(v);
+  const eventIdx = I('event_name');
+  // Eduzz status: 1=fatura aberta (não paga), 3=PAGA, 6/7=reembolso/chargeback
+  const statusPago = (v) => String(v||'').split('.')[0].trim() === '3';
+  const statusReembolso = (v) => ['4','5','6','7','8','9'].includes(String(v||'').split('.')[0].trim());
+
+  // Esta aba tem fontes misturadas (organic, manychat, ig, meta_ads).
+  // Filtra: meta_ads + (campanha/medium/produto contém "claude" ou "imersão").
+  const isClaudeMeta = (r) => {
+    if (idx.src < 0 || !r[idx.src] || normKey(r[idx.src]) !== META_SOURCE_FILTER) return false;
+    const med  = (idx.medium  >= 0 ? (r[idx.medium] ||'') : '').toLowerCase();
+    const cam  = (idx.camp    >= 0 ? (r[idx.camp]   ||'') : '').toLowerCase();
+    const prod = (idx.produto >= 0 ? (r[idx.produto]||'') : '').toLowerCase();
+    return med.includes(CAMPAIGN_FILTER) || cam.includes(CAMPAIGN_FILTER) ||
+           prod.includes('claude') || prod.includes('imersão') || prod.includes('imersao');
   };
 
-  const sales = rows.slice(1).filter(r => r.length > 5)
-    .filter(r => parseEduzzValue(r[idx.valor]) > 0)
-    .filter(r => !isCancelled(r[idx.status]));
+  // 1ª passada: marca trans_keys que tiveram reembolso/chargeback (pra excluir)
+  const reembolsadas = new Set();
+  rows.slice(1).forEach(r => {
+    if (idx.orderid >= 0 && r[idx.orderid] && statusReembolso(r[idx.status])) reembolsadas.add((r[idx.orderid]||'').trim());
+  });
 
-  console.log('[webhook_eduzz] cols:', header.length, '| valor@'+idx.valor, 'status@'+idx.status, 'nome@'+idx.nome, 'paiddate@'+idx.dataPag);
-  console.log('[webhook_eduzz] linhas brutas:', rows.length-1, '| pós-filtro:', sales.length, '(valor>0 + não cancelada)');
-  sales.forEach((r,i)=>{ console.log(`  ✓ ${i+1}: ${r[idx.nome]||'?'} | R$ ${r[idx.valor]} | ${r[idx.dataPag]||r[idx.dataCri]||'?'} | utm_med="${(r[idx.medium]||'').slice(0,40)}"`); });
+  const sales = rows.slice(1).filter(r => r.length > 5)
+    .filter(r => statusPago(r[idx.status]))                              // só PAGAS (status 3)
+    .filter(r => parseEduzzValue(r[idx.valor]) > 0)
+    .filter(r => isClaudeMeta(r))                                        // só meta_ads Imersão Claude
+    .filter(r => !(idx.orderid >= 0 && reembolsadas.has((r[idx.orderid]||'').trim()))); // exclui reembolsadas
+
+  console.log('[webhook_eduzz] cols:', header.length, '| status@'+idx.status, 'valor@'+idx.valor, 'paiddate@'+idx.dataPag, 'src@'+idx.src);
+  console.log('[webhook_eduzz] linhas brutas:', rows.length-1, '| vendas pagas meta+claude:', sales.length);
 
   sales.forEach(r => {
     const orderId = idx.orderid >= 0 ? (r[idx.orderid]||'').trim() : '';
     if (orderId && SEEN_ORDER_IDS.has(orderId)) return;
     if (orderId) SEEN_ORDER_IDS.add(orderId);
     const valor = parseEduzzValue(r[idx.valor]);
-    // 1) tenta colunas conhecidas; 2) varre a linha inteira procurando a melhor data
+    // Data: paiddate (YYYYMMDD) > createdate > varredura. + hora correspondente
     let dataRaw = ((r[idx.dataPag]||'') + ' ' + (r[idx.horaPag]||'')).trim();
-    let dataBR = normalizeDateBR(dataRaw);
-    if (!dataBR) {
-      const dataCriRaw = ((r[idx.dataCri]||'') + ' ' + (r[idx.horaCri]||'')).trim();
-      dataBR = normalizeDateBR(dataCriRaw);
-      if (dataBR) dataRaw = dataCriRaw;
-    }
-    if (!dataBR) {
-      const best = findBestDate(r, header);
-      if (best.dataBR) { dataBR = best.dataBR; dataRaw = best.raw; }
-    }
-    // Se MESMO ASSIM não achou data, descarta a venda (não joga pra hoje)
-    if (!dataBR) {
-      console.warn('[webhook_eduzz] descartada — sem data parseável:', r[idx.nome], '| valor', r[idx.valor]);
-      return;
-    }
+    let dataBR = normalizeDateBR(r[idx.dataPag]);
+    if (!dataBR) { dataBR = normalizeDateBR(r[idx.dataCri]); if (dataBR) dataRaw = ((r[idx.dataCri]||'')+' '+(r[idx.horaCri]||'')).trim(); }
+    if (!dataBR) { const best = findBestDate(r, header); if (best.dataBR) { dataBR = best.dataBR; dataRaw = best.raw; } }
+    if (!dataBR) { console.warn('[webhook_eduzz] descartada — sem data:', r[idx.nome]); return; }
+    // Dedupe extra por conteúdo (email+data+valor) — evita overlap com vendas_eduzz
+    const compositeKey = (r[idx.email]||'').toLowerCase().trim()+'|'+dataBR+'|'+Math.round(valor);
+    if (SEEN_ORDER_IDS.has(compositeKey)) return;
+    SEEN_ORDER_IDS.add(compositeKey);
     const iso = saleIsoFromBR(dataBR, dataRaw);
     RAW_SALES_ITEMS.push({
       cliente: r[idx.nome] || 'Cliente', email: (r[idx.email]||'').toLowerCase().trim(),
