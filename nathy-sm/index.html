@@ -363,12 +363,70 @@ function showWebhookDebug() {
   alert(msg);
 }
 
-// ====== FETCH ======
-async function fetchSheetCSV(sheetName) {
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error(`Erro ao carregar "${sheetName}": ${resp.status}`);
-  return await resp.text();
+// ====== FETCH (JSONP via gviz) ======
+// Usa <script> + responseHandler do gviz em vez de fetch().
+// Vantagem: NAO depende de CORS, entao funciona tanto hospedado (http/https)
+// quanto abrindo o arquivo localmente (file://). Resolve o "Failed to fetch".
+
+// Converte celula gviz para string equivalente ao CSV (preserva data ISO e numero BR)
+function gvizCellToStr(cell) {
+  if (cell == null) return '';
+  if (cell.f != null) return String(cell.f); // valor formatado (ex: "2026-01-02", "6,92")
+  let v = cell.v;
+  if (v == null) return '';
+  if (typeof v === 'string' && /^Date\(/.test(v)) {
+    const m = v.match(/Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?\)/);
+    if (m) {
+      const y = +m[1], mo = (+m[2]) + 1, d = +m[3];
+      return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+  }
+  return String(v);
+}
+
+// Transforma a resposta gviz (table.cols/rows) num array de linhas (linha 0 = cabecalho),
+// mantendo o mesmo formato que o parseCSV produzia.
+function gvizToRows(resp) {
+  if (!resp || !resp.table) throw new Error('Resposta invalida do Google Sheets');
+  const cols = resp.table.cols || [];
+  const rows = resp.table.rows || [];
+  const out = [];
+  out.push(cols.map(c => (c.label != null && c.label !== '') ? c.label : (c.id || '')));
+  for (const r of rows) {
+    const c = (r && r.c) || [];
+    const line = [];
+    for (let j = 0; j < cols.length; j++) line.push(gvizCellToStr(c[j]));
+    out.push(line);
+  }
+  return out;
+}
+
+function fetchSheetGviz(sheetName) {
+  return new Promise((resolve, reject) => {
+    const cb = 'jgt_cb_' + Math.random().toString(36).slice(2);
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq`
+      + `?tqx=out:json;responseHandler:${cb}&sheet=${encodeURIComponent(sheetName)}`;
+    const script = document.createElement('script');
+    let done = false;
+    const cleanup = () => {
+      try { delete window[cb]; } catch (e) { window[cb] = undefined; }
+      if (script.parentNode) script.parentNode.removeChild(script);
+    };
+    const timer = setTimeout(() => {
+      if (done) return; done = true; cleanup();
+      reject(new Error(`Tempo esgotado ao carregar "${sheetName}"`));
+    }, 25000);
+    window[cb] = function (resp) {
+      if (done) return; done = true; clearTimeout(timer); cleanup();
+      try { resolve(gvizToRows(resp)); } catch (e) { reject(e); }
+    };
+    script.onerror = () => {
+      if (done) return; done = true; clearTimeout(timer); cleanup();
+      reject(new Error(`Falha ao carregar "${sheetName}" (rede ou aba inexistente)`));
+    };
+    script.src = url;
+    document.head.appendChild(script);
+  });
 }
 
 // ====== PROCESS DATA ======
@@ -1108,33 +1166,26 @@ async function loadData() {
   try {
     document.getElementById('loading-msg').textContent = 'Buscando dados da planilha...';
 
-    // Busca Gerenciador e Resumo (essenciais — erro aqui para tudo)
-    const [gCSV, rCSV] = await Promise.all([
-      fetchSheetCSV(GERENCIADOR_SHEET),
-      fetchSheetCSV(RESUMO_SHEET)
+    // Gerenciador e Resumo sao essenciais (erro aqui para tudo)
+    const [gRows, rRows] = await Promise.all([
+      fetchSheetGviz(GERENCIADOR_SHEET),
+      fetchSheetGviz(RESUMO_SHEET)
     ]);
 
-    // Webhook — falha silenciosa se aba não existir ou retornar HTML
+    // Webhook - falha silenciosa se a aba nao existir ou nao tiver acesso
     document.getElementById('loading-msg').textContent = 'Buscando vendas do Webhook...';
-    let wCSV = '';
+    let wRows = [];
+    let webhookOk = false;
     try {
-      const raw = await fetchSheetCSV(WEBHOOK_SHEET);
-      if (isValidCSV(raw)) {
-        wCSV = raw;
-        console.log('[WEBHOOK] CSV válido recebido, tamanho:', raw.length);
-      } else {
-        console.warn('[WEBHOOK] Retornou HTML em vez de CSV. Verifique o nome da aba "' + WEBHOOK_SHEET + '" na planilha.');
-        console.log('[WEBHOOK] Primeiros 200 chars:', raw.substring(0, 200));
-      }
+      wRows = await fetchSheetGviz(WEBHOOK_SHEET);
+      webhookOk = wRows.length > 1;
+      console.log('[WEBHOOK] Linhas recebidas:', wRows.length - 1);
     } catch (wErr) {
       console.warn('[WEBHOOK] Erro ao buscar aba Webhook:', wErr.message);
     }
 
     document.getElementById('loading-msg').textContent = 'Processando dados...';
-    const gRows = parseCSV(gCSV);
-    const rRows = parseCSV(rCSV);
-    const wRows = wCSV ? parseCSV(wCSV) : [];
-    _debugWRows = wRows; // salva para diagnóstico
+    _debugWRows = wRows; // salva para diagnostico
 
     processData(gRows, rRows, wRows);
     initDatePickers();
@@ -1142,14 +1193,13 @@ async function loadData() {
 
     document.getElementById('loading-overlay').style.display = 'none';
 
-    // Mostra status do webhook para diagnóstico (some após 8s)
+    // Status do webhook (some apos 10s)
     const wStatus = document.createElement('div');
     wStatus.id = 'webhook-status';
     wStatus.style.cssText = 'position:fixed;bottom:16px;right:16px;background:#12121f;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:10px 14px;font-size:11px;color:rgba(255,255,255,.6);z-index:9999;max-width:320px';
-    const wDias = Object.keys((() => { try { return window._webhookDias || {}; } catch(e) { return {}; } })());
-    wStatus.innerHTML = wCSV
+    wStatus.innerHTML = webhookOk
       ? `📡 <strong style="color:#ff6b2b">Webhook OK</strong> — ${wRows.length - 1} linhas carregadas`
-      : `⚠️ <strong style="color:#e74c3c">Webhook não lido</strong> — aba "<strong>${WEBHOOK_SHEET}</strong>" não encontrada ou sem acesso. Verifique o nome exato da aba.`;
+      : `⚠️ <strong style="color:#e74c3c">Webhook nao lido</strong> — aba "<strong>${WEBHOOK_SHEET}</strong>" nao encontrada ou sem acesso.`;
     document.body.appendChild(wStatus);
     setTimeout(() => { if (wStatus.parentNode) wStatus.parentNode.removeChild(wStatus); }, 10000);
 

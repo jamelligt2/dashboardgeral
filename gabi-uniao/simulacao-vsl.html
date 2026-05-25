@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulação VSL R$ 100/dia — Curva de Maturação</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#F8F9FA; --white:#FFFFFF; --ink:#1A1A2E; --ink2:#6B7280; --ink3:#9CA3AF;
+    --green:#22C55E; --red:#EF4444; --gray:#9CA3AF; --border:#E5E7EB;
+    --blue:#3B82F6; --amber:#F59E0B; --violet:#8B5CF6;
+    --shadow:0 1px 3px rgba(0,0,0,0.06),0 4px 12px rgba(0,0,0,0.04);
+    --p1:#EF4444; --p2:#F59E0B; --p3:#22C55E;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--ink);font-family:'Inter',sans-serif;font-size:13px;}
+
+  .header{background:var(--white);border-bottom:1px solid var(--border);padding:18px 28px;
+    display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+  .header h1{font-size:15px;font-weight:600;}
+  .header-sub{font-size:11px;color:var(--ink2);margin-top:3px;}
+  .kpis{display:flex;gap:8px;flex-wrap:wrap;}
+  .kpi{background:var(--white);border:1px solid var(--border);border-radius:8px;
+    padding:8px 14px;text-align:center;min-width:120px;}
+  .kpi .kl{font-size:9px;color:var(--ink3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px;}
+  .kpi .kv{font-size:14px;font-weight:600;}
+  .kv.ok{color:var(--green);} .kv.bad{color:var(--red);} .kv.neu{color:var(--ink2);}
+  .kv.blue{color:var(--blue);} .kv.amber{color:var(--amber);}
+
+  /* Fases */
+  .phases{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:20px 24px 0;}
+  .phase{background:var(--white);border:1px solid var(--border);border-radius:10px;
+    padding:14px 16px;box-shadow:var(--shadow);}
+  .phase.p1{border-top:4px solid var(--p1);}
+  .phase.p2{border-top:4px solid var(--p2);}
+  .phase.p3{border-top:4px solid var(--p3);}
+  .phase-tag{display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.1em;padding:2px 8px;border-radius:4px;margin-bottom:6px;}
+  .p1 .phase-tag{background:#FEF2F2;color:#991B1B;}
+  .p2 .phase-tag{background:#FFFBEB;color:#92400E;}
+  .p3 .phase-tag{background:#F0FDF4;color:#166534;}
+  .phase-dates{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:4px;}
+  .phase-label{font-size:10px;font-weight:600;color:var(--ink2);margin-bottom:6px;}
+  .phase-desc{font-size:11px;color:var(--ink2);line-height:1.55;margin-bottom:10px;}
+  .phase-nums{display:grid;grid-template-columns:1fr 1fr;gap:6px;border-top:1px solid var(--border);padding-top:10px;}
+  .pn-item .pn-lbl{font-size:8px;color:var(--ink3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;}
+  .pn-item .pn-val{font-size:13px;font-weight:700;}
+
+  /* Gráfico duplo */
+  .charts-row{display:grid;grid-template-columns:1.6fr 1fr;gap:14px;margin:18px 24px 0;}
+  .chart-wrap{background:var(--white);border:1px solid var(--border);border-radius:12px;
+    padding:18px 18px 14px;box-shadow:var(--shadow);}
+  .chart-header{display:flex;justify-content:space-between;align-items:flex-start;
+    margin-bottom:14px;flex-wrap:wrap;gap:8px;}
+  .chart-title{font-size:11.5px;font-weight:500;color:var(--ink2);}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;}
+  .leg{display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--ink2);}
+  .leg-dot{width:10px;height:10px;border-radius:2px;}
+  .chart-canvas-wrap{position:relative;height:300px;}
+  .chart-canvas-wrap.tall{height:320px;}
+
+  /* Fase markers no chart */
+  .phase-markers{display:flex;gap:2px;margin-top:6px;border-radius:4px;overflow:hidden;height:8px;}
+  .pm{flex:1;} .pm.p1{background:#FCA5A5;} .pm.p2{background:#FCD34D;} .pm.p3{background:#86EFAC;}
+
+  /* Projeção tabela */
+  .proj-wrap{background:var(--white);margin:14px 24px 0;border:1px solid var(--border);
+    border-radius:12px;padding:18px;box-shadow:var(--shadow);}
+  .proj-title{font-size:11.5px;font-weight:500;color:var(--ink2);margin-bottom:12px;}
+  .proj-table{width:100%;border-collapse:collapse;}
+  .proj-table th{font-size:9px;color:var(--ink3);text-transform:uppercase;letter-spacing:.07em;
+    font-weight:600;padding:4px 10px;text-align:right;border-bottom:1px solid var(--border);}
+  .proj-table th:first-child{text-align:left;}
+  .proj-table td{padding:6px 10px;text-align:right;font-size:12px;border-bottom:1px solid #F3F4F6;}
+  .proj-table td:first-child{text-align:left;font-weight:500;font-size:11px;color:var(--ink2);}
+  .proj-table tr.highlight td{background:#F0FDF4;font-weight:600;}
+  .proj-table tr.highlight td:first-child{color:var(--green);}
+  .proj-table .bad{color:var(--red);} .proj-table .ok{color:var(--green);}
+  .proj-table .neu{color:var(--ink2);} .proj-table .amber{color:var(--amber);}
+
+  .alerts{margin:14px 24px 24px;display:flex;flex-direction:column;gap:8px;}
+  .alert{padding:9px 13px;border-radius:8px;font-size:12px;line-height:1.5;display:flex;gap:8px;}
+  .alert.danger{background:#FEF2F2;border:1px solid #FECACA;color:#991B1B;}
+  .alert.warn{background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;}
+  .alert.ok{background:#F0FDF4;border:1px solid #BBF7D0;color:#166534;}
+  .alert.info{background:#EFF6FF;border:1px solid #BFDBFE;color:#1E40AF;}
+
+  .footer{text-align:center;padding:14px;font-size:10px;color:var(--ink3);
+    border-top:1px solid var(--border);}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Simulação: VSL a R$ 100/dia — Curva de Maturação em 3 Fases</h1>
+    <p class="header-sub">Instituto do Amor Divino · Início 10/jun/2026 · Taxa Eduzz embutida nos valores líquidos</p>
+  </div>
+  <div class="kpis">
+    <div class="kpi"><p class="kl">Total investido até 31/jul</p><p class="kv blue">R$ 5.200</p></div>
+    <div class="kpi"><p class="kl">Total faturado até 31/jul</p><p class="kv ok">R$ 5.900</p></div>
+    <div class="kpi"><p class="kl">Break-even do VSL</p><p class="kv amber">24/jul</p></div>
+    <div class="kpi"><p class="kl">Resultado líquido em 31/jul</p><p class="kv ok">+ R$ 700</p></div>
+    <div class="kpi"><p class="kl">Lucro projetado agosto</p><p class="kv ok">+ R$ 3.100/mês</p></div>
+  </div>
+</div>
+
+<div class="phases">
+  <div class="phase p1">
+    <div class="phase-tag">Fase 1 — Teste</div>
+    <div class="phase-dates">10 a 24/jun</div>
+    <div class="phase-label">15 dias · zero retorno</div>
+    <div class="phase-desc">Período de aprendizado do pixel e otimização de criativos. R$ 100/dia gastos, zero vendas.</div>
+    <div class="phase-nums">
+      <div class="pn-item"><div class="pn-lbl">Gasto total</div><div class="pn-val" style="color:var(--red)">R$ 1.500</div></div>
+      <div class="pn-item"><div class="pn-lbl">Receita</div><div class="pn-val" style="color:var(--ink2)">R$ 0</div></div>
+      <div class="pn-item"><div class="pn-lbl">Resultado</div><div class="pn-val" style="color:var(--red)">− R$ 1.500</div></div>
+      <div class="pn-item"><div class="pn-lbl">Saldo acum. VSL</div><div class="pn-val" style="color:var(--red)">− R$ 1.500</div></div>
+    </div>
+  </div>
+  <div class="phase p2">
+    <div class="phase-tag">Fase 2 — Empate</div>
+    <div class="phase-dates">25/jun a 09/jul</div>
+    <div class="phase-label">15 dias · ROAS 1 (break-even)</div>
+    <div class="phase-desc">VSL convertendo o suficiente para pagar os próprios anúncios. R$ 100 gasto = R$ 100 recebido.</div>
+    <div class="phase-nums">
+      <div class="pn-item"><div class="pn-lbl">Gasto total</div><div class="pn-val" style="color:var(--ink2)">R$ 1.500</div></div>
+      <div class="pn-item"><div class="pn-lbl">Receita</div><div class="pn-val" style="color:var(--ink2)">R$ 1.500</div></div>
+      <div class="pn-item"><div class="pn-lbl">Resultado</div><div class="pn-val" style="color:var(--amber)">R$ 0</div></div>
+      <div class="pn-item"><div class="pn-lbl">Saldo acum. VSL</div><div class="pn-val" style="color:var(--red)">− R$ 1.500</div></div>
+    </div>
+  </div>
+  <div class="phase p3">
+    <div class="phase-tag">Fase 3 — Escala</div>
+    <div class="phase-dates">10/jul em diante</div>
+    <div class="phase-label">ROAS 2 líquido · + R$ 100/dia</div>
+    <div class="phase-desc">VSL lucrativo: R$ 200 recebido para cada R$ 100 investido. Recupera déficit da fase 1 em 15 dias.</div>
+    <div class="phase-nums">
+      <div class="pn-item"><div class="pn-lbl">Gasto/dia</div><div class="pn-val" style="color:var(--ink2)">R$ 100</div></div>
+      <div class="pn-item"><div class="pn-lbl">Receita/dia</div><div class="pn-val" style="color:var(--green)">R$ 200</div></div>
+      <div class="pn-item"><div class="pn-lbl">Lucro líquido/dia</div><div class="pn-val" style="color:var(--green)">+ R$ 100</div></div>
+      <div class="pn-item"><div class="pn-lbl">Break-even VSL</div><div class="pn-val" style="color:var(--green)">24/jul</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="charts-row">
+  <!-- Gráfico principal: linha do tempo VSL -->
+  <div class="chart-wrap">
+    <div class="chart-header">
+      <span class="chart-title">Saldo acumulado do VSL + movimentações diárias (10/jun a 31/jul)</span>
+      <div class="legend">
+        <div class="leg"><div class="leg-dot" style="background:rgba(34,197,94,0.4);border:1.5px solid #22C55E"></div>Receita</div>
+        <div class="leg"><div class="leg-dot" style="background:rgba(239,68,68,0.3);border:1.5px solid #EF4444"></div>Gasto (ads)</div>
+        <div class="leg"><div class="leg-dot" style="background:var(--blue);border-radius:50%"></div>Saldo acum.</div>
+      </div>
+    </div>
+    <div class="chart-canvas-wrap tall">
+      <canvas id="chartVSL"></canvas>
+    </div>
+    <!-- Faixa de fases -->
+    <div style="display:flex;gap:0;margin-top:6px;border-radius:4px;overflow:hidden;height:6px;">
+      <div style="flex:21;background:#FECACA;" title="Fase 1: 10-24/jun"></div>
+      <div style="flex:15;background:#FDE68A;" title="Fase 2: 25/jun-09/jul"></div>
+      <div style="flex:22;background:#BBF7D0;" title="Fase 3: 10-31/jul"></div>
+    </div>
+    <div style="display:flex;gap:0;margin-top:3px;">
+      <div style="flex:21;font-size:8px;color:#991B1B;text-align:center;">Fase 1</div>
+      <div style="flex:15;font-size:8px;color:#92400E;text-align:center;">Fase 2</div>
+      <div style="flex:22;font-size:8px;color:#166534;text-align:center;">Fase 3</div>
+    </div>
+  </div>
+
+  <!-- Gráfico da curva de payback -->
+  <div class="chart-wrap">
+    <div class="chart-header">
+      <span class="chart-title">Curva de payback — quando o VSL se paga</span>
+    </div>
+    <div class="chart-canvas-wrap tall">
+      <canvas id="chartPayback"></canvas>
+    </div>
+    <div style="font-size:9px;color:var(--ink3);text-align:center;margin-top:6px;">
+      Zero = break-even · acima do zero = lucro acumulado
+    </div>
+  </div>
+</div>
+
+<!-- Projeção de escala -->
+<div class="proj-wrap">
+  <div class="proj-title">Projeção de escala — quanto seria necessário investir/dia para cobrir o rombo de junho (R$ 17.407)</div>
+  <table class="proj-table">
+    <thead>
+      <tr>
+        <th>Investimento/dia</th>
+        <th>Receita/dia (ROAS 2)</th>
+        <th>Lucro líquido/dia</th>
+        <th>Lucro mensal</th>
+        <th>Dias para break-even</th>
+        <th>Dias para cobrir rombo jun</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>R$ 100</td>
+        <td>R$ 200</td>
+        <td class="ok">+ R$ 100</td>
+        <td class="ok">+ R$ 3.100</td>
+        <td class="amber">45 dias (24/jul)</td>
+        <td class="bad">174 dias</td>
+      </tr>
+      <tr>
+        <td>R$ 300</td>
+        <td>R$ 600</td>
+        <td class="ok">+ R$ 300</td>
+        <td class="ok">+ R$ 9.300</td>
+        <td class="amber">45 dias</td>
+        <td class="bad">58 dias</td>
+      </tr>
+      <tr>
+        <td>R$ 500</td>
+        <td>R$ 1.000</td>
+        <td class="ok">+ R$ 500</td>
+        <td class="ok">+ R$ 15.500</td>
+        <td class="amber">45 dias</td>
+        <td class="amber">35 dias</td>
+      </tr>
+      <tr class="highlight">
+        <td>R$ 1.000</td>
+        <td>R$ 2.000</td>
+        <td class="ok">+ R$ 1.000</td>
+        <td class="ok">+ R$ 31.000</td>
+        <td class="amber">45 dias</td>
+        <td class="ok">17 dias</td>
+      </tr>
+      <tr>
+        <td>R$ 2.000</td>
+        <td>R$ 4.000</td>
+        <td class="ok">+ R$ 2.000</td>
+        <td class="ok">+ R$ 62.000</td>
+        <td class="amber">45 dias</td>
+        <td class="ok">9 dias</td>
+      </tr>
+    </tbody>
+  </table>
+  <p style="font-size:9px;color:var(--ink3);margin-top:8px;">* Projeção assume ROAS 2 líquido constante a partir do dia 30. O tempo de break-even permanece 45 dias independente da escala (a Fase 1 de R$1.500 é fixa).</p>
+</div>
+
+<div class="alerts">
+  <div class="alert info">ℹ <span><strong>Break-even do VSL em 24/jul:</strong> a campanha se paga 45 dias após o início. A partir daí, cada R$ 1 investido retorna R$ 1 de lucro líquido (além do próprio investimento).</span></div>
+  <div class="alert warn">⚠️ <span><strong>A escala de R$ 100/dia não resolve o rombo de junho (R$ 17.407):</strong> geraria apenas + R$ 700 líquido até 31/jul. Para neutralizar o rombo dentro de julho, seria necessário escalar para pelo menos R$ 1.000/dia já na Fase 3 (a partir de 10/jul).</span></div>
+  <div class="alert ok">✓ <span><strong>Cenário ideal — B + C + VSL:</strong> usar antecipação (B) para cobrir os buracos de maio/junho, lançamento (C) para resolver o rombo estrutural, e o VSL como fonte de receita recorrente a partir de agosto.</span></div>
+  <div class="alert ok">✓ <span><strong>Projeção de agosto com ROAS 2:</strong> a partir de 01/ago, com o VSL já no break-even e ROAS 2 constante, o VSL gera + R$ 3.100/mês líquido a R$ 100/dia. Escalando para R$ 1.000/dia, gera + R$ 31.000/mês — o que mudaria o cenário estrutural do caixa.</span></div>
+</div>
+
+<div class="footer">Instituto do Amor Divino · Simulação VSL R$ 100/dia · 3 Fases · 10/jun–31/jul 2026 · 25/05/2026</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+// ── Gerar dados dia a dia ─────────────────────────────────────────────────────
+const MONTH_NAMES = ['jan','fev','mar','abr','mai','jun','jul','ago'];
+const START = new Date(2026, 5, 10); // 10/jun
+const END   = new Date(2026, 6, 31); // 31/jul
+
+const labels = [], dailyAds = [], dailyRev = [], dailyNet = [];
+let dayIndex = 0;
+for (let d = new Date(START); d <= END; d.setDate(d.getDate() + 1)) {
+  labels.push(`${String(d.getDate()).padStart(2,'0')}/${MONTH_NAMES[d.getMonth()]}`);
+  const ads = -100;
+  const rev = dayIndex < 15 ? 0 : dayIndex < 30 ? 100 : 200;
+  dailyAds.push(ads);
+  dailyRev.push(rev);
+  dailyNet.push(rev + ads);
+  dayIndex++;
+}
+
+// Saldo acumulado
+let acc = 0;
+const saldo = dailyNet.map(n => { acc += n; return acc; });
+
+// Índices importantes
+const IDX_F2 = 15;   // 25/jun — Fase 2
+const IDX_F3 = 30;   // 10/jul — Fase 3
+const IDX_BE = 45;   // 24/jul — break-even
+
+// Cores dos pontos do saldo
+const ptColors = saldo.map((v, i) => {
+  if (i === IDX_F2) return '#F59E0B';
+  if (i === IDX_F3) return '#F59E0B';
+  if (i === IDX_BE) return '#22C55E';
+  return v >= 0 ? '#22C55E' : '#EF4444';
+});
+const ptRadius = saldo.map((_, i) =>
+  (i === IDX_F2 || i === IDX_F3 || i === IDX_BE) ? 8 : 3
+);
+const ptBorderW = saldo.map((_, i) =>
+  (i === IDX_F2 || i === IDX_F3 || i === IDX_BE) ? 2 : 1.5
+);
+
+// ── Gráfico 1 — Timeline VSL ──────────────────────────────────────────────────
+new Chart(document.getElementById('chartVSL').getContext('2d'), {
+  type: 'bar',
+  data: {
+    labels,
+    datasets: [
+      {
+        type: 'line',
+        label: 'Saldo acumulado VSL',
+        data: saldo,
+        borderColor: '#3B82F6',
+        borderWidth: 2.5,
+        tension: 0.3,
+        fill: false,
+        pointBackgroundColor: function(ctx) { return ptColors[ctx.dataIndex] || '#3B82F6'; },
+        pointBorderColor: '#fff',
+        pointBorderWidth: function(ctx) { return ptBorderW[ctx.dataIndex] || 1.5; },
+        pointRadius: function(ctx) { return ptRadius[ctx.dataIndex] || 3; },
+        pointHoverRadius: 7,
+        order: 0,
+      },
+      {
+        type: 'bar',
+        label: 'Receita diária',
+        data: dailyRev.map(v => v > 0 ? v : null),
+        backgroundColor: 'rgba(34,197,94,0.35)',
+        borderColor: 'rgba(34,197,94,0.8)',
+        borderWidth: 1.5,
+        borderRadius: 3,
+        order: 1,
+      },
+      {
+        type: 'bar',
+        label: 'Gasto (ads)',
+        data: dailyAds,
+        backgroundColor: 'rgba(239,68,68,0.25)',
+        borderColor: 'rgba(239,68,68,0.6)',
+        borderWidth: 1.5,
+        borderRadius: 3,
+        order: 2,
+      },
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#fff',
+        borderColor: '#E5E7EB',
+        borderWidth: 1,
+        titleColor: '#1A1A2E',
+        bodyColor: '#6B7280',
+        padding: 10,
+        callbacks: {
+          title: function(items) {
+            const i = items[0].dataIndex;
+            const lbl = items[0].label;
+            if (i === IDX_F2) return lbl + ' ★ Início Fase 2';
+            if (i === IDX_F3) return lbl + ' ★ Início Fase 3 (ROAS 2)';
+            if (i === IDX_BE) return lbl + ' ✓ Break-even!';
+            return lbl;
+          },
+          label: function(item) {
+            const v = item.raw;
+            if (v === null || v === undefined) return null;
+            const fmt = n => 'R$ ' + Math.abs(Math.round(n)).toLocaleString('pt-BR');
+            if (item.dataset.label === 'Saldo acumulado VSL') return ' Saldo VSL: '+(v<0?'−':'+') + fmt(v);
+            if (item.dataset.label === 'Receita diária' && v) return ' Receita: +' + fmt(v);
+            if (item.dataset.label === 'Gasto (ads)' && v) return ' Gasto ads: −' + fmt(v);
+            return null;
+          },
+          labelColor: function(item) {
+            const c = ['#3B82F6','#22C55E','#EF4444'][item.datasetIndex];
+            return { borderColor: c, backgroundColor: c };
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: {
+          font: { size: 9, family: 'Inter' },
+          color: '#9CA3AF',
+          maxRotation: 0,
+          autoSkip: true,
+          maxTicksLimit: 18,
+        },
+        border: { color: '#E5E7EB' }
+      },
+      y: {
+        grid: { color: 'rgba(0,0,0,0.04)' },
+        ticks: {
+          font: { size: 9, family: 'Inter' },
+          color: '#9CA3AF',
+          callback: v => {
+            if (v === 0) return 'R$ 0';
+            const abs = Math.abs(v);
+            const sign = v < 0 ? '−' : '+';
+            return sign + 'R$ ' + abs.toLocaleString('pt-BR');
+          }
+        },
+        border: { dash: [3,3], color: 'transparent' }
+      }
+    }
+  }
+});
+
+// ── Gráfico 2 — Curva de payback ──────────────────────────────────────────────
+const ptColorsPayback = saldo.map((v, i) => {
+  if (i === IDX_BE) return '#22C55E';
+  return v >= 0 ? '#22C55E' : '#EF4444';
+});
+
+new Chart(document.getElementById('chartPayback').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels,
+    datasets: [
+      {
+        label: 'Saldo acumulado VSL',
+        data: saldo,
+        borderColor: function(ctx) {
+          // cor da linha muda depois do break-even
+          return '#3B82F6';
+        },
+        borderWidth: 2.5,
+        tension: 0.3,
+        fill: {
+          target: { value: 0 },
+          above: 'rgba(34,197,94,0.12)',
+          below: 'rgba(239,68,68,0.1)',
+        },
+        pointBackgroundColor: function(ctx) { return ptColorsPayback[ctx.dataIndex] || '#EF4444'; },
+        pointBorderColor: '#fff',
+        pointBorderWidth: function(ctx) { return ctx.dataIndex === IDX_BE ? 2.5 : 1.5; },
+        pointRadius: function(ctx) { return ctx.dataIndex === IDX_BE ? 9 : 2.5; },
+        pointHoverRadius: 7,
+      },
+      // Linha zero reference
+      {
+        label: 'Zero (break-even)',
+        data: labels.map(() => 0),
+        borderColor: 'rgba(100,116,139,0.35)',
+        borderWidth: 1,
+        borderDash: [5, 4],
+        pointRadius: 0,
+        fill: false,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#fff',
+        borderColor: '#E5E7EB',
+        borderWidth: 1,
+        titleColor: '#1A1A2E',
+        bodyColor: '#6B7280',
+        padding: 10,
+        callbacks: {
+          title: function(items) {
+            const i = items[0].dataIndex;
+            const lbl = items[0].label;
+            if (i === IDX_BE) return '✓ BREAK-EVEN — ' + lbl;
+            return lbl;
+          },
+          label: function(item) {
+            if (item.dataset.label === 'Zero (break-even)') return null;
+            const v = item.raw;
+            const fmt = n => 'R$ ' + Math.abs(Math.round(n)).toLocaleString('pt-BR');
+            return ' Saldo VSL: ' + (v < 0 ? '−' : '+') + fmt(v);
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: {
+          font: { size: 9, family: 'Inter' },
+          color: '#9CA3AF',
+          maxRotation: 0,
+          autoSkip: true,
+          maxTicksLimit: 10,
+        },
+        border: { color: '#E5E7EB' }
+      },
+      y: {
+        grid: { color: 'rgba(0,0,0,0.04)' },
+        ticks: {
+          font: { size: 9, family: 'Inter' },
+          color: '#9CA3AF',
+          callback: v => {
+            const abs = Math.abs(v);
+            const sign = v < 0 ? '−' : v > 0 ? '+' : '';
+            return sign + 'R$' + abs.toLocaleString('pt-BR');
+          }
+        },
+        border: { dash: [3,3], color: 'transparent' }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
