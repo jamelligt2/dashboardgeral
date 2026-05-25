@@ -309,9 +309,15 @@ const CONFIG = {
   },
   // ── Webhook de vendas (Kiwify) ────────────────────────────────────
   WEBHOOK_SHEET: 'Webhook',
+  WEBHOOK_GID:   613949166,          // gid da aba Webhook (export?format=csv é à prova de CORS)
   PRODUTO_NOME:  'o grande salto',   // identifica venda do produto (case-insensitive)
   OB_KEYWORDS:   ['gravaç','gravac'],// produtos com esses termos = order bump (ex.: Gravação)
   VALORES_EM_CENTAVOS: true,         // Kiwify envia em centavos
+  // Atribuição manual: vendas sem utm_content são creditadas a um anúncio e contam como tráfego.
+  // chave = email do comprador (minúsculo) · valor = nome do anúncio (igual ao do Gerenciador)
+  VENDA_ATRIBUICAO: {
+    'kassicasagrande@gmail.com': 'GS-ADV11 - CEO',
+  },
   STATUS_APROVADO: ['paid','approved','aprovado','pago','complete','completed'],
   W: {
     orderId:    0,
@@ -412,8 +418,8 @@ async function fetchSheetCSV(){
 }
 
 async function fetchWebhookCSV(){
-  // Webhook é opcional: se falhar, segue sem vendas
-  const url = `https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(CONFIG.WEBHOOK_SHEET)}`;
+  // Webhook é opcional: se falhar, segue sem vendas. Usa export+gid (à prova de CORS).
+  const url = `https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/export?format=csv&gid=${CONFIG.WEBHOOK_GID}`;
   const controller = new AbortController();
   const timeout = setTimeout(()=>controller.abort(), 20000);
   try {
@@ -481,6 +487,12 @@ function processSales(rows){
   for (const c of byCust.values()){
     const valor = c.fatPrincipal + c.fatOB;
     if (valor <= 0) continue;
+    const emailKey = (c.email||'').toLowerCase();
+    const atribManual = CONFIG.VENDA_ATRIBUICAO[emailKey];   // anúncio atribuído manualmente
+    const ad = atribManual || c.utmContent || '';            // anúncio que recebe o crédito
+    const isTrafego = atribManual
+      ? true
+      : (c.src||'').toLowerCase().replace(/[\s_-]/g,'') === 'metaads';
     sales.push({
       data: c.data, nome: c.nome, email: c.email,
       valor, fatPrincipal: c.fatPrincipal, fatOB: c.fatOB,
@@ -488,7 +500,8 @@ function processSales(rows){
       produtosOB: c.produtosOB,
       temOB: c.fatOB > 0,
       utmSource: c.src, utmContent: c.utmContent,
-      isTrafego: (c.src||'').toLowerCase().replace(/[\s_-]/g,'') === 'metaads',
+      adAtribuido: ad,
+      isTrafego,
     });
   }
   return sales.sort((a,b)=> b.data.localeCompare(a.data));
@@ -815,8 +828,16 @@ function isActiveByRecency(item, allRowsForKey){
   return item.lastDate >= cutoff && item.spend > 0;
 }
 
-function renderCriativos(rows){
+function renderCriativos(rows, sales){
   const criativos = aggregateBy(rows, r => r.ad);
+  // crédito de vendas por anúncio (webhook): adAtribuido -> {fat, n}
+  const credito = {};
+  for (const s of (sales||[])){
+    const k = s.adAtribuido;
+    if (!k) continue;
+    if (!credito[k]) credito[k] = { fat:0, n:0 };
+    credito[k].fat += s.valor; credito[k].n++;
+  }
   // anexar derivadas
   for (const c of criativos){
     c.ctr  = c.impressions ? (c.clicks/c.impressions)*100 : 0;
@@ -825,6 +846,10 @@ function renderCriativos(rows){
     c.custoFinal = c.checkout ? c.spend/c.checkout : 0;   // custo por finalização
     c.hook = c.impressions ? (c.video3s/c.impressions)*100 : 0;
     c.hold = c.video3s ? (c.video75/c.video3s)*100 : 0;
+    const cr = credito[c.key] || { fat:0, n:0 };
+    c.vendas = cr.n;                                       // vendas atribuídas (webhook)
+    c.faturamento = cr.fat;
+    c.roas = c.spend ? c.faturamento/c.spend : 0;
     c.ativo = isActiveByRecency(c);
   }
   // filtro status
@@ -857,7 +882,9 @@ function renderCriativos(rows){
           <div class="cri-metric"><span class="cri-metric-label">CPC</span><span class="cri-metric-val">${fmtBRL(c.cpc)}</span></div>
           <div class="cri-metric"><span class="cri-metric-label">Finalizações</span><span class="cri-metric-val">${fmtNum(c.checkout)}</span></div>
           <div class="cri-metric"><span class="cri-metric-label">Custo/Final.</span><span class="cri-metric-val">${fmtBRL(c.custoFinal)}</span></div>
-          <div class="cri-metric"><span class="cri-metric-label">Compras</span><span class="cri-metric-val">${fmtNum(c.purchase)}</span></div>
+          <div class="cri-metric"><span class="cri-metric-label">Vendas</span><span class="cri-metric-val ${c.vendas>0?'good':''}">${fmtNum(c.vendas)}</span></div>
+          <div class="cri-metric"><span class="cri-metric-label">Faturamento</span><span class="cri-metric-val ${c.faturamento>0?'good':''}">${fmtBRL(c.faturamento)}</span></div>
+          <div class="cri-metric"><span class="cri-metric-label">ROAS</span><span class="cri-metric-val">${c.roas>0?c.roas.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—'}</span></div>
           <div class="cri-metric"><span class="cri-metric-label">CPA</span><span class="cri-metric-val">${fmtBRL(c.cpa)}</span></div>
         </div>
         ${c.link ? `<a href="${escapeAttr(c.link)}" target="_blank" rel="noopener" class="cri-link" title="${escapeAttr(c.link)}">🔗 Ver criativo no Instagram</a>` : ''}
@@ -868,7 +895,7 @@ function renderCriativos(rows){
   // Tabela
   const head = `<thead><tr>
     <th>Criativo</th><th>Status</th><th>Invest.</th><th>Impressões</th><th>Cliques</th>
-    <th>CTR</th><th>CPC</th><th>Hook</th><th>Hold</th><th>Finaliz.</th><th>Custo/Final.</th><th>Compras</th><th>CPA</th><th>Link</th>
+    <th>CTR</th><th>CPC</th><th>Hook</th><th>Hold</th><th>Finaliz.</th><th>Custo/Final.</th><th>Vendas</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>CPA</th><th>Link</th>
   </tr></thead>`;
   const body = list.length ? list.map(c => `
     <tr>
@@ -883,11 +910,14 @@ function renderCriativos(rows){
       <td>${fmtPct(c.hold)}</td>
       <td>${fmtNum(c.checkout)}</td>
       <td>${fmtBRL(c.custoFinal)}</td>
+      <td class="${c.vendas>0?'green':''}">${fmtNum(c.vendas)}</td>
+      <td class="${c.faturamento>0?'green':''}">${fmtBRL(c.faturamento)}</td>
+      <td>${c.roas>0?c.roas.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—'}</td>
       <td>${fmtNum(c.purchase)}</td>
       <td>${fmtBRL(c.cpa)}</td>
       <td>${c.link ? `<a href="${escapeAttr(c.link)}" target="_blank" rel="noopener" style="color:#ff6b2b">🔗 abrir</a>` : '—'}</td>
     </tr>
-  `).join('') : `<tr><td colspan="14" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados</td></tr>`;
+  `).join('') : `<tr><td colspan="17" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados</td></tr>`;
   document.getElementById('tbl-criativos').innerHTML = head + '<tbody>'+body+'</tbody>';
 }
 
@@ -1035,13 +1065,13 @@ function setCriStatus(s, el){
   CRI_STATUS = s;
   document.querySelectorAll('.cri-status-btn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
-  renderCriativos(filterByDate(ROWS, CUR_FROM, CUR_TO));
+  renderCriativos(filterByDate(ROWS, CUR_FROM, CUR_TO), filterSalesByDate(SALES, CUR_FROM, CUR_TO));
 }
 function setCriSort(s, el){
   CRI_SORT = s;
   document.querySelectorAll('.cri-sort-btn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
-  renderCriativos(filterByDate(ROWS, CUR_FROM, CUR_TO));
+  renderCriativos(filterByDate(ROWS, CUR_FROM, CUR_TO), filterSalesByDate(SALES, CUR_FROM, CUR_TO));
 }
 function setPubStatus(s, el){
   PUB_STATUS = s;
@@ -1094,7 +1124,7 @@ function applyFilter(){
   renderTrafego(filtered, fsales);
   renderVendas(fsales);
   renderVisao(filtered, fsales);
-  renderCriativos(filtered);
+  renderCriativos(filtered, fsales);
   renderPublicos(filtered);
   renderPeriodo(filtered, weekKey, 'tbl-semanal', 'chart-sem-inv', 'chart-sem-ctr', 'Semana');
   renderPeriodo(filtered, monthKey, 'tbl-mensal', 'chart-mes-inv', 'chart-mes-ctr', 'Mês');
