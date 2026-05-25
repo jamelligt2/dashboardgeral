@@ -191,7 +191,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
   <div class="vendas-scroll" id="vendas-cards"></div>
   <div class="chart-grid-2x2">
     <div class="chart-card"><h4>Investimento diário (Meta Ads)</h4><canvas id="ch-inv-dia"></canvas></div>
-    <div class="chart-card"><h4>Faturamento diário (Tráfego vs Orgânico)</h4><canvas id="ch-fat-dia"></canvas></div>
+    <div class="chart-card"><h4>Faturamento diário (Tráfego vs Sem Atribuição)</h4><canvas id="ch-fat-dia"></canvas></div>
   </div>
   <div class="funil-section">
     <div class="chart-card">
@@ -633,6 +633,7 @@ function renderTrafego(dias, sales){
   const imps = dias.reduce((a,d)=>a+d.imp,0);
   const pvs = dias.reduce((a,d)=>a+d.pv,0);
   const cks = dias.reduce((a,d)=>a+d.ck,0);
+  const metaPurch = dias.reduce((a,d)=>a+d.purch,0);  // compras atribuídas pelo pixel da Meta
 
   const traf = sales.filter(isTrafego);
   const org  = sales.filter(s=>!isTrafego(s));
@@ -653,10 +654,11 @@ function renderTrafego(dias, sales){
   document.getElementById('kpi-trafego').innerHTML = `
     <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${fmtR(inv)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Fat. Tráfego</div><div class="kpi-value green">${fmtR(fatTraf)}</div><div class="kpi-sub">OB: ${fmtR(obTraf)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Fat. Orgânico</div><div class="kpi-value yellow">${fmtR(fatOrg)}</div><div class="kpi-sub">OB: ${fmtR(obOrg)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Fat. Sem Atribuição</div><div class="kpi-value yellow">${fmtR(fatOrg)}</div><div class="kpi-sub">OB: ${fmtR(obOrg)}</div></div>
     <div class="kpi-card"><div class="kpi-label">ROAS Tráfego</div><div class="kpi-value ${roas>=1?'green':'red'}">${fmtX(roas)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Vendas Tráfego</div><div class="kpi-value">${traf.length}${obQtdT?` <span style="font-size:11px;color:#ff6b2b">+${obQtdT} OB</span>`:''}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Vendas Orgânico</div><div class="kpi-value">${org.length}${obQtdO?` <span style="font-size:11px;color:#ff6b2b">+${obQtdO} OB</span>`:''}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Vendas Tráfego</div><div class="kpi-value">${traf.length}${obQtdT?` <span style="font-size:11px;color:#ff6b2b">+${obQtdT} OB</span>`:''}</div><div class="kpi-sub">via UTM</div></div>
+    <div class="kpi-card"><div class="kpi-label">Compras (Meta)</div><div class="kpi-value ${metaPurch>traf.length?'orange':''}">${fmtN(metaPurch)}</div><div class="kpi-sub">pixel · pode divergir da UTM</div></div>
+    <div class="kpi-card"><div class="kpi-label">Vendas s/ Atrib.</div><div class="kpi-value">${org.length}${obQtdO?` <span style="font-size:11px;color:#ff6b2b">+${obQtdO} OB</span>`:''}</div><div class="kpi-sub">direto / sem UTM</div></div>
     <div class="kpi-card"><div class="kpi-label">CAC</div><div class="kpi-value">${dash(cac)?fmtR(cac):'—'}</div></div>
     <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value">${dash(tm)?fmtR(tm):'—'}</div></div>
     <div class="kpi-card"><div class="kpi-label">Cliques</div><div class="kpi-value">${fmtN(cliques)}</div></div>
@@ -681,7 +683,7 @@ function renderTrafego(dias, sales){
         <div class="venda-data">${s.data}</div>
         ${s.fatOB>0?`<div class="venda-ob">🛒 OB: ${fmtR(s.fatOB)}</div>`:''}
         <div class="venda-meta">
-          ${t?`<span>Criativo:</span> ${s.utmContent||'—'}<br><span>Público:</span> ${s.utmMedium||'—'}`:`<span>Origem:</span> ${s.utmSource||'orgânico'}`}
+          ${t?`<span>Criativo:</span> ${s.utmContent||'—'}<br><span>Público:</span> ${s.utmMedium||'—'}`:`<span>Origem:</span> ${s.utmSource||'direto / sem UTM'}`}
         </div>
       </div>`;
     }).join('');
@@ -689,7 +691,7 @@ function renderTrafego(dias, sales){
 
   // Gráficos
   drawDailyCharts(dias, sales);
-  drawFunil(cliques,pvs,cks,traf.length);
+  drawFunil(cliques,pvs,cks,metaPurch);  // funil Meta = dados do pixel (não da UTM)
 }
 
 function drawDailyCharts(dias, sales){
@@ -716,7 +718,7 @@ function drawDailyCharts(dias, sales){
     labels: labels2,
     datasets:[
       {label:'Tráfego',data:arrT,backgroundColor:'rgba(255,107,43,0.85)',borderRadius:4},
-      {label:'Orgânico',data:arrO,backgroundColor:'rgba(255,183,55,0.85)',borderRadius:4}
+      {label:'Sem Atribuição',data:arrO,backgroundColor:'rgba(255,183,55,0.85)',borderRadius:4}
     ]
   });
 }
@@ -766,7 +768,7 @@ function renderVisao(dias, sales){
     <div class="kpi-card"><div class="kpi-label">ROAS Total</div><div class="kpi-value ${roas>=1?'green':'red'}">${fmtX(roas)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Vendas Total</div><div class="kpi-value">${sales.length}</div></div>
     <div class="kpi-card"><div class="kpi-label">Tráfego</div><div class="kpi-value">${traf.length}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Orgânicas</div><div class="kpi-value">${org.length}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Sem Atribuição</div><div class="kpi-value">${org.length}</div></div>
     <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value">${dash(tm)?fmtR(tm):'—'}</div></div>
     <div class="kpi-card"><div class="kpi-label">CAC Total</div><div class="kpi-value">${dash(cac)?fmtR(cac):'—'}</div></div>
   `;
@@ -778,7 +780,7 @@ function renderVisao(dias, sales){
     else { fatOpor[s.data]=(fatOpor[s.data]||0)+s.fatTotal; }
   });
   const allDates = [...new Set([...dias.map(d=>d.data),...Object.keys(fatTpor),...Object.keys(fatOpor)])].sort();
-  let html = `<thead><tr><th>Data</th><th>Invest.</th><th>Fat. Total</th><th>ROAS</th><th>Compras</th><th>Tráfego</th><th>Orgânicas</th><th>Ticket Médio</th><th>CAC</th></tr></thead><tbody>`;
+  let html = `<thead><tr><th>Data</th><th>Invest.</th><th>Fat. Total</th><th>ROAS</th><th>Compras</th><th>Tráfego</th><th>Sem Atrib.</th><th>Ticket Médio</th><th>CAC</th></tr></thead><tbody>`;
   allDates.forEach(d => {
     const dia = dias.find(x=>x.data===d) || {inv:0};
     const ft = fatTpor[d]||0, fo = fatOpor[d]||0, ft2 = ft+fo;
