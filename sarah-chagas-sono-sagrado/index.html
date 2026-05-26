@@ -721,13 +721,26 @@ function csvToDaily(text){
 }
 
 async function fetchDailyFromSheets(){
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${GID_DAILY}&_=${Date.now()}`;
-  const r = await fetch(url, {credentials:'include', cache:'no-store'});
-  if(!r.ok) throw new Error('HTTP '+r.status);
-  const text = await r.text();
-  if(text.includes('<!DOCTYPE html>')||text.includes('<html'))
-    throw new Error('resposta HTML — não logado no Google');
-  return csvToDaily(text);
+  // Planilha pública — não usa credentials (não exige login na conta Google).
+  // Tenta gviz primeiro; se falhar tenta export?format=csv como fallback.
+  const urls = [
+    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${GID_DAILY}&_=${Date.now()}`,
+    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID_DAILY}&_=${Date.now()}`,
+  ];
+  let lastErr;
+  for(const url of urls){
+    try{
+      const r = await fetch(url, {cache:'no-store', redirect:'follow'});
+      if(!r.ok){ lastErr = new Error('HTTP '+r.status); continue; }
+      const text = await r.text();
+      if(text.includes('<!DOCTYPE html>')||text.includes('<html')){
+        lastErr = new Error('planilha não está pública (resposta HTML)');
+        continue;
+      }
+      return csvToDaily(text);
+    }catch(e){ lastErr = e; }
+  }
+  throw lastErr || new Error('falha ao buscar planilha');
 }
 
 /* ============== ERR BANNER ============== */
@@ -836,7 +849,7 @@ async function loadAndRender(manual){
     badge.className = 'live-badge cached';
     txt.textContent = 'SNAPSHOT';
     stamp.textContent = `Snapshot · ${FALLBACK_DAILY.length} dias`;
-    err.innerHTML = `<b>Usando snapshot local.</b> Não consegui puxar a planilha ao vivo (${e.message}). Abra este dashboard no Chrome logado na conta Google que tem acesso, ou clique em <b>↻ Atualizar</b>.`;
+    err.innerHTML = `<b>Usando snapshot local.</b> Não consegui puxar a planilha ao vivo (${e.message}). Verifique se a planilha está compartilhada como <b>"Qualquer pessoa com o link · Leitor"</b> e clique em <b>↻ Atualizar</b>.`;
     err.style.display = 'block';
   } finally {
     btn.disabled = false;
