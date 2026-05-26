@@ -54,6 +54,17 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',Roboto,Arial,
 .kpi.v2{border-color:rgba(255,140,66,.5)}.kpi.v2 .val{color:var(--orange-bright)}.kpi.v2 .bar{background:var(--orange-bright)}
 .kpi.v3{border-color:rgba(255,149,0,.5)}.kpi.v3 .val{color:var(--amber)}.kpi.v3 .bar{background:var(--amber)}
 .kpi.v4{border-color:rgba(196,74,26,.6)}.kpi.v4 .val{color:var(--orange-dark)}.kpi.v4 .bar{background:var(--orange-dark)}
+.kpi.vgreen{border-color:rgba(74,222,128,.6);background:linear-gradient(135deg,rgba(74,222,128,.10),rgba(74,222,128,.02))}
+.kpi.vgreen .val{color:#4ade80}
+.kpi.vgreen .bar{background:#4ade80}
+.kpi.vgreen .lbl{color:#86efac}
+.kpi.vgreen::after{content:"";position:absolute;top:0;right:0;width:80px;height:80px;background:radial-gradient(circle at top right,rgba(74,222,128,.25),transparent 70%);pointer-events:none}
+.kpi.vred{border-color:rgba(248,113,113,.6);background:linear-gradient(135deg,rgba(248,113,113,.10),rgba(248,113,113,.02))}
+.kpi.vred .val{color:#f87171}
+.kpi.vred .bar{background:#f87171}
+.kpi.vred .lbl{color:#fca5a5}
+.kpi.vred::after{content:"";position:absolute;top:0;right:0;width:80px;height:80px;background:radial-gradient(circle at top right,rgba(248,113,113,.25),transparent 70%);pointer-events:none}
+.kpi-tag{position:absolute;top:14px;right:14px;background:rgba(74,222,128,.18);color:#4ade80;border:1px solid rgba(74,222,128,.4);padding:2px 8px;border-radius:10px;font-size:9.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;z-index:2}
 .kpi .bar{position:absolute;bottom:0;left:0;right:0;height:3px;border-radius:0 0 12px 12px}
 
 .audience-row{display:grid;grid-template-columns:1.1fr 1.1fr .7fr;gap:14px;margin-top:8px}
@@ -191,10 +202,16 @@ tbody tr.total td{color:var(--orange)}
 
   <div class="section-title">Indicadores principais</div>
   <div class="kpis">
+    <div class="kpi vgreen">
+      <span class="kpi-tag">★ MÉTRICA-CHAVE</span>
+      <div class="lbl">Custo por Lead (CPL)</div>
+      <div class="val">R$ 8,14</div>
+      <div class="sub">Meta R$ 15 · <b style="color:#4ade80">46% abaixo</b></div>
+      <div class="bar"></div>
+    </div>
     <div class="kpi v1"><div class="lbl">Investimento</div><div class="val">R$ 122,17</div><div class="sub">7 dias · R$ 17,45/dia</div><div class="bar"></div></div>
     <div class="kpi v2"><div class="lbl">Visitas na página</div><div class="val">49</div><div class="sub">7 visitas/dia em média</div><div class="bar"></div></div>
-    <div class="kpi v3"><div class="lbl">Leads gerados</div><div class="val">15</div><div class="sub">CPL R$ 8,14 · meta R$ 15</div><div class="bar"></div></div>
-    <div class="kpi v4"><div class="lbl">CTR Médio</div><div class="val">2,98%</div><div class="sub">Saudável (meta &gt; 2%)</div><div class="bar"></div></div>
+    <div class="kpi v3"><div class="lbl">Leads gerados</div><div class="val">15</div><div class="sub">CTR 2,98% · CVR 30,6%</div><div class="bar"></div></div>
   </div>
 
   <div class="section-title">Faixas etárias ativas no período</div>
@@ -827,20 +844,45 @@ function updateTotalsFromDaily(){
   const cvr = t.clicks? t.leads/t.clicks*100:0;
   const dias = DAILY.length || 1;
 
-  // KPIs visão geral: Investimento · Visitas · Leads · CTR
+  // KPIs visão geral: CPL (verde/vermelho) · Investimento · Visitas · Leads
+  const META_CPL = 15;
   const kpiVals = document.querySelectorAll('#panel-geral .kpis .kpi .val');
   if(kpiVals.length===4){
-    kpiVals[0].textContent = fmtMoney(t.spend);
-    kpiVals[1].textContent = fmtInt(t.clicks);
-    kpiVals[2].textContent = fmtInt(t.leads);
-    kpiVals[3].textContent = fmtPct(ctr);
+    kpiVals[0].textContent = t.leads? fmtMoney(cpl) : '—';
+    kpiVals[1].textContent = fmtMoney(t.spend);
+    kpiVals[2].textContent = fmtInt(t.clicks);
+    kpiVals[3].textContent = fmtInt(t.leads);
   }
   const kpiSubs = document.querySelectorAll('#panel-geral .kpis .kpi .sub');
   if(kpiSubs.length===4){
-    kpiSubs[0].textContent = `${dias} dias · ${fmtMoney(t.spend/dias)}/dia`;
-    kpiSubs[1].textContent = `${(t.clicks/dias).toFixed(1).replace('.',',')} visitas/dia em média`;
-    kpiSubs[2].textContent = t.leads? `CPL ${fmtMoney(cpl)} · meta R$ 15` : 'Sem leads ainda';
-    kpiSubs[3].textContent = `${fmtInt(t.imp)} impressões`;
+    if(t.leads && cpl < META_CPL){
+      const pct = ((1 - cpl/META_CPL)*100).toFixed(0);
+      kpiSubs[0].innerHTML = `Meta R$ ${META_CPL} · <b style="color:#4ade80">${pct}% abaixo</b>`;
+    } else if(t.leads){
+      const pct = ((cpl/META_CPL - 1)*100).toFixed(0);
+      kpiSubs[0].innerHTML = `Meta R$ ${META_CPL} · <b style="color:#f87171">${pct}% acima</b>`;
+    } else {
+      kpiSubs[0].textContent = 'Aguardando leads';
+    }
+    kpiSubs[1].textContent = `${dias} dias · ${fmtMoney(t.spend/dias)}/dia`;
+    kpiSubs[2].textContent = `${(t.clicks/dias).toFixed(1).replace('.',',')} visitas/dia em média`;
+    kpiSubs[3].innerHTML = `CTR ${fmtPct(ctr)} · CVR ${fmtPct(cvr)}`;
+  }
+
+  // CPL card: alterna entre vgreen/vred conforme meta
+  const cplCard = document.querySelector('#panel-geral .kpis .kpi.vgreen, #panel-geral .kpis .kpi.vred');
+  if(cplCard && t.leads){
+    if(cpl >= META_CPL){
+      cplCard.classList.remove('vgreen');
+      cplCard.classList.add('vred');
+      const tag = cplCard.querySelector('.kpi-tag');
+      if(tag){ tag.textContent='⚠ ACIMA DA META'; tag.style.background='rgba(248,113,113,.18)'; tag.style.color='#f87171'; tag.style.border='1px solid rgba(248,113,113,.4)'; }
+    } else {
+      cplCard.classList.remove('vred');
+      cplCard.classList.add('vgreen');
+      const tag = cplCard.querySelector('.kpi-tag');
+      if(tag){ tag.textContent='★ MÉTRICA-CHAVE'; tag.style.background='rgba(74,222,128,.18)'; tag.style.color='#4ade80'; tag.style.border='1px solid rgba(74,222,128,.4)'; }
+    }
   }
 
   // Funil SVG
