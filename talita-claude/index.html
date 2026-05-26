@@ -142,7 +142,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
     </div>
     <div>
       <div class="brand">🎓 Imersão Claude · Talita Marques</div>
-      <div class="subtitle">Dashboard de Performance — Perpétuo · Jamelli GT · 2026 · <span style="color:rgba(46,204,113,.7)">v2.3 (criativos + outros)</span></div>
+      <div class="subtitle">Dashboard de Performance — Perpétuo · Jamelli GT · 2026 · <span style="color:rgba(46,204,113,.7)">v2.5 (botão Hoje)</span></div>
     </div>
   </div>
   <div class="period-bar">
@@ -150,6 +150,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
     <input type="date" id="dateFrom" class="date-input" onchange="onDateChange()">
     <span class="period-sep">→</span>
     <input type="date" id="dateTo" class="date-input" onchange="onDateChange()">
+    <button class="preset-btn" onclick="setPreset(1,this)">Hoje</button>
     <button class="preset-btn" onclick="setPreset(7,this)">7d</button>
     <button class="preset-btn" onclick="setPreset(14,this)">14d</button>
     <button class="preset-btn" onclick="setPreset(30,this)">30d</button>
@@ -307,7 +308,7 @@ let DIAS = [], SEMANAL = [], MENSAL = [], CRIATIVOS = [], PUBLICOS = [];
 let VENDAS_RASTREADAS = [];
 let RAW_SALES_ITEMS = [];
 let SEEN_ORDER_IDS = new Set();
-let CRIATIVO_OUTROS = null;  // bucket de vendas sem criativo identificado (bio link, ID, UTM quebrada)
+let GER_ROWS = [];  // linhas brutas do Gerenciador (por dia/criativo/adset) p/ reagregar no filtro
 let dateFrom = null, dateTo = null;
 let criFilter = 'todos', criSort = 'inv';
 let pubFilter = 'todos', pubSort = 'inv';
@@ -469,7 +470,6 @@ async function loadData() {
     processVendasEduzz(vECSV);
     processWebhookEduzz(wECSV);
     commitSales();
-    finalizeCriativos();
     rebuildPeriodBuckets();
     fixFatFromDias();
 
@@ -490,7 +490,8 @@ function processGerenciador(csv) {
 
   const dayMap = {};
   data.forEach(r => {
-    const iso = r[0]; const d = isoToBR(iso);
+    const iso = String(r[0]).slice(0,10);  // só YYYY-MM-DD, descarta hora se houver
+    const d = isoToBR(iso);
     if (!dayMap[d]) dayMap[d] = { data: d, iso, inv: 0, cliques: 0, pv: 0, ck: 0, imp: 0, fat: 0, compras: 0 };
     dayMap[d].inv     += parseBRNum(r[1]);
     dayMap[d].cliques += parseBRNum(r[2]);
@@ -500,46 +501,76 @@ function processGerenciador(csv) {
   });
   DIAS = Object.values(dayMap).sort((a,b) => a.iso.localeCompare(b.iso));
 
-  const criMap = {};
-  data.forEach(r => {
-    const name = (r[8]||'').trim(); if (!name) return;
-    const iso = r[0];
-    if (!criMap[name]) criMap[name] = { nome: name, link: r[10]||'', adset: r[7]||'', inv:0, cliques:0, imp:0, pv:0, ck:0, ultInv:null };
-    const c = criMap[name];
-    const inv = parseBRNum(r[1]);
-    c.inv += inv; c.cliques += parseBRNum(r[2]); c.pv += parseBRNum(r[3]); c.ck += parseBRNum(r[4]); c.imp += parseBRNum(r[11]);
-    if (!c.link && r[10]) c.link = r[10];
-    if (inv > 0 && (!c.ultInv || iso > c.ultInv)) c.ultInv = iso;
-  });
+  // Guarda linhas brutas (por dia/criativo/adset) pra reagregar conforme o filtro de datas
+  GER_ROWS = data.map(r => ({
+    iso: String(r[0]).slice(0,10),  // normalizado p/ comparações de range
+    ad: (r[8]||'').trim(), adset: (r[7]||'').trim(), link: r[10]||'',
+    inv: parseBRNum(r[1]), cliques: parseBRNum(r[2]), pv: parseBRNum(r[3]), ck: parseBRNum(r[4]), imp: parseBRNum(r[11])
+  }));
+}
+
+// Agrega criativos DENTRO da janela de datas atual (dateFrom/dateTo) + atribui vendas do período
+function computeCriativos(){
+  const inRange = (iso) => (!dateFrom || iso >= dateFrom) && (!dateTo || iso <= dateTo);
   const today = new Date(); const d7 = new Date(today); d7.setDate(d7.getDate()-7);
   const iso7 = d7.toISOString().slice(0,10);
-  CRIATIVOS = Object.values(criMap).map(c => ({
-    nome: c.nome, link: c.link, adset: c.adset, inv: c.inv, cliques: c.cliques, imp: c.imp, pv: c.pv, ck: c.ck,
-    compras: 0, fat: 0,
-    cpc: c.cliques>0 ? c.inv/c.cliques : 0,
-    cpm: c.imp>0 ? c.inv/c.imp*1000 : 0,
-    ctr: c.imp>0 ? c.cliques/c.imp*100 : 0,
-    ticket: 0, cac: 0, roas: 0,
-    ativo: !!(c.ultInv && c.ultInv >= iso7)
-  }));
-
-  const pubMap = {};
-  data.forEach(r => {
-    const adset = (r[7]||'').trim(); if (!adset) return;
-    const iso = r[0];
-    if (!pubMap[adset]) pubMap[adset] = { nome: adset, inv:0, cliques:0, imp:0, pv:0, ck:0, ultInv:null };
-    const p = pubMap[adset];
-    const inv = parseBRNum(r[1]);
-    p.inv += inv; p.cliques += parseBRNum(r[2]); p.pv += parseBRNum(r[3]); p.ck += parseBRNum(r[4]); p.imp += parseBRNum(r[11]);
-    if (inv > 0 && (!p.ultInv || iso > p.ultInv)) p.ultInv = iso;
+  // última data de gasto (all-time) por criativo → flag "ativo"
+  const ultInvAll = {}; const allNames = {};
+  GER_ROWS.forEach(r => {
+    if (!r.ad) return; allNames[r.ad] = true;
+    if (r.inv > 0 && (!ultInvAll[r.ad] || r.iso > ultInvAll[r.ad])) ultInvAll[r.ad] = r.iso;
   });
-  PUBLICOS = Object.values(pubMap).map(p => ({
-    nome: p.nome, inv: p.inv, cliques: p.cliques, imp: p.imp, pv: p.pv, ck: p.ck,
+  // agrega gasto/cliques/imp no período por criativo
+  const m = {};
+  GER_ROWS.forEach(r => {
+    if (!r.ad || !inRange(r.iso)) return;
+    if (!m[r.ad]) m[r.ad] = { nome:r.ad, link:r.link, adset:r.adset, inv:0, cliques:0, imp:0, pv:0, ck:0, compras:0, fat:0 };
+    const c = m[r.ad]; c.inv+=r.inv; c.cliques+=r.cliques; c.imp+=r.imp; c.pv+=r.pv; c.ck+=r.ck; if(!c.link&&r.link)c.link=r.link;
+  });
+  // atribui vendas do período aos criativos
+  let outros = null;
+  filteredVendas().forEach(v => {
+    const c0 = String(v.criativo||'').trim();
+    let match = c0 ? Object.values(m).find(c => c.nome.toLowerCase()===c0.toLowerCase() || c0.toLowerCase().includes(c.nome.toLowerCase()) || c.nome.toLowerCase().includes(c0.toLowerCase())) : null;
+    // se não casou com criativo que teve gasto no período, mas o nome existe no histórico → cria entrada (inv 0)
+    if (!match && c0 && allNames[c0]) { m[c0] = { nome:c0, link:'', adset:'', inv:0, cliques:0, imp:0, pv:0, ck:0, compras:0, fat:0 }; match = m[c0]; }
+    if (match) { match.fat += v.valor; match.compras += 1; }
+    else { if(!outros) outros = { nome:'Outros / sem criativo identificado', link:'', adset:'', inv:0, cliques:0, imp:0, pv:0, ck:0, compras:0, fat:0, _outros:true }; outros.fat += v.valor; outros.compras += 1; }
+  });
+  const list = Object.values(m);
+  if (outros) list.push(outros);
+  list.forEach(c => {
+    c.cpc = c.cliques>0 ? c.inv/c.cliques : 0;
+    c.cpm = c.imp>0 ? c.inv/c.imp*1000 : 0;
+    c.ctr = c.imp>0 ? c.cliques/c.imp*100 : 0;
+    c.roas = c.inv>0 ? c.fat/c.inv : 0;
+    c.ticket = c.compras>0 ? c.fat/c.compras : 0;
+    c.cac = c.compras>0 ? c.inv/c.compras : 0;
+    c.ativo = !c._outros && !!(ultInvAll[c.nome] && ultInvAll[c.nome] >= iso7);
+  });
+  return list;
+}
+
+// Agrega públicos (adsets) DENTRO da janela de datas atual
+function computePublicos(){
+  const inRange = (iso) => (!dateFrom || iso >= dateFrom) && (!dateTo || iso <= dateTo);
+  const today = new Date(); const d7 = new Date(today); d7.setDate(d7.getDate()-7);
+  const iso7 = d7.toISOString().slice(0,10);
+  const ultInvAll = {};
+  GER_ROWS.forEach(r => { if(r.adset && r.inv>0 && (!ultInvAll[r.adset]||r.iso>ultInvAll[r.adset])) ultInvAll[r.adset]=r.iso; });
+  const m = {};
+  GER_ROWS.forEach(r => {
+    if (!r.adset || !inRange(r.iso)) return;
+    if (!m[r.adset]) m[r.adset] = { nome:r.adset, inv:0, cliques:0, imp:0, pv:0, ck:0 };
+    const p = m[r.adset]; p.inv+=r.inv; p.cliques+=r.cliques; p.imp+=r.imp; p.pv+=r.pv; p.ck+=r.ck;
+  });
+  return Object.values(m).map(p => ({
+    nome:p.nome, inv:p.inv, cliques:p.cliques, imp:p.imp, pv:p.pv, ck:p.ck,
     cpc: p.cliques>0 ? p.inv/p.cliques : 0,
     cpm: p.imp>0 ? p.inv/p.imp*1000 : 0,
     ctr: p.imp>0 ? p.cliques/p.imp*100 : 0,
     connectRate: p.cliques>0 ? p.pv/p.cliques*100 : 0,
-    ativo: !!(p.ultInv && p.ultInv >= iso7)
+    ativo: !!(ultInvAll[p.nome] && ultInvAll[p.nome] >= iso7)
   }));
 }
 
@@ -717,7 +748,6 @@ function processWebhookEduzz(csv) {
 
 // =================== COMMIT (agrupa por pedido: principal + bumps) ===================
 function commitSales(){
-  CRIATIVO_OUTROS = null;  // reseta bucket de não-atribuídos
   const groups = {};
   RAW_SALES_ITEMS.forEach(it => {
     const minuteKey = (it.iso||'').slice(0,16);
@@ -732,7 +762,6 @@ function commitSales(){
     const totalValor = items.reduce((s,it)=>s+it.valor, 0);
     const bumps = items.filter(it => it !== main);
     addSaleToDay(main.dataBR, totalValor);
-    addSaleToCriativo(main.criativo, totalValor);
     VENDAS_RASTREADAS.push({
       cliente: main.cliente, email: main.email, valor: totalValor, valorPrincipal: main.valor,
       bumps: bumps.length, bumpsValor: bumps.reduce((s,b)=>s+b.valor,0),
@@ -750,37 +779,6 @@ function addSaleToDay(dataBR, valor){
     DIAS.push({data: dataBR, iso, inv:0, cliques:0, pv:0, ck:0, imp:0, fat:valor, compras:1});
     DIAS.sort((a,b)=>a.iso.localeCompare(b.iso));
   }
-}
-function addSaleToCriativo(content, valor){
-  const c0 = String(content||'').trim();
-  let match = null;
-  if (c0) {
-    match = CRIATIVOS.find(c =>
-      c.nome.toLowerCase() === c0.toLowerCase() ||
-      c0.toLowerCase().includes(c.nome.toLowerCase()) ||
-      c.nome.toLowerCase().includes(c0.toLowerCase()));
-  }
-  if (match) { match.fat += valor; match.compras += 1; }
-  else {
-    // Venda sem criativo identificado (link_in_bio, ID numérico, {{ad.name}}, etc) → bucket Outros
-    if (!CRIATIVO_OUTROS) CRIATIVO_OUTROS = {
-      nome: 'Outros / sem criativo identificado', link:'', adset:'',
-      inv:0, cliques:0, imp:0, pv:0, ck:0, compras:0, fat:0,
-      cpc:0, cpm:0, ctr:0, ticket:0, cac:0, roas:0, ativo:false, _outros:true
-    };
-    CRIATIVO_OUTROS.fat += valor; CRIATIVO_OUTROS.compras += 1;
-  }
-}
-function finalizeCriativos(){
-  // Anexa o bucket "Outros" se houver vendas não atribuídas
-  if (CRIATIVO_OUTROS && CRIATIVO_OUTROS.compras > 0 && !CRIATIVOS.includes(CRIATIVO_OUTROS)) {
-    CRIATIVOS.push(CRIATIVO_OUTROS);
-  }
-  CRIATIVOS.forEach(c => {
-    c.roas = c.inv > 0 ? c.fat / c.inv : 0;
-    c.ticket = c.compras > 0 ? c.fat / c.compras : 0;
-    c.cac = c.compras > 0 ? c.inv / c.compras : 0;
-  });
 }
 function rebuildPeriodBuckets(){
   const semSet = new Set(), mesSet = new Set();
@@ -987,7 +985,7 @@ function setCriFiltro(f,btn){criFilter=f;document.querySelectorAll('.cri-filtro'
 function setCriSort(s,btn){criSort=s;document.querySelectorAll('.cri-sort').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderCriativos();}
 function roasTxt(c){ return c.inv > 0 ? br(c.roas)+'x' : (c.fat>0 ? '∞' : '—'); }
 function renderCriativos(){
-  let cris = [...CRIATIVOS];
+  let cris = computeCriativos();
   if (criFilter==='ativos') cris = cris.filter(c=>c.ativo);
   if (criFilter==='inativos') cris = cris.filter(c=>!c.ativo && !c._outros);
   if (criSort==='inv') cris.sort((a,b)=>b.inv-a.inv);
@@ -1026,7 +1024,7 @@ function renderCriativos(){
 function setPubFiltro(f,btn){pubFilter=f;document.querySelectorAll('.pub-filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderPublicos();}
 function setPubSort(s,btn){pubSort=s;document.querySelectorAll('.pub-sort-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderPublicos();}
 function renderPublicos(){
-  let pubs=[...PUBLICOS];
+  let pubs=computePublicos();
   if(pubFilter==='ativos')pubs=pubs.filter(p=>p.ativo);
   if(pubFilter==='inativos')pubs=pubs.filter(p=>!p.ativo);
   if(pubSort==='inv')pubs.sort((a,b)=>b.inv-a.inv);
@@ -1105,7 +1103,7 @@ function renderAll(){
 
 // =================== RELOAD MANUAL ===================
 async function reloadData(){
-  DIAS=[];SEMANAL=[];MENSAL=[];CRIATIVOS=[];PUBLICOS=[];VENDAS_RASTREADAS=[];RAW_SALES_ITEMS=[];SEEN_ORDER_IDS=new Set();CRIATIVO_OUTROS=null;
+  DIAS=[];SEMANAL=[];MENSAL=[];CRIATIVOS=[];PUBLICOS=[];VENDAS_RASTREADAS=[];RAW_SALES_ITEMS=[];SEEN_ORDER_IDS=new Set();GER_ROWS=[];
   document.getElementById('loading-overlay').style.display = 'flex';
   document.getElementById('loading-msg').textContent = 'Recarregando da planilha...';
   await loadData();
