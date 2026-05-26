@@ -192,9 +192,9 @@ tbody tr.total td{color:var(--orange)}
   <div class="section-title">Indicadores principais</div>
   <div class="kpis">
     <div class="kpi v1"><div class="lbl">Investimento</div><div class="val">R$ 122,17</div><div class="sub">7 dias · R$ 17,45/dia</div><div class="bar"></div></div>
-    <div class="kpi v2"><div class="lbl">Custo por Lead</div><div class="val">R$ 8,14</div><div class="sub">Meta R$ 15 · 46% abaixo</div><div class="bar"></div></div>
-    <div class="kpi v3"><div class="lbl">CTR Médio</div><div class="val">2,98%</div><div class="sub">Saudável (meta &gt; 2%)</div><div class="bar"></div></div>
-    <div class="kpi v4"><div class="lbl">CPM Médio</div><div class="val">R$ 74,22</div><div class="sub">Custo por 1k impressões</div><div class="bar"></div></div>
+    <div class="kpi v2"><div class="lbl">Visitas na página</div><div class="val">49</div><div class="sub">7 visitas/dia em média</div><div class="bar"></div></div>
+    <div class="kpi v3"><div class="lbl">Leads gerados</div><div class="val">15</div><div class="sub">CPL R$ 8,14 · meta R$ 15</div><div class="bar"></div></div>
+    <div class="kpi v4"><div class="lbl">CTR Médio</div><div class="val">2,98%</div><div class="sub">Saudável (meta &gt; 2%)</div><div class="bar"></div></div>
   </div>
 
   <div class="section-title">Faixas etárias ativas no período</div>
@@ -266,7 +266,13 @@ tbody tr.total td{color:var(--orange)}
     </div>
   </div>
 
-  <div class="section-title">Evolução diária</div>
+  <div class="section-title">Visitas na página · evolução diária</div>
+  <div class="chart-grid">
+    <div class="chart-wrap"><h4>Visitas na página por dia (cliques no anúncio)</h4><canvas id="chartVisits"></canvas></div>
+    <div class="chart-wrap"><h4>Visitas acumuladas no período</h4><canvas id="chartVisitsCum"></canvas></div>
+  </div>
+
+  <div class="section-title">Evolução diária · leads e investimento</div>
   <div class="chart-grid">
     <div class="chart-wrap"><h4>Leads & Investimento por dia</h4><canvas id="chartDaily"></canvas></div>
     <div class="chart-wrap"><h4>CPL diário (R$)</h4><canvas id="chartCPL"></canvas></div>
@@ -553,7 +559,63 @@ function buildCharts() {
   const dates = DAILY.map(d=>d.date);
   const leads = DAILY.map(d=>d.leads);
   const spend = DAILY.map(d=>d.spend);
+  const visits = DAILY.map(d=>d.clicks);
   const cpls = DAILY.map(d=> d.leads>0 ? +(d.spend/d.leads).toFixed(2) : null);
+
+  // Visitas por dia — area chart
+  charts.visits = new Chart(document.getElementById('chartVisits'),{
+    type:'bar',
+    data:{
+      labels:dates,
+      datasets:[{
+        label:'Visitas na página',
+        data:visits,
+        backgroundColor:'#ff6b35',
+        borderRadius:6,
+        borderSkipped:false
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:c=>c.parsed.y+' visitas'}}
+      },
+      scales:{
+        x:{grid:{color:GRID}},
+        y:{grid:{color:GRID},title:{display:true,text:'Visitas'},beginAtZero:true,ticks:{stepSize:1}}
+      }
+    }
+  });
+
+  // Visitas acumuladas
+  let cum = 0;
+  const cumulative = visits.map(v => cum += v);
+  charts.visitsCum = new Chart(document.getElementById('chartVisitsCum'),{
+    type:'line',
+    data:{
+      labels:dates,
+      datasets:[{
+        label:'Visitas acumuladas',
+        data:cumulative,
+        borderColor:'#ff8c42',
+        backgroundColor:'rgba(255,140,66,.25)',
+        fill:true, tension:.35,
+        pointRadius:5, pointBackgroundColor:'#ff8c42'
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:c=>'Total: '+c.parsed.y+' visitas'}}
+      },
+      scales:{
+        x:{grid:{color:GRID}},
+        y:{grid:{color:GRID},title:{display:true,text:'Visitas acumuladas'},beginAtZero:true}
+      }
+    }
+  });
 
   charts.daily = new Chart(document.getElementById('chartDaily'),{
     type:'bar',
@@ -765,19 +827,19 @@ function updateTotalsFromDaily(){
   const cvr = t.clicks? t.leads/t.clicks*100:0;
   const dias = DAILY.length || 1;
 
-  // KPIs visão geral
+  // KPIs visão geral: Investimento · Visitas · Leads · CTR
   const kpiVals = document.querySelectorAll('#panel-geral .kpis .kpi .val');
   if(kpiVals.length===4){
     kpiVals[0].textContent = fmtMoney(t.spend);
-    kpiVals[1].textContent = t.leads? fmtMoney(cpl) : '—';
-    kpiVals[2].textContent = fmtPct(ctr);
-    kpiVals[3].textContent = fmtMoney(cpm);
+    kpiVals[1].textContent = fmtInt(t.clicks);
+    kpiVals[2].textContent = fmtInt(t.leads);
+    kpiVals[3].textContent = fmtPct(ctr);
   }
   const kpiSubs = document.querySelectorAll('#panel-geral .kpis .kpi .sub');
   if(kpiSubs.length===4){
     kpiSubs[0].textContent = `${dias} dias · ${fmtMoney(t.spend/dias)}/dia`;
-    kpiSubs[1].textContent = `${fmtInt(t.leads)} leads · meta R$ 15`;
-    kpiSubs[2].textContent = `${fmtInt(t.clicks)} cliques no link`;
+    kpiSubs[1].textContent = `${(t.clicks/dias).toFixed(1).replace('.',',')} visitas/dia em média`;
+    kpiSubs[2].textContent = t.leads? `CPL ${fmtMoney(cpl)} · meta R$ 15` : 'Sem leads ainda';
     kpiSubs[3].textContent = `${fmtInt(t.imp)} impressões`;
   }
 
