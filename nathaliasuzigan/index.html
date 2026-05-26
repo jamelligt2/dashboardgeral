@@ -619,7 +619,7 @@ function processWebhook(csv) {
 
   var whMap = {};
   rows.slice(1).forEach(function(r) {
-    if ((r[5] || '').toLowerCase().trim() !== 'paid') return;
+    var status = (r[5] || '').toLowerCase().trim(); if (status !== 'paid' && status !== 'refunded') return; var isRefunded = status === 'refunded';
 
     var dataPagto = (r[27] || '').trim();
     if (!dataPagto) return;
@@ -643,22 +643,25 @@ function processWebhook(csv) {
     var dataBR = p[2] + '/' + p[1] + '/' + p[0];
     var amount = parseMoney(r[6] || '0');
 
-    if (!whMap[dataBR]) whMap[dataBR] = { fat: 0, compras: 0, fat_ob: 0, compras_ob: 0 };
+    if (!whMap[dataBR]) whMap[dataBR] = { fat: 0, compras: 0, fat_ob: 0, compras_ob: 0, fat_dev: 0, compras_dev: 0 };
     if (isOB) {
       whMap[dataBR].fat_ob     += amount;
       whMap[dataBR].compras_ob += 1;
     } else {
       whMap[dataBR].fat     += amount;
       whMap[dataBR].compras += 1;
+              if (isRefunded) { whMap[dataBR].fat_dev += amount; whMap[dataBR].compras_dev += 1; }
     }
   });
 
   DIAS.forEach(function(d) {
-    var wh = whMap[d.data] || { fat: 0, compras: 0, fat_ob: 0, compras_ob: 0 };
+    var wh = whMap[d.data] || { fat: 0, compras: 0, fat_ob: 0, compras_ob: 0, fat_dev: 0, compras_dev: 0 };
     d.fat        = wh.fat;
     d.compras    = wh.compras;
     d.fat_ob     = wh.fat_ob;
     d.compras_ob = wh.compras_ob;
+            d.fat_dev    = wh.fat_dev;
+            d.compras_dev = wh.compras_dev;
   });
   var wkFat = {}, wkCo = {}, wkFatOB = {}, wkCoOB = {};
   DIAS.forEach(function(d) {
@@ -787,10 +790,10 @@ function mkChart(id, labels, data, label, type) {
 }
 
 function renderVisao(dias) {
-  var inv = 0, imp = 0, cl = 0, pv = 0, ck = 0, fat = 0, compras = 0, fat_ob = 0, compras_ob = 0;
+  var inv = 0, imp = 0, cl = 0, pv = 0, ck = 0, fat = 0, compras = 0, fat_ob = 0, compras_ob = 0, fat_dev = 0, compras_dev = 0;
   dias.forEach(function(d) {
     inv += d.inv; imp += d.imp; cl += d.cliques; pv += d.pv; ck += d.ck;
-    fat += (d.fat || 0); compras += (d.compras || 0);
+    fat += (d.fat || 0); compras += (d.compras || 0); fat_dev += (d.fat_dev || 0); compras_dev += (d.compras_dev || 0);
     fat_ob += (d.fat_ob || 0); compras_ob += (d.compras_ob || 0);
   });
   var fatTotal = fat + fat_ob;
@@ -827,6 +830,8 @@ function renderVisao(dias) {
     kpiCard('CAC',           brl(cac),         '') +
     kpiCard('Cliques',       brInt(cl),        '') +
     kpiCard('Impressoes',    brInt(imp),       '') +
+            kpiCard('Devoluções', brInt(compras_dev), 'orange') +
+          kpiCard('Fat. Devolvido', brl(fat_dev), '') +
     kpiCard('CPC',           brl(cpc),         'orange') +
     kpiCard('CPM',           brl(cpm),         '') +
     kpiCard('CTR',           pct(ctr),         ctrColor(ctr)) +
