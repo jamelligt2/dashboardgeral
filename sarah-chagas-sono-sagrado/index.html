@@ -328,7 +328,18 @@ tbody tr.total td{color:var(--orange)}
 </div>
 
 <script>
-const DAILY = [
+/* ============================================================
+   AUTO-REFRESH do Google Sheets — Sarah Chagas · Sono Sagrado
+   Sheet: 15L2SoUvWTDdg5V-oP2BNXxaW7lTWdHRAIK86GtGx_0k
+   - Fetch direto via gviz (sessão Chrome autenticada)
+   - Auto-refresh a cada 5 min
+   - Fallback para snapshot embarcado
+============================================================ */
+const SHEET_ID = '15L2SoUvWTDdg5V-oP2BNXxaW7lTWdHRAIK86GtGx_0k';
+const GID_DAILY = '0';     // tabela diária principal
+const AUTO_REFRESH_MIN = 5;
+
+let DAILY = [
   {date:'13/05', spend:18.50, imp:7,   clicks:2,  leads:1},
   {date:'14/05', spend:15.36, imp:75,  clicks:3,  leads:0},
   {date:'15/05', spend:25.48, imp:51,  clicks:3,  leads:0},
@@ -337,6 +348,7 @@ const DAILY = [
   {date:'18/05', spend:16.12, imp:496, clicks:18, leads:7},
   {date:'19/05', spend:9.44,  imp:167, clicks:4,  leads:1},
 ];
+const FALLBACK_DAILY = DAILY.slice();
 
 const KEYWORDS = [
   {kw:'consultora de sono infantil',  imp:79, clicks:6, leads:1, spend:42.88},
@@ -629,24 +641,214 @@ function buildCharts() {
   });
 }
 
-function loadAndRender(forceLive){
-  const badge = document.getElementById('liveBadge');
-  const txt = document.getElementById('liveBadgeText');
-  badge.className = 'live-badge loading';
-  txt.textContent = 'CARREGANDO…';
-  setTimeout(()=>{
-    badge.className = 'live-badge cached';
-    txt.textContent = 'SNAPSHOT';
-    const now = new Date();
-    document.getElementById('updatedAt').textContent = now.toLocaleString('pt-BR');
-  }, 700);
+/* ============== CSV PARSER ============== */
+function parseCSV(text){
+  const rows=[]; let cur=[], f='', q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){
+      if(c==='"'&&text[i+1]==='"'){f+='"';i++;}
+      else if(c==='"') q=false;
+      else f+=c;
+    } else {
+      if(c==='"') q=true;
+      else if(c===',') {cur.push(f); f='';}
+      else if(c==='\n'){cur.push(f); rows.push(cur); cur=[]; f='';}
+      else if(c!=='\r') f+=c;
+    }
+  }
+  if(f.length||cur.length){cur.push(f); rows.push(cur);}
+  return rows;
+}
+function parseBR(v){
+  if(v==null) return 0;
+  const s=String(v).trim().replace(/R\$/gi,'').replace(/\s/g,'').replace(/\./g,'').replace(',','.');
+  const n=parseFloat(s);
+  return isNaN(n)?0:n;
+}
+function fmtDateShort(s){
+  if(!s) return '';
+  // accept 2026-05-13 or 13/05/2026 or 13/05
+  const m1=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m1) return m1[3]+'/'+m1[2];
+  const m2=s.match(/^(\d{1,2})\/(\d{1,2})/);
+  if(m2) return m2[1].padStart(2,'0')+'/'+m2[2].padStart(2,'0');
+  return s;
 }
 
-renderDaily();
-renderKeywords();
-renderAges();
-renderDailyAge();
-buildCharts();
+/* parse daily CSV from Sarah Chagas sheet */
+function csvToDaily(text){
+  const lines = parseCSV(text).filter(l => l.length>1 && l.some(c=>c!==''));
+  if(lines.length<2) throw new Error('sem dados');
+  const h = lines[0].map(x=>x.trim());
+  const findIdx = (...needles) => {
+    for(const n of needles){
+      const i = h.findIndex(x => new RegExp(n,'i').test(x));
+      if(i>=0) return i;
+    }
+    return -1;
+  };
+  const col = {
+    date:    findIdx('^Date','Data'),
+    clicks:  findIdx('^Clicks','Cliques'),
+    conv:    findIdx('Conversions','Conversões','Conversoes','Leads'),
+    imp:     findIdx('Impressions','Impressões','Impressoes'),
+    spend:   findIdx('Cost','Spend','Amount Spent','Investimento','Valor','Custo'),
+  };
+  if(col.date<0 || col.clicks<0 || col.imp<0 || col.spend<0) throw new Error('cabeçalho incompatível');
+
+  // aggregate by date
+  const map = new Map();
+  lines.slice(1).forEach(l => {
+    const d = (l[col.date]||'').trim();
+    if(!d) return;
+    const dk = fmtDateShort(d);
+    if(!dk) return;
+    if(!map.has(dk)) map.set(dk,{date:dk,spend:0,imp:0,clicks:0,leads:0});
+    const r = map.get(dk);
+    r.clicks += parseBR(l[col.clicks]);
+    r.leads  += parseBR(l[col.conv]);
+    r.imp    += parseBR(l[col.imp]);
+    r.spend  += parseBR(l[col.spend]);
+  });
+  const out = [...map.values()].sort((a,b)=>{
+    const [da,ma]=a.date.split('/').map(Number);
+    const [db,mb]=b.date.split('/').map(Number);
+    return (ma-mb)||(da-db);
+  });
+  if(!out.length) throw new Error('sem linhas válidas');
+  return out;
+}
+
+async function fetchDailyFromSheets(){
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${GID_DAILY}&_=${Date.now()}`;
+  const r = await fetch(url, {credentials:'include', cache:'no-store'});
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const text = await r.text();
+  if(text.includes('<!DOCTYPE html>')||text.includes('<html'))
+    throw new Error('resposta HTML — não logado no Google');
+  return csvToDaily(text);
+}
+
+/* ============== ERR BANNER ============== */
+function ensureErrBanner(){
+  let el = document.getElementById('errBanner');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'errBanner';
+    el.style.cssText='background:linear-gradient(90deg,rgba(196,74,26,.25),rgba(196,74,26,.05));border:1px solid rgba(196,74,26,.5);border-left:4px solid #c44a1a;border-radius:8px;padding:10px 16px;font-size:12px;color:#ffb38a;margin-bottom:12px;line-height:1.5;display:none';
+    document.querySelector('.wrap').prepend(el);
+  }
+  return el;
+}
+
+/* ============== RENDER TOTALS ============== */
+function updateTotalsFromDaily(){
+  const t = DAILY.reduce((o,d)=>{o.spend+=d.spend;o.imp+=d.imp;o.clicks+=d.clicks;o.leads+=d.leads;return o;},{spend:0,imp:0,clicks:0,leads:0});
+  const ctr = t.imp? t.clicks/t.imp*100:0;
+  const cpc = t.clicks? t.spend/t.clicks:0;
+  const cpm = t.imp? t.spend/t.imp*1000:0;
+  const cpl = t.leads? t.spend/t.leads:0;
+  const cvr = t.clicks? t.leads/t.clicks*100:0;
+  const dias = DAILY.length || 1;
+
+  // KPIs visão geral
+  const kpiVals = document.querySelectorAll('#panel-geral .kpis .kpi .val');
+  if(kpiVals.length===4){
+    kpiVals[0].textContent = fmtMoney(t.spend);
+    kpiVals[1].textContent = t.leads? fmtMoney(cpl) : '—';
+    kpiVals[2].textContent = fmtPct(ctr);
+    kpiVals[3].textContent = fmtMoney(cpm);
+  }
+  const kpiSubs = document.querySelectorAll('#panel-geral .kpis .kpi .sub');
+  if(kpiSubs.length===4){
+    kpiSubs[0].textContent = `${dias} dias · ${fmtMoney(t.spend/dias)}/dia`;
+    kpiSubs[1].textContent = `${fmtInt(t.leads)} leads · meta R$ 15`;
+    kpiSubs[2].textContent = `${fmtInt(t.clicks)} cliques no link`;
+    kpiSubs[3].textContent = `${fmtInt(t.imp)} impressões`;
+  }
+
+  // Funil SVG
+  const svg = document.querySelector('.funnel-svg-wrap svg');
+  if(svg){
+    const texts = svg.querySelectorAll('text');
+    if(texts.length>=8){
+      texts[1].textContent = fmtInt(t.imp);
+      texts[3].textContent = fmtInt(t.clicks);
+      texts[4].textContent = 'CTR '+fmtPct(ctr);
+      texts[6].textContent = fmtInt(t.leads);
+      texts[7].textContent = 'CVR '+fmtPct(cvr);
+    }
+  }
+  // Funnel cards
+  const fmVals = document.querySelectorAll('.funnel-metrics-row .fm-card .val');
+  if(fmVals.length===3){
+    fmVals[0].textContent = t.clicks? fmtMoney(cpc):'—';
+    fmVals[1].textContent = fmtMoney(cpm);
+    fmVals[2].textContent = fmtPct(cvr);
+  }
+
+  // Header period
+  if(DAILY.length){
+    const period = `CAP130526 — ${DAILY[0].date} a ${DAILY[DAILY.length-1].date}`;
+    const hdr = document.getElementById('hdr-period');
+    if(hdr) hdr.textContent = period;
+  }
+}
+
+/* ============== LOAD & RENDER ============== */
+function destroyCharts(){
+  Object.keys(charts).forEach(k=>{try{charts[k].destroy()}catch(e){} delete charts[k];});
+}
+function renderAll(){
+  destroyCharts();
+  updateTotalsFromDaily();
+  renderDaily();
+  renderKeywords();
+  renderAges();
+  renderDailyAge();
+  buildCharts();
+}
+
+async function loadAndRender(manual){
+  const badge = document.getElementById('liveBadge');
+  const txt = document.getElementById('liveBadgeText');
+  const btn = document.getElementById('refreshBtn');
+  const stamp = document.getElementById('updatedAt');
+  const err = ensureErrBanner();
+
+  badge.className = 'live-badge loading';
+  txt.textContent = manual? 'ATUALIZANDO…':'CARREGANDO…';
+  btn.disabled = true;
+  err.style.display = 'none';
+
+  try {
+    const rows = await fetchDailyFromSheets();
+    DAILY = rows;
+    renderAll();
+    badge.className = 'live-badge live';
+    txt.textContent = 'AO VIVO';
+    const now = new Date();
+    stamp.textContent = `Atualizado ${now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} · ${rows.length} dias`;
+  } catch(e){
+    DAILY = FALLBACK_DAILY.slice();
+    renderAll();
+    badge.className = 'live-badge cached';
+    txt.textContent = 'SNAPSHOT';
+    stamp.textContent = `Snapshot · ${FALLBACK_DAILY.length} dias`;
+    err.innerHTML = `<b>Usando snapshot local.</b> Não consegui puxar a planilha ao vivo (${e.message}). Abra este dashboard no Chrome logado na conta Google que tem acesso, ou clique em <b>↻ Atualizar</b>.`;
+    err.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* INIT: render snapshot first, then try to fetch live */
+renderAll();
+loadAndRender(false);
+
+/* AUTO-REFRESH a cada 5 minutos */
+setInterval(()=>loadAndRender(false), AUTO_REFRESH_MIN*60*1000);
 </script>
 </body>
 </html>
