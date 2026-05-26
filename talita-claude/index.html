@@ -142,7 +142,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
     </div>
     <div>
       <div class="brand">🎓 Imersão Claude · Talita Marques</div>
-      <div class="subtitle">Dashboard de Performance — Perpétuo · Jamelli GT · 2026 · <span style="color:rgba(46,204,113,.7)">v2.2 (ig + datas Eduzz)</span></div>
+      <div class="subtitle">Dashboard de Performance — Perpétuo · Jamelli GT · 2026 · <span style="color:rgba(46,204,113,.7)">v2.3 (criativos + outros)</span></div>
     </div>
   </div>
   <div class="period-bar">
@@ -307,6 +307,7 @@ let DIAS = [], SEMANAL = [], MENSAL = [], CRIATIVOS = [], PUBLICOS = [];
 let VENDAS_RASTREADAS = [];
 let RAW_SALES_ITEMS = [];
 let SEEN_ORDER_IDS = new Set();
+let CRIATIVO_OUTROS = null;  // bucket de vendas sem criativo identificado (bio link, ID, UTM quebrada)
 let dateFrom = null, dateTo = null;
 let criFilter = 'todos', criSort = 'inv';
 let pubFilter = 'todos', pubSort = 'inv';
@@ -716,6 +717,7 @@ function processWebhookEduzz(csv) {
 
 // =================== COMMIT (agrupa por pedido: principal + bumps) ===================
 function commitSales(){
+  CRIATIVO_OUTROS = null;  // reseta bucket de não-atribuídos
   const groups = {};
   RAW_SALES_ITEMS.forEach(it => {
     const minuteKey = (it.iso||'').slice(0,16);
@@ -750,16 +752,30 @@ function addSaleToDay(dataBR, valor){
   }
 }
 function addSaleToCriativo(content, valor){
-  if (!content) return;
-  const c0 = String(content).trim();
-  if (!c0) return;
-  const match = CRIATIVOS.find(c =>
-    c.nome.toLowerCase() === c0.toLowerCase() ||
-    c0.toLowerCase().includes(c.nome.toLowerCase()) ||
-    c.nome.toLowerCase().includes(c0.toLowerCase()));
+  const c0 = String(content||'').trim();
+  let match = null;
+  if (c0) {
+    match = CRIATIVOS.find(c =>
+      c.nome.toLowerCase() === c0.toLowerCase() ||
+      c0.toLowerCase().includes(c.nome.toLowerCase()) ||
+      c.nome.toLowerCase().includes(c0.toLowerCase()));
+  }
   if (match) { match.fat += valor; match.compras += 1; }
+  else {
+    // Venda sem criativo identificado (link_in_bio, ID numérico, {{ad.name}}, etc) → bucket Outros
+    if (!CRIATIVO_OUTROS) CRIATIVO_OUTROS = {
+      nome: 'Outros / sem criativo identificado', link:'', adset:'',
+      inv:0, cliques:0, imp:0, pv:0, ck:0, compras:0, fat:0,
+      cpc:0, cpm:0, ctr:0, ticket:0, cac:0, roas:0, ativo:false, _outros:true
+    };
+    CRIATIVO_OUTROS.fat += valor; CRIATIVO_OUTROS.compras += 1;
+  }
 }
 function finalizeCriativos(){
+  // Anexa o bucket "Outros" se houver vendas não atribuídas
+  if (CRIATIVO_OUTROS && CRIATIVO_OUTROS.compras > 0 && !CRIATIVOS.includes(CRIATIVO_OUTROS)) {
+    CRIATIVOS.push(CRIATIVO_OUTROS);
+  }
   CRIATIVOS.forEach(c => {
     c.roas = c.inv > 0 ? c.fat / c.inv : 0;
     c.ticket = c.compras > 0 ? c.fat / c.compras : 0;
@@ -969,30 +985,41 @@ function renderTbodyDias(dias){
 // =================== RENDER: CRIATIVOS ===================
 function setCriFiltro(f,btn){criFilter=f;document.querySelectorAll('.cri-filtro').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderCriativos();}
 function setCriSort(s,btn){criSort=s;document.querySelectorAll('.cri-sort').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderCriativos();}
+function roasTxt(c){ return c.inv > 0 ? br(c.roas)+'x' : (c.fat>0 ? '∞' : '—'); }
 function renderCriativos(){
   let cris = [...CRIATIVOS];
   if (criFilter==='ativos') cris = cris.filter(c=>c.ativo);
-  if (criFilter==='inativos') cris = cris.filter(c=>!c.ativo);
+  if (criFilter==='inativos') cris = cris.filter(c=>!c.ativo && !c._outros);
   if (criSort==='inv') cris.sort((a,b)=>b.inv-a.inv);
   else if (criSort==='ctr') cris.sort((a,b)=>b.ctr-a.ctr);
   else if (criSort==='cpc') cris.sort((a,b)=>(a.cpc||999)-(b.cpc||999));
   else if (criSort==='roas') cris.sort((a,b)=>b.roas-a.roas);
   else if (criSort==='vendas') cris.sort((a,b)=>b.compras-a.compras);
+  // "Outros / sem criativo" sempre por último
+  cris.sort((a,b)=>(a._outros?1:0)-(b._outros?1:0));
   if (!cris.length) { document.getElementById('cri-cards').innerHTML = '<div class="empty-state"><strong>Nenhum criativo no filtro.</strong>Tente mudar o filtro.</div>'; document.getElementById('tbody-criativos').innerHTML = ''; return; }
-  document.getElementById('cri-cards').innerHTML = cris.map(c => `
-    <div class="cri-card ${c.ativo?'ativo':''}">
-      <div class="cri-card-header"><div class="cri-name">${c.nome}</div><div class="cri-badge ${c.ativo?'ativo':'inativo'}">${c.ativo?'Ativo':'Inativo'}</div></div>
+  document.getElementById('cri-cards').innerHTML = cris.map(c => {
+    const badge = c._outros
+      ? '<div class="cri-badge" style="background:rgba(241,196,15,.15);color:#f1c40f">Sem criativo</div>'
+      : `<div class="cri-badge ${c.ativo?'ativo':'inativo'}">${c.ativo?'Ativo':'Inativo'}</div>`;
+    return `
+    <div class="cri-card ${c.ativo?'ativo':''}" style="${c._outros?'border-color:rgba(241,196,15,.3)':''}">
+      <div class="cri-card-header"><div class="cri-name">${c.nome}</div>${badge}</div>
       <div class="cri-metrics">
-        <div class="cri-metric"><div class="cri-metric-label">Invest.</div><div class="cri-metric-val hl">${brl(c.inv)}</div></div>
-        <div class="cri-metric"><div class="cri-metric-label">ROAS</div><div class="cri-metric-val hl">${br(c.roas)}x</div></div>
-        <div class="cri-metric"><div class="cri-metric-label">CTR</div><div class="cri-metric-val">${pct(c.ctr)}</div></div>
-        <div class="cri-metric"><div class="cri-metric-label">CPC</div><div class="cri-metric-val">${brl(c.cpc)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">Invest.</div><div class="cri-metric-val hl">${c._outros?'—':brl(c.inv)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">ROAS</div><div class="cri-metric-val hl">${roasTxt(c)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">CTR</div><div class="cri-metric-val">${c._outros?'—':pct(c.ctr)}</div></div>
+        <div class="cri-metric"><div class="cri-metric-label">CPC</div><div class="cri-metric-val">${c._outros?'—':brl(c.cpc)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">Compras</div><div class="cri-metric-val">${br(c.compras,0)}</div></div>
         <div class="cri-metric"><div class="cri-metric-label">Fat.</div><div class="cri-metric-val">${brl(c.fat)}</div></div>
       </div>
       ${c.link ? `<a class="cri-link" href="${c.link}" target="_blank">🔗 ${c.link}</a>` : ''}
-    </div>`).join('');
-  document.getElementById('tbody-criativos').innerHTML = cris.map(c => `<tr><td>${c.nome}</td><td>${brl(c.inv)}</td><td>${br(c.cliques,0)}</td><td>${br(c.imp,0)}</td><td>${br(c.pv,0)}</td><td>${pct(c.ctr)}</td><td>${brl(c.cpc)}</td><td>${br(c.compras,0)}</td><td>${brl(c.fat)}</td><td>${br(c.roas)}x</td><td>${statusBadge(c.inv,c.fat)}</td></tr>`).join('');
+    </div>`;
+  }).join('');
+  document.getElementById('tbody-criativos').innerHTML = cris.map(c => {
+    const st = c._outros ? '<span class="badge aguardar">Sem criativo</span>' : statusBadge(c.inv,c.fat);
+    return `<tr><td>${c.nome}</td><td>${c._outros?'—':brl(c.inv)}</td><td>${c._outros?'—':br(c.cliques,0)}</td><td>${c._outros?'—':br(c.imp,0)}</td><td>${c._outros?'—':br(c.pv,0)}</td><td>${c._outros?'—':pct(c.ctr)}</td><td>${c._outros?'—':brl(c.cpc)}</td><td>${br(c.compras,0)}</td><td>${brl(c.fat)}</td><td>${roasTxt(c)}</td><td>${st}</td></tr>`;
+  }).join('');
 }
 
 // =================== RENDER: PÚBLICOS ===================
@@ -1078,7 +1105,7 @@ function renderAll(){
 
 // =================== RELOAD MANUAL ===================
 async function reloadData(){
-  DIAS=[];SEMANAL=[];MENSAL=[];CRIATIVOS=[];PUBLICOS=[];VENDAS_RASTREADAS=[];RAW_SALES_ITEMS=[];SEEN_ORDER_IDS=new Set();
+  DIAS=[];SEMANAL=[];MENSAL=[];CRIATIVOS=[];PUBLICOS=[];VENDAS_RASTREADAS=[];RAW_SALES_ITEMS=[];SEEN_ORDER_IDS=new Set();CRIATIVO_OUTROS=null;
   document.getElementById('loading-overlay').style.display = 'flex';
   document.getElementById('loading-msg').textContent = 'Recarregando da planilha...';
   await loadData();
