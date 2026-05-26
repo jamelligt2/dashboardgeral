@@ -142,7 +142,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
     </div>
     <div>
       <div class="brand">🎓 Imersão Claude · Talita Marques</div>
-      <div class="subtitle">Dashboard de Performance — Perpétuo · Jamelli GT · 2026 · <span style="color:rgba(46,204,113,.7)">v2.1 (datas Eduzz corrigidas)</span></div>
+      <div class="subtitle">Dashboard de Performance — Perpétuo · Jamelli GT · 2026 · <span style="color:rgba(46,204,113,.7)">v2.2 (ig + datas Eduzz)</span></div>
     </div>
   </div>
   <div class="period-bar">
@@ -297,8 +297,10 @@ const VENDAS_SHEET        = 'vendas';         // export Kiwify (legacy)
 const VENDAS_EDUZZ_SHEET  = 'vendas_eduzz';   // export Eduzz (atual)
 const WEBHOOK_EDUZZ_SHEET = 'webhook_eduzz';  // webhook Eduzz (atual)
 const META_SOURCE_FILTER  = 'metaads';
+const TRAFFIC_SOURCES     = ['metaads','ig'];  // fontes consideradas tráfego pago
 const CAMPAIGN_FILTER     = 'claude';
 const MAIN_PRODUCT_KEY    = 'imersão claude para mentoras';
+function isTrafficSource(s){ return TRAFFIC_SOURCES.includes(normKey(s)); }
 
 // Estado global
 let DIAS = [], SEMANAL = [], MENSAL = [], CRIATIVOS = [], PUBLICOS = [];
@@ -553,7 +555,7 @@ function processVendas(csv) {
 
   const sales = rows.slice(1).filter(r => r.length > 5)
     .filter(r => r[idx.status] && r[idx.status].toLowerCase().trim() === 'paid')
-    .filter(r => r[idx.src] && normKey(r[idx.src]) === META_SOURCE_FILTER)
+    .filter(r => isTrafficSource(r[idx.src]))
     .filter(r => { const m=(r[idx.medium]||'').toLowerCase(),c=(r[idx.camp]||'').toLowerCase(); return m.includes(CAMPAIGN_FILTER)||c.includes(CAMPAIGN_FILTER); });
 
   sales.forEach(r => {
@@ -585,7 +587,7 @@ function processWebhook(csv) {
 
   const sales = rows.slice(1).filter(r => r.length > 2)
     .filter(r => r[idx.status] && r[idx.status].toLowerCase().replace(/"/g,'').trim() === 'paid')
-    .filter(r => r[idx.source] && normKey(r[idx.source]) === META_SOURCE_FILTER)
+    .filter(r => isTrafficSource(r[idx.source]))
     .filter(r => { const med=(r[idx.medium]||'').toLowerCase(),cam=(r[idx.campaign]||'').toLowerCase(); return med.includes(CAMPAIGN_FILTER)||cam.includes(CAMPAIGN_FILTER); });
 
   sales.forEach(r => {
@@ -618,7 +620,7 @@ function processVendasEduzz(csv) {
 
   const sales = rows.slice(1).filter(r => r.length > 5)
     .filter(r => r[idx.status] && r[idx.status].toLowerCase().trim() === 'paga')
-    .filter(r => r[idx.src] && normKey(r[idx.src]) === META_SOURCE_FILTER)
+    .filter(r => isTrafficSource(r[idx.src]))
     .filter(r => { const med=(r[idx.medium]||'').toLowerCase(),cam=(r[idx.camp]||'').toLowerCase(); return med.includes(CAMPAIGN_FILTER)||cam.includes(CAMPAIGN_FILTER); });
 
   sales.forEach(r => {
@@ -663,7 +665,7 @@ function processWebhookEduzz(csv) {
   // Esta aba tem fontes misturadas (organic, manychat, ig, meta_ads).
   // Filtra: meta_ads + (campanha/medium/produto contém "claude" ou "imersão").
   const isClaudeMeta = (r) => {
-    if (idx.src < 0 || !r[idx.src] || normKey(r[idx.src]) !== META_SOURCE_FILTER) return false;
+    if (idx.src < 0 || !isTrafficSource(r[idx.src])) return false;  // meta_ads OU ig
     const med  = (idx.medium  >= 0 ? (r[idx.medium] ||'') : '').toLowerCase();
     const cam  = (idx.camp    >= 0 ? (r[idx.camp]   ||'') : '').toLowerCase();
     const prod = (idx.produto >= 0 ? (r[idx.produto]||'') : '').toLowerCase();
