@@ -206,7 +206,7 @@ tbody tr.total td{color:var(--orange)}
       <span class="kpi-tag">★ MÉTRICA-CHAVE</span>
       <div class="lbl">Custo por Lead (CPL)</div>
       <div class="val">R$ 8,14</div>
-      <div class="sub">Meta R$ 15 · <b style="color:#4ade80">46% abaixo</b></div>
+      <div class="sub">15 leads em 7 dias · custo médio por captação</div>
       <div class="bar"></div>
     </div>
     <div class="kpi v1"><div class="lbl">Investimento</div><div class="val">R$ 122,17</div><div class="sub">7 dias · R$ 17,45/dia</div><div class="bar"></div></div>
@@ -844,8 +844,7 @@ function updateTotalsFromDaily(){
   const cvr = t.clicks? t.leads/t.clicks*100:0;
   const dias = DAILY.length || 1;
 
-  // KPIs visão geral: CPL (verde/vermelho) · Investimento · Visitas · Leads
-  const META_CPL = 15;
+  // KPIs visão geral: CPL (verde) · Investimento · Visitas · Leads
   const kpiVals = document.querySelectorAll('#panel-geral .kpis .kpi .val');
   if(kpiVals.length===4){
     kpiVals[0].textContent = t.leads? fmtMoney(cpl) : '—';
@@ -855,34 +854,12 @@ function updateTotalsFromDaily(){
   }
   const kpiSubs = document.querySelectorAll('#panel-geral .kpis .kpi .sub');
   if(kpiSubs.length===4){
-    if(t.leads && cpl < META_CPL){
-      const pct = ((1 - cpl/META_CPL)*100).toFixed(0);
-      kpiSubs[0].innerHTML = `Meta R$ ${META_CPL} · <b style="color:#4ade80">${pct}% abaixo</b>`;
-    } else if(t.leads){
-      const pct = ((cpl/META_CPL - 1)*100).toFixed(0);
-      kpiSubs[0].innerHTML = `Meta R$ ${META_CPL} · <b style="color:#f87171">${pct}% acima</b>`;
-    } else {
-      kpiSubs[0].textContent = 'Aguardando leads';
-    }
+    kpiSubs[0].textContent = t.leads
+      ? `${fmtInt(t.leads)} leads em ${dias} dias · custo médio por captação`
+      : 'Aguardando leads';
     kpiSubs[1].textContent = `${dias} dias · ${fmtMoney(t.spend/dias)}/dia`;
     kpiSubs[2].textContent = `${(t.clicks/dias).toFixed(1).replace('.',',')} visitas/dia em média`;
     kpiSubs[3].innerHTML = `CTR ${fmtPct(ctr)} · CVR ${fmtPct(cvr)}`;
-  }
-
-  // CPL card: alterna entre vgreen/vred conforme meta
-  const cplCard = document.querySelector('#panel-geral .kpis .kpi.vgreen, #panel-geral .kpis .kpi.vred');
-  if(cplCard && t.leads){
-    if(cpl >= META_CPL){
-      cplCard.classList.remove('vgreen');
-      cplCard.classList.add('vred');
-      const tag = cplCard.querySelector('.kpi-tag');
-      if(tag){ tag.textContent='⚠ ACIMA DA META'; tag.style.background='rgba(248,113,113,.18)'; tag.style.color='#f87171'; tag.style.border='1px solid rgba(248,113,113,.4)'; }
-    } else {
-      cplCard.classList.remove('vred');
-      cplCard.classList.add('vgreen');
-      const tag = cplCard.querySelector('.kpi-tag');
-      if(tag){ tag.textContent='★ MÉTRICA-CHAVE'; tag.style.background='rgba(74,222,128,.18)'; tag.style.color='#4ade80'; tag.style.border='1px solid rgba(74,222,128,.4)'; }
-    }
   }
 
   // Funil SVG
