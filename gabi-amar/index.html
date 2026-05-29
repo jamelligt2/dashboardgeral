@@ -44,6 +44,8 @@ td{padding:7px 10px;text-align:right;border-bottom:1px solid rgba(255,255,255,.0
 td:first-child{text-align:left;font-family:'DM Sans',sans-serif;font-size:12px}
 tr:hover td{background:rgba(255,255,255,.025)}
 .funil-section{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:16px 0}
+.funil-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:18px}
+.funil-card h4{font-size:11px;color:rgba(255,255,255,.45);margin-bottom:14px;text-transform:uppercase;letter-spacing:.5px}
 .funil-bar-wrap{margin-bottom:12px}
 .funil-label{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;color:rgba(255,255,255,.7)}
 .funil-bar-bg{background:rgba(255,255,255,.05);border-radius:4px;height:14px;overflow:hidden}
@@ -54,7 +56,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
 .chart-grid-2x2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0}
 .chart-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:16px}
 .chart-card h4{font-size:11px;color:rgba(255,255,255,.45);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
-.chart-card canvas{max-height:190px}
+.chart-card canvas{max-height:200px}
 .sec-title{font-size:13px;font-weight:600;color:rgba(255,255,255,.65);margin:20px 0 10px;border-left:3px solid #ff6b2b;padding-left:10px}
 .cri-filterbar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
 .cri-filter-btn,.cri-status-btn,.cri-sort-btn,.pub-filter-btn,.pub-sort-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 12px;border-radius:5px;cursor:pointer;font-size:12px;transition:all .2s;font-family:'DM Sans',sans-serif}
@@ -96,6 +98,8 @@ tr:hover td{background:rgba(255,255,255,.025)}
 .sale-meta{font-size:10px;color:rgba(255,255,255,.4);line-height:1.6}
 .sale-ob{font-size:10px;color:#2ecc71;margin-top:4px}
 .empty{padding:40px;text-align:center;color:rgba(255,255,255,.3);font-size:13px}
+.badge-corrigir{color:#e74c3c;font-weight:600}
+.badge-ok{color:#2ecc71}
 @media(max-width:900px){.cri-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:600px){.cri-grid{grid-template-columns:1fr}.chart-grid-2x2{grid-template-columns:1fr}.funil-section{grid-template-columns:1fr}}
 </style>
@@ -124,6 +128,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
     <input type="date" id="dateFrom" class="date-input" onchange="onDateChange()">
     <span class="period-sep">→</span>
     <input type="date" id="dateTo" class="date-input" onchange="onDateChange()">
+    <button class="preset-btn" onclick="setPreset('today',this)">Hoje</button>
     <button class="preset-btn" onclick="setPreset(7,this)">7d</button>
     <button class="preset-btn" onclick="setPreset(14,this)">14d</button>
     <button class="preset-btn" onclick="setPreset(30,this)">30d</button>
@@ -148,12 +153,28 @@ tr:hover td{background:rgba(255,255,255,.025)}
 
 <div id="trafego" class="content active">
   <div class="kpi-grid" id="kpi-trafego"></div>
+  <div class="funil-section">
+    <div class="funil-card"><h4>Funil de Conversão</h4><div id="funil-trafego"></div></div>
+    <div class="funil-card"><h4>Taxas</h4><div class="taxa-grid" id="taxas-trafego"></div></div>
+  </div>
+  <div class="chart-grid-2x2">
+    <div class="chart-card"><h4>Investimento Diário</h4><canvas id="ch-inv-dia-t"></canvas></div>
+    <div class="chart-card"><h4>Connect Rate Diário (PV ÷ Cliques)</h4><canvas id="ch-cr-dia-t"></canvas></div>
+  </div>
   <div class="sec-title">🛒 Compradores</div>
   <div class="sales-scroll" id="sales-scroll"></div>
 </div>
 
 <div id="visao" class="content">
   <div class="kpi-grid" id="kpi-visao"></div>
+  <div class="funil-section">
+    <div class="funil-card"><h4>Funil de Conversão</h4><div id="funil-visao"></div></div>
+    <div class="funil-card"><h4>Taxas</h4><div class="taxa-grid" id="taxas-visao"></div></div>
+  </div>
+  <div class="chart-grid-2x2">
+    <div class="chart-card"><h4>Investimento Diário</h4><canvas id="ch-inv-dia-v"></canvas></div>
+    <div class="chart-card"><h4>Connect Rate Diário (PV ÷ Cliques)</h4><canvas id="ch-cr-dia-v"></canvas></div>
+  </div>
   <div class="sec-title">Dia a Dia</div>
   <div class="tbl-wrap"><table id="tbl-visao"></table></div>
 </div>
@@ -217,7 +238,7 @@ const CONFIG = {
 
   SHEET_ID:          '1ewoAkIuDNtOsMNsu4OKGEVFj_w8ulGFcIlr4qTfb174',
   GERENCIADOR_SHEET: 'Gerenciador',
-  // Fontes de vendas: a aba "Vendas" (Eduzz, dados atuais) + a aba "Webhook" (feed futuro).
+  // Fontes de vendas: aba "Vendas" (histórico Eduzz) + aba "Webhook" (feed ao vivo).
   // Linhas anteriores à DATA_MINIMA ou de teste caem fora automaticamente.
   VENDAS_SHEETS: ['Vendas', 'Webhook'],
   DATA_MINIMA:  '2026-05-05',
@@ -227,7 +248,7 @@ const CONFIG = {
   VALORES_EM_CENTAVOS: false,
 
   // Mapeamento por NOME de cabeçalho (case-insensitive, sem acento) ─────
-  // Aba Vendas (Eduzz)
+  // Aba Vendas (Eduzz - relatório)
   V: {
     data:     ['data de pagamento','data de criacao'],
     produto:  ['produto','nome da oferta'],
@@ -240,14 +261,14 @@ const CONFIG = {
     campanha: ['utm medium'],       // campanha completa "[JGT]..."
     criativo: ['utm content'],      // anúncio (ex.: "IASA-E02")
   },
-  // Aba Webhook (Eduzz invoice_paid)
+  // Aba Webhook (Eduzz invoice_paid - feed ao vivo)
   WH: {
     event:    ['event'],
     data:     ['data.paidat','data.createdat','senddate'],
-    produto:  ['data.items[0].name'],
+    produto:  ['data.offer.name','data.items[0].name'],
     cliente:  ['data.buyer.name'],
     email:    ['data.buyer.email'],
-    fatTotal: ['data.price.paid.value','data.price.value'],
+    fatTotal: ['data.price.paid.value','data.paid.value','data.price.value'],
     utmSource:['data.utm.source'],
     publico:  ['data.utm.campaign'],
     campanha: ['data.utm.medium'],
@@ -282,7 +303,6 @@ function parseNum(v){
   if(v==null) return 0;
   let s = v.toString().trim();
   if(!s) return 0;
-  // remove R$, espaços; trata 1.234,56 (BR) e 1234.56
   s = s.replace(/[R$\s]/g,'');
   if(s.includes(',')) s = s.replace(/\./g,'').replace(',','.');
   const n = parseFloat(s);
@@ -293,10 +313,8 @@ function normDate(v){
   if(!v) return '';
   let s = v.toString().trim();
   if(!s) return '';
-  // ISO 2026-05-25 ou 2026-05-25T...
   let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if(m) return `${m[1]}-${m[2]}-${m[3]}`;
-  // BR 28/05/2026 ou 28/05/2026 11:20
   m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if(m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
   return '';
@@ -309,6 +327,7 @@ function fmtBR(v){
 function fmtInt(v){ return (v||0).toLocaleString('pt-BR'); }
 function fmtPct(v){ if(!isFinite(v)||v===0) return '—'; return v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%'; }
 function fmtX(v){ if(!isFinite(v)||v===0) return '—'; return v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'x'; }
+function ddmm(d){ return d.slice(8,10)+'/'+d.slice(5,7); }
 
 // ── CSV parser ───────────────────────────────────────────────────────
 function parseCSV(text){
@@ -340,7 +359,9 @@ function headerIndex(headerRow, candidates){
 }
 
 async function fetchSheetCSV(sheetName){
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+  // headers=1 força o Google a tratar exatamente 1 linha de cabeçalho
+  // (evita que a linha de "ping" do webhook seja fundida ao cabeçalho)
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}&headers=1`;
   const controller = new AbortController();
   const timeout = setTimeout(()=>controller.abort(),20000);
   try{
@@ -359,9 +380,9 @@ async function fetchSheetCSV(sheetName){
 }
 
 // ── Estado global ────────────────────────────────────────────────────
-let GROWS = [];   // {date,inv,cliques,pv,ck,purchase,campaign,adset,ad,reach,imp,link}
-let SALES = [];   // {data,nome,email,fatTotal,fatOB,utmSource,publico,campanha,criativo}
-let DIAS  = [];   // datas únicas do gerenciador
+let GROWS = [];
+let SALES = [];
+let DIAS  = [];
 let GMAXDATE = '';
 let criStatus='todos', criSort='inv', pubStatus='todos', pubSort='inv';
 
@@ -444,7 +465,7 @@ function parseVendas(text){
   if(rows.length<2) return [];
   const h=rows[0], V=CONFIG.V;
   const ix={}; for(const k in V) ix[k]=headerIndex(h,V[k]);
-  if(ix.cliente<0 && ix.fatTotal<0) return []; // não é a aba esperada
+  if(ix.cliente<0 && ix.fatTotal<0) return [];
   const out=[];
   for(let i=1;i<rows.length;i++){
     const r=rows[i];
@@ -474,9 +495,10 @@ function parseWebhook(text){
   for(let i=1;i<rows.length;i++){
     const r=rows[i];
     const ev=norm(r[ix.event]);
+    // só faturas pagas (ignora ping e outros eventos)
     if(ix.event>=0 && !ev.includes('invoice_paid') && !CONFIG.STATUS_APROVADO.map(norm).includes(ev)) continue;
-    const prod=norm(r[ix.produto]);
-    if(CONFIG.PRODUTO_NOME && prod && !prod.includes(norm(CONFIG.PRODUTO_NOME))) continue;
+    // Conta exclusiva do produto Amar: não filtramos por nome do item
+    // (order bumps reordenam items[0].name e podem ocultar o produto principal).
     const d=normDate(r[ix.data]);
     if(!d || d<CONFIG.DATA_MINIMA) continue;
     const ft=parseNum(r[ix.fatTotal]);
@@ -492,6 +514,10 @@ function parseWebhook(text){
 // ── Filtro de data ───────────────────────────────────────────────────
 function allDatesSorted(){
   return [...GROWS.map(g=>g.date), ...SALES.map(s=>s.data)].filter(Boolean).sort();
+}
+function todayStr(){
+  const n=new Date();
+  return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
 }
 function setupDateRange(){
   const ad=allDatesSorted();
@@ -518,14 +544,16 @@ function setPreset(days,btn){
   const ad=allDatesSorted();
   if(!ad.length) return;
   const first=ad[0], last=ad[ad.length-1];
-  let from=first;
-  if(days!=='all'){
+  let from=first, to=last;
+  if(days==='today'){
+    from=to=todayStr();
+  } else if(days!=='all'){
     const d=new Date(last+'T00:00:00'); d.setDate(d.getDate()-(days-1));
     from=d.toISOString().slice(0,10);
     if(from<first) from=first;
   }
   document.getElementById('dateFrom').value=from;
-  document.getElementById('dateTo').value=last;
+  document.getElementById('dateTo').value=to;
   updateRangeInfo(); renderAll();
 }
 
@@ -539,7 +567,6 @@ function aggGer(rows){
   return a;
 }
 
-// entidade ativa = teve registro na última data do gerenciador (proxy, pois não há coluna de status)
 function activeSet(field){
   const s=new Set();
   GROWS.forEach(g=>{ if(g.date===GMAXDATE && g[field]) s.add(g[field]); });
@@ -561,8 +588,47 @@ function kpi(label,value,cls,sub){
   return `<div class="kpi-card"><div class="kpi-label">${label}</div><div class="kpi-value ${cls||''}">${value}</div>${sub?`<div class="kpi-sub">${sub}</div>`:''}</div>`;
 }
 
+// ── Funil + Taxas ────────────────────────────────────────────────────
+function renderFunil(id,g){
+  const steps=[['Cliques',g.cliques],['Pageviews',g.pv],['Checkouts',g.ck],['Compras (pixel)',g.purchase]];
+  const max=Math.max(g.cliques,1);
+  let h='';
+  steps.forEach(([lbl,val])=>{
+    const w=Math.max(2,(val/max*100));
+    h+=`<div class="funil-bar-wrap"><div class="funil-label"><span>${lbl}</span><span>${fmtInt(val)}</span></div><div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${w}%"></div></div></div>`;
+  });
+  document.getElementById(id).innerHTML=h;
+}
+function renderTaxas(id,g){
+  const ctr=g.imp>0?g.cliques/g.imp*100:0;
+  const cr=g.cliques>0?g.pv/g.cliques*100:0;
+  const tck=g.pv>0?g.ck/g.pv*100:0;
+  const tcp=g.pv>0?g.purchase/g.pv*100:0;
+  const item=(l,v)=>`<div class="taxa-item"><span>${l}</span><span class="taxa-val">${fmtPct(v)}</span></div>`;
+  document.getElementById(id).innerHTML=item('CTR (Cliques ÷ Impr.)',ctr)+item('Connect Rate (PV ÷ Cliques)',cr)+item('Taxa Checkout (CK ÷ PV)',tck)+item('Taxa Compra (Compras ÷ PV)',tcp);
+}
+
+// ── Gráficos diários ─────────────────────────────────────────────────
+let chInvT,chCrT,chInvV,chCrV;
+function renderDailyCharts(rows,suffix){
+  const byDay={};
+  rows.forEach(r=>{const m=byDay[r.date]||(byDay[r.date]={inv:0,pv:0,cl:0});m.inv+=r.inv;m.pv+=r.pv;m.cl+=r.cliques;});
+  const days=Object.keys(byDay).sort();
+  const labels=days.map(ddmm);
+  const inv=days.map(d=>+byDay[d].inv.toFixed(2));
+  const cr=days.map(d=>byDay[d].cl>0?+(byDay[d].pv/byDay[d].cl*100).toFixed(2):0);
+  if(suffix==='t'){
+    chInvT=mkChart(chInvT,'ch-inv-dia-t',labels,inv,'Investimento');
+    chCrT=mkLine(chCrT,'ch-cr-dia-t',labels,cr,'Connect Rate %');
+  } else {
+    chInvV=mkChart(chInvV,'ch-inv-dia-v',labels,inv,'Investimento');
+    chCrV=mkLine(chCrV,'ch-cr-dia-v',labels,cr,'Connect Rate %');
+  }
+}
+
 function renderTrafego(from,to){
-  const g=aggGer(gFilter(from,to));
+  const grows=gFilter(from,to);
+  const g=aggGer(grows);
   const sales=sFilter(from,to);
   const tr=sales.filter(isTrafego), org=sales.filter(s=>!isTrafego(s));
   const fatTr=tr.reduce((a,s)=>a+s.fatTotal,0), fatOrg=org.reduce((a,s)=>a+s.fatTotal,0);
@@ -590,7 +656,10 @@ function renderTrafego(from,to){
   h+=kpi('CPM',fmtBR(cpm));
   document.getElementById('kpi-trafego').innerHTML=h;
 
-  // cards de compradores
+  renderFunil('funil-trafego',g);
+  renderTaxas('taxas-trafego',g);
+  renderDailyCharts(grows,'t');
+
   let c='';
   if(!sales.length){ c='<div class="empty">Nenhuma venda no período.</div>'; }
   else sales.forEach(s=>{
@@ -607,7 +676,8 @@ function renderTrafego(from,to){
 }
 
 function renderVisao(from,to){
-  const g=aggGer(gFilter(from,to));
+  const grows=gFilter(from,to);
+  const g=aggGer(grows);
   const sales=sFilter(from,to);
   const tr=sales.filter(isTrafego);
   const fatTotal=sales.reduce((a,s)=>a+s.fatTotal,0);
@@ -625,22 +695,28 @@ function renderVisao(from,to){
   h+=kpi('CAC Total',fmtBR(cac),'orange');
   document.getElementById('kpi-visao').innerHTML=h;
 
-  // dia a dia
-  const days=[...new Set([...gFilter(from,to).map(x=>x.date),...sales.map(s=>s.data)])].sort((a,b)=>b.localeCompare(a));
-  let rows='<tr><th>Data</th><th>Invest.</th><th>Fat. Total</th><th>ROAS</th><th>Compras</th><th>Tráfego</th><th>Orgânicas</th><th>Ticket</th><th>CAC</th></tr>';
-  if(!days.length){ rows+='<tr><td colspan="9" style="text-align:center;color:rgba(255,255,255,.3)">Sem dados</td></tr>'; }
+  renderFunil('funil-visao',g);
+  renderTaxas('taxas-visao',g);
+  renderDailyCharts(grows,'v');
+
+  const days=[...new Set([...grows.map(x=>x.date),...sales.map(s=>s.data)])].sort((a,b)=>b.localeCompare(a));
+  let rows='<tr><th>Data</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Cliques</th><th>PV</th><th>CK</th><th>Imp.</th><th>CPC</th><th>CPM</th><th>Status</th></tr>';
+  if(!days.length){ rows+='<tr><td colspan="12" style="text-align:center;color:rgba(255,255,255,.3)">Sem dados</td></tr>'; }
   days.forEach(d=>{
     const gi=aggGer(GROWS.filter(x=>x.date===d));
-    const sd=sales.filter(s=>s.data===d), trd=sd.filter(isTrafego);
+    const sd=sales.filter(s=>s.data===d);
     const fat=sd.reduce((a,s)=>a+s.fatTotal,0);
     const r=gi.inv>0?fat/gi.inv:0;
-    const tk=sd.length?fat/sd.length:0, cc=trd.length?gi.inv/trd.length:0;
-    rows+=`<tr><td>${d.split('-').reverse().join('/')}</td><td>${fmtBR(gi.inv)}</td><td>${fmtBR(fat)}</td><td>${fmtX(r)}</td><td>${fmtInt(sd.length)}</td><td>${fmtInt(trd.length)}</td><td>${fmtInt(sd.length-trd.length)}</td><td>${fmtBR(tk)}</td><td>${fmtBR(cc)}</td></tr>`;
+    const cpc=gi.cliques>0?gi.inv/gi.cliques:0;
+    const cpm=gi.imp>0?gi.inv/gi.imp*1000:0;
+    const corrigir=gi.inv>0 && sd.length===0;
+    const st=corrigir?'<span class="badge-corrigir">Corrigir</span>':(sd.length>0?'<span class="badge-ok">OK</span>':'—');
+    rows+=`<tr><td>${d.split('-').reverse().join('/')}</td><td>${fmtBR(gi.inv)}</td><td>${fmtBR(fat)}</td><td>${fmtX(r)}</td><td>${fmtInt(sd.length)}</td><td>${fmtInt(gi.cliques)}</td><td>${fmtInt(gi.pv)}</td><td>${fmtInt(gi.ck)}</td><td>${fmtInt(gi.imp)}</td><td>${fmtBR(cpc)}</td><td>${fmtBR(cpm)}</td><td>${st}</td></tr>`;
   });
   document.getElementById('tbl-visao').innerHTML=rows;
 }
 
-// ── Criativos / Públicos: recalcular do zero por período ─────────────
+// ── Criativos / Públicos ─────────────────────────────────────────────
 function buildMap(from,to,gField,sField){
   const grows=gFilter(from,to), fsales=sFilter(from,to);
   const map={};
@@ -663,22 +739,12 @@ function buildMap(from,to,gField,sField){
   });
 }
 
-function sortItems(items,sort){
-  const dir=(sort==='cpc')?1:-1;
-  return items.sort((a,b)=>{
-    const va=a[sort]||0, vb=b[sort]||0;
-    if(sort==='cpc'){ const aa=va||1e9, bb=vb||1e9; return (aa-bb); }
-    return dir*((vb)-(va))*-1*-1; // mantém desc para os demais
-  });
-}
-
 function renderCriativos(from,to){
   let items=buildMap(from,to,'ad','criativo');
   const act=activeSet('ad');
   items=items.map(m=>({...m,ativo:act.has(m.key)}));
   if(criStatus==='ativos') items=items.filter(m=>m.ativo);
   if(criStatus==='inativos') items=items.filter(m=>!m.ativo);
-  // ordenar
   items.sort((a,b)=> criSort==='cpc' ? ((a.cpc||1e9)-(b.cpc||1e9)) : ((b[criSort]||0)-(a[criSort]||0)));
   let g='';
   if(!items.length){ g='<div class="empty">Sem criativos no período.</div>'; }
@@ -769,7 +835,13 @@ function mkChart(old,ctxId,labels,data,label){
   if(old) old.destroy();
   const ctx=document.getElementById(ctxId); if(!ctx) return null;
   return new Chart(ctx,{type:'bar',data:{labels,datasets:[{label,data,backgroundColor:'rgba(255,107,43,0.85)',borderRadius:4}]},
-    options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'rgba(255,255,255,.4)',font:{size:10}},grid:{display:false}},y:{ticks:{color:'rgba(255,255,255,.4)',font:{size:10}},grid:{color:'rgba(255,255,255,.05)'}}}}});
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'rgba(255,255,255,.4)',font:{size:9},maxRotation:90,minRotation:90},grid:{display:false}},y:{ticks:{color:'rgba(255,255,255,.4)',font:{size:10}},grid:{color:'rgba(255,255,255,.05)'}}}}});
+}
+function mkLine(old,ctxId,labels,data,label){
+  if(old) old.destroy();
+  const ctx=document.getElementById(ctxId); if(!ctx) return null;
+  return new Chart(ctx,{type:'line',data:{labels,datasets:[{label,data,borderColor:'#ff6b2b',backgroundColor:'rgba(255,107,43,0.15)',fill:true,tension:.3,pointRadius:2,pointBackgroundColor:'#ff6b2b'}]},
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'rgba(255,255,255,.4)',font:{size:9},maxRotation:90,minRotation:90},grid:{display:false}},y:{ticks:{color:'rgba(255,255,255,.4)',font:{size:10}},grid:{color:'rgba(255,255,255,.05)'}}}}});
 }
 function renderSemanal(){
   const items=aggBy(isoWeek);
@@ -789,6 +861,8 @@ function showTab(id,el){
   document.querySelectorAll('.content').forEach(c=>c.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById(id).classList.add('active'); if(el) el.classList.add('active');
+  // re-render para dimensionar corretamente os gráficos da aba que ficou visível
+  renderAll();
 }
 function setCriStatus(s,el){criStatus=s;document.querySelectorAll('.cri-status-btn').forEach(b=>b.classList.remove('active'));el.classList.add('active');const{from,to}=getRange();renderCriativos(from,to);}
 function setCriSort(s,el){criSort=s;document.querySelectorAll('.cri-sort-btn').forEach(b=>b.classList.remove('active'));el.classList.add('active');const{from,to}=getRange();renderCriativos(from,to);}
