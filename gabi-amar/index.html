@@ -401,11 +401,12 @@ async function loadData(){
         sales = sales.concat(/webhook|make/i.test(sh) ? parseWebhook(t) : parseVendas(t));
       }catch(e){ console.warn('Aba '+sh+' ignorada:', e.message); }
     }
-    // dedupe por comprador + dia (a aba "Vendas" é processada antes e tem
-    // prioridade sobre o "Webhook", que pode ter colunas desalinhadas)
+    // dedupe por comprador + valor (imune a diferença de fuso/data entre
+    // as abas — ex.: Webhook grava paidAt em UTC e vira o dia da madrugada).
+    // "Vendas" e "VendasMake" são processadas antes do "Webhook" e têm prioridade.
     const seen=new Set();
     SALES = sales.filter(s=>{
-      const k = norm(s.email)+'|'+s.data;
+      const k = norm(s.email)+'|'+(s.fatTotal||0).toFixed(2);
       if(seen.has(k)) return false; seen.add(k); return true;
     }).sort((a,b)=>b.data.localeCompare(a.data));
 
