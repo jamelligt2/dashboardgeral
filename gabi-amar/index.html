@@ -87,7 +87,6 @@ tr:hover td{background:rgba(255,255,255,.025)}
 .pub-metric-val{font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:#ff6b2b}
 .pub-metric-val.neutral{color:#e8e6f0}
 .pub-metric-lbl{font-size:9px;color:rgba(255,255,255,.35);margin-top:2px;text-transform:uppercase;letter-spacing:.4px}
-.ob-info{background:rgba(255,107,43,.07);border:1px solid rgba(255,107,43,.2);border-radius:8px;padding:10px 14px;font-size:11px;color:rgba(255,255,255,.55);margin-bottom:16px;line-height:1.5}
 .sales-scroll{display:flex;gap:12px;overflow-x:auto;padding-bottom:12px;margin-top:6px}
 .sale-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:14px;min-width:230px;flex-shrink:0}
 .sale-card.trafego{border-left:3px solid #2ecc71}
@@ -175,6 +174,8 @@ tr:hover td{background:rgba(255,255,255,.025)}
     <div class="chart-card"><h4>Investimento Diário</h4><canvas id="ch-inv-dia-v"></canvas></div>
     <div class="chart-card"><h4>Connect Rate Diário (PV ÷ Cliques)</h4><canvas id="ch-cr-dia-v"></canvas></div>
   </div>
+  <div class="sec-title">Vendas por UTM (criativo) — Tráfego Pago</div>
+  <div class="tbl-wrap"><table id="tbl-utm"></table></div>
   <div class="sec-title">Dia a Dia</div>
   <div class="tbl-wrap"><table id="tbl-visao"></table></div>
 </div>
@@ -238,17 +239,15 @@ const CONFIG = {
 
   SHEET_ID:          '1ewoAkIuDNtOsMNsu4OKGEVFj_w8ulGFcIlr4qTfb174',
   GERENCIADOR_SHEET: 'Gerenciador',
-  // Fontes de vendas: aba "Vendas" (histórico Eduzz) + aba "Webhook" (feed ao vivo).
-  // Linhas anteriores à DATA_MINIMA ou de teste caem fora automaticamente.
-  VENDAS_SHEETS: ['Vendas', 'Webhook'],
+  // "Vendas" (export Eduzz) tem prioridade; "VendasMake" é o feed ao vivo limpo
+  // (cenário Make); "Webhook" é o feed antigo/desalinhado (mantido p/ histórico).
+  VENDAS_SHEETS: ['Vendas', 'VendasMake', 'Webhook'],
   DATA_MINIMA:  '2026-05-05',
 
   PRODUTO_NOME: 'amar',
   PRODUTO_PRECO_MINIMO: 0,
   VALORES_EM_CENTAVOS: false,
 
-  // Mapeamento por NOME de cabeçalho (case-insensitive, sem acento) ─────
-  // Aba Vendas (Eduzz - relatório)
   V: {
     data:     ['data de pagamento','data de criacao'],
     produto:  ['produto','nome da oferta'],
@@ -257,11 +256,10 @@ const CONFIG = {
     email:    ['cliente / e-mail'],
     fatTotal: ['valor total da venda'],
     utmSource:['utm source'],
-    publico:  ['utm campaign'],     // adset / público (ex.: "ADV+ Mulheres 30+")
-    campanha: ['utm medium'],       // campanha completa "[JGT]..."
-    criativo: ['utm content'],      // anúncio (ex.: "IASA-E02")
+    publico:  ['utm campaign'],
+    campanha: ['utm medium'],
+    criativo: ['utm content'],
   },
-  // Aba Webhook (Eduzz invoice_paid - feed ao vivo)
   WH: {
     event:    ['event'],
     data:     ['data.paidat','data.createdat','senddate'],
@@ -274,7 +272,6 @@ const CONFIG = {
     campanha: ['data.utm.medium'],
     criativo: ['data.utm.content'],
   },
-  // Aba Gerenciador (estrutura desta conta)
   G: {
     date:     ['date'],
     inv:      ['spend (cost, amount spent)','spend','investimento'],
@@ -359,8 +356,7 @@ function headerIndex(headerRow, candidates){
 }
 
 async function fetchSheetCSV(sheetName){
-  // headers=1 força o Google a tratar exatamente 1 linha de cabeçalho
-  // (evita que a linha de "ping" do webhook seja fundida ao cabeçalho)
+  // headers=1 força 1 linha de cabeçalho (evita o Google fundir a linha de "ping" do webhook)
   const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}&headers=1`;
   const controller = new AbortController();
   const timeout = setTimeout(()=>controller.abort(),20000);
@@ -402,13 +398,14 @@ async function loadData(){
       try{
         if(msg) msg.textContent='Carregando vendas ('+sh+')...';
         const t = await fetchSheetCSV(sh);
-        sales = sales.concat(sh.toLowerCase()==='webhook' ? parseWebhook(t) : parseVendas(t));
+        sales = sales.concat(/webhook|make/i.test(sh) ? parseWebhook(t) : parseVendas(t));
       }catch(e){ console.warn('Aba '+sh+' ignorada:', e.message); }
     }
-    // dedupe por email+data+valor
+    // dedupe por comprador + dia (a aba "Vendas" é processada antes e tem
+    // prioridade sobre o "Webhook", que pode ter colunas desalinhadas)
     const seen=new Set();
     SALES = sales.filter(s=>{
-      const k = norm(s.email)+'|'+s.data+'|'+s.fatTotal.toFixed(2);
+      const k = norm(s.email)+'|'+s.data;
       if(seen.has(k)) return false; seen.add(k); return true;
     }).sort((a,b)=>b.data.localeCompare(a.data));
 
@@ -455,9 +452,20 @@ function makeSale(o){
   const principal = CONFIG.VALORES_EM_CENTAVOS ? o.fatTotal/100 : o.fatTotal;
   return {
     data:o.data, nome:o.nome||'—', email:o.email||'',
-    fatTotal:principal, fatOB:0,
+    fatTotal:principal, fatOB:0, produto:o.produto||'',
     utmSource:o.utmSource||'', publico:o.publico||'', campanha:o.campanha||'', criativo:o.criativo||'',
   };
+}
+
+// Classifica a venda pelo ticket do produto principal: 37 (Plenária) ou 97 (VIP/Gravado)
+function ticketBucket(s){
+  const p=norm(s.produto||'');
+  if(p.includes('plenaria')) return 37;
+  if(p.includes('vip')||p.includes('gravado')||p.includes('oferta base')) return 97;
+  const v=s.fatTotal;
+  if(v>0 && v<70) return 37;
+  if(v>=70) return 97;
+  return 0;
 }
 
 function parseVendas(text){
@@ -466,22 +474,36 @@ function parseVendas(text){
   const h=rows[0], V=CONFIG.V;
   const ix={}; for(const k in V) ix[k]=headerIndex(h,V[k]);
   if(ix.cliente<0 && ix.fatTotal<0) return [];
-  const out=[];
+  // Agrupa linhas da MESMA fatura (order bumps geram várias linhas) por
+  // comprador + data/hora de pagamento -> 1 venda, somando o valor total.
+  const groups={};
   for(let i=1;i<rows.length;i++){
     const r=rows[i];
     const status=norm(r[ix.status]);
     if(ix.status>=0 && !CONFIG.STATUS_APROVADO.map(norm).includes(status)) continue;
-    const prod=norm(r[ix.produto]);
-    if(CONFIG.PRODUTO_NOME && prod && !prod.includes(norm(CONFIG.PRODUTO_NOME))) continue;
     const d=normDate(r[ix.data]);
     if(!d || d<CONFIG.DATA_MINIMA) continue;
-    const ft=parseNum(r[ix.fatTotal]);
-    if(ft < CONFIG.PRODUTO_PRECO_MINIMO) continue;
-    out.push(makeSale({
-      data:d, nome:r[ix.cliente], email:r[ix.email], fatTotal:ft,
-      utmSource:r[ix.utmSource], publico:r[ix.publico], campanha:r[ix.campanha], criativo:r[ix.criativo],
-    }));
+    const key=norm(r[ix.email])+'|'+((r[ix.data]||'').toString().trim());
+    let gp=groups[key];
+    if(!gp){ gp=groups[key]={fat:0,nome:(r[ix.cliente]||'—'),email:(r[ix.email]||''),data:d,produto:'',utmSource:'',publico:'',campanha:'',criativo:'',amar:false}; }
+    gp.fat += parseNum(r[ix.fatTotal]);
+    const pn=norm(r[ix.produto]);
+    if(pn.includes(norm(CONFIG.PRODUTO_NOME))) gp.amar=true;
+    // produto principal = linha Plenária ou VIP (não a do bump "Gravado")
+    if(!gp.produto || (pn.includes('plenaria')||pn.includes('vip'))) gp.produto=r[ix.produto]||gp.produto;
+    if(!gp.utmSource && (r[ix.utmSource]||'').toString().trim()){
+      gp.utmSource=r[ix.utmSource]; gp.publico=r[ix.publico]; gp.campanha=r[ix.campanha]; gp.criativo=r[ix.criativo];
+    }
   }
+  const out=[];
+  Object.values(groups).forEach(gp=>{
+    if(CONFIG.PRODUTO_NOME && !gp.amar) return;
+    if(gp.fat<=0) return;
+    out.push(makeSale({
+      data:gp.data, nome:gp.nome, email:gp.email, fatTotal:gp.fat, produto:gp.produto,
+      utmSource:gp.utmSource, publico:gp.publico, campanha:gp.campanha, criativo:gp.criativo,
+    }));
+  });
   return out;
 }
 
@@ -495,16 +517,14 @@ function parseWebhook(text){
   for(let i=1;i<rows.length;i++){
     const r=rows[i];
     const ev=norm(r[ix.event]);
-    // só faturas pagas (ignora ping e outros eventos)
     if(ix.event>=0 && !ev.includes('invoice_paid') && !CONFIG.STATUS_APROVADO.map(norm).includes(ev)) continue;
-    // Conta exclusiva do produto Amar: não filtramos por nome do item
-    // (order bumps reordenam items[0].name e podem ocultar o produto principal).
+    // Conta exclusiva do Amar: não filtramos por nome do item (order bumps reordenam).
     const d=normDate(r[ix.data]);
     if(!d || d<CONFIG.DATA_MINIMA) continue;
     const ft=parseNum(r[ix.fatTotal]);
     if(ft<=0) continue;
     out.push(makeSale({
-      data:d, nome:r[ix.cliente], email:r[ix.email], fatTotal:ft,
+      data:d, nome:r[ix.cliente], email:r[ix.email], fatTotal:ft, produto:r[ix.produto],
       utmSource:r[ix.utmSource], publico:r[ix.publico], campanha:r[ix.campanha], criativo:r[ix.criativo],
     }));
   }
@@ -588,7 +608,6 @@ function kpi(label,value,cls,sub){
   return `<div class="kpi-card"><div class="kpi-label">${label}</div><div class="kpi-value ${cls||''}">${value}</div>${sub?`<div class="kpi-sub">${sub}</div>`:''}</div>`;
 }
 
-// ── Funil + Taxas ────────────────────────────────────────────────────
 function renderFunil(id,g){
   const steps=[['Cliques',g.cliques],['Pageviews',g.pv],['Checkouts',g.ck],['Compras (pixel)',g.purchase]];
   const max=Math.max(g.cliques,1);
@@ -608,7 +627,6 @@ function renderTaxas(id,g){
   document.getElementById(id).innerHTML=item('CTR (Cliques ÷ Impr.)',ctr)+item('Connect Rate (PV ÷ Cliques)',cr)+item('Taxa Checkout (CK ÷ PV)',tck)+item('Taxa Compra (Compras ÷ PV)',tcp);
 }
 
-// ── Gráficos diários ─────────────────────────────────────────────────
 let chInvT,chCrT,chInvV,chCrV;
 function renderDailyCharts(rows,suffix){
   const byDay={};
@@ -683,7 +701,11 @@ function renderVisao(from,to){
   const fatTotal=sales.reduce((a,s)=>a+s.fatTotal,0);
   const roas=g.inv>0?fatTotal/g.inv:0;
   const ticket=sales.length?fatTotal/sales.length:0;
-  const cac=tr.length?g.inv/tr.length:0;
+  const cacGeral=sales.length?g.inv/sales.length:0;   // investimento ÷ TODAS as vendas
+  const cacTraf=tr.length?g.inv/tr.length:0;           // investimento ÷ vendas de tráfego
+  const tot=sales.length||1;
+  const b37=sales.filter(s=>ticketBucket(s)===37).length;
+  const b97=sales.filter(s=>ticketBucket(s)===97).length;
   let h='';
   h+=kpi('Investimento',fmtBR(g.inv),'orange');
   h+=kpi('Fat. Total',fmtBR(fatTotal),'green');
@@ -692,12 +714,28 @@ function renderVisao(from,to){
   h+=kpi('Tráfego',fmtInt(tr.length),'green');
   h+=kpi('Orgânicas',fmtInt(sales.length-tr.length),'yellow');
   h+=kpi('Ticket Médio',fmtBR(ticket));
-  h+=kpi('CAC Total',fmtBR(cac),'orange');
+  h+=kpi('CAC Geral',fmtBR(cacGeral),'orange','invest. ÷ todas');
+  h+=kpi('CAC Tráfego',fmtBR(cacTraf),'orange','invest. ÷ tráfego');
+  h+=kpi('Vendas R$37 (Plenária)',fmtInt(b37),'green',fmtPct(b37/tot*100));
+  h+=kpi('Vendas R$97 (VIP)',fmtInt(b97),'orange',fmtPct(b97/tot*100));
   document.getElementById('kpi-visao').innerHTML=h;
 
   renderFunil('funil-visao',g);
   renderTaxas('taxas-visao',g);
   renderDailyCharts(grows,'v');
+
+  // Vendas por UTM (criativo) — apenas tráfego pago
+  const utmMap={};
+  tr.forEach(s=>{
+    const k=s.criativo||'(sem UTM content)';
+    const m=utmMap[k]||(utmMap[k]={k,n:0,fat:0,pub:s.publico||''});
+    m.n++; m.fat+=s.fatTotal; if(!m.pub&&s.publico) m.pub=s.publico;
+  });
+  const utmArr=Object.values(utmMap).sort((a,b)=>b.n-a.n||b.fat-a.fat);
+  let ur='<tr><th>UTM (criativo)</th><th>Público</th><th>Vendas</th><th>Fat.</th><th>% das vendas tráfego</th></tr>';
+  if(!utmArr.length) ur+='<tr><td colspan="5" style="text-align:center;color:rgba(255,255,255,.3)">Sem vendas de tráfego no período</td></tr>';
+  utmArr.forEach(m=>{ ur+=`<tr><td>${m.k}</td><td>${m.pub||'—'}</td><td>${fmtInt(m.n)}</td><td>${fmtBR(m.fat)}</td><td>${fmtPct(tr.length?m.n/tr.length*100:0)}</td></tr>`; });
+  document.getElementById('tbl-utm').innerHTML=ur;
 
   const days=[...new Set([...grows.map(x=>x.date),...sales.map(s=>s.data)])].sort((a,b)=>b.localeCompare(a));
   let rows='<tr><th>Data</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Cliques</th><th>PV</th><th>CK</th><th>Imp.</th><th>CPC</th><th>CPM</th><th>Status</th></tr>';
@@ -861,7 +899,6 @@ function showTab(id,el){
   document.querySelectorAll('.content').forEach(c=>c.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById(id).classList.add('active'); if(el) el.classList.add('active');
-  // re-render para dimensionar corretamente os gráficos da aba que ficou visível
   renderAll();
 }
 function setCriStatus(s,el){criStatus=s;document.querySelectorAll('.cri-status-btn').forEach(b=>b.classList.remove('active'));el.classList.add('active');const{from,to}=getRange();renderCriativos(from,to);}
