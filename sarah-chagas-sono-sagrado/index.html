@@ -189,6 +189,7 @@ tbody tr.total td{color:var(--orange)}
 </div>
 <div class="tabs">
   <div class="tab active" data-tab="geral">Visão Geral</div>
+  <div class="tab" data-tab="grupos">Grupos de Anúncios</div>
   <div class="tab" data-tab="keywords">Palavras-chave</div>
   <div class="tab" data-tab="publicos">Faixa Etária</div>
   <div class="tab" data-tab="diaria">Análise Diária</div>
@@ -294,11 +295,39 @@ tbody tr.total td{color:var(--orange)}
     <div class="chart-wrap"><h4>Leads & Investimento por dia</h4><canvas id="chartDaily"></canvas></div>
     <div class="chart-wrap"><h4>CPL diário (R$)</h4><canvas id="chartCPL"></canvas></div>
   </div>
+
+  <div class="section-title">CPL semana a semana</div>
+  <div class="chart-grid">
+    <div class="chart-wrap"><h4>CPL semanal (R$)</h4><canvas id="chartCPLWeek"></canvas></div>
+    <div class="chart-wrap"><h4>Leads & Investimento por semana</h4><canvas id="chartWeekSummary"></canvas></div>
+  </div>
   <div class="table-wrap" style="margin-top:18px">
     <table id="tbl-daily">
       <thead><tr><th class="left">Dia</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPM</th><th>CPL</th><th>Clq→Lead</th></tr></thead>
       <tbody></tbody>
     </table>
+  </div>
+</div>
+
+<!-- ====== GRUPOS DE ANÚNCIOS ====== -->
+<div class="panel" id="panel-grupos">
+  <div class="info-banner" id="grupos-banner">Comparativo entre <b>grupos de anúncios</b> da campanha. Cada grupo concentra um tema de palavras-chave e tem orçamento próprio. Use este painel para decidir <b>onde realocar verba</b>.</div>
+
+  <div class="section-title">Visão de cada grupo</div>
+  <div class="audience-row" id="grupos-cards"></div>
+
+  <div class="section-title">Ranking de grupos · ordenado por CPL</div>
+  <div class="table-wrap">
+    <table id="tbl-grupos">
+      <thead><tr><th>#</th><th class="left">Grupo de anúncios</th><th>Impr.</th><th>Visitas</th><th>Leads</th><th>Invest.</th><th>CTR</th><th>CPC</th><th>CPM</th><th>CPL</th><th>Clq→Lead</th><th>Status</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="section-title">Distribuição entre grupos</div>
+  <div class="chart-grid">
+    <div class="chart-wrap"><h4>Investimento por grupo</h4><canvas id="chartGrSpend"></canvas></div>
+    <div class="chart-wrap"><h4>Leads por grupo</h4><canvas id="chartGrLeads"></canvas></div>
   </div>
 </div>
 
@@ -386,6 +415,13 @@ const AGES = [
   {age:'35-44', imp:814, clicks:25, leads:12, spend:41.78},
   {age:'45-54', imp:289, clicks:9,  leads:2,  spend:11.07},
   {age:'25-34', imp:544, clicks:15, leads:2,  spend:69.30},
+];
+
+/* Grupos de Anúncios (Ad Groups) — aggregated from sheet
+   Atualmente só "Grupo de anúncios 1" está ativo.
+   Quando criar mais grupos na campanha, eles aparecerão aqui automaticamente. */
+const AD_GROUPS = [
+  {name:'Grupo de anúncios 1', tema:'Consultoria de Sono Infantil', imp:1646, clicks:49, leads:15, spend:122.17},
 ];
 
 const DAILY_AGE = [
@@ -546,6 +582,111 @@ function renderAges() {
   document.querySelector('#tbl-publicos tbody').innerHTML = html;
 }
 
+function renderGroups() {
+  const rows = AD_GROUPS.map(g => {
+    const ctr = g.imp>0?(g.clicks/g.imp*100):0;
+    const cpc = g.clicks>0?(g.spend/g.clicks):0;
+    const cpm = g.imp>0?(g.spend/g.imp*1000):0;
+    const cpl = g.leads>0?(g.spend/g.leads):null;
+    const cvr = g.clicks>0?(g.leads/g.clicks*100):0;
+    return {...g, ctr, cpc, cpm, cpl, cvr};
+  });
+  rows.sort((a,b)=>{
+    if(a.cpl===null) return 1;
+    if(b.cpl===null) return -1;
+    return a.cpl-b.cpl;
+  });
+
+  // CARDS
+  const cardsEl = document.getElementById('grupos-cards');
+  const banner = document.getElementById('grupos-banner');
+  cardsEl.innerHTML = '';
+
+  if(rows.length === 1){
+    // Single group — show one full-width card
+    cardsEl.style.gridTemplateColumns = '1fr';
+    const r = rows[0];
+    banner.innerHTML = `Atualmente existe apenas <b>1 grupo de anúncios</b> ativo na campanha. Quando você criar novos grupos, eles serão comparados aqui automaticamente.`;
+    cardsEl.insertAdjacentHTML('beforeend', `
+      <div class="aud-card main">
+        <div class="aud-label m">★ ÚNICO GRUPO ATIVO</div>
+        <div class="aud-name">${r.name} <span style="font-weight:500;color:#b8b8b8;font-size:13px;margin-left:8px">${r.tema||''}</span></div>
+        <div class="aud-grid" style="grid-template-columns:repeat(5,1fr)">
+          <div class="aud-stat"><div class="n">${fmtMoney(r.spend)}</div><div class="l">Invest.</div></div>
+          <div class="aud-stat"><div class="n">${fmtInt(r.imp)}</div><div class="l">Impressões</div></div>
+          <div class="aud-stat"><div class="n">${fmtInt(r.clicks)}</div><div class="l">Visitas</div></div>
+          <div class="aud-stat"><div class="n">${fmtInt(r.leads)}</div><div class="l">Leads</div></div>
+          <div class="aud-stat"><div class="n" style="color:#4ade80">${r.cpl?fmtMoney(r.cpl):'—'}</div><div class="l">CPL</div></div>
+        </div>
+        <div class="aud-meta">CTR <b>${fmtPct(r.ctr)}</b> · CPC <b>${r.cpc?fmtMoney(r.cpc):'—'}</b> · CPM <b>${fmtMoney(r.cpm)}</b> · Clq→Lead <b>${fmtPct(r.cvr)}</b></div>
+      </div>
+    `);
+  } else {
+    // 2+ groups — comparativo
+    cardsEl.style.gridTemplateColumns = '1.1fr 1.1fr .7fr';
+    banner.innerHTML = `Comparativo entre <b>${rows.length} grupos de anúncios</b> ativos. Grupos com CPL alto e poucos leads são candidatos a pausar ou ter o lance reduzido.`;
+    const r1 = rows[0], r2 = rows[1];
+    cardsEl.insertAdjacentHTML('beforeend', `
+      <div class="aud-card main">
+        <div class="aud-label m">🏆 MELHOR GRUPO · MENOR CPL</div>
+        <div class="aud-name">${r1.name}</div>
+        <div class="aud-grid">
+          <div class="aud-stat"><div class="n">${fmtInt(r1.leads)}</div><div class="l">Leads</div></div>
+          <div class="aud-stat"><div class="n">${fmtInt(r1.clicks)}</div><div class="l">Visitas</div></div>
+          <div class="aud-stat"><div class="n">${r1.cpl?fmtMoney(r1.cpl):'—'}</div><div class="l">CPL</div></div>
+        </div>
+        <div class="aud-meta">Invest.: <b>${fmtMoney(r1.spend)}</b> · Impr.: <b>${fmtInt(r1.imp)}</b> · CTR: <b>${fmtPct(r1.ctr)}</b> · CVR: <b>${fmtPct(r1.cvr)}</b></div>
+      </div>
+      <div class="aud-card sec">
+        <div class="aud-label s">SEGUNDO MELHOR</div>
+        <div class="aud-name">${r2.name}</div>
+        <div class="aud-grid">
+          <div class="aud-stat"><div class="n">${fmtInt(r2.leads)}</div><div class="l">Leads</div></div>
+          <div class="aud-stat"><div class="n">${fmtInt(r2.clicks)}</div><div class="l">Visitas</div></div>
+          <div class="aud-stat"><div class="n">${r2.cpl?fmtMoney(r2.cpl):'—'}</div><div class="l">CPL</div></div>
+        </div>
+        <div class="aud-meta">Invest.: <b>${fmtMoney(r2.spend)}</b> · Impr.: <b>${fmtInt(r2.imp)}</b> · CTR: <b>${fmtPct(r2.ctr)}</b> · CVR: <b>${fmtPct(r2.cvr)}</b></div>
+      </div>
+      <div class="compare">
+        <h4>${r1.name.length>20?'Grupo 1':r1.name} vs ${r2.name.length>20?'Grupo 2':r2.name}</h4>
+        <div class="compare-bar">
+          <div class="q" style="width:${(r1.leads/(r1.leads+r2.leads)*100)||50}%"></div>
+          <div class="q2" style="width:${(r2.leads/(r1.leads+r2.leads)*100)||50}%"></div>
+        </div>
+        <div class="compare-legend">
+          <span><span class="dot" style="background:#ff6b35"></span>${fmtInt(r1.leads)} leads</span>
+          <span><span class="dot" style="background:#8b2a0a"></span>${fmtInt(r2.leads)} leads</span>
+        </div>
+        <div class="compare-cpl">
+          <div class="lbl">Diferença de CPL</div>
+          <div class="v">${r1.cpl&&r2.cpl?((r2.cpl/r1.cpl).toFixed(1).replace('.',',')+'× mais caro'):'—'}</div>
+          <div class="s">${r1.cpl?fmtMoney(r1.cpl):'—'} vs ${r2.cpl?fmtMoney(r2.cpl):'—'}</div>
+        </div>
+      </div>
+    `);
+  }
+
+  // TABLE
+  let html = '';
+  rows.forEach((r,i) => {
+    html += `<tr>
+      <td class="left">${rankBadge(i)}</td>
+      <td class="left"><b>${r.name}</b>${r.tema?` <span style="color:#b8b8b8;font-weight:400">· ${r.tema}</span>`:''}</td>
+      <td>${fmtInt(r.imp)}</td>
+      <td>${fmtInt(r.clicks)}</td>
+      <td><b>${fmtInt(r.leads)}</b></td>
+      <td>${fmtMoney(r.spend)}</td>
+      <td>${fmtPct(r.ctr)}</td>
+      <td>${r.cpc?fmtMoney(r.cpc):'—'}</td>
+      <td>${fmtMoney(r.cpm)}</td>
+      <td>${r.cpl?fmtMoney(r.cpl):'—'}</td>
+      <td>${r.cvr?fmtPct(r.cvr):'—'}</td>
+      <td>${statusBadge({clicks:r.clicks,leads:r.leads,imp:r.imp,spend:r.spend,cpl:r.cpl})}</td>
+    </tr>`;
+  });
+  document.querySelector('#tbl-grupos tbody').innerHTML = html;
+}
+
 function renderDailyAge() {
   let html='';
   DAILY_AGE.forEach(d => {
@@ -572,12 +713,44 @@ Chart.defaults.font.family = "'Segoe UI',Roboto,Arial,sans-serif";
 Chart.defaults.font.size = 11;
 const GRID = 'rgba(255,255,255,0.05)';
 
+// Agrupa por semana (início na segunda-feira)
+function weekStartKey(dateStr){
+  const parts = dateStr.split('/');
+  const d = parseInt(parts[0]);
+  const m = parseInt(parts[1]);
+  const y = parts[2] ? parseInt(parts[2]) : 2026;
+  const dt = new Date(y, m-1, d);
+  const day = dt.getDay() || 7; // Sun=7, Mon=1
+  dt.setDate(dt.getDate() - day + 1);
+  const dd = String(dt.getDate()).padStart(2,'0');
+  const mm = String(dt.getMonth()+1).padStart(2,'0');
+  return {key:`${dd}/${mm}`, sort:dt.getTime(),
+          end:(() => { const e=new Date(dt); e.setDate(e.getDate()+6); return String(e.getDate()).padStart(2,'0')+'/'+String(e.getMonth()+1).padStart(2,'0'); })()};
+}
+function aggregateByWeek(){
+  const map = new Map();
+  DAILY.forEach(d => {
+    const w = weekStartKey(d.date);
+    if(!map.has(w.key)) map.set(w.key, {label:`${w.key} → ${w.end}`, sort:w.sort, spend:0, imp:0, clicks:0, leads:0, days:0});
+    const r = map.get(w.key);
+    r.spend += d.spend; r.imp += d.imp; r.clicks += d.clicks; r.leads += d.leads; r.days++;
+  });
+  return [...map.values()].sort((a,b)=>a.sort-b.sort);
+}
+
 function buildCharts() {
   const dates = DAILY.map(d=>d.date);
   const leads = DAILY.map(d=>d.leads);
   const spend = DAILY.map(d=>d.spend);
   const visits = DAILY.map(d=>d.clicks);
   const cpls = DAILY.map(d=> d.leads>0 ? +(d.spend/d.leads).toFixed(2) : null);
+
+  // Semanal
+  const WEEKS = aggregateByWeek();
+  const wLabels = WEEKS.map(w=>w.label);
+  const wCPL = WEEKS.map(w => w.leads>0 ? +(w.spend/w.leads).toFixed(2) : null);
+  const wLeads = WEEKS.map(w => w.leads);
+  const wSpend = WEEKS.map(w => +w.spend.toFixed(2));
 
   // Visitas por dia — area chart
   charts.visits = new Chart(document.getElementById('chartVisits'),{
@@ -667,6 +840,60 @@ function buildCharts() {
     }
   });
 
+  // CPL semanal — barras com cor dinâmica (verde se cai, vermelho se sobe vs semana anterior)
+  const wColors = wCPL.map((v,i)=>{
+    if(v==null) return '#3a3a3a';
+    if(i===0) return '#ff6b35';
+    const prev = wCPL[i-1];
+    if(prev==null) return '#ff6b35';
+    return v <= prev ? '#4ade80' : '#f87171';
+  });
+  charts.cplWeek = new Chart(document.getElementById('chartCPLWeek'),{
+    type:'bar',
+    data:{
+      labels:wLabels,
+      datasets:[{
+        label:'CPL semanal',
+        data:wCPL,
+        backgroundColor:wColors,
+        borderRadius:8,
+        borderSkipped:false
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:c=>'CPL: R$ '+(c.parsed.y||0).toFixed(2).replace('.',',')}}
+      },
+      scales:{
+        x:{grid:{color:GRID}, ticks:{font:{size:10}}},
+        y:{grid:{color:GRID}, title:{display:true,text:'R$ por lead'}, beginAtZero:true}
+      }
+    }
+  });
+
+  // Leads & Investimento semanal
+  charts.weekSummary = new Chart(document.getElementById('chartWeekSummary'),{
+    type:'bar',
+    data:{
+      labels:wLabels,
+      datasets:[
+        {label:'Leads', data:wLeads, backgroundColor:'#ff6b35', borderRadius:6, yAxisID:'y'},
+        {label:'Investimento (R$)', type:'line', data:wSpend, borderColor:'#fff', backgroundColor:'rgba(255,255,255,.1)', tension:.3, yAxisID:'y1', pointRadius:5, pointBackgroundColor:'#fff'}
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'top',labels:{boxWidth:12}}},
+      scales:{
+        x:{grid:{color:GRID}, ticks:{font:{size:10}}},
+        y:{position:'left',grid:{color:GRID},title:{display:true,text:'Leads'},beginAtZero:true},
+        y1:{position:'right',grid:{display:false},title:{display:true,text:'R$'},beginAtZero:true}
+      }
+    }
+  });
+
   const kSorted = [...KEYWORDS].sort((a,b)=>b.spend-a.spend);
   charts.kwSpend = new Chart(document.getElementById('chartKwSpend'),{
     type:'bar',
@@ -692,6 +919,32 @@ function buildCharts() {
       indexAxis:'y', responsive:true, maintainAspectRatio:false,
       plugins:{legend:{display:false}},
       scales:{x:{grid:{color:GRID}, beginAtZero:true},y:{grid:{display:false}}}
+    }
+  });
+
+  // GROUPS charts
+  const grSorted = [...AD_GROUPS].sort((a,b)=>b.spend-a.spend);
+  const grColors = ['#ff6b35','#ff9500','#c44a1a','#ff8c42','#8b2a0a','#ffb38a'];
+  charts.grSpend = new Chart(document.getElementById('chartGrSpend'),{
+    type:'doughnut',
+    data:{
+      labels:grSorted.map(g=>g.name),
+      datasets:[{data:grSorted.map(g=>g.spend), backgroundColor:grColors, borderWidth:2, borderColor:'#0a0a0a'}]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'right',labels:{boxWidth:12}}, tooltip:{callbacks:{label:c=>c.label+': R$ '+c.parsed.toFixed(2)}}}
+    }
+  });
+  charts.grLeads = new Chart(document.getElementById('chartGrLeads'),{
+    type:'doughnut',
+    data:{
+      labels:grSorted.map(g=>g.name),
+      datasets:[{data:grSorted.map(g=>g.leads), backgroundColor:grColors, borderWidth:2, borderColor:'#0a0a0a'}]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'right',labels:{boxWidth:12}}}
     }
   });
 
@@ -898,6 +1151,7 @@ function renderAll(){
   destroyCharts();
   updateTotalsFromDaily();
   renderDaily();
+  renderGroups();
   renderKeywords();
   renderAges();
   renderDailyAge();
