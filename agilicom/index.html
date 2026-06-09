@@ -451,19 +451,7 @@ function showTab(id,el){
 
 </style>
 <script id="agilicom-custom">
-
-window.fmtBRL = function(v) { return 'R\$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); };
-window.fmtPct = function(v) { return Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%'; };
-window.fmtN   = function(v) { return Number(v||0).toLocaleString('pt-BR'); };
-window.updateRangeInfo = function() {
-  var df=document.getElementById('dateFrom'),dt=document.getElementById('dateTo'),ri=document.getElementById('dash-range-info');
-  if(!df||!dt||!ri)return;
-  var days=Math.round((new Date(dt.value)-new Date(df.value))/86400000)+1;
-  ri.textContent=days+(days===1?' dia':' dias');
-};
-window.criStatusFiltro='todos'; window.criSortKey='conversas';
-window.pubStatusFiltro='todos'; window.pubSortKey='invest';
-
+window.fmtBRL=function(v){return 'R\$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});};window.fmtPct=function(v){return Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%';};window.fmtN=function(v){return Number(v||0).toLocaleString('pt-BR');};window.updateRangeInfo=function(){var df=document.getElementById('dateFrom'),dt=document.getElementById('dateTo'),ri=document.getElementById('dash-range-info');if(!df||!dt||!ri)return;var days=Math.round((new Date(dt.value)-new Date(df.value))/86400000)+1;ri.textContent=days+(days===1?' dia':' dias');};window.criStatusFiltro='todos';window.criSortKey='conversas';window.pubStatusFiltro='todos';window.pubSortKey='invest';
 window.classifyAdset = function(n) {
   var s = (n||'').toLowerCase();
   if (s.includes('visitante') || s.includes('page view') || s.includes('engaj'))
@@ -623,30 +611,68 @@ window.renderDoughnutCharts = function(filtered){
   if(cc){cc.data.labels=labels;cc.data.datasets[0].data=convs;cc.data.datasets[0].backgroundColor=colors.slice(0,labels.length);cc.update();}
 };
 
-window.buildCriCard = function(adName,d,isAtivo){
-  var ctr=d.impr>0?d.clk/d.impr:0,cpc=d.clk>0?d.spend/d.clk:0,cpm=d.impr>0?(d.spend/d.impr)*1000:0,cpconv=d.conv>0?d.spend/d.conv:0,txcc=d.clk>0?d.conv/d.clk:0,link=d.link||'#';
-  var pC=d.conv>=5&&cpconv<25?'escalar':d.conv>=2?'avaliar':'pausar',pT=d.conv>=5&&cpconv<25?'ESCALAR':d.conv>=2?'AVALIAR':'PAUSAR';
-  return '<div class="cri-card '+(isAtivo?'ativo':'inativo')+'">'+'<div class="cri-card-header"><div class="cri-name">'+adName+'</div><div style="display:flex;gap:4px;flex-shrink:0;"><span class="cri-badge '+(isAtivo?'cri-ativo':'cri-inativo')+'">'+(isAtivo?'● Ativo':'● Inativo')+'</span><span class="cri-badge '+pC+'">'+pT+'</span></div></div>'+'<div class="cri-invest-block"><div class="cri-metric-label">Invest.</div><div class="cri-metric-val hl">'+fmtBRL(d.spend)+'</div></div>'+'<div class="cri-metrics-2col"><div class="cri-metric"><div class="cri-metric-label">Conversas</div><div class="cri-metric-val">'+d.conv+'</div></div><div class="cri-metric"><div class="cri-metric-label">Custo/Conv</div><div class="cri-metric-val">'+(d.conv>0?fmtBRL(cpconv):'—')+'</div></div></div>'+'<div class="cri-metrics-grid"><div class="cri-metric"><div class="cri-metric-label">CTR</div><div class="cri-metric-val">'+fmtPct(ctr)+'</div></div><div class="cri-metric"><div class="cri-metric-label">CPC</div><div class="cri-metric-val">'+(d.clk>0?fmtBRL(cpc):'—')+'</div></div><div class="cri-metric"><div class="cri-metric-label">CPM</div><div class="cri-metric-val">'+fmtBRL(cpm)+'</div></div><div class="cri-metric"><div class="cri-metric-label">Clq→Conv</div><div class="cri-metric-val">'+(d.clk>0?fmtPct(txcc):'—')+'</div></div><div class="cri-metric"><div class="cri-metric-label">Cliques</div><div class="cri-metric-val">'+fmtN(d.clk)+'</div></div><div class="cri-metric"><div class="cri-metric-label">Imp.</div><div class="cri-metric-val">'+fmtN(d.impr)+'</div></div></div>'+'<a class="cri-link" href="'+link+'" target="_blank">'+link+'</a></div>';
+window.buildCriCard = function(adName, d, isAtivo) {
+  var ctr    = d.impr > 0 ? (d.clk / d.impr * 100) : 0;
+  var cpc    = d.clk  > 0 ? d.spend / d.clk  : 0;
+  var cpm    = d.impr > 0 ? (d.spend / d.impr * 1000) : 0;
+  var cpconv = d.conv > 0 ? d.spend / d.conv : 0;
+  var clqConv= d.clk  > 0 ? (d.conv  / d.clk  * 100) : 0;
+  var perf   = d.conv>=5 && cpconv<30 ? 'escalar' : d.conv>=2 ? 'avaliar' : 'pausar';
+  var perfTxt= d.conv>=5 && cpconv<30 ? 'ESCALAR' : d.conv>=2 ? 'AVALIAR' : 'PAUSAR';
+  var statusBadge = isAtivo
+    ? '<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:rgba(46,204,113,0.15);color:#2ecc71;font-weight:600;">&#9679; Ativo</span>'
+    : '<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.4);font-weight:600;">Inativo</span>';
+  return '<div class="cri-card'+(isAtivo?' ativo':'')+'">' +
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">' +
+      '<div style="font-size:12px;font-weight:600;color:#e8e6f0;flex:1;line-height:1.4;">'+adName+'</div>' +
+      '<div style="display:flex;gap:5px;flex-shrink:0;">'+statusBadge+'<span class="badge-perf badge-'+perf+'">'+perfTxt+'</span></div>' +
+    '</div>' +
+    '<div style="font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;margin-bottom:2px;">INVEST.</div>' +
+    '<div style="font-size:24px;font-weight:700;color:var(--orange);margin-bottom:12px;">'+fmtBRL(d.spend)+'</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">' +
+      '<div><div style="font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;">CONVERSAS</div><div style="font-size:18px;font-weight:700;color:var(--orange-b);">'+d.conv+'</div></div>' +
+      '<div><div style="font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;">CUSTO/CONV</div><div style="font-size:18px;font-weight:700;">'+(d.conv>0?fmtBRL(cpconv):'—')+'</div></div>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px;">' +
+      '<div><div style="font-size:10px;color:rgba(255,255,255,0.4);">CTR</div><div style="font-size:12px;font-weight:600;">'+fmtPct(ctr)+'</div></div>' +
+      '<div><div style="font-size:10px;color:rgba(255,255,255,0.4);">CPC</div><div style="font-size:12px;font-weight:600;">'+fmtBRL(cpc)+'</div></div>' +
+      '<div><div style="font-size:10px;color:rgba(255,255,255,0.4);">CPM</div><div style="font-size:12px;font-weight:600;">'+fmtBRL(cpm)+'</div></div>' +
+      '<div><div style="font-size:10px;color:rgba(255,255,255,0.4);">CLQ→CONV</div><div style="font-size:12px;font-weight:600;">'+fmtPct(clqConv)+'</div></div>' +
+      '<div><div style="font-size:10px;color:rgba(255,255,255,0.4);">CLIQUES</div><div style="font-size:12px;font-weight:600;">'+fmtN(d.clk)+'</div></div>' +
+      '<div><div style="font-size:10px;color:rgba(255,255,255,0.4);">IMP.</div><div style="font-size:12px;font-weight:600;">'+fmtN(d.impr)+'</div></div>' +
+    '</div>' +
+    (d.link?'<a href="'+d.link+'" target="_blank" style="font-size:10px;color:rgba(255,152,0,0.7);word-break:break-all;">'+d.link+'</a>':'') +
+  '</div>';
 };
 
-window.renderCriCards = function(filtered){
-  if(!filtered) filtered=getFilteredData();
-  var byAd=aggBy(filtered,'ad'),entries=Object.entries(byAd).map(function(e){return{name:e[0],data:e[1],ativo:isAdAtivo(e[0],filtered)};});
-  var sf=window.criStatusFiltro||'ativos';
-  if(sf==='ativos') entries=entries.filter(function(e){return e.ativo;});
-  else if(sf==='inativos') entries=entries.filter(function(e){return !e.ativo;});
-  entries.sort(function(a,b){var da=a.data,db=b.data,sk=window.criSortKey||'conv';if(sk==='conv')return db.conv-da.conv;if(sk==='spend')return db.spend-da.spend;if(sk==='ctr')return(db.impr>0?db.clk/db.impr:0)-(da.impr>0?da.clk/da.impr:0);if(sk==='cpc'){return(da.clk>0?da.spend/da.clk:9999)-(db.clk>0?db.spend/db.clk:9999);}if(sk==='cpconv'){return(da.conv>0?da.spend/da.conv:9999)-(db.conv>0?db.spend/db.conv:9999);}return db.spend-da.spend;});
-  var grid=document.getElementById('cri-cards');if(!grid)return;
-  grid.innerHTML=entries.length===0?'<div style="color:rgba(255,255,255,0.35);font-size:13px;padding:24px;">Nenhum criativo encontrado.</div>':entries.map(function(e){return buildCriCard(e.name,e.data,e.ativo);}).join('');
-  var allKeys=Object.keys(aggBy(filtered,'ad')),nA=allKeys.filter(function(ad){return isAdAtivo(ad,filtered);}).length;
-  var btnA=document.querySelector('.cri-status-btn[data-status="ativos"]'),btnI=document.querySelector('.cri-status-btn[data-status="inativos"]');
-  if(btnA) btnA.textContent='● Ativos ('+nA+')';
-  if(btnI) btnI.textContent='● Inativos ('+(allKeys.length-nA)+')';
+window.renderCriCards = function(filtered) {
+  if (!filtered) filtered = getFilteredData();
+  var byAd = aggBy(filtered, 'ad');
+  var entries = Object.entries(byAd).map(function(e){return{name:e[0],data:e[1],isAtivo:isAdAtivo(e[0],filtered)};});
+  var nAt = entries.filter(function(x){return x.isAtivo;}).length;
+  var nIn = entries.filter(function(x){return !x.isAtivo;}).length;
+  var caEl=document.getElementById('cri-count-ativos'), ciEl=document.getElementById('cri-count-inativos');
+  if(caEl)caEl.textContent=nAt; if(ciEl)ciEl.textContent=nIn;
+  var show=entries;
+  if(window.criStatusFiltro==='ativos')show=entries.filter(function(x){return x.isAtivo;});
+  if(window.criStatusFiltro==='inativos')show=entries.filter(function(x){return !x.isAtivo;});
+  var sk=window.criSortKey||'conversas';
+  show.sort(function(a,b){
+    var d1=a.data,d2=b.data;
+    if(sk==='conversas')return d2.conv-d1.conv;
+    if(sk==='invest')return d2.spend-d1.spend;
+    if(sk==='ctr')return(d2.impr>0?d2.clk/d2.impr:0)-(d1.impr>0?d1.clk/d1.impr:0);
+    if(sk==='cpc')return(d1.clk>0?d1.spend/d1.clk:9999)-(d2.clk>0?d2.spend/d2.clk:9999);
+    if(sk==='cpconv')return(d1.conv>0?d1.spend/d1.conv:9999)-(d2.conv>0?d2.spend/d2.conv:9999);
+    return 0;
+  });
+  var grid=document.getElementById('cri-cards'); if(!grid)return;
+  grid.innerHTML=show.map(function(item){return buildCriCard(item.name,item.data,item.isAtivo);}).join('');
 };
 
-window.setCriFiltro = function(filtro,btn){window.criStatusFiltro=filtro;document.querySelectorAll('.cri-status-btn').forEach(function(b){b.classList.remove('active');});if(btn)btn.classList.add('active');window.renderCriCards();};
+window.setCriFiltro = function(s,btn){window.criStatusFiltro=s;document.querySelectorAll('#cri-filterbar .filter-btn').forEach(function(b){b.classList.remove('active');});if(btn)btn.classList.add('active');renderCriCards(getFilteredData());};
 
-window.setCriSort = function(sk,btn){window.criSortKey=sk;document.querySelectorAll('.cri-sort-btn').forEach(function(b){b.classList.remove('active');});if(btn)btn.classList.add('active');window.renderCriCards();};
+window.setCriSort = function(k,btn){window.criSortKey=k;document.querySelectorAll('#cri-filterbar .sort-btn').forEach(function(b){b.classList.remove('active');});if(btn)btn.classList.add('active');renderCriCards(getFilteredData());};
 
 window.renderCriativosTable = function(f){window.renderCriCards(f);};
 
@@ -782,86 +808,7 @@ window.renderAll = function(){
 
 window.renderPublicosTable = window.renderPubCards;
 
-
-function _agilicomInit() {
-  try{if(typeof DATA!=='undefined')window.DATA=DATA;}catch(e){}
-
-  // Header
-  var hdr=document.querySelector('.header');
-  if(hdr){
-    hdr.innerHTML='<div class="logo-badge">JGT</div>'+
-      '<div style="width:1px;height:32px;background:rgba(255,255,255,0.15);flex-shrink:0;"></div>'+
-      '<div class="header-text"><h1>AGILICOM</h1>'+
-        '<div class="header-sub"><span class="header-dot">\u2022</span><span>Dashboard de Conversa</span>'+
-        '<span class="header-sep"> \u2014 </span><span class="header-campaign">Campanha de Mensagem</span></div></div>'+
-      '<div class="header-spacer"></div>'+
-      '<div class="period-bar" id="period-bar">'+
-        '<label>De</label><input type="date" id="dateFrom" class="date-input" value="2026-06-02"/>'+
-        '<label>\u2014</label><input type="date" id="dateTo" class="date-input" value="2026-06-09"/>'+
-        '<button class="preset-btn" onclick="setDashPreset(7,this)">7d</button>'+
-        '<button class="preset-btn" onclick="setDashPreset(14,this)">14d</button>'+
-        '<button class="preset-btn" onclick="setDashPreset(30,this)">30d</button>'+
-        '<button class="preset-btn" id="dash-btn-all" onclick="setDashPreset(0,this)">Tudo</button>'+
-        '<span class="range-info" id="dash-range-info">7 dias</span></div>';
-    var df=document.getElementById('dateFrom'),dt=document.getElementById('dateTo');
-    if(df)df.addEventListener('change',function(){renderAll();});
-    if(dt)dt.addEventListener('change',function(){renderAll();});
-  }
-
-  // Remove info banner
-  var b=document.querySelector('.info-banner'); if(b)b.remove();
-
-  // Rebuild Criativos panel as cards
-  var cp=document.getElementById('panel-criativos');
-  if(cp){cp.innerHTML=
-    '<div class="pub-filterbar" id="cri-filterbar" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">'+
-      '<button class="filter-btn active" onclick="setCriFiltro(\'todos\',this)">Todos</button>'+
-      '<button class="filter-btn" id="btn-cri-ativos" onclick="setCriFiltro(\'ativos\',this)">&#9679; Ativos (<span id=\"cri-count-ativos\">0</span>)</button>'+
-      '<button class="filter-btn" id="btn-cri-inativos" onclick="setCriFiltro(\'inativos\',this)">&#9679; Inativos (<span id=\"cri-count-inativos\">0</span>)</button>'+
-      '<div style="flex:1"></div>'+
-      '<span style="font-size:11px;color:rgba(255,255,255,0.4)">Ordenar:</span>'+
-      '<button class="sort-btn active" onclick="setCriSort(\'conversas\',this)">Conversas</button>'+
-      '<button class="sort-btn" onclick="setCriSort(\'invest\',this)">Investimento</button>'+
-      '<button class="sort-btn" onclick="setCriSort(\'ctr\',this)">CTR</button>'+
-      '<button class="sort-btn" onclick="setCriSort(\'cpc\',this)">CPC</button>'+
-      '<button class="sort-btn" onclick="setCriSort(\'cpconv\',this)">Custo/Conv</button>'+
-    '</div>'+
-    '<div id="cri-cards" class="cri-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;"></div>';}
-
-  // Rebuild Públicos panel as cards
-  var pp=document.getElementById('panel-publicos');
-  if(pp){pp.innerHTML=
-    '<div class="pub-filterbar" id="pub-filterbar" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">'+
-      '<button class="filter-btn active" onclick="setPubFiltro(\'todos\',this)">Todos</button>'+
-      '<button class="filter-btn" id="btn-pub-ativos" onclick="setPubFiltro(\'ativos\',this)">&#9679; Ativos (<span id=\"pub-count-ativos\">0</span>)</button>'+
-      '<button class="filter-btn" id="btn-pub-inativos" onclick="setPubFiltro(\'inativos\',this)">&#9679; Inativos (<span id=\"pub-count-inativos\">0</span>)</button>'+
-      '<div style="flex:1"></div>'+
-      '<span style="font-size:11px;color:rgba(255,255,255,0.4)">Ordenar:</span>'+
-      '<button class="sort-btn active" onclick="setPubSort(\'invest\',this)">Investimento</button>'+
-      '<button class="sort-btn" onclick="setPubSort(\'ctr\',this)">CTR</button>'+
-      '<button class="sort-btn" onclick="setPubSort(\'cpc\',this)">CPC</button>'+
-      '<button class="sort-btn" onclick="setPubSort(\'conv\',this)">Conversas</button>'+
-      '<button class="sort-btn" onclick="setPubSort(\'cpconv\',this)">Custo/Conv</button>'+
-    '</div>'+
-    '<div id="pub-cards" class="pub-grid"></div>';}
-
-  // Reorder: Conjuntos after Funil
-  var pg=document.getElementById('panel-geral');
-  if(pg){var ag=document.getElementById('adsets-grid');
-    if(ag){var ct=ag.previousElementSibling,fs=pg.querySelector('.funnel-section');
-      if(fs&&ct){pg.removeChild(ct);pg.removeChild(ag);
-        fs.parentNode.insertBefore(ct,fs.nextSibling);
-        fs.parentNode.insertBefore(ag,ct.nextSibling);}}}
-
-  setTimeout(function(){
-    try{if(typeof DATA!=='undefined')window.DATA=DATA;}catch(e){}
-    if(window.setDashPreset)setDashPreset(7,document.querySelector('.preset-btn'));
-    else if(window.renderAll)renderAll();
-  },150);
-}
-if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',_agilicomInit);}
-else{_agilicomInit();}
-
+function _agilicomInit(){try{if(typeof DATA!=='undefined')window.DATA=DATA;}catch(e){}var hdr=document.querySelector('.header');if(hdr){hdr.innerHTML='<div class=\"logo-badge\">JGT</div><div style=\"width:1px;height:32px;background:rgba(255,255,255,0.15);flex-shrink:0;\"></div><div class=\"header-text\"><h1>AGILICOM</h1><div class=\"header-sub\"><span class=\"header-dot\">•</span><span>Dashboard de Conversa</span><span class=\"header-sep\"> — </span><span class=\"header-campaign\">Campanha de Mensagem</span></div></div><div class=\"header-spacer\"></div><div class=\"period-bar\" id=\"period-bar\"><label>De</label><input type=\"date\" id=\"dateFrom\" class=\"date-input\" value=\"2026-06-02\"/><label>—</label><input type=\"date\" id=\"dateTo\" class=\"date-input\" value=\"2026-06-09\"/><button class=\"preset-btn\" onclick=\"setDashPreset(7,this)\">7d</button><button class=\"preset-btn\" onclick=\"setDashPreset(14,this)\">14d</button><button class=\"preset-btn\" onclick=\"setDashPreset(30,this)\">30d</button><button class=\"preset-btn\" id=\"dash-btn-all\" onclick=\"setDashPreset(0,this)\">Tudo</button><span class=\"range-info\" id=\"dash-range-info\">7 dias</span></div>';var df=document.getElementById('dateFrom'),dt=document.getElementById('dateTo');if(df)df.addEventListener('change',function(){renderAll();});if(dt)dt.addEventListener('change',function(){renderAll();});}var b=document.querySelector('.info-banner');if(b)b.remove();var cp=document.getElementById('panel-criativos');if(cp){cp.innerHTML='<div class=\"pub-filterbar\" id=\"cri-filterbar\" style=\"display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;\"><button class=\"filter-btn active\" onclick=\"setCriFiltro('todos',this)\">Todos</button><button class=\"filter-btn\" id=\"btn-cri-ativos\" onclick=\"setCriFiltro('ativos',this)\">&#9679; Ativos (<span id=\"cri-count-ativos\">0</span>)</button><button class=\"filter-btn\" id=\"btn-cri-inativos\" onclick=\"setCriFiltro('inativos',this)\">&#9679; Inativos (<span id=\"cri-count-inativos\">0</span>)</button><div style=\"flex:1\"></div><span style=\"font-size:11px;color:rgba(255,255,255,0.4)\">Ordenar:</span><button class=\"sort-btn active\" onclick=\"setCriSort('conversas',this)\">Conversas</button><button class=\"sort-btn\" onclick=\"setCriSort('invest',this)\">Investimento</button><button class=\"sort-btn\" onclick=\"setCriSort('ctr',this)\">CTR</button><button class=\"sort-btn\" onclick=\"setCriSort('cpc',this)\">CPC</button><button class=\"sort-btn\" onclick=\"setCriSort('cpconv',this)\">Custo/Conv</button></div><div id=\"cri-cards\" class=\"cri-grid\" style=\"display:grid;grid-template-columns:repeat(3,1fr);gap:12px;\"></div>';}var pp=document.getElementById('panel-publicos');if(pp){pp.innerHTML='<div class=\"pub-filterbar\" id=\"pub-filterbar\" style=\"display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;\"><button class=\"filter-btn active\" onclick=\"setPubFiltro('todos',this)\">Todos</button><button class=\"filter-btn\" id=\"btn-pub-ativos\" onclick=\"setPubFiltro('ativos',this)\">&#9679; Ativos (<span id=\"pub-count-ativos\">0</span>)</button><button class=\"filter-btn\" id=\"btn-pub-inativos\" onclick=\"setPubFiltro('inativos',this)\">&#9679; Inativos (<span id=\"pub-count-inativos\">0</span>)</button><div style=\"flex:1\"></div><span style=\"font-size:11px;color:rgba(255,255,255,0.4)\">Ordenar:</span><button class=\"sort-btn active\" onclick=\"setPubSort('invest',this)\">Investimento</button><button class=\"sort-btn\" onclick=\"setPubSort('ctr',this)\">CTR</button><button class=\"sort-btn\" onclick=\"setPubSort('cpc',this)\">CPC</button><button class=\"sort-btn\" onclick=\"setPubSort('conv',this)\">Conversas</button><button class=\"sort-btn\" onclick=\"setPubSort('cpconv',this)\">Custo/Conv</button></div><div id=\"pub-cards\" class=\"pub-grid\"></div>';}var pg=document.getElementById('panel-geral');if(pg){var ag=document.getElementById('adsets-grid');if(ag){var ct=ag.previousElementSibling,fs=pg.querySelector('.funnel-section');if(fs&&ct){pg.removeChild(ct);pg.removeChild(ag);fs.parentNode.insertBefore(ct,fs.nextSibling);fs.parentNode.insertBefore(ag,ct.nextSibling);}}}setTimeout(function(){try{if(typeof DATA!=='undefined')window.DATA=DATA;}catch(e){}if(window.setDashPreset)setDashPreset(7,document.querySelector('.preset-btn'));else if(window.renderAll)renderAll();},150);}if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',_agilicomInit);}else{_agilicomInit();}
 </script>
 </body>
 </html>
