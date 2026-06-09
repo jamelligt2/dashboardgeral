@@ -451,7 +451,8 @@ function showTab(id,el){
 
 </style>
 <script id="agilicom-custom">
-// ── Formatting helpers ──────────────────────────────────────────────────
+
+// ── Formatting helpers ────────────────────────────────────────────────────
 window.fmtBRL = function(v) {
   return 'R\$ ' + Number(v||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
 };
@@ -461,7 +462,7 @@ window.fmtPct = function(v) {
 window.fmtN = function(v) {
   return Number(v||0).toLocaleString('pt-BR');
 };
-window.updateRangeInfo = function(f) {
+window.updateRangeInfo = function() {
   var df = document.getElementById('dateFrom');
   var dt = document.getElementById('dateTo');
   var ri = document.getElementById('dash-range-info');
@@ -471,35 +472,22 @@ window.updateRangeInfo = function(f) {
   ri.textContent = days + (days === 1 ? ' dia' : ' dias');
 };
 
-// ── State ────────────────────────────────────────────────────────────────
+// ── State ───────────────────────────────────────────────────────────────
 window.criStatusFiltro = 'todos';
 window.criSortKey = 'conversas';
 window.pubStatusFiltro = 'todos';
 window.pubSortKey = 'invest';
 
-// ── Helper: is adset active (last date within 7d of max) ────────────────
-window.isAdsetAtivo = function(adsetName, filtered) {
-  var maxDate = filtered.reduce(function(m,r){return r.date>m?r.date:m;},'');
-  var adRows = filtered.filter(function(r){return r.adset===adsetName;});
-  if (!adRows.length) return false;
-  var lastDate = adRows.reduce(function(m,r){return r.date>m?r.date:m;},'');
-  return (new Date(maxDate) - new Date(lastDate)) <= 7*86400000;
-};
-window.isAdAtivo = function(adName, filtered) {
-  var maxDate = filtered.reduce(function(m,r){return r.date>m?r.date:m;},'');
-  var adRows = filtered.filter(function(r){return r.ad===adName;});
-  if (!adRows.length) return false;
-  var lastDate = adRows.reduce(function(m,r){return r.date>m?r.date:m;},'');
-  return (new Date(maxDate) - new Date(lastDate)) <= 7*86400000;
-};
+
 window.classifyAdset = function(n) {
   var s = (n||'').toLowerCase();
-  if (s.includes('visitante') || s.includes('page view') || s.includes('engaj')) return 'Quente';
-  if (s.includes('semelhante') || s.includes('lookalike')) return 'Morno';
-  return 'Frio · Profissão';
+  if (s.includes('visitante') || s.includes('page view') || s.includes('engaj'))
+    return {tipo: 'Quente', cor: '#e74c3c'};
+  if (s.includes('semelhante') || s.includes('lookalike'))
+    return {tipo: 'Morno', cor: '#ff9800'};
+  return {tipo: 'Frio · Profissão', cor: '#c44a1a'};
 };
 
-// ── getFilteredData ──────────────────────────────────────────────────────
 window.getFilteredData = function() {
   var df = document.getElementById('dateFrom');
   var dt = document.getElementById('dateTo');
@@ -508,7 +496,22 @@ window.getFilteredData = function() {
   return (window.DATA||DATA||[]).filter(function(r){return r.date>=from && r.date<=to;});
 };
 
-// ── renderKPIs ───────────────────────────────────────────────────────────
+window.isAdsetAtivo = function(adsetName, filtered) {
+  var maxDate = filtered.reduce(function(m,r){return r.date>m?r.date:m;},'');
+  var adRows = filtered.filter(function(r){return r.adset===adsetName;});
+  if (!adRows.length) return false;
+  var lastDate = adRows.reduce(function(m,r){return r.date>m?r.date:m;},'');
+  return (new Date(maxDate) - new Date(lastDate)) <= 7*86400000;
+};
+
+window.isAdAtivo = function(adName, filtered) {
+  var maxDate = filtered.reduce(function(m,r){return r.date>m?r.date:m;},'');
+  var adRows = filtered.filter(function(r){return r.ad===adName;});
+  if (!adRows.length) return false;
+  var lastDate = adRows.reduce(function(m,r){return r.date>m?r.date:m;},'');
+  return (new Date(maxDate) - new Date(lastDate)) <= 7*86400000;
+};
+
 window.renderKPIs = function(f) {
   var T = {spend:0,conv:0,clk:0,impr:0};
   f.forEach(function(d){T.spend+=d.spend||0;T.conv+=d.conv||0;T.clk+=d.clk||0;T.impr+=d.impr||0;});
@@ -526,7 +529,6 @@ window.renderKPIs = function(f) {
   if(el('kpi-impr-sub'))el('kpi-impr-sub').textContent=fmtBRL(cpc)+' CPC m\u00e9dio';
 };
 
-// ── renderFunnel ─────────────────────────────────────────────────────────
 window.renderFunnel = function(f) {
   var T = {spend:0,conv:0,clk:0,impr:0};
   f.forEach(function(d){T.spend+=d.spend||0;T.conv+=d.conv||0;T.clk+=d.clk||0;T.impr+=d.impr||0;});
@@ -545,31 +547,41 @@ window.renderFunnel = function(f) {
   if(el('fm-txcc'))el('fm-txcc').textContent=fmtPct(txcc);
 };
 
+window.buildPubCard = function(name, d, totalSpend) {
+  var tipo = window.classifyAdset(name);
+  var ctr = d.impr > 0 ? (d.clk / d.impr * 100) : 0;
+  var cpc = d.clk > 0 ? d.spend / d.clk : 0;
+  var cpm = d.impr > 0 ? (d.spend / d.impr * 1000) : 0;
+  var cpconv = d.conv > 0 ? d.spend / d.conv : 0;
+  var clqConv = d.clk > 0 ? (d.conv / d.clk * 100) : 0;
+  var pct = totalSpend > 0 ? (d.spend / totalSpend * 100) : 0;
+  var perfClass = d.conv >= 5 && cpconv < 30 ? 'escalar' : d.conv >= 2 ? 'avaliar' : 'pausar';
+  var perfText = d.conv >= 5 && cpconv < 30 ? 'ESCALAR' : d.conv >= 2 ? 'AVALIAR' : 'PAUSAR';
+  var barWidth = Math.min(pct, 100).toFixed(1);
 
-// ── Render Functions ────────────────────────────────────────────
-window.buildPubCard = function(name,d,totalSpend){
-  var ctr=d.impr>0?d.clk/d.impr:0,cpc=d.clk>0?d.spend/d.clk:0,cpm=d.impr>0?(d.spend/d.impr)*1000:0,cpconv=d.conv>0?d.spend/d.conv:0,txcc=d.clk>0?d.conv/d.clk:0,pct=totalSpend>0?(d.spend/totalSpend)*100:0;
-  var tipo=classifyAdset(name);
-  var perfClass=d.conv>=5&&cpconv<30?'escalar':d.conv>=2?'avaliar':'pausar';
-  var perfText=d.conv>=5&&cpconv<30?'ESCALAR':d.conv>=2?'AVALIAR':'PAUSAR';
-  return '<div class="pub-card">'+
-    '<div class="pub-card-header"><div class="pub-name">'+name+'</div><span class="cri-badge '+perfClass+'">'+perfText+'</span></div>'+
-    '<div class="pub-tipo" style="color:'+tipo.cor+';border-color:'+tipo.cor+'33;">'+tipo.tipo+'</div>'+
-    '<div class="pub-metrics">'+
-      '<div class="pub-metric"><div class="pub-metric-val">'+fmtBRL(d.spend)+'</div><div class="pub-metric-lbl">Invest.</div></div>'+
-      '<div class="pub-metric"><div class="pub-metric-val">'+d.conv+'</div><div class="pub-metric-lbl">Conversas</div></div>'+
-      '<div class="pub-metric"><div class="pub-metric-val neutral">'+(d.conv>0?fmtBRL(cpconv):'—')+'</div><div class="pub-metric-lbl">Custo/Conv</div></div>'+
-    '</div>'+
-    '<div class="pub-grid2">'+
-      '<div class="pub-metric2"><div class="pub-metric2-lbl">CTR</div><div class="pub-metric2-val">'+fmtPct(ctr)+'</div></div>'+
-      '<div class="pub-metric2"><div class="pub-metric2-lbl">CPC</div><div class="pub-metric2-val">'+(d.clk>0?fmtBRL(cpc):'—')+'</div></div>'+
-      '<div class="pub-metric2"><div class="pub-metric2-lbl">CPM</div><div class="pub-metric2-val">'+fmtBRL(cpm)+'</div></div>'+
-      '<div class="pub-metric2"><div class="pub-metric2-lbl">Clq→Conv</div><div class="pub-metric2-val">'+(d.clk>0?fmtPct(txcc):'—')+'</div></div>'+
-      '<div class="pub-metric2"><div class="pub-metric2-lbl">Cliques</div><div class="pub-metric2-val">'+fmtN(d.clk)+'</div></div>'+
-      '<div class="pub-metric2"><div class="pub-metric2-lbl">Imp.</div><div class="pub-metric2-val">'+fmtN(d.impr)+'</div></div>'+
-    '</div>'+
-    '<div class="pub-bar-wrap"><div class="pub-bar-label"><span>% do Investimento Total</span><span>'+pct.toFixed(1)+'%</span></div>'+
-    '<div class="pub-bar-bg"><div class="pub-bar-fill" style="width:'+Math.min(pct,100).toFixed(1)+'%"></div></div></div>'+
+  return '<div class="pub-card">' +
+    '<div class="pub-card-header">' +
+      '<div class="pub-name">' + name + '</div>' +
+      '<span class="badge-perf badge-' + perfClass + '">' + perfText + '</span>' +
+    '</div>' +
+    '<div style="display:inline-block;color:' + tipo.cor + ';background:' + tipo.cor + '18;border:1px solid ' + tipo.cor + '44;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;margin-bottom:12px;">' + tipo.tipo + '</div>' +
+    '<div class="pub-metrics">' +
+      '<div class="pub-metric"><div class="pub-metric-val">' + fmtBRL(d.spend) + '</div><div class="pub-metric-lbl">Invest.</div></div>' +
+      '<div class="pub-metric"><div class="pub-metric-val neutral">' + d.conv + '</div><div class="pub-metric-lbl">Conversas</div></div>' +
+      '<div class="pub-metric"><div class="pub-metric-val">' + (d.conv > 0 ? fmtBRL(cpconv) : '—') + '</div><div class="pub-metric-lbl">Custo/Conv</div></div>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;">' +
+      '<div class="pub-metric2"><div class="pub-metric2-lbl">CTR</div><div class="pub-metric2-val">' + fmtPct(ctr) + '</div></div>' +
+      '<div class="pub-metric2"><div class="pub-metric2-lbl">CPC</div><div class="pub-metric2-val">' + fmtBRL(cpc) + '</div></div>' +
+      '<div class="pub-metric2"><div class="pub-metric2-lbl">CPM</div><div class="pub-metric2-val">' + fmtBRL(cpm) + '</div></div>' +
+      '<div class="pub-metric2"><div class="pub-metric2-lbl">CLQ→CONV</div><div class="pub-metric2-val">' + fmtPct(clqConv) + '</div></div>' +
+      '<div class="pub-metric2"><div class="pub-metric2-lbl">CLIQUES</div><div class="pub-metric2-val">' + fmtN(d.clk) + '</div></div>' +
+      '<div class="pub-metric2"><div class="pub-metric2-lbl">IMP.</div><div class="pub-metric2-val">' + fmtN(d.impr) + '</div></div>' +
+    '</div>' +
+    '<div style="margin-top:8px;">' +
+      '<div style="display:flex;justify-content:space-between;font-size:10px;color:rgba(255,255,255,0.4);margin-bottom:4px;"><span>% do Investimento Total</span><span>' + pct.toFixed(1) + '%</span></div>' +
+      '<div style="height:4px;background:rgba(255,255,255,0.08);border-radius:2px;"><div style="height:100%;width:' + barWidth + '%;background:var(--orange);border-radius:2px;"></div></div>' +
+    '</div>' +
   '</div>';
 };
 
@@ -782,15 +794,16 @@ window.renderAll = function(){
 window.renderPublicosTable = window.renderPubCards;
 
 
-
-// ── Init on page load ────────────────────────────────────────────────────
-window.renderPublicosTable = window.renderPubCards;
-
+// ── Page Init ────────────────────────────────────────────────────────────
 function _agilicomInit() {
+  // Expose DATA globally (needed because DATA is var-scoped in inline script)
+  try { if (typeof DATA !== 'undefined') window.DATA = DATA; } catch(e) {}
+
   // Rebuild header
   var hdr = document.querySelector('.header');
   if (hdr) {
-    hdr.innerHTML = '<div class="logo-badge">JGT</div>' +
+    hdr.innerHTML =
+      '<div class="logo-badge">JGT</div>' +
       '<div style="width:1px;height:32px;background:rgba(255,255,255,0.15);flex-shrink:0;"></div>' +
       '<div class="header-text">' +
         '<h1>AGILICOM</h1>' +
@@ -823,78 +836,28 @@ function _agilicomInit() {
   var banner = document.querySelector('.info-banner');
   if (banner) banner.remove();
 
-  // Reorder sections: Conjuntos after Funil
+  // Reorder: Conjuntos after Funil
   var pg = document.getElementById('panel-geral');
   if (pg) {
-    var adsetsGrid = document.getElementById('adsets-grid');
-    if (adsetsGrid) {
-      var conjuntosTitle = adsetsGrid.previousElementSibling;
-      var funelSection = pg.querySelector('.funnel-section');
-      if (funelSection && conjuntosTitle) {
-        pg.removeChild(conjuntosTitle);
-        pg.removeChild(adsetsGrid);
-        funelSection.parentNode.insertBefore(conjuntosTitle, funelSection.nextSibling);
-        funelSection.parentNode.insertBefore(adsetsGrid, conjuntosTitle.nextSibling);
+    var ag = document.getElementById('adsets-grid');
+    if (ag) {
+      var ct = ag.previousElementSibling;
+      var fs = pg.querySelector('.funnel-section');
+      if (fs && ct) {
+        pg.removeChild(ct);
+        pg.removeChild(ag);
+        fs.parentNode.insertBefore(ct, fs.nextSibling);
+        fs.parentNode.insertBefore(ag, ct.nextSibling);
       }
     }
   }
 
-  // Build criativos panel filterbar if not present
-  var criPanel = document.getElementById('panel-criativos');
-  if (criPanel && !criPanel.querySelector('.cri-filterbar')) {
-    var criContent = criPanel.querySelector('.panel-content') || criPanel;
-    var fb = document.createElement('div');
-    fb.className = 'pub-filterbar';
-    fb.id = 'cri-filterbar';
-    fb.innerHTML = '<button class="filter-btn active" onclick="setCriFiltro(\'todos\',this)">Todos</button>' +
-      '<button class="filter-btn" id="btn-cri-ativos" onclick="setCriFiltro(\'ativos\',this)">\u25cf Ativos (<span id=\"cri-count-ativos\">0</span>)</button>' +
-      '<button class="filter-btn" id="btn-cri-inativos" onclick="setCriFiltro(\'inativos\',this)">\u25cf Inativos (<span id=\"cri-count-inativos\">0</span>)</button>' +
-      '<div style="flex:1"></div>' +
-      '<span style="font-size:11px;color:rgba(255,255,255,0.4)">Ordenar:</span>' +
-      '<button class="sort-btn active" onclick="setCriSort(\'conversas\',this)">Conversas</button>' +
-      '<button class="sort-btn" onclick="setCriSort(\'invest\',this)">Investimento</button>' +
-      '<button class="sort-btn" onclick="setCriSort(\'ctr\',this)">CTR</button>';
-    var grid = document.createElement('div');
-    grid.id = 'cri-cards';
-    grid.className = 'cri-grid';
-    grid.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:12px;';
-    criContent.insertBefore(fb, criContent.firstChild);
-    criContent.insertBefore(grid, fb.nextSibling);
-  }
-
-  // Build publicos panel filterbar if not present  
-  var pubPanel = document.getElementById('panel-publicos');
-  if (pubPanel && !pubPanel.querySelector('#pub-filterbar')) {
-    var pubContent = pubPanel.querySelector('.panel-content') || pubPanel;
-    var pfb = document.createElement('div');
-    pfb.className = 'pub-filterbar';
-    pfb.id = 'pub-filterbar';
-    pfb.innerHTML = '<button class="filter-btn active" onclick="setPubFiltro(\'todos\',this)">Todos</button>' +
-      '<button class="filter-btn" id="btn-pub-ativos" onclick="setPubFiltro(\'ativos\',this)">\u25cf Ativos (<span id=\"pub-count-ativos\">0</span>)</button>' +
-      '<button class="filter-btn" id="btn-pub-inativos" onclick="setPubFiltro(\'inativos\',this)">\u25cf Inativos (<span id=\"pub-count-inativos\">0</span>)</button>' +
-      '<div style="flex:1"></div>' +
-      '<span style="font-size:11px;color:rgba(255,255,255,0.4)">Ordenar:</span>' +
-      '<button class="sort-btn active" onclick="setPubSort(\'invest\',this)">Investimento</button>' +
-      '<button class="sort-btn" onclick="setPubSort(\'ctr\',this)">CTR</button>' +
-      '<button class="sort-btn" onclick="setPubSort(\'cpc\',this)">CPC</button>' +
-      '<button class="sort-btn" onclick="setPubSort(\'conv\',this)">Conversas</button>';
-    var pgrid = document.createElement('div');
-    pgrid.id = 'pub-cards';
-    pgrid.className = 'pub-grid';
-    pubContent.insertBefore(pfb, pubContent.firstChild);
-    pubContent.insertBefore(pgrid, pfb.nextSibling);
-  }
-
-  // Expose DATA globally
-  try { if (typeof DATA !== "undefined") window.DATA = DATA; } catch(e){}
-  // Trigger 7d preset after short delay (to allow DATA to be available)
-  setTimeout(function(){
-    if (window.setDashPreset) {
-      setDashPreset(7, document.querySelector('.preset-btn'));
-    } else if (window.renderAll) {
-      renderAll();
-    }
-  }, 100);
+  // Trigger 7d preset
+  setTimeout(function() {
+    try { if (typeof DATA !== 'undefined') window.DATA = DATA; } catch(e) {}
+    if (window.setDashPreset) setDashPreset(7, document.querySelector('.preset-btn'));
+    else if (window.renderAll) renderAll();
+  }, 150);
 }
 
 if (document.readyState === 'loading') {
