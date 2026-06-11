@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diagnóstico — Dashboard de Captação | Jamelli GT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg-primary:#0d0d0d;--bg-secondary:#1a1a1a;--bg-card:#1e1e1e;--bg-card-hover:#252525;
+  --orange:#ff6b00;--orange-light:#ff8533;--green:#00d68f;--red:#ff3d71;--yellow:#ffaa00;--blue:#3366ff;
+  --text-primary:#fff;--text-secondary:#a0a0a0;--text-muted:#666;--border:#2a2a2a;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg-primary);color:var(--text-primary);font-family:'Inter',sans-serif;min-height:100vh;font-size:13px}
+::-webkit-scrollbar{width:7px;height:7px}::-webkit-scrollbar-track{background:#111}::-webkit-scrollbar-thumb{background:#ff6b0055;border-radius:4px}
+a{color:inherit}
+
+/* LOADING */
+#loading{position:fixed;inset:0;background:var(--bg-primary);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;padding:20px}
+.load-logo{font-size:32px;font-weight:900;letter-spacing:1px}
+.load-logo .o{color:var(--orange)}
+.load-bar{width:160px;height:4px;border-radius:3px;background:linear-gradient(90deg,var(--orange),var(--orange-light))}
+.load-sub{color:var(--text-secondary);font-size:13px;max-width:420px;line-height:1.5}
+.spinner{width:34px;height:34px;border:3px solid rgba(255,107,0,.2);border-top-color:var(--orange);border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.err-box{background:rgba(255,61,113,.08);border:1px solid rgba(255,61,113,.3);border-radius:12px;padding:22px 26px;max-width:520px;text-align:left;display:none}
+.err-box h3{color:var(--red);font-size:15px;margin-bottom:10px}
+.err-box p{color:var(--text-secondary);font-size:12.5px;line-height:1.6;margin-bottom:6px}
+.err-box code{background:#000;padding:1px 6px;border-radius:4px;color:var(--orange-light);font-size:11px}
+
+/* HEADER */
+.header{background:var(--bg-secondary);border-bottom:1px solid var(--border);padding:14px 26px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;position:sticky;top:0;z-index:100}
+.header-left{display:flex;align-items:center;gap:18px}
+.header-logo{display:flex;align-items:center;gap:9px}
+.logo-main{font-size:18px;font-weight:900;letter-spacing:.5px}
+.logo-main .o{color:var(--orange)}
+.logo-bar{width:2px;height:26px;background:var(--orange);border-radius:2px}
+.logo-sub{font-size:9.5px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;font-weight:600;line-height:1.3;max-width:80px}
+.header-divider{width:1px;height:34px;background:var(--border)}
+.header-info h1{font-size:15px;font-weight:800;letter-spacing:.2px}
+.header-info p{font-size:11px;color:var(--text-secondary);margin-top:2px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.live-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(0,214,143,.12);color:var(--green);padding:2px 8px;border-radius:20px;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 1.6s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+.header-right{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.upd-stamp{font-size:10px;color:var(--text-muted)}
+.demo-banner{display:flex;align-items:center;gap:14px;margin:0 0 18px;padding:13px 18px;background:linear-gradient(90deg,rgba(255,107,0,.14),rgba(255,107,0,.04));border:1px solid rgba(255,107,0,.4);border-radius:12px}
+.demo-banner .demo-ico{font-size:20px;flex-shrink:0}
+.demo-banner .demo-txt{flex:1;font-size:12.5px;line-height:1.5;color:var(--text-dim)}
+.demo-banner .demo-txt strong{color:var(--orange)}
+.demo-retry{flex-shrink:0;background:rgba(255,107,0,.15);border:1px solid rgba(255,107,0,.5);color:var(--orange);padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+.demo-retry:hover{background:rgba(255,107,0,.28)}
+.src-badge-demo{background:rgba(255,107,0,.16)!important;border-color:rgba(255,107,0,.5)!important;color:var(--orange)!important}
+.src-badge-demo .live-dot{background:var(--orange)!important;animation:none!important}
+.btn-refresh{background:rgba(255,107,0,.12);border:1px solid rgba(255,107,0,.3);color:var(--orange);padding:7px 13px;border-radius:8px;font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px;transition:.2s}
+.btn-refresh:hover{background:rgba(255,107,0,.2)}
+
+/* PERIOD FILTER */
+.filterbar{background:var(--bg-secondary);border-bottom:1px solid var(--border);padding:11px 26px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.filterbar label{font-size:11px;color:var(--text-secondary);white-space:nowrap}
+.date-input{background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);padding:6px 10px;border-radius:7px;font-size:12px;font-family:inherit;cursor:pointer;outline:none}
+.date-input:focus{border-color:var(--orange)}
+.date-input::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;cursor:pointer}
+.fbtn{background:var(--bg-card);border:1px solid var(--border);color:var(--text-secondary);padding:6px 13px;border-radius:7px;cursor:pointer;font-size:11.5px;font-family:inherit;font-weight:600;transition:.2s;white-space:nowrap}
+.fbtn:hover,.fbtn.active{background:rgba(255,107,0,.18);border-color:var(--orange);color:var(--orange)}
+.fbtn.solid{background:var(--orange);color:#000;border-color:var(--orange)}
+.fbtn.ghost{background:transparent}
+.range-days{font-size:11px;color:var(--orange-light);font-weight:600;margin-left:2px}
+
+/* TABS */
+.tabs{display:flex;background:var(--bg-secondary);border-bottom:1px solid var(--border);padding:0 26px;overflow-x:auto}
+.tab{padding:13px 18px;cursor:pointer;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-secondary);border-bottom:2px solid transparent;white-space:nowrap;transition:.2s}
+.tab:hover{color:var(--text-primary)}.tab.active{color:var(--orange);border-bottom-color:var(--orange)}
+
+.page{padding:22px 26px;display:none}.page.active{display:block}
+.sec-title{font-size:14px;font-weight:700;color:var(--orange);margin:22px 0 12px;padding-left:11px;border-left:4px solid var(--orange);display:flex;align-items:center;gap:8px}
+.sec-title:first-child{margin-top:0}
+.sec-note{font-size:11px;color:var(--text-muted);font-weight:400;text-transform:none;letter-spacing:0}
+
+/* KPI */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.kpi-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;transition:.2s}
+.kpi-card:hover{border-color:rgba(255,107,0,.4)}
+.kpi-label{font-size:10px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px;font-weight:600}
+.kpi-value{font-size:25px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
+.kpi-sub{font-size:10.5px;color:var(--text-muted);margin-top:5px}
+.c-orange{color:var(--orange)}.c-green{color:var(--green)}.c-red{color:var(--red)}.c-yellow{color:var(--yellow)}.c-blue{color:#5b82ff}
+
+/* FUNNEL */
+.funnel-layout{display:grid;grid-template-columns:1.25fr 1fr;gap:22px;margin-top:4px}
+.funnel-bars{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:20px}
+.fstep{margin-bottom:6px}
+.fstep-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
+.fstep-name{font-size:11.5px;color:var(--text-secondary);font-weight:600}
+.fstep-val{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums}
+.fbar{height:30px;border-radius:7px;display:flex;align-items:center;padding-left:12px;font-size:11px;font-weight:700;color:#000;transition:.4s;min-width:42px}
+.fdrop{text-align:center;font-size:10.5px;color:var(--yellow);font-weight:600;margin:3px 0}
+.funnel-side{display:flex;flex-direction:column;gap:10px}
+.fside-card{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:13px 15px}
+.fside-card .t{font-size:10px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:6px}
+.fside-card .v{font-size:18px;font-weight:800;font-variant-numeric:tabular-nums}
+.fside-3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.fside-3 .v{font-size:15px}
+.loss-box{background:rgba(255,61,113,.08);border:1px solid rgba(255,61,113,.3);border-radius:10px;padding:13px 15px}
+.loss-box .t{color:var(--red)}
+
+/* CHARTS */
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:4px}
+.chart-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px}
+.chart-card h4{font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:12px}
+.chart-wrap{position:relative;height:230px}
+
+/* TABLE */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:12px;background:var(--bg-card)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:rgba(255,107,0,.1);color:var(--text-secondary);padding:10px 11px;text-align:right;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap;border-bottom:1px solid var(--border)}
+th:first-child{text-align:left}
+th.sortable{cursor:pointer;user-select:none}
+th.sortable:hover{color:var(--orange)}
+th .arr{opacity:.3;margin-left:3px}
+th.asc .arr,th.desc .arr{opacity:1;color:var(--orange)}
+td{padding:9px 11px;text-align:right;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums;color:var(--text-primary)}
+td:first-child{text-align:left}
+tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:var(--bg-card-hover)}
+.cri-link{color:var(--orange-light);text-decoration:none;font-size:11px}
+.cri-link:hover{text-decoration:underline}
+
+/* BADGES */
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap}
+.badge-green{background:rgba(0,214,143,.15);color:var(--green)}
+.badge-yellow{background:rgba(255,170,0,.15);color:var(--yellow)}
+.badge-red{background:rgba(255,61,113,.15);color:var(--red)}
+.badge-orange{background:rgba(255,107,0,.15);color:var(--orange)}
+.status-dot{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:600;padding:3px 9px;border-radius:20px;white-space:nowrap}
+.status-dot .d{width:7px;height:7px;border-radius:50%}
+.st-ativo{background:rgba(0,214,143,.12);color:var(--green)}.st-ativo .d{background:var(--green);box-shadow:0 0 6px var(--green)}
+.st-inativo{background:rgba(255,255,255,.05);color:var(--text-muted)}.st-inativo .d{background:var(--text-muted)}
+
+/* MONTHLY CARDS */
+.mcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:8px}
+.mcard{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px;border-top:3px solid var(--orange)}
+.mcard h3{font-size:14px;font-weight:800;margin-bottom:3px}
+.mcard .days{font-size:10px;color:var(--text-muted);margin-bottom:12px}
+.mrow{display:flex;justify-content:space-between;font-size:11.5px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.mrow:last-child{border-bottom:none}
+.mrow .k{color:var(--text-secondary)}.mrow .v{font-weight:700;font-variant-numeric:tabular-nums}
+
+.insight{background:rgba(255,107,0,.06);border:1px solid rgba(255,107,0,.22);border-radius:10px;padding:13px 16px;font-size:12px;line-height:1.6;color:var(--text-secondary);margin-top:12px}
+.insight b{color:var(--text-primary)}.insight .hl{color:var(--orange);font-weight:700}
+.empty{color:var(--text-muted);font-size:12.5px;padding:22px;text-align:center}
+
+@media(max-width:900px){.funnel-layout,.charts-row{grid-template-columns:1fr}}
+@media(max-width:768px){
+  .kpi-grid{grid-template-columns:repeat(2,1fr)}.kpi-value{font-size:21px}
+  .tab{padding:11px 13px;font-size:11px}td,th{padding:8px 8px;font-size:11px}
+  .header-divider{display:none}
+}
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="load-logo"><span class="o">JAMELLI</span> GT</div>
+  <div class="load-bar"></div>
+  <div class="spinner" id="ld-spin"></div>
+  <div class="load-sub" id="ld-msg">Conectando com a planilha…</div>
+  <div class="err-box" id="ld-err">
+    <h3>Não consegui carregar os dados</h3>
+    <p>O dashboard busca os dados ao vivo do Google Sheets. Para funcionar, a planilha precisa estar pública.</p>
+    <p><b>Como liberar:</b> Planilha → <b>Compartilhar</b> → Acesso geral → <b>"Qualquer pessoa com o link"</b> → <b>Leitor</b>.</p>
+    <p>Aba lida: <code>Cap1-Checkout</code></p>
+    <p id="ld-err-detail" style="color:var(--text-muted);margin-top:8px"></p>
+  </div>
+</div>
+
+<div class="header">
+  <div class="header-left">
+    <div class="header-logo">
+      <span class="logo-main"><span class="o">JAMELLI</span></span>
+      <div class="logo-bar"></div>
+      <span class="logo-sub">Gestão de Tráfego</span>
+    </div>
+    <div class="header-divider"></div>
+    <div class="header-info">
+      <h1>Diagnóstico — Captação de Leads</h1>
+      <p>Meta Ads · Campanha de Formulário <span class="live-badge" id="src-badge"><span class="live-dot"></span>Dados ao vivo</span></p>
+    </div>
+  </div>
+  <div class="header-right">
+    <span class="upd-stamp" id="upd-stamp"></span>
+    <button class="btn-refresh" onclick="loadData()">↻ Atualizar</button>
+  </div>
+</div>
+
+<div class="demo-banner" id="demo-banner" style="display:none">
+  <span class="demo-ico">⚠</span>
+  <div class="demo-txt">
+    <strong>Modo demonstração</strong> — não foi possível buscar os dados ao vivo do Google Sheets a partir deste preview.
+    Exibindo o último snapshot embutido (atualizado até 11/06/2026). Ao publicar este arquivo num servidor (ex.: Netlify) com a planilha pública, os dados ao vivo carregam automaticamente.
+  </div>
+  <button class="demo-retry" onclick="loadData()">↻ Tentar ao vivo</button>
+</div>
+
+<div class="filterbar">
+  <label>Período</label>
+  <input type="date" id="dateFrom" class="date-input" onchange="onDateChange()">
+  <span style="color:var(--text-muted)">→</span>
+  <input type="date" id="dateTo" class="date-input" onchange="onDateChange()">
+  <button class="fbtn" onclick="setPreset(7,this)">7d</button>
+  <button class="fbtn" onclick="setPreset(14,this)">14d</button>
+  <button class="fbtn" onclick="setPreset(30,this)">30d</button>
+  <button class="fbtn active" id="btn-all" onclick="setPreset('all',this)">Tudo</button>
+  <span class="range-days" id="range-days"></span>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab(0,this)">Visão Geral</div>
+  <div class="tab" onclick="switchTab(1,this)">Criativos</div>
+  <div class="tab" onclick="switchTab(2,this)">Públicos</div>
+  <div class="tab" onclick="switchTab(3,this)">Análise Semanal</div>
+  <div class="tab" onclick="switchTab(4,this)">Comparativo Mensal</div>
+</div>
+
+<!-- VISÃO GERAL -->
+<div class="page active" id="page-0">
+  <div class="sec-title">Indicadores do Período</div>
+  <div class="kpi-grid" id="kpis"></div>
+
+  <div class="sec-title">Funil de Captação <span class="sec-note">Impressões → Cliques → Leads</span></div>
+  <div class="funnel-layout">
+    <div class="funnel-bars" id="funnel-bars"></div>
+    <div class="funnel-side" id="funnel-side"></div>
+  </div>
+
+  <div class="sec-title">Evolução Diária</div>
+  <div class="charts-row">
+    <div class="chart-card"><h4>CPL por Dia</h4><div class="chart-wrap"><canvas id="ch-cpl"></canvas></div></div>
+    <div class="chart-card"><h4>Investimento e Leads por Dia</h4><div class="chart-wrap"><canvas id="ch-invlead"></canvas></div></div>
+  </div>
+</div>
+
+<!-- CRIATIVOS -->
+<div class="page" id="page-1">
+  <div class="sec-title">Ranking de Criativos <span class="sec-note">ordenado por CPL — clique nos cabeçalhos para reordenar</span></div>
+  <div class="tbl-wrap">
+    <table id="tbl-cri">
+      <thead><tr>
+        <th class="sortable" data-k="ativo" data-t="num">Status <span class="arr">↕</span></th>
+        <th class="sortable" data-k="nome" data-t="text">Criativo <span class="arr">↕</span></th>
+        <th class="sortable" data-k="inv" data-t="num">Invest. <span class="arr">↕</span></th>
+        <th class="sortable" data-k="imp" data-t="num">Impr. <span class="arr">↕</span></th>
+        <th class="sortable" data-k="cliques" data-t="num">Cliques <span class="arr">↕</span></th>
+        <th class="sortable" data-k="leads" data-t="num">Leads <span class="arr">↕</span></th>
+        <th class="sortable" data-k="ctr" data-t="num">CTR <span class="arr">↕</span></th>
+        <th class="sortable" data-k="cpc" data-t="num">CPC <span class="arr">↕</span></th>
+        <th class="sortable desc" data-k="cpl" data-t="num">CPL <span class="arr">↕</span></th>
+        <th class="sortable" data-k="convRate" data-t="num">Clk→Lead <span class="arr">↕</span></th>
+        <th>Status</th><th>Link</th>
+      </tr></thead>
+      <tbody id="tbody-cri"></tbody>
+    </table>
+  </div>
+  <div class="charts-row" style="margin-top:16px">
+    <div class="chart-card"><h4>Top 10 Criativos — CPL (R$)</h4><div class="chart-wrap"><canvas id="ch-cri-cpl"></canvas></div></div>
+    <div class="chart-card"><h4>Top 10 Criativos — Volume de Leads</h4><div class="chart-wrap"><canvas id="ch-cri-vol"></canvas></div></div>
+  </div>
+  <div class="insight" id="cri-insight"></div>
+</div>
+
+<!-- PÚBLICOS -->
+<div class="page" id="page-2">
+  <div class="sec-title">Ranking de Públicos <span class="sec-note">por conjunto de anúncios</span></div>
+  <div class="tbl-wrap">
+    <table id="tbl-pub">
+      <thead><tr>
+        <th class="sortable" data-k="ativo" data-t="num">Status <span class="arr">↕</span></th>
+        <th class="sortable" data-k="nome" data-t="text">Público (Conjunto) <span class="arr">↕</span></th>
+        <th class="sortable" data-k="inv" data-t="num">Invest. <span class="arr">↕</span></th>
+        <th class="sortable" data-k="imp" data-t="num">Impr. <span class="arr">↕</span></th>
+        <th class="sortable" data-k="cliques" data-t="num">Cliques <span class="arr">↕</span></th>
+        <th class="sortable" data-k="leads" data-t="num">Leads <span class="arr">↕</span></th>
+        <th class="sortable" data-k="ctr" data-t="num">CTR <span class="arr">↕</span></th>
+        <th class="sortable" data-k="cpc" data-t="num">CPC <span class="arr">↕</span></th>
+        <th class="sortable desc" data-k="cpl" data-t="num">CPL <span class="arr">↕</span></th>
+        <th>Status</th>
+      </tr></thead>
+      <tbody id="tbody-pub"></tbody>
+    </table>
+  </div>
+  <div class="charts-row" style="margin-top:16px">
+    <div class="chart-card"><h4>Investimento por Público</h4><div class="chart-wrap"><canvas id="ch-pub-inv"></canvas></div></div>
+    <div class="chart-card"><h4>CPL por Público</h4><div class="chart-wrap"><canvas id="ch-pub-cpl"></canvas></div></div>
+  </div>
+  <div class="insight" id="pub-insight"></div>
+</div>
+
+<!-- SEMANAL -->
+<div class="page" id="page-3">
+  <div class="sec-title">Análise Semanal</div>
+  <div class="tbl-wrap">
+    <table id="tbl-sem">
+      <thead><tr>
+        <th>Semana</th><th>Período</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>Leads</th>
+        <th>CTR</th><th>CPC</th><th>CPM</th><th>CPL</th><th>Clk→Lead</th><th>Tend. CPL</th>
+      </tr></thead>
+      <tbody id="tbody-sem"></tbody>
+    </table>
+  </div>
+  <div class="charts-row" style="margin-top:16px">
+    <div class="chart-card"><h4>CPL e Leads por Semana</h4><div class="chart-wrap"><canvas id="ch-sem-cpl"></canvas></div></div>
+    <div class="chart-card"><h4>CPC vs CPM por Semana</h4><div class="chart-wrap"><canvas id="ch-sem-cpc"></canvas></div></div>
+  </div>
+  <div class="insight" id="sem-insight"></div>
+</div>
+
+<!-- MENSAL -->
+<div class="page" id="page-4">
+  <div class="sec-title">Comparativo Mensal</div>
+  <div class="mcards" id="mcards"></div>
+  <div class="sec-title">Tabela Comparativa <span class="sec-note">2 meses mais recentes</span></div>
+  <div class="tbl-wrap" id="mcomp-wrap"></div>
+  <div class="charts-row" style="margin-top:16px">
+    <div class="chart-card"><h4>Investimento por Mês</h4><div class="chart-wrap"><canvas id="ch-mes-inv"></canvas></div></div>
+    <div class="chart-card"><h4>CPL e Leads por Mês</h4><div class="chart-wrap"><canvas id="ch-mes-cpl"></canvas></div></div>
+  </div>
+  <div class="insight" id="mes-insight"></div>
+</div>
+
+<script>
+/* ============ CONFIG ============ */
+const CONFIG = {
+  sheetId: '1-QDKKtSfBHJ7mLxWTd_BwKWXDMbGtIyDLoE8nNzi6jo',
+  capSheet: 'Cap1-Checkout'
+};
+
+/* ============ FALLBACK (snapshot embutido — usado só quando o fetch ao vivo falha) ============ */
+const FALLBACK_CSV = `
+Date,Campaign Name,Adset Name,Ad Name,Instagram Permalink URL,"Spend (Cost, Amount Spent)",Impressions,Action Link Clicks,Action Leads
+2026-01-21,[JGT][LEAD][FORMS][DIAGNÓSTICO] PP2001,00 - PROFISSÕES,ade01,https://www.instagram.com/p/DUS4ip3jOQN/,"R$ 2,41",52,0,"0,00"
+2026-01-21,[JGT][LEAD][FORMS][DIAGNÓSTICO] PP2001,00 - PROFISSÕES,ade02,https://www.instagram.com/p/DUS4imaDLNX/,"R$ 3,09",46,0,"0,00"
+2026-01-21,[JGT][LEAD][FORMS][DIAGNÓSTICO] PP2001,00 - PROFISSÕES,ade03,https://www.instagram.com/p/DUS4nkLjKaV/,"R$ 0,05",3,0,"0,00"
+2026-01-21,[JGT][LEAD][FORMS][DIAGNÓSTICO] PP2001,00 - PROFISSÕES,ade04,https://www.instagram.com/p/DUS4nl_jEUt/,"R$ 0,19",6,0,"0,00"
+2026-01-22,[JGT][LEAD][FORMS][DIAGNÓSTICO] PP2001,00 - PROFISSÕES,ade01,https://www.instagram.com/p/DUS4ip3jOQN/,"R$ 2,27",60,2,"1,00"
+2026-01-22,[JGT][LEAD][FORMS][DIAGNÓSTICO] PP2001,00 - PROFISSÕES,ade02,https://www.instagram.com/p/DUS4imaDLNX/,"R$ 5,30",95,0,"0,00"
+2026-01-22,[JGT][LEAD][FORMS][DIAGNÓSTICO] PP2001,00 - PROFISSÕES,ade04,https://www.instagram.com/p/DUS4nl_jEUt/,"R$ 2,45",47,1,"0,00"
+2026-01-23,[JGT][LEAD][FORMS][DIAGNÓSTICO] PP2001,00 - PROFISSÕES,ade01,https://www.instagram.com/p/DUS4ip3jOQN/,"R$ 0,53",17,0,"0,00"
+2026-01-23,[JGT][LEAD][FORMS][DIAGNÓSTICO] PP2001,00 - PROFISSÕES,ade02,https://www.instagram.com/p/DUS4imaDLNX/,"R$ 2,92",73,3,"1,00"
+2026-01-23,[JGT][LEAD][FORMS][DIAGNÓSTICO] PP2001,00 - PROFISSÕES,ade03,https://www.instagram.com/p/DUS4nkLjKaV/,"R$ 4,16",92,3,"0,00"
+2026-01-23,[JGT][LEAD][FORMS][DIAGNÓSTICO] PP2001,00 - PROFISSÕES,ade04,https://www.instagram.com/p/DUS4nl_jEUt/,"R$ 2,00",52,2,"2,00"
+2026-01-24,[JGT][LEAD][FORMS][DIAGNÓSTICO] PP2001,00 - PROFISSÕES,ade01,https://www.instagram.com/p/DUS4ip3jOQN/,"R$ 0,04",1,0,"0,00"
+2026-01-24,[JGT][LEAD][FORMS][DIAGNÓSTICO] PP2001,00 - PROFISSÕES,ade02,https://www.instagram.com/p/DUS4imaDLNX/,"R$ 6,32",177,4,"1,00"
+2026-01-25,[JGT][LEAD][FORMS][DIAGNÓSTICO] PP2001,00 - PROFISSÕES,ade02,https://www.instagram.com/p/DUS4imaDLNX/,"R$ 16,18",529,24,"5,00"
+2026-01-25,[JGT][LEAD][FORMS][DIAGNÓSTICO][PQ] PP2001,00 - Começaram a seguir,ade02,https://www.instagram.com/p/DT6wNEMDGw7/,"R$ 0,75",32,0,"0,00"
+2026-01-25,[JGT][LEAD][FORMS][DIAGNÓSTICO][PQ] PP2001,00 - Começaram a seguir,ade04,https://www.instagram.com/p/DT9Lq8NjEYl/,"R$ 0,78",15,0,"0,00"
+2026-01-26,[JGT][LEAD][FORMS][DIAGNÓSTICO] PP2001,00 - PROFISSÕES,ade02,https://www.instagram.com/p/DUS4imaDLNX/,"R$ 6,43",273,6,"1,00"
+2026-01-26,[JGT][LEAD][FORMS][DIAGNÓSTICO] PP2001,00 - PROFISSÕES,ade04,https://www.instagram.com/p/DUS4nl_jEUt/,"R$ 0,41",8,0,"0,00"
+2026-01-26,[JGT][LEAD][FORMS][DIAGNÓSTICO][PQ] PP2001,00 - Começaram a seguir,ade01,https://www.instagram.com/p/DT9LoKdjArh/,"R$ 0,27",19,0,"0,00"
+2026-01-26,[JGT][LEAD][FORMS][DIAGNÓSTICO][PQ] PP2001,00 - Começaram a seguir,ade02,https://www.instagram.com/p/DT6wNEMDGw7/,"R$ 8,92",367,2,"1,00"
+2026-01-27,[JGT][LEAD][FORMS][DIAGNÓSTICO] PP2001,00 - PROFISSÕES,ade02,https://www.instagram.com/p/DUS4imaDLNX/,"R$ 9,65",358,7,"2,00"
+2026-01-27,[JGT][LEAD][FORMS][DIAGNÓSTICO][PQ] PP2001,00 - Começaram a seguir,ade01,https://www.instagram.com/p/DT9LoKdjArh/,"R$ 0,90",25,0,"0,00"
+2026-01-27,[JGT][LEAD][FORMS][DIAGNÓSTICO][PQ] PP2001,00 - Começaram a seguir,ade02,https://www.instagram.com/p/DT6wNEMDGw7/,"R$ 9,57",257,7,"0,00"
+2026-01-27,[JGT][LEAD][FORMS][DIAGNÓSTICO][PQ] PP2001,00 - Começaram a seguir,ade04,https://www.instagram.com/p/DT9Lq8NjEYl/,"R$ 1,35",43,0,"0,00"
+2026-01-28,[JGT][LEAD][FORMS][DIAGNÓSTICO] PP2001,00 - PROFISSÕES,ade02,https://www.instagram.com/p/DUS4imaDLNX/,"R$ 5,34",160,6,"2,00"
+2026-01-28,[JGT][LEAD][FORMS][DIAGNÓSTICO] PP2001,00 - PROFISSÕES,ade04,https://www.instagram.com/p/DUS4nl_jEUt/,"R$ 4,89",182,4,"0,00"
+2026-01-28,[JGT][LEAD][FORMS][DIAGNÓSTICO][PQ] PP2001,00 - Começaram a seguir,ade01,https://www.instagram.com/p/DT9LoKdjArh/,"R$ 0,40",9,1,"0,00"
+2026-01-28,[JGT][LEAD][FORMS][DIAGNÓSTICO][PQ] PP2001,00 - Começaram a seguir,ade02,https://www.instagram.com/p/DT6wNEMDGw7/,"R$ 7,31",221,8,"2,00"
+2026-01-29,[JGT][LEAD][FORMS][DIAGNÓSTICO] PP2001,00 - PROFISSÕES,ade04,https://www.instagram.com/p/DUS4nl_jEUt/,"R$ 7,03",223,3,"0,00"
+2026-01-29,[JGT][LEAD][FORMS][DIAGNÓSTICO][PQ] PP2001,00 - Começaram a seguir,ade01,https://www.instagram.com/p/DT9LoKdjArh/,"R$ 7,51",277,11,"1,00"
+2026-01-29,[JGT][LEAD][FORMS][DIAGNÓSTICO][PQ] PP2001,00 - Começaram a seguir,ade04,https://www.instagram.com/p/DT9Lq8NjEYl/,"R$ 3,05",52,1,"0,00"
+2026-01-30,[JGT][LEAD][FORMS][DIAGNÓSTICO] PP2001,00 - PROFISSÕES,ade03,https://www.instagram.com/p/DUS4nkLjKaV/,"R$ 10,49",191,4,"0,00"
+2026-01-30,[JGT][LEAD][FORMS][DIAGNÓSTICO] PP2001,00 - PROFISSÕES,ade04,https://www.instagram.com/p/DUS4nl_jEUt/,"R$ 0,33",5,0,"0,00"
+2026-01-30,[JGT][LEAD][FORMS][DIAGNÓSTICO][PQ] PP2001,00 - Começaram a seguir,ade01,https://www.instagram.com/p/DT9LoKdjArh/,"R$ 0,03",1,0,"0,00"
+2026-01-30,[JGT][LEAD][FORMS][DIAGNÓSTICO][PQ] PP2001,00 - Começaram a seguir,ade04,https://www.instagram.com/p/DT9Lq8NjEYl/,"R$ 2,53",77,2,"0,00"
+2026-01-31,[JGT][LEAD][FORMS][DIAGNÓSTICO] PP2001,00 - PROFISSÕES,ade01,https://www.instagram.com/p/DUS4ip3jOQN/,"R$ 0,14",13,1,"0,00"
+2026-01-31,[JGT][LEAD][FORMS][DIAGNÓSTICO] PP2001,00 - PROFISSÕES,ade03,https://www.instagram.com/p/DUS4nkLjKaV/,"R$ 9,01",183,4,"3,00"
+2026-02-01,[JGT][LEAD][FORMS][DIAGNÓSTICO] PP2001,00 - PROFISSÕES,ade03,https://www.instagram.com/p/DUS4nkLjKaV/,"R$ 14,78",322,5,"1,00"
+2026-02-02,[JGT][LEAD][FORMS][DIAGNÓSTICO] PP2001,00 - PROFISSÕES,ade01,https://www.instagram.com/p/DUS4ip3jOQN/,"R$ 8,56",268,6,"1,00"
+2026-02-02,[JGT][LEAD][FORMS][DIAGNÓSTICO] PP2001,00 - PROFISSÕES,ade03,https://www.instagram.com/p/DUS4nkLjKaV/,"R$ 0,67",27,1,"0,00"
+2026-02-03,[JGT][LEAD][FORMS][DIAGNÓSTICO] PP2001,00 - PROFISSÕES,ade01,https://www.instagram.com/p/DUS4ip3jOQN/,"R$ 2,22",50,1,"0,00"
+2026-02-06,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE010602,https://www.instagram.com/p/DUe1c4JjHM0/,"R$ 14,60",264,4,"1,00"
+2026-02-07,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE010602,https://www.instagram.com/p/DUe1c4JjHM0/,"R$ 15,58",330,7,"2,00"
+2026-02-08,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE010602,https://www.instagram.com/p/DUe1c4JjHM0/,"R$ 25,69",867,16,"5,00"
+2026-02-09,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE010602,https://www.instagram.com/p/DUe1c4JjHM0/,"R$ 17,52",573,13,"2,00"
+2026-02-09,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE020602,https://www.instagram.com/p/DUptUjPDCiE/,"R$ 0,42",12,1,"0,00"
+2026-02-09,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE030602,https://www.instagram.com/p/DUnxiF2DHCv/,"R$ 3,90",136,5,"1,00"
+2026-02-09,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE050602,https://www.instagram.com/p/DUptUjijNLN/,"R$ 0,85",16,4,"2,00"
+2026-02-10,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE020602,https://www.instagram.com/p/DUptUjPDCiE/,"R$ 9,32",257,10,"2,00"
+2026-02-10,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE030602,https://www.instagram.com/p/DUnxiF2DHCv/,"R$ 4,93",114,2,"1,00"
+2026-02-10,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE080602,https://www.instagram.com/p/DUnxiP8jMXx/,"R$ 2,81",75,1,"0,00"
+2026-02-11,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE020602,https://www.instagram.com/p/DUptUjPDCiE/,"R$ 5,74",165,7,"4,00"
+2026-02-11,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE030602,https://www.instagram.com/p/DUnxiF2DHCv/,"R$ 8,45",239,12,"2,00"
+2026-02-11,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE040602,https://www.instagram.com/p/DUptUudDG_f/,"R$ 0,02",1,0,"0,00"
+2026-02-11,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE050602,https://www.instagram.com/p/DUptUjijNLN/,"R$ 0,40",1,1,"0,00"
+2026-02-11,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE060602,https://www.instagram.com/p/DUnxhkZjAIq/,"R$ 1,43",53,1,"0,00"
+2026-02-11,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE070602,https://www.instagram.com/p/DUnxkhjDEMH/,"R$ 0,03",2,0,"0,00"
+2026-02-11,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE080602,https://www.instagram.com/p/DUnxiP8jMXx/,"R$ 0,16",4,0,"0,00"
+2026-02-12,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE020602,https://www.instagram.com/p/DUptUjPDCiE/,"R$ 0,07",3,0,"0,00"
+2026-02-12,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE030602,https://www.instagram.com/p/DUnxiF2DHCv/,"R$ 14,82",376,5,"0,00"
+2026-02-12,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE060602,https://www.instagram.com/p/DUnxhkZjAIq/,"R$ 2,15",78,2,"0,00"
+2026-02-13,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE030602,https://www.instagram.com/p/DUnxiF2DHCv/,"R$ 16,01",366,14,"3,00"
+2026-02-13,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE040602,https://www.instagram.com/p/DUptUudDG_f/,"R$ 0,07",6,0,"0,00"
+2026-02-13,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE050602,https://www.instagram.com/p/DUptUjijNLN/,"R$ 0,09",4,0,"0,00"
+2026-02-13,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE060602,https://www.instagram.com/p/DUnxhkZjAIq/,"R$ 4,04",108,2,"0,00"
+2026-02-14,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE030602,https://www.instagram.com/p/DUnxiF2DHCv/,"R$ 15,19",381,13,"2,00"
+2026-02-14,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE050602,https://www.instagram.com/p/DUptUjijNLN/,"R$ 1,05",36,1,"0,00"
+2026-02-14,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE060602,https://www.instagram.com/p/DUnxhkZjAIq/,"R$ 3,05",68,2,"0,00"
+2026-02-15,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE020602,https://www.instagram.com/p/DUptUjPDCiE/,"R$ 0,30",16,0,"0,00"
+2026-02-15,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE030602,https://www.instagram.com/p/DUnxiF2DHCv/,"R$ 21,15",612,13,"4,00"
+2026-02-15,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE060602,https://www.instagram.com/p/DUnxhkZjAIq/,"R$ 1,48",36,0,"0,00"
+2026-02-15,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE080602,https://www.instagram.com/p/DUnxiP8jMXx/,"R$ 0,76",14,1,"0,00"
+2026-02-16,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE030602,https://www.instagram.com/p/DUnxiF2DHCv/,"R$ 19,15",632,15,"6,00"
+2026-02-16,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE050602,https://www.instagram.com/p/DUptUjijNLN/,"R$ 1,75",56,4,"0,00"
+2026-02-16,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE060602,https://www.instagram.com/p/DUnxhkZjAIq/,"R$ 2,45",65,2,"0,00"
+2026-02-17,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE030602,https://www.instagram.com/p/DUnxiF2DHCv/,"R$ 21,27",730,18,"6,00"
+2026-02-17,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE060602,https://www.instagram.com/p/DUnxhkZjAIq/,"R$ 1,50",35,1,"0,00"
+2026-02-18,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE030602,https://www.instagram.com/p/DUnxiF2DHCv/,"R$ 13,53",566,17,"4,00"
+2026-02-18,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE050602,https://www.instagram.com/p/DUptUjijNLN/,"R$ 2,00",61,2,"1,00"
+2026-02-18,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE060602,https://www.instagram.com/p/DUnxhkZjAIq/,"R$ 0,39",14,0,"0,00"
+2026-02-18,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE080602,https://www.instagram.com/p/DUnxiP8jMXx/,"R$ 1,44",56,1,"0,00"
+2026-02-19,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE020602,https://www.instagram.com/p/DUptUjPDCiE/,"R$ 0,03",1,0,"0,00"
+2026-02-19,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE030602,https://www.instagram.com/p/DUnxiF2DHCv/,"R$ 13,86",512,8,"2,00"
+2026-02-19,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE050602,https://www.instagram.com/p/DUptUjijNLN/,"R$ 1,55",84,1,"0,00"
+2026-02-19,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE060602,https://www.instagram.com/p/DUnxhkZjAIq/,"R$ 0,07",1,0,"0,00"
+2026-02-20,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE020602,https://www.instagram.com/p/DUptUjPDCiE/,"R$ 0,02",1,0,"0,00"
+2026-02-20,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE030602,https://www.instagram.com/p/DUnxiF2DHCv/,"R$ 18,45",667,11,"3,00"
+2026-02-20,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE050602,https://www.instagram.com/p/DUptUjijNLN/,"R$ 0,03",2,0,"0,00"
+2026-02-20,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE060602,https://www.instagram.com/p/DUnxhkZjAIq/,"R$ 0,06",3,1,"0,00"
+2026-02-20,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE080602,https://www.instagram.com/p/DUnxiP8jMXx/,"R$ 0,20",10,0,"0,00"
+2026-02-21,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE030602,https://www.instagram.com/p/DUnxiF2DHCv/,"R$ 15,57",519,14,"5,00"
+2026-02-21,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE050602,https://www.instagram.com/p/DUptUjijNLN/,"R$ 0,79",20,0,"0,00"
+2026-02-21,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE060602,https://www.instagram.com/p/DUnxhkZjAIq/,"R$ 1,53",47,2,"1,00"
+2026-02-22,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE030602,https://www.instagram.com/p/DUnxiF2DHCv/,"R$ 19,38",628,13,"1,00"
+2026-02-22,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE060602,https://www.instagram.com/p/DUnxhkZjAIq/,"R$ 2,02",78,1,"0,00"
+2026-02-22,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE080602,https://www.instagram.com/p/DUnxiP8jMXx/,"R$ 0,20",2,0,"0,00"
+2026-02-23,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE030602,https://www.instagram.com/p/DUnxiF2DHCv/,"R$ 12,10",298,13,"3,00"
+2026-02-23,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE040602,https://www.instagram.com/p/DUptUudDG_f/,"R$ 0,40",18,0,"0,00"
+2026-02-23,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE050602,https://www.instagram.com/p/DUptUjijNLN/,"R$ 0,06",1,0,"0,00"
+2026-02-23,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE060602,https://www.instagram.com/p/DUnxhkZjAIq/,"R$ 4,45",139,4,"1,00"
+2026-02-24,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE030602,https://www.instagram.com/p/DUnxiF2DHCv/,"R$ 19,60",496,14,"4,00"
+2026-02-24,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE050602,https://www.instagram.com/p/DUptUjijNLN/,"R$ 1,53",63,2,"0,00"
+2026-02-24,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE060602,https://www.instagram.com/p/DUnxhkZjAIq/,"R$ 1,97",80,2,"0,00"
+2026-02-25,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE030602,https://www.instagram.com/p/DUnxiF2DHCv/,"R$ 18,44",473,8,"1,00"
+2026-02-25,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE060602,https://www.instagram.com/p/DUnxhkZjAIq/,"R$ 1,47",47,0,"0,00"
+2026-02-25,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE070602,https://www.instagram.com/p/DUnxkhjDEMH/,"R$ 0,02",3,0,"0,00"
+2026-02-25,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE080602,https://www.instagram.com/p/DUnxiP8jMXx/,"R$ 1,10",33,2,"2,00"
+2026-02-26,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE030602,https://www.instagram.com/p/DUnxiF2DHCv/,"R$ 17,71",447,17,"5,00"
+2026-02-26,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE050602,https://www.instagram.com/p/DUptUjijNLN/,"R$ 0,61",22,0,"0,00"
+2026-02-26,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE060602,https://www.instagram.com/p/DUnxhkZjAIq/,"R$ 0,94",18,0,"0,00"
+2026-02-27,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE020602,https://www.instagram.com/p/DUptUjPDCiE/,"R$ 0,03",1,0,"0,00"
+2026-02-27,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE030602,https://www.instagram.com/p/DUnxiF2DHCv/,"R$ 18,92",479,14,"3,00"
+2026-02-27,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE040602,https://www.instagram.com/p/DUptUudDG_f/,"R$ 0,06",4,0,"0,00"
+2026-02-27,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE060602,https://www.instagram.com/p/DUnxhkZjAIq/,"R$ 0,60",17,0,"0,00"
+2026-02-28,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE030602,https://www.instagram.com/p/DUnxiF2DHCv/,"R$ 13,83",294,10,"2,00"
+2026-02-28,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE050602,https://www.instagram.com/p/DUptUjijNLN/,"R$ 0,07",2,0,"0,00"
+2026-02-28,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE060602,https://www.instagram.com/p/DUnxhkZjAIq/,"R$ 1,88",43,1,"1,00"
+2026-02-28,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE080602,https://www.instagram.com/p/DUnxiP8jMXx/,"R$ 1,27",44,2,"0,00"
+2026-03-01,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE030602,https://www.instagram.com/p/DUnxiF2DHCv/,"R$ 19,69",573,12,"1,00"
+2026-03-01,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE050602,https://www.instagram.com/p/DUptUjijNLN/,"R$ 1,33",57,1,"0,00"
+2026-03-01,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE060602,https://www.instagram.com/p/DUnxhkZjAIq/,"R$ 1,49",47,0,"0,00"
+2026-03-02,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE020602,https://www.instagram.com/p/DUptUjPDCiE/,"R$ 0,13",4,0,"0,00"
+2026-03-02,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE030602,https://www.instagram.com/p/DUnxiF2DHCv/,"R$ 17,95",574,8,"1,00"
+2026-03-02,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE050602,https://www.instagram.com/p/DUptUjijNLN/,"R$ 0,01",1,0,"0,00"
+2026-03-02,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE060602,https://www.instagram.com/p/DUnxhkZjAIq/,"R$ 2,55",65,1,"0,00"
+2026-03-02,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE080602,https://www.instagram.com/p/DUnxiP8jMXx/,"R$ 0,06",2,0,"0,00"
+2026-03-03,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE030602,https://www.instagram.com/p/DUnxiF2DHCv/,"R$ 12,11",322,3,"0,00"
+2026-03-03,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE050602,https://www.instagram.com/p/DUptUjijNLN/,"R$ 1,28",20,0,"0,00"
+2026-03-03,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE060602,https://www.instagram.com/p/DUnxhkZjAIq/,"R$ 3,53",121,3,"1,00"
+2026-03-04,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE030602,https://www.instagram.com/p/DUnxiF2DHCv/,"R$ 20,01",446,13,"3,00"
+2026-03-04,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE060602,https://www.instagram.com/p/DUnxhkZjAIq/,"R$ 1,70",62,1,"0,00"
+2026-03-04,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE080602,https://www.instagram.com/p/DUnxiP8jMXx/,"R$ 0,23",8,2,"1,00"
+2026-03-05,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE030602,https://www.instagram.com/p/DUnxiF2DHCv/,"R$ 7,65",171,4,"0,00"
+2026-03-05,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE040602,https://www.instagram.com/p/DUptUudDG_f/,"R$ 1,22",30,1,"0,00"
+2026-03-05,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE050602,https://www.instagram.com/p/DUptUjijNLN/,"R$ 0,45",8,1,"0,00"
+2026-03-05,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE060602,https://www.instagram.com/p/DUnxhkZjAIq/,"R$ 8,38",206,6,"2,00"
+2026-03-06,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE030602,https://www.instagram.com/p/DUnxiF2DHCv/,"R$ 8,22",178,6,"3,00"
+2026-03-06,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE040602,https://www.instagram.com/p/DUptUudDG_f/,"R$ 0,34",7,0,"0,00"
+2026-03-06,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE050602,https://www.instagram.com/p/DUptUjijNLN/,"R$ 7,11",154,4,"1,00"
+2026-03-06,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE060602,https://www.instagram.com/p/DUnxhkZjAIq/,"R$ 3,14",83,2,"0,00"
+2026-03-07,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE020602,https://www.instagram.com/p/DUptUjPDCiE/,"R$ 0,41",6,2,"0,00"
+2026-03-07,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE040602,https://www.instagram.com/p/DUptUudDG_f/,"R$ 0,03",4,0,"0,00"
+2026-03-07,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE050602,https://www.instagram.com/p/DUptUjijNLN/,"R$ 20,41",422,12,"1,00"
+2026-03-08,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE050602,https://www.instagram.com/p/DUptUjijNLN/,"R$ 25,86",492,9,"2,00"
+2026-03-09,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE050602,https://www.instagram.com/p/DUptUjijNLN/,"R$ 15,28",366,7,"1,00"
+2026-03-09,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE070602,https://www.instagram.com/p/DUnxkhjDEMH/,"R$ 0,09",3,0,"0,00"
+2026-03-09,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE080602,https://www.instagram.com/p/DUnxiP8jMXx/,"R$ 2,23",56,1,"0,00"
+2026-03-10,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE040602,https://www.instagram.com/p/DUptUudDG_f/,"R$ 0,86",19,0,"0,00"
+2026-03-10,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE050602,https://www.instagram.com/p/DUptUjijNLN/,"R$ 18,65",443,19,"2,00"
+2026-03-11,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE020602,https://www.instagram.com/p/DUptUjPDCiE/,"R$ 0,69",11,0,"0,00"
+2026-03-11,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE050602,https://www.instagram.com/p/DUptUjijNLN/,"R$ 19,02",398,7,"0,00"
+2026-03-12,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE050602,https://www.instagram.com/p/DUptUjijNLN/,"R$ 7,60",99,3,"0,00"
+2026-03-12,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE070602,https://www.instagram.com/p/DUnxkhjDEMH/,"R$ 0,05",1,0,"0,00"
+2026-03-12,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE080602,https://www.instagram.com/p/DUnxiP8jMXx/,"R$ 12,48",241,8,"1,00"
+2026-03-13,[JGT][FORMS][DIAGNÓSTICO][TESTE] PP2001,00 - SETORES,ADE050602,https://www.instagram.com/p/DUptUjijNLN/,"R$ 10,78",170,8,"1,00"
+2026-03-25,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0125,https://www.instagram.com/p/DWX0wTtjMrP/,"R$ 2,42",46,1,"0,00"
+2026-03-25,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0225,https://www.instagram.com/p/DWX0wpAjFKz/,"R$ 9,33",184,6,"3,00"
+2026-03-25,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0325,https://www.instagram.com/p/DWX0wkuDI0P/,"R$ 3,28",48,0,"0,00"
+2026-03-25,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0425,https://www.instagram.com/p/DWX0wvpjGa0/,"R$ 0,70",9,0,"0,00"
+2026-03-25,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0525,https://www.instagram.com/p/DWX0wQEDM02/,"R$ 0,01",1,0,"0,00"
+2026-03-25,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0625,https://www.instagram.com/p/DWX0wvPjImT/,"R$ 0,15",6,0,"0,00"
+2026-03-26,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0125,https://www.instagram.com/p/DWX0wTtjMrP/,"R$ 1,10",22,0,"0,00"
+2026-03-26,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0225,https://www.instagram.com/p/DWX0wpAjFKz/,"R$ 14,42",378,3,"2,00"
+2026-03-26,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0325,https://www.instagram.com/p/DWX0wkuDI0P/,"R$ 0,40",14,0,"0,00"
+2026-03-26,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0425,https://www.instagram.com/p/DWX0wvpjGa0/,"R$ 1,34",15,1,"1,00"
+2026-03-26,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0625,https://www.instagram.com/p/DWX0wvPjImT/,"R$ 0,16",8,0,"0,00"
+2026-03-27,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0125,https://www.instagram.com/p/DWX0wTtjMrP/,"R$ 3,14",51,0,"0,00"
+2026-03-27,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0225,https://www.instagram.com/p/DWX0wpAjFKz/,"R$ 9,93",203,3,"1,00"
+2026-03-27,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0325,https://www.instagram.com/p/DWX0wkuDI0P/,"R$ 0,11",3,0,"0,00"
+2026-03-27,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0425,https://www.instagram.com/p/DWX0wvpjGa0/,"R$ 0,14",4,0,"0,00"
+2026-03-27,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0525,https://www.instagram.com/p/DWX0wQEDM02/,"R$ 0,05",1,0,"0,00"
+2026-03-27,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0625,https://www.instagram.com/p/DWX0wvPjImT/,"R$ 1,92",31,0,"0,00"
+2026-03-28,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0125,https://www.instagram.com/p/DWX0wTtjMrP/,"R$ 1,00",14,0,"0,00"
+2026-03-28,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0225,https://www.instagram.com/p/DWX0wpAjFKz/,"R$ 18,28",278,4,"0,00"
+2026-03-28,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0425,https://www.instagram.com/p/DWX0wvpjGa0/,"R$ 0,95",14,0,"0,00"
+2026-03-28,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0525,https://www.instagram.com/p/DWX0wQEDM02/,"R$ 0,21",1,0,"0,00"
+2026-03-28,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0625,https://www.instagram.com/p/DWX0wvPjImT/,"R$ 2,46",27,1,"0,00"
+2026-03-29,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0125,https://www.instagram.com/p/DWX0wTtjMrP/,"R$ 5,47",71,1,"0,00"
+2026-03-29,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0225,https://www.instagram.com/p/DWX0wpAjFKz/,"R$ 10,78",136,1,"0,00"
+2026-03-29,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0325,https://www.instagram.com/p/DWX0wkuDI0P/,"R$ 0,22",1,0,"0,00"
+2026-03-29,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0425,https://www.instagram.com/p/DWX0wvpjGa0/,"R$ 0,05",1,0,"0,00"
+2026-03-29,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0525,https://www.instagram.com/p/DWX0wQEDM02/,"R$ 3,44",51,0,"0,00"
+2026-03-29,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0625,https://www.instagram.com/p/DWX0wvPjImT/,"R$ 4,18",76,1,"0,00"
+2026-03-30,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0125,https://www.instagram.com/p/DWX0wTtjMrP/,"R$ 1,92",31,1,"0,00"
+2026-03-30,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0225,https://www.instagram.com/p/DWX0wpAjFKz/,"R$ 8,20",145,2,"1,00"
+2026-03-30,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0325,https://www.instagram.com/p/DWX0wkuDI0P/,"R$ 0,10",6,0,"0,00"
+2026-03-30,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0425,https://www.instagram.com/p/DWX0wvpjGa0/,"R$ 0,16",7,0,"0,00"
+2026-03-30,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0525,https://www.instagram.com/p/DWX0wQEDM02/,"R$ 1,34",26,0,"0,00"
+2026-03-30,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0625,https://www.instagram.com/p/DWX0wvPjImT/,"R$ 2,33",44,0,"0,00"
+2026-03-31,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0125,https://www.instagram.com/p/DWX0wTtjMrP/,"R$ 1,29",25,1,"0,00"
+2026-03-31,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0225,https://www.instagram.com/p/DWX0wpAjFKz/,"R$ 19,26",302,4,"0,00"
+2026-03-31,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0525,https://www.instagram.com/p/DWX0wQEDM02/,"R$ 1,56",18,1,"0,00"
+2026-03-31,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0625,https://www.instagram.com/p/DWX0wvPjImT/,"R$ 0,79",24,1,"0,00"
+2026-04-01,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0125,https://www.instagram.com/p/DWX0wTtjMrP/,"R$ 0,26",5,0,"0,00"
+2026-04-01,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0225,https://www.instagram.com/p/DWX0wpAjFKz/,"R$ 15,62",298,2,"0,00"
+2026-04-01,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0325,https://www.instagram.com/p/DWX0wkuDI0P/,"R$ 0,13",2,0,"0,00"
+2026-04-01,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0425,https://www.instagram.com/p/DWX0wvpjGa0/,"R$ 0,01",1,0,"0,00"
+2026-04-01,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0525,https://www.instagram.com/p/DWX0wQEDM02/,"R$ 0,17",2,0,"0,00"
+2026-04-01,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0625,https://www.instagram.com/p/DWX0wvPjImT/,"R$ 2,36",9,1,"1,00"
+2026-04-02,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0225,https://www.instagram.com/p/DWX0wpAjFKz/,"R$ 15,59",248,1,"0,00"
+2026-04-02,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0425,https://www.instagram.com/p/DWX0wvpjGa0/,"R$ 0,88",8,0,"0,00"
+2026-04-02,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0525,https://www.instagram.com/p/DWX0wQEDM02/,"R$ 0,01",1,0,"0,00"
+2026-04-02,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0625,https://www.instagram.com/p/DWX0wvPjImT/,"R$ 1,42",17,0,"0,00"
+2026-04-03,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0225,https://www.instagram.com/p/DWX0wpAjFKz/,"R$ 21,99",281,7,"0,00"
+2026-04-03,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0325,https://www.instagram.com/p/DWX0wkuDI0P/,"R$ 0,06",4,1,"0,00"
+2026-04-03,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0525,https://www.instagram.com/p/DWX0wQEDM02/,"R$ 1,26",13,0,"0,00"
+2026-04-04,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0125,https://www.instagram.com/p/DWX0wTtjMrP/,"R$ 2,08",34,0,"0,00"
+2026-04-04,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0225,https://www.instagram.com/p/DWX0wpAjFKz/,"R$ 13,62",185,1,"0,00"
+2026-04-04,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0325,https://www.instagram.com/p/DWX0wkuDI0P/,"R$ 0,07",1,0,"0,00"
+2026-04-04,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0425,https://www.instagram.com/p/DWX0wvpjGa0/,"R$ 0,74",7,0,"0,00"
+2026-04-04,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0625,https://www.instagram.com/p/DWX0wvPjImT/,"R$ 1,51",18,1,"0,00"
+2026-04-05,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0125,https://www.instagram.com/p/DWX0wTtjMrP/,"R$ 3,12",48,2,"0,00"
+2026-04-05,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0225,https://www.instagram.com/p/DWX0wpAjFKz/,"R$ 18,22",214,1,"0,00"
+2026-04-05,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0525,https://www.instagram.com/p/DWX0wQEDM02/,"R$ 2,62",16,1,"0,00"
+2026-04-05,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0625,https://www.instagram.com/p/DWX0wvPjImT/,"R$ 0,25",2,0,"0,00"
+2026-04-06,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0125,https://www.instagram.com/p/DWX0wTtjMrP/,"R$ 4,47",72,2,"1,00"
+2026-04-06,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0225,https://www.instagram.com/p/DWX0wpAjFKz/,"R$ 8,03",141,1,"0,00"
+2026-04-06,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0325,https://www.instagram.com/p/DWX0wkuDI0P/,"R$ 1,33",14,0,"0,00"
+2026-04-06,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0425,https://www.instagram.com/p/DWX0wvpjGa0/,"R$ 0,03",1,0,"0,00"
+2026-04-06,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0525,https://www.instagram.com/p/DWX0wQEDM02/,"R$ 3,30",32,1,"0,00"
+2026-04-06,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0625,https://www.instagram.com/p/DWX0wvPjImT/,"R$ 3,10",35,1,"0,00"
+2026-04-07,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0125,https://www.instagram.com/p/DWX0wTtjMrP/,"R$ 1,22",21,1,"1,00"
+2026-04-07,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0225,https://www.instagram.com/p/DWX0wpAjFKz/,"R$ 16,62",287,3,"1,00"
+2026-04-07,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0325,https://www.instagram.com/p/DWX0wkuDI0P/,"R$ 0,64",10,0,"0,00"
+2026-04-07,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0425,https://www.instagram.com/p/DWX0wvpjGa0/,"R$ 2,26",35,0,"0,00"
+2026-04-07,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0525,https://www.instagram.com/p/DWX0wQEDM02/,"R$ 1,35",15,0,"0,00"
+2026-04-07,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0625,https://www.instagram.com/p/DWX0wvPjImT/,"R$ 3,89",38,0,"0,00"
+2026-04-08,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0225,https://www.instagram.com/p/DWX0wpAjFKz/,"R$ 15,34",161,3,"0,00"
+2026-04-09,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0225,https://www.instagram.com/p/DWX0wpAjFKz/,"R$ 12,08",163,3,"0,00"
+2026-04-09,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0425,https://www.instagram.com/p/DWX0wvpjGa0/,"R$ 0,05",2,0,"0,00"
+2026-04-10,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0225,https://www.instagram.com/p/DWX0wpAjFKz/,"R$ 20,22",216,3,"0,00"
+2026-04-10,[JGT][FORMS][DIAGNOSTICO] PP25032 PP2001,00 - Mulheres com faculdade,ADE0225,https://www.instagram.com/p/DWX0wpAjFKz/,"R$ 6,81",91,2,"0,00"
+2026-04-10,[JGT][FORMS][DIAGNOSTICO] PP25032 PP2001,00 - Mulheres com faculdade,ADE0425,https://www.instagram.com/p/DWX0wvpjGa0/,"R$ 3,52",42,0,"0,00"
+2026-04-11,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0225,https://www.instagram.com/p/DWX0wpAjFKz/,"R$ 19,99",223,2,"0,00"
+2026-04-11,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0425,https://www.instagram.com/p/DWX0wvpjGa0/,"R$ 0,34",3,0,"0,00"
+2026-04-11,[JGT][FORMS][DIAGNOSTICO] PP25032 PP2001,00 - Mulheres com faculdade,ADE0225,https://www.instagram.com/p/DWX0wpAjFKz/,"R$ 3,22",41,0,"0,00"
+2026-04-11,[JGT][FORMS][DIAGNOSTICO] PP25032 PP2001,00 - Mulheres com faculdade,ADE0425,https://www.instagram.com/p/DWX0wvpjGa0/,"R$ 2,50",36,0,"0,00"
+2026-04-12,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0225,https://www.instagram.com/p/DWX0wpAjFKz/,"R$ 27,71",254,5,"1,00"
+2026-04-12,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0425,https://www.instagram.com/p/DWX0wvpjGa0/,"R$ 0,32",5,0,"0,00"
+2026-04-12,[JGT][FORMS][DIAGNOSTICO] PP25032 PP2001,00 - Mulheres com faculdade,ADE0225,https://www.instagram.com/p/DWX0wpAjFKz/,"R$ 10,76",156,0,"0,00"
+2026-04-12,[JGT][FORMS][DIAGNOSTICO] PP25032 PP2001,00 - Mulheres com faculdade,ADE0425,https://www.instagram.com/p/DWX0wvpjGa0/,"R$ 2,37",14,0,"0,00"
+2026-04-13,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0225,https://www.instagram.com/p/DWX0wpAjFKz/,"R$ 24,55",312,3,"1,00"
+2026-04-13,[JGT][FORMS][DIAGNOSTICO] PP25032 PP2001,00 - Mulheres com faculdade,ADE0225,https://www.instagram.com/p/DWX0wpAjFKz/,"R$ 10,95",155,1,"0,00"
+2026-04-13,[JGT][FORMS][DIAGNOSTICO] PP25032 PP2001,00 - Mulheres com faculdade,ADE0425,https://www.instagram.com/p/DWX0wvpjGa0/,"R$ 4,21",30,0,"0,00"
+2026-04-14,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADE03,https://www.instagram.com/p/DXHZKUGjJtC/,"R$ 17,82",208,1,"0,00"
+2026-04-14,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADE04,https://www.instagram.com/p/DXHZF2QDPKn/,"R$ 13,60",297,4,"0,00"
+2026-04-14,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADE05,https://www.instagram.com/p/DXLUw06jN5f/,"R$ 18,14",207,3,"1,00"
+2026-04-14,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADV01,,"R$ 14,67",300,3,"0,00"
+2026-04-14,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADV02,https://www.instagram.com/p/DXHZG0GDIZ3/,"R$ 17,52",214,2,"0,00"
+2026-04-14,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADV03,https://www.instagram.com/p/DXHZHMmDKwF/,"R$ 18,66",213,2,"2,00"
+2026-04-14,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADe01,https://www.instagram.com/p/DXLUwsjjMN2/,"R$ 18,16",260,8,"2,00"
+2026-04-14,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADe02,https://www.instagram.com/p/DXHZEvgjCjV/,"R$ 21,03",233,2,"1,00"
+2026-04-14,[JGT][FORMS][DIAGNOSTICO] PP2503 PP2001,00 - SETORES,ADE0225,https://www.instagram.com/p/DWX0wpAjFKz/,"R$ 6,07",50,1,"0,00"
+2026-04-14,[JGT][FORMS][DIAGNOSTICO] PP25032 PP2001,00 - Mulheres com faculdade,ADE0225,https://www.instagram.com/p/DWX0wpAjFKz/,"R$ 3,46",32,0,"0,00"
+2026-04-14,[JGT][FORMS][DIAGNOSTICO] PP25032 PP2001,00 - Mulheres com faculdade,ADE0425,https://www.instagram.com/p/DWX0wvpjGa0/,"R$ 0,90",8,0,"0,00"
+2026-04-15,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADE03,https://www.instagram.com/p/DXHZKUGjJtC/,"R$ 11,62",98,0,"0,00"
+2026-04-15,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADE04,https://www.instagram.com/p/DXHZF2QDPKn/,"R$ 6,91",88,4,"0,00"
+2026-04-15,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADE05,https://www.instagram.com/p/DXLUw06jN5f/,"R$ 18,84",202,0,"0,00"
+2026-04-15,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADV01,,"R$ 11,16",75,4,"1,00"
+2026-04-15,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADV02,https://www.instagram.com/p/DXHZG0GDIZ3/,"R$ 5,26",50,0,"0,00"
+2026-04-15,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADV03,https://www.instagram.com/p/DXHZHMmDKwF/,"R$ 22,24",253,2,"0,00"
+2026-04-15,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADe01,https://www.instagram.com/p/DXLUwsjjMN2/,"R$ 21,85",380,5,"1,00"
+2026-04-15,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADe02,https://www.instagram.com/p/DXHZEvgjCjV/,"R$ 8,81",80,0,"0,00"
+2026-04-16,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADE05,https://www.instagram.com/p/DXLUw06jN5f/,"R$ 4,37",45,1,"0,00"
+2026-04-16,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADV01,,"R$ 19,66",499,10,"0,00"
+2026-04-16,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADV03,https://www.instagram.com/p/DXHZHMmDKwF/,"R$ 13,04",130,1,"0,00"
+2026-04-16,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADe01,https://www.instagram.com/p/DXLUwsjjMN2/,"R$ 18,02",248,5,"1,00"
+2026-04-16,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE03,https://www.instagram.com/p/DXMlvaijDTx/,"R$ 1,07",15,0,"0,00"
+2026-04-16,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE04,https://www.instagram.com/p/DXQeUWcjLNZ/,"R$ 7,51",146,4,"2,00"
+2026-04-16,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE05,https://www.instagram.com/p/DXLUw06jN5f/,"R$ 3,69",52,2,"0,00"
+2026-04-16,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV02,https://www.instagram.com/p/DXHZG0GDIZ3/,"R$ 1,24",15,0,"0,00"
+2026-04-16,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV03,https://www.instagram.com/p/DXHZHMmDKwF/,"R$ 1,54",32,1,"0,00"
+2026-04-16,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADe01,https://www.instagram.com/p/DXLUwsjjMN2/,"R$ 0,96",14,0,"0,00"
+2026-04-16,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADe02,https://www.instagram.com/p/DXQeUWejM9-/,"R$ 1,31",15,0,"0,00"
+2026-04-17,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADV01,,"R$ 14,96",141,4,"0,00"
+2026-04-17,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADV03,https://www.instagram.com/p/DXHZHMmDKwF/,"R$ 1,37",11,1,"0,00"
+2026-04-17,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADe01,https://www.instagram.com/p/DXLUwsjjMN2/,"R$ 14,94",214,3,"1,00"
+2026-04-17,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE03,https://www.instagram.com/p/DXMlvaijDTx/,"R$ 0,22",8,0,"0,00"
+2026-04-17,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE04,https://www.instagram.com/p/DXQeUWcjLNZ/,"R$ 9,97",211,3,"0,00"
+2026-04-17,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE05,https://www.instagram.com/p/DXLUw06jN5f/,"R$ 0,94",21,0,"0,00"
+2026-04-17,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV02,https://www.instagram.com/p/DXHZG0GDIZ3/,"R$ 0,88",21,1,"0,00"
+2026-04-17,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV03,https://www.instagram.com/p/DXHZHMmDKwF/,"R$ 0,41",9,0,"0,00"
+2026-04-17,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADe01,https://www.instagram.com/p/DXLUwsjjMN2/,"R$ 0,23",2,0,"0,00"
+2026-04-17,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADe02,https://www.instagram.com/p/DXQeUWejM9-/,"R$ 0,22",7,0,"0,00"
+2026-04-18,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADe01,https://www.instagram.com/p/DXLUwsjjMN2/,"R$ 16,48",188,1,"0,00"
+2026-04-18,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE03,https://www.instagram.com/p/DXMlvaijDTx/,"R$ 0,05",3,0,"0,00"
+2026-04-18,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE04,https://www.instagram.com/p/DXQeUWcjLNZ/,"R$ 1,05",29,0,"0,00"
+2026-04-18,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE05,https://www.instagram.com/p/DXLUw06jN5f/,"R$ 14,99",197,7,"4,00"
+2026-04-18,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV02,https://www.instagram.com/p/DXHZG0GDIZ3/,"R$ 0,55",6,0,"0,00"
+2026-04-18,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV03,https://www.instagram.com/p/DXHZHMmDKwF/,"R$ 1,44",24,1,"0,00"
+2026-04-18,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADe02,https://www.instagram.com/p/DXQeUWejM9-/,"R$ 1,49",12,0,"0,00"
+2026-04-19,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADe01,https://www.instagram.com/p/DXLUwsjjMN2/,"R$ 23,95",264,10,"2,00"
+2026-04-19,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE04,https://www.instagram.com/p/DXQeUWcjLNZ/,"R$ 0,68",17,0,"0,00"
+2026-04-19,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE05,https://www.instagram.com/p/DXLUw06jN5f/,"R$ 27,86",545,12,"4,00"
+2026-04-19,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV02,https://www.instagram.com/p/DXHZG0GDIZ3/,"R$ 0,02",1,0,"0,00"
+2026-04-19,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV03,https://www.instagram.com/p/DXHZHMmDKwF/,"R$ 1,12",20,2,"0,00"
+2026-04-20,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADe01,https://www.instagram.com/p/DXLUwsjjMN2/,"R$ 27,08",471,15,"6,00"
+2026-04-20,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE05,https://www.instagram.com/p/DXLUw06jN5f/,"R$ 17,33",391,4,"1,00"
+2026-04-20,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV02,https://www.instagram.com/p/DXHZG0GDIZ3/,"R$ 0,03",1,0,"0,00"
+2026-04-20,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV03,https://www.instagram.com/p/DXHZHMmDKwF/,"R$ 0,16",4,1,"1,00"
+2026-04-21,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADe01,https://www.instagram.com/p/DXLUwsjjMN2/,"R$ 24,90",458,11,"3,00"
+2026-04-21,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE05,https://www.instagram.com/p/DXLUw06jN5f/,"R$ 18,76",424,10,"3,00"
+2026-04-21,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV03,https://www.instagram.com/p/DXHZHMmDKwF/,"R$ 0,06",2,0,"0,00"
+2026-04-22,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADe01,https://www.instagram.com/p/DXLUwsjjMN2/,"R$ 13,35",271,11,"3,00"
+2026-04-22,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE05,https://www.instagram.com/p/DXLUw06jN5f/,"R$ 15,44",340,4,"1,00"
+2026-04-22,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV03,https://www.instagram.com/p/DXHZHMmDKwF/,"R$ 0,04",2,0,"0,00"
+2026-04-23,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADe01,https://www.instagram.com/p/DXLUwsjjMN2/,"R$ 15,85",323,2,"0,00"
+2026-04-23,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE04,https://www.instagram.com/p/DXQeUWcjLNZ/,"R$ 0,02",1,0,"0,00"
+2026-04-23,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE05,https://www.instagram.com/p/DXLUw06jN5f/,"R$ 20,22",442,8,"4,00"
+2026-04-23,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV02,https://www.instagram.com/p/DXHZG0GDIZ3/,"R$ 0,23",1,0,"0,00"
+2026-04-23,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADe02,https://www.instagram.com/p/DXQeUWejM9-/,"R$ 0,05",2,0,"0,00"
+2026-04-24,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADe01,https://www.instagram.com/p/DXLUwsjjMN2/,"R$ 15,64",325,3,"0,00"
+2026-04-24,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE04,https://www.instagram.com/p/DXQeUWcjLNZ/,"R$ 0,09",4,0,"0,00"
+2026-04-24,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE05,https://www.instagram.com/p/DXLUw06jN5f/,"R$ 16,09",359,5,"2,00"
+2026-04-24,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV02,https://www.instagram.com/p/DXHZG0GDIZ3/,"R$ 0,10",2,0,"0,00"
+2026-04-24,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV03,https://www.instagram.com/p/DXHZHMmDKwF/,"R$ 0,09",5,0,"0,00"
+2026-04-24,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADe01,https://www.instagram.com/p/DXLUwsjjMN2/,"R$ 0,01",1,0,"0,00"
+2026-04-24,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADe02,https://www.instagram.com/p/DXQeUWejM9-/,"R$ 0,41",6,0,"0,00"
+2026-04-25,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADe01,https://www.instagram.com/p/DXLUwsjjMN2/,"R$ 19,14",331,8,"2,00"
+2026-04-25,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE04,https://www.instagram.com/p/DXQeUWcjLNZ/,"R$ 1,32",36,1,"1,00"
+2026-04-25,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE05,https://www.instagram.com/p/DXLUw06jN5f/,"R$ 14,63",248,9,"1,00"
+2026-04-25,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV02,https://www.instagram.com/p/DXHZG0GDIZ3/,"R$ 0,71",14,1,"0,00"
+2026-04-25,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV03,https://www.instagram.com/p/DXHZHMmDKwF/,"R$ 2,03",38,2,"0,00"
+2026-04-25,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADe02,https://www.instagram.com/p/DXQeUWejM9-/,"R$ 0,69",8,0,"0,00"
+2026-04-26,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADe01,https://www.instagram.com/p/DXLUwsjjMN2/,"R$ 22,53",401,8,"2,00"
+2026-04-26,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE04,https://www.instagram.com/p/DXQeUWcjLNZ/,"R$ 2,74",55,0,"0,00"
+2026-04-26,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE05,https://www.instagram.com/p/DXLUw06jN5f/,"R$ 14,16",261,9,"1,00"
+2026-04-26,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV02,https://www.instagram.com/p/DXHZG0GDIZ3/,"R$ 0,72",20,0,"0,00"
+2026-04-26,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV03,https://www.instagram.com/p/DXHZHMmDKwF/,"R$ 4,21",60,1,"1,00"
+2026-04-27,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADe01,https://www.instagram.com/p/DXLUwsjjMN2/,"R$ 25,59",505,9,"3,00"
+2026-04-27,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE04,https://www.instagram.com/p/DXQeUWcjLNZ/,"R$ 0,88",21,0,"0,00"
+2026-04-27,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE05,https://www.instagram.com/p/DXLUw06jN5f/,"R$ 11,75",209,1,"0,00"
+2026-04-27,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV02,https://www.instagram.com/p/DXHZG0GDIZ3/,"R$ 1,12",12,0,"0,00"
+2026-04-27,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV03,https://www.instagram.com/p/DXHZHMmDKwF/,"R$ 9,67",152,3,"2,00"
+2026-04-28,[JGT][FORMS]DIAGNÓSTICO] PP1404 PP2001,00 - SETORES 2026,ADe01,https://www.instagram.com/p/DXLUwsjjMN2/,"R$ 10,74",182,3,"2,00"
+2026-04-28,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE03,https://www.instagram.com/p/DXMlvaijDTx/,"R$ 0,02",2,0,"0,00"
+2026-04-28,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE04,https://www.instagram.com/p/DXQeUWcjLNZ/,"R$ 3,19",55,1,"0,00"
+2026-04-28,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE05,https://www.instagram.com/p/DXLUw06jN5f/,"R$ 14,48",274,6,"2,00"
+2026-04-28,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV02,https://www.instagram.com/p/DXHZG0GDIZ3/,"R$ 0,45",6,0,"0,00"
+2026-04-28,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV03,https://www.instagram.com/p/DXHZHMmDKwF/,"R$ 3,77",52,1,"1,00"
+2026-04-29,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE03,https://www.instagram.com/p/DXMlvaijDTx/,"R$ 0,01",1,0,"0,00"
+2026-04-29,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE04,https://www.instagram.com/p/DXQeUWcjLNZ/,"R$ 1,76",44,0,"0,00"
+2026-04-29,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE05,https://www.instagram.com/p/DXLUw06jN5f/,"R$ 14,30",307,6,"1,00"
+2026-04-29,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV02,https://www.instagram.com/p/DXHZG0GDIZ3/,"R$ 0,66",5,1,"0,00"
+2026-04-29,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV03,https://www.instagram.com/p/DXHZHMmDKwF/,"R$ 0,42",12,1,"1,00"
+2026-04-29,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADe02,https://www.instagram.com/p/DXQeUWejM9-/,"R$ 0,24",1,0,"0,00"
+2026-04-30,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE04,https://www.instagram.com/p/DXQeUWcjLNZ/,"R$ 1,34",40,1,"0,00"
+2026-04-30,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE05,https://www.instagram.com/p/DXLUw06jN5f/,"R$ 16,34",232,13,"2,00"
+2026-04-30,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV03,https://www.instagram.com/p/DXHZHMmDKwF/,"R$ 3,04",55,0,"0,00"
+2026-05-01,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE05,https://www.instagram.com/p/DXLUw06jN5f/,"R$ 10,87",203,3,"2,00"
+2026-05-01,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV03,https://www.instagram.com/p/DXHZHMmDKwF/,"R$ 8,27",171,4,"2,00"
+2026-05-02,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE04,https://www.instagram.com/p/DXQeUWcjLNZ/,"R$ 0,27",5,0,"0,00"
+2026-05-02,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE05,https://www.instagram.com/p/DXLUw06jN5f/,"R$ 6,14",127,4,"3,00"
+2026-05-02,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV03,https://www.instagram.com/p/DXHZHMmDKwF/,"R$ 8,47",176,0,"0,00"
+2026-05-02,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADe02,https://www.instagram.com/p/DXQeUWejM9-/,"R$ 0,04",2,0,"0,00"
+2026-05-03,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE04,https://www.instagram.com/p/DXQeUWcjLNZ/,"R$ 0,12",4,0,"0,00"
+2026-05-03,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE05,https://www.instagram.com/p/DXLUw06jN5f/,"R$ 14,37",320,5,"2,00"
+2026-05-03,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV03,https://www.instagram.com/p/DXHZHMmDKwF/,"R$ 7,33",140,3,"0,00"
+2026-05-04,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE05,https://www.instagram.com/p/DXLUw06jN5f/,"R$ 25,78",451,11,"5,00"
+2026-05-04,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADV03,https://www.instagram.com/p/DXHZHMmDKwF/,"R$ 0,70",17,0,"0,00"
+2026-05-05,[JGT][FORMS]DIAGNÓSTICO][PROFISSOES] PP1404 PP2001,00 - PROFISSIONAIS,ADE05,https://www.instagram.com/p/DXLUw06jN5f/,"R$ 9,11",158,5,"0,00"
+2026-05-05,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 9,57",177,2,"2,00"
+2026-05-05,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0205,https://www.instagram.com/p/DX9tOT0DEdr/,"R$ 7,89",149,1,"0,00"
+2026-05-05,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0305,https://www.instagram.com/p/DX9tRE7jB5W/,"R$ 8,34",143,1,"0,00"
+2026-05-05,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0405,https://www.instagram.com/p/DYD-JJ-jFb4/,"R$ 7,19",158,3,"0,00"
+2026-05-05,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0505,https://www.instagram.com/p/DYD-JOnDEwM/,"R$ 8,64",112,2,"0,00"
+2026-05-05,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0605,https://www.instagram.com/p/DX9tO2YjO5s/,"R$ 9,05",134,0,"0,00"
+2026-05-06,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 12,79",208,2,"0,00"
+2026-05-06,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0205,https://www.instagram.com/p/DX9tOT0DEdr/,"R$ 11,77",167,4,"1,00"
+2026-05-06,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0305,https://www.instagram.com/p/DX9tRE7jB5W/,"R$ 11,03",155,3,"0,00"
+2026-05-06,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0405,https://www.instagram.com/p/DYD-JJ-jFb4/,"R$ 14,99",261,8,"2,00"
+2026-05-06,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0505,https://www.instagram.com/p/DYD-JOnDEwM/,"R$ 13,64",168,7,"2,00"
+2026-05-06,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0605,https://www.instagram.com/p/DX9tO2YjO5s/,"R$ 14,67",133,2,"0,00"
+2026-05-07,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 11,58",138,5,"1,00"
+2026-05-07,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0405,https://www.instagram.com/p/DYD-JJ-jFb4/,"R$ 10,92",202,5,"0,00"
+2026-05-07,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0505,https://www.instagram.com/p/DYD-JOnDEwM/,"R$ 11,45",149,2,"0,00"
+2026-05-08,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 13,75",201,7,"2,00"
+2026-05-08,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0405,https://www.instagram.com/p/DYD-JJ-jFb4/,"R$ 12,76",190,2,"0,00"
+2026-05-08,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0505,https://www.instagram.com/p/DYD-JOnDEwM/,"R$ 15,56",218,5,"1,00"
+2026-05-09,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 11,14",154,4,"2,00"
+2026-05-09,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0405,https://www.instagram.com/p/DYD-JJ-jFb4/,"R$ 12,49",211,2,"0,00"
+2026-05-09,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0505,https://www.instagram.com/p/DYD-JOnDEwM/,"R$ 11,35",154,2,"1,00"
+2026-05-10,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 19,04",280,4,"0,00"
+2026-05-10,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0405,https://www.instagram.com/p/DYD-JJ-jFb4/,"R$ 20,87",255,5,"1,00"
+2026-05-10,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0505,https://www.instagram.com/p/DYD-JOnDEwM/,"R$ 18,31",273,3,"1,00"
+2026-05-11,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 15,56",330,4,"0,00"
+2026-05-11,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0405,https://www.instagram.com/p/DYD-JJ-jFb4/,"R$ 15,21",256,5,"2,00"
+2026-05-11,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0505,https://www.instagram.com/p/DYD-JOnDEwM/,"R$ 13,98",262,2,"2,00"
+2026-05-12,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 15,59",245,6,"1,00"
+2026-05-12,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0405,https://www.instagram.com/p/DYD-JJ-jFb4/,"R$ 15,75",227,7,"1,00"
+2026-05-12,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0505,https://www.instagram.com/p/DYD-JOnDEwM/,"R$ 15,28",227,3,"0,00"
+2026-05-13,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 14,01",260,2,"0,00"
+2026-05-13,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0405,https://www.instagram.com/p/DYD-JJ-jFb4/,"R$ 14,99",191,6,"0,00"
+2026-05-13,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0505,https://www.instagram.com/p/DYD-JOnDEwM/,"R$ 15,28",218,3,"0,00"
+2026-05-14,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 15,82",279,6,"1,00"
+2026-05-14,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0405,https://www.instagram.com/p/DYD-JJ-jFb4/,"R$ 14,46",246,7,"0,00"
+2026-05-14,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0505,https://www.instagram.com/p/DYD-JOnDEwM/,"R$ 17,05",245,5,"2,00"
+2026-05-15,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 14,02",210,0,"0,00"
+2026-05-15,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0405,https://www.instagram.com/p/DYD-JJ-jFb4/,"R$ 15,05",197,9,"2,00"
+2026-05-15,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0505,https://www.instagram.com/p/DYD-JOnDEwM/,"R$ 13,79",214,1,"0,00"
+2026-05-16,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 10,89",151,3,"1,00"
+2026-05-16,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0405,https://www.instagram.com/p/DYD-JJ-jFb4/,"R$ 8,60",145,6,"1,00"
+2026-05-16,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0505,https://www.instagram.com/p/DYD-JOnDEwM/,"R$ 11,28",213,4,"1,00"
+2026-05-17,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 20,10",315,10,"1,00"
+2026-05-17,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0405,https://www.instagram.com/p/DYD-JJ-jFb4/,"R$ 18,82",230,10,"0,00"
+2026-05-17,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0505,https://www.instagram.com/p/DYD-JOnDEwM/,"R$ 18,50",260,7,"0,00"
+2026-05-18,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 15,80",312,10,"2,00"
+2026-05-18,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0405,https://www.instagram.com/p/DYD-JJ-jFb4/,"R$ 17,37",205,8,"3,00"
+2026-05-18,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0505,https://www.instagram.com/p/DYD-JOnDEwM/,"R$ 16,06",245,1,"0,00"
+2026-05-19,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 16,40",236,7,"1,00"
+2026-05-19,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0405,https://www.instagram.com/p/DYD-JJ-jFb4/,"R$ 17,39",297,6,"0,00"
+2026-05-19,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0505,https://www.instagram.com/p/DYD-JOnDEwM/,"R$ 18,89",299,8,"2,00"
+2026-05-20,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 17,37",209,7,"1,00"
+2026-05-20,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0405,https://www.instagram.com/p/DYD-JJ-jFb4/,"R$ 17,63",211,11,"1,00"
+2026-05-20,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0505,https://www.instagram.com/p/DYD-JOnDEwM/,"R$ 17,90",292,5,"0,00"
+2026-05-21,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 15,62",185,3,"0,00"
+2026-05-21,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0405,https://www.instagram.com/p/DYD-JJ-jFb4/,"R$ 15,26",156,8,"0,00"
+2026-05-21,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0505,https://www.instagram.com/p/DYD-JOnDEwM/,"R$ 13,24",198,1,"0,00"
+2026-05-22,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 11,77",156,4,"1,00"
+2026-05-22,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0405,https://www.instagram.com/p/DYD-JJ-jFb4/,"R$ 7,35",46,3,"0,00"
+2026-05-22,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0505,https://www.instagram.com/p/DYD-JOnDEwM/,"R$ 5,74",58,0,"0,00"
+2026-05-22,[JGT][FORMS][DIAGNÓSTICO][VIDEO] PP2403 PP2001,00 - PROFISSIONAIS,ADV0105,https://www.instagram.com/p/DYo_HL9DPgf/,"R$ 13,63",130,2,"0,00"
+2026-05-22,[JGT][FORMS][DIAGNÓSTICO][VIDEO] PP2403 PP2001,00 - PROFISSIONAIS,ADV0205,https://www.instagram.com/p/DYo_HJ1jFkt/,"R$ 12,12",137,1,"0,00"
+2026-05-22,[JGT][FORMS][DIAGNÓSTICO][VIDEO] PP2403 PP2001,00 - PROFISSIONAIS,ADV0305,https://www.instagram.com/p/DYo_G_tjNgY/,"R$ 12,52",130,2,"0,00"
+2026-05-22,[JGT][FORMS][DIAGNÓSTICO][VIDEO] PP2403 PP2001,00 - PROFISSIONAIS,ADV0405,https://www.instagram.com/p/DYo_It1jPXd/,"R$ 13,12",120,2,"0,00"
+2026-05-23,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 7,84",122,2,"1,00"
+2026-05-23,[JGT][FORMS][DIAGNÓSTICO][VIDEO] PP2403 PP2001,00 - PROFISSIONAIS,ADV0105,https://www.instagram.com/p/DYo_HL9DPgf/,"R$ 2,55",46,1,"0,00"
+2026-05-23,[JGT][FORMS][DIAGNÓSTICO][VIDEO] PP2403 PP2001,00 - PROFISSIONAIS,ADV0205,https://www.instagram.com/p/DYo_HJ1jFkt/,"R$ 3,94",78,1,"0,00"
+2026-05-23,[JGT][FORMS][DIAGNÓSTICO][VIDEO] PP2403 PP2001,00 - PROFISSIONAIS,ADV0305,https://www.instagram.com/p/DYo_G_tjNgY/,"R$ 3,66",49,1,"0,00"
+2026-05-23,[JGT][FORMS][DIAGNÓSTICO][VIDEO] PP2403 PP2001,00 - PROFISSIONAIS,ADV0405,https://www.instagram.com/p/DYo_It1jPXd/,"R$ 3,06",49,0,"0,00"
+2026-05-24,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 23,24",296,13,"4,00"
+2026-05-24,[JGT][FORMS][DIAGNÓSTICO][VIDEO] PP2403 PP2001,00 - PROFISSIONAIS,ADV0105,https://www.instagram.com/p/DYo_HL9DPgf/,"R$ 13,21",166,1,"0,00"
+2026-05-24,[JGT][FORMS][DIAGNÓSTICO][VIDEO] PP2403 PP2001,00 - PROFISSIONAIS,ADV0205,https://www.instagram.com/p/DYo_HJ1jFkt/,"R$ 16,67",189,6,"4,00"
+2026-05-24,[JGT][FORMS][DIAGNÓSTICO][VIDEO] PP2403 PP2001,00 - PROFISSIONAIS,ADV0305,https://www.instagram.com/p/DYo_G_tjNgY/,"R$ 14,71",175,3,"0,00"
+2026-05-24,[JGT][FORMS][DIAGNÓSTICO][VIDEO] PP2403 PP2001,00 - PROFISSIONAIS,ADV0405,https://www.instagram.com/p/DYo_It1jPXd/,"R$ 16,14",144,2,"0,00"
+2026-05-25,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 17,76",267,8,"1,00"
+2026-05-25,[JGT][FORMS][DIAGNÓSTICO][VIDEO] PP2403 PP2001,00 - PROFISSIONAIS,ADV0105,https://www.instagram.com/p/DYo_HL9DPgf/,"R$ 8,79",79,2,"0,00"
+2026-05-25,[JGT][FORMS][DIAGNÓSTICO][VIDEO] PP2403 PP2001,00 - PROFISSIONAIS,ADV0205,https://www.instagram.com/p/DYo_HJ1jFkt/,"R$ 14,70",185,3,"0,00"
+2026-05-25,[JGT][FORMS][DIAGNÓSTICO][VIDEO] PP2403 PP2001,00 - PROFISSIONAIS,ADV0305,https://www.instagram.com/p/DYo_G_tjNgY/,"R$ 8,09",62,1,"0,00"
+2026-05-25,[JGT][FORMS][DIAGNÓSTICO][VIDEO] PP2403 PP2001,00 - PROFISSIONAIS,ADV0405,https://www.instagram.com/p/DYo_It1jPXd/,"R$ 9,53",81,0,"0,00"
+2026-05-26,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 15,03",227,4,"1,00"
+2026-05-26,[JGT][FORMS][DIAGNÓSTICO][VIDEO] PP2403 PP2001,00 - PROFISSIONAIS,ADV0205,https://www.instagram.com/p/DYo_HJ1jFkt/,"R$ 5,93",114,0,"0,00"
+2026-05-27,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 13,63",260,4,"3,00"
+2026-05-27,[JGT][FORMS][DIAGNÓSTICO][VIDEO] PP2403 PP2001,00 - PROFISSIONAIS,ADV0205,https://www.instagram.com/p/DYo_HJ1jFkt/,"R$ 11,75",126,1,"0,00"
+2026-05-28,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 13,92",238,6,"2,00"
+2026-05-28,[JGT][FORMS][DIAGNÓSTICO][VIDEO] PP2403 PP2001,00 - PROFISSIONAIS,ADV0205,https://www.instagram.com/p/DYo_HJ1jFkt/,"R$ 8,99",136,2,"0,00"
+2026-05-29,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 12,71",224,2,"0,00"
+2026-05-29,[JGT][FORMS][DIAGNÓSTICO][VIDEO] PP2403 PP2001,00 - PROFISSIONAIS,ADV0205,https://www.instagram.com/p/DYo_HJ1jFkt/,"R$ 8,14",90,0,"0,00"
+2026-05-30,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 8,51",179,6,"1,00"
+2026-05-30,[JGT][FORMS][DIAGNÓSTICO][VIDEO] PP2403 PP2001,00 - PROFISSIONAIS,ADV0205,https://www.instagram.com/p/DYo_HJ1jFkt/,"R$ 3,80",57,0,"0,00"
+2026-05-31,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 19,67",326,6,"1,00"
+2026-05-31,[JGT][FORMS][DIAGNÓSTICO][VIDEO] PP2403 PP2001,00 - PROFISSIONAIS,ADV0205,https://www.instagram.com/p/DYo_HJ1jFkt/,"R$ 14,40",146,2,"0,00"
+2026-06-01,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 18,45",290,6,"3,00"
+2026-06-01,[JGT][FORMS][DIAGNÓSTICO][VIDEO] PP2403 PP2001,00 - PROFISSIONAIS,ADV0205,https://www.instagram.com/p/DYo_HJ1jFkt/,"R$ 11,31",144,2,"0,00"
+2026-06-02,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 16,26",285,4,"1,00"
+2026-06-02,[JGT][FORMS][DIAGNÓSTICO][VIDEO] PP2403 PP2001,00 - PROFISSIONAIS,ADV0205,https://www.instagram.com/p/DYo_HJ1jFkt/,"R$ 12,23",131,4,"0,00"
+2026-06-03,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 15,59",257,2,"1,00"
+2026-06-03,[JGT][FORMS][DIAGNÓSTICO][VIDEO] PP2403 PP2001,00 - PROFISSIONAIS,ADV0205,https://www.instagram.com/p/DYo_HJ1jFkt/,"R$ 5,89",51,0,"0,00"
+2026-06-03,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0103,https://www.instagram.com/p/DZJTMvPDN8D/,"R$ 0,10",5,0,"0,00"
+2026-06-03,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0203,https://www.instagram.com/p/DZJTMvoDHdt/,"R$ 2,85",59,3,"0,00"
+2026-06-03,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0403,https://www.instagram.com/p/DZJTMwBDOQv/,"R$ 0,30",5,0,"0,00"
+2026-06-03,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0503,https://www.instagram.com/p/DZJTMvKjDVA/,"R$ 0,42",12,4,"0,00"
+2026-06-03,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0603,https://www.instagram.com/p/DZJTM5OjLSm/,"R$ 1,07",24,0,"0,00"
+2026-06-03,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0703,https://www.instagram.com/p/DZJTM7GDPvG/,"R$ 1,08",21,0,"0,00"
+2026-06-04,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 14,99",254,12,"1,00"
+2026-06-04,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0103,https://www.instagram.com/p/DZJTMvPDN8D/,"R$ 2,06",39,1,"0,00"
+2026-06-04,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0203,https://www.instagram.com/p/DZJTMvoDHdt/,"R$ 18,54",223,6,"1,00"
+2026-06-04,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0303,https://www.instagram.com/p/DZJTMn-DEGy/,"R$ 1,82",25,0,"0,00"
+2026-06-04,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0403,https://www.instagram.com/p/DZJTMwBDOQv/,"R$ 0,86",8,0,"0,00"
+2026-06-04,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0503,https://www.instagram.com/p/DZJTMvKjDVA/,"R$ 12,34",111,6,"2,00"
+2026-06-04,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0603,https://www.instagram.com/p/DZJTM5OjLSm/,"R$ 7,37",137,5,"0,00"
+2026-06-04,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0703,https://www.instagram.com/p/DZJTM7GDPvG/,"R$ 2,98",37,1,"0,00"
+2026-06-05,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 11,36",182,3,"1,00"
+2026-06-05,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0103,https://www.instagram.com/p/DZJTMvPDN8D/,"R$ 1,71",23,2,"0,00"
+2026-06-05,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0203,https://www.instagram.com/p/DZJTMvoDHdt/,"R$ 5,12",68,3,"0,00"
+2026-06-05,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0303,https://www.instagram.com/p/DZJTMn-DEGy/,"R$ 9,24",99,1,"1,00"
+2026-06-05,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0403,https://www.instagram.com/p/DZJTMwBDOQv/,"R$ 0,23",4,2,"0,00"
+2026-06-05,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0503,https://www.instagram.com/p/DZJTMvKjDVA/,"R$ 10,38",182,5,"0,00"
+2026-06-05,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0603,https://www.instagram.com/p/DZJTM5OjLSm/,"R$ 7,48",105,6,"1,00"
+2026-06-05,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0703,https://www.instagram.com/p/DZJTM7GDPvG/,"R$ 0,49",5,0,"0,00"
+2026-06-05,[JGT][LEADS][DIAGNÓSTICO][ADV] PP2001,00 - ADV,ADE0105,https://www.instagram.com/p/DZNJaOIjGjY/,"R$ 10,85",93,6,"2,00"
+2026-06-05,[JGT][LEADS][DIAGNÓSTICO][ADV] PP2001,00 - ADV,ADV0106,https://www.instagram.com/p/DZNJcaTjAFu/,"R$ 1,46",4,1,"1,00"
+2026-06-05,[JGT][LEADS][DIAGNÓSTICO][ADV] PP2001,00 - ADV,ADV0206,https://www.instagram.com/p/DZNJb2BjJ0R/,"R$ 0,07",3,0,"0,00"
+2026-06-05,[JGT][LEADS][DIAGNÓSTICO][ADV] PP2001,00 - ADV,ADV0406,https://www.instagram.com/p/DZNJc0nDANb/,"R$ 0,34",5,0,"0,00"
+2026-06-05,[JGT][LEADS][DIAGNÓSTICO][ADV] PP2001,00 - ADV,ADV0506,https://www.instagram.com/p/DZNJcrBDMfU/,"R$ 0,07",1,0,"0,00"
+2026-06-06,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 8,68",164,4,"0,00"
+2026-06-06,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0103,https://www.instagram.com/p/DZJTMvPDN8D/,"R$ 0,38",2,1,"0,00"
+2026-06-06,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0303,https://www.instagram.com/p/DZJTMn-DEGy/,"R$ 19,43",332,9,"0,00"
+2026-06-06,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0403,https://www.instagram.com/p/DZJTMwBDOQv/,"R$ 0,46",6,0,"0,00"
+2026-06-06,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0503,https://www.instagram.com/p/DZJTMvKjDVA/,"R$ 15,78",185,8,"1,00"
+2026-06-06,[JGT][LEADS][DIAGNÓSTICO][ADV] PP2001,00 - ADV,ADE0105,https://www.instagram.com/p/DZNJaOIjGjY/,"R$ 0,02",1,0,"0,00"
+2026-06-06,[JGT][LEADS][DIAGNÓSTICO][ADV] PP2001,00 - ADV,ADV0106,https://www.instagram.com/p/DZNJcaTjAFu/,"R$ 0,50",6,0,"0,00"
+2026-06-06,[JGT][LEADS][DIAGNÓSTICO][ADV] PP2001,00 - ADV,ADV0206,https://www.instagram.com/p/DZNJb2BjJ0R/,"R$ 0,20",2,0,"0,00"
+2026-06-06,[JGT][LEADS][DIAGNÓSTICO][ADV] PP2001,00 - ADV,ADV0306,https://www.instagram.com/p/DZNJcmdDEzy/,"R$ 0,87",15,0,"0,00"
+2026-06-06,[JGT][LEADS][DIAGNÓSTICO][ADV] PP2001,00 - ADV,ADV0406,https://www.instagram.com/p/DZNJc0nDANb/,"R$ 0,39",3,0,"0,00"
+2026-06-06,[JGT][LEADS][DIAGNÓSTICO][ADV] PP2001,00 - ADV,ADV0606,https://www.instagram.com/p/DZNJcwPDNlQ/,"R$ 0,95",19,0,"0,00"
+2026-06-07,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 20,91",294,5,"0,00"
+2026-06-07,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0103,https://www.instagram.com/p/DZJTMvPDN8D/,"R$ 3,49",45,5,"0,00"
+2026-06-07,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0303,https://www.instagram.com/p/DZJTMn-DEGy/,"R$ 7,68",79,2,"0,00"
+2026-06-07,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0403,https://www.instagram.com/p/DZJTMwBDOQv/,"R$ 2,26",10,0,"0,00"
+2026-06-07,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0503,https://www.instagram.com/p/DZJTMvKjDVA/,"R$ 20,70",312,8,"3,00"
+2026-06-07,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0603,https://www.instagram.com/p/DZJTM5OjLSm/,"R$ 3,66",52,1,"1,00"
+2026-06-07,[JGT][LEADS][DIAGNÓSTICO][ADV] PP2001,00 - ADV,ADE0105,https://www.instagram.com/p/DZNJaOIjGjY/,"R$ 9,64",159,1,"1,00"
+2026-06-07,[JGT][LEADS][DIAGNÓSTICO][ADV] PP2001,00 - ADV,ADV0106,https://www.instagram.com/p/DZNJcaTjAFu/,"R$ 0,53",9,0,"0,00"
+2026-06-07,[JGT][LEADS][DIAGNÓSTICO][ADV] PP2001,00 - ADV,ADV0206,https://www.instagram.com/p/DZNJb2BjJ0R/,"R$ 0,02",1,0,"0,00"
+2026-06-07,[JGT][LEADS][DIAGNÓSTICO][ADV] PP2001,00 - ADV,ADV0306,https://www.instagram.com/p/DZNJcmdDEzy/,"R$ 0,34",5,0,"0,00"
+2026-06-07,[JGT][LEADS][DIAGNÓSTICO][ADV] PP2001,00 - ADV,ADV0406,https://www.instagram.com/p/DZNJc0nDANb/,"R$ 1,35",27,0,"0,00"
+2026-06-07,[JGT][LEADS][DIAGNÓSTICO][ADV] PP2001,00 - ADV,ADV0506,https://www.instagram.com/p/DZNJcrBDMfU/,"R$ 0,55",2,1,"0,00"
+2026-06-07,[JGT][LEADS][DIAGNÓSTICO][ADV] PP2001,00 - ADV,ADV0606,https://www.instagram.com/p/DZNJcwPDNlQ/,"R$ 0,70",14,0,"0,00"
+2026-06-08,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 14,97",188,5,"1,00"
+2026-06-08,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0503,https://www.instagram.com/p/DZJTMvKjDVA/,"R$ 25,99",474,7,"1,00"
+2026-06-08,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0703,https://www.instagram.com/p/DZJTM7GDPvG/,"R$ 0,13",7,1,"0,00"
+2026-06-08,[JGT][LEADS][DIAGNÓSTICO][ADV] PP2001,00 - ADV,ADE0105,https://www.instagram.com/p/DZNJaOIjGjY/,"R$ 12,80",217,4,"0,00"
+2026-06-09,[JGT][FORMS][DIAGNÓSTICO][JUNHO][FECHADO] PP2001,00 - PROFISSÕES,ADE0105,https://www.instagram.com/p/DZXn_gBDF9M/,"R$ 0,07",3,0,"0,00"
+2026-06-09,[JGT][FORMS][DIAGNÓSTICO][JUNHO][FECHADO] PP2001,00 - PROFISSÕES,ADE0503,https://www.instagram.com/p/DZXn_dGjKCI/,"R$ 3,25",39,1,"0,00"
+2026-06-09,[JGT][FORMS][DIAGNÓSTICO][JUNHO][FECHADO] PP2001,00 - PROFISSÕES,ADE0603,https://www.instagram.com/p/DZXn_VLjGFV/,"R$ 7,36",109,0,"0,00"
+2026-06-09,[JGT][FORMS][DIAGNÓSTICO][NOVOS] PP2403 PP2001 PP2001,00 - PROFISSIONAIS,ADE0105,https://www.instagram.com/p/DYD-I8IjHL0/,"R$ 5,61",70,4,"0,00"
+2026-06-09,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0403,https://www.instagram.com/p/DZJTMwBDOQv/,"R$ 0,23",3,0,"0,00"
+2026-06-09,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0503,https://www.instagram.com/p/DZJTMvKjDVA/,"R$ 5,27",68,1,"0,00"
+2026-06-09,[JGT][FORMS][DIAGNÓSTICO][prof] PP2403 PP2001,00 - PROFISSIONAIS,ADE0603,https://www.instagram.com/p/DZJTM5OjLSm/,"R$ 1,87",25,2,"1,00"
+2026-06-09,[JGT][LEADS][DIAGNÓSTICO][ADV] PP2001,00 - ADV,ADE0105,https://www.instagram.com/p/DZNJaOIjGjY/,"R$ 3,96",47,1,"0,00"
+2026-06-09,[JGT][LEADS][DIAGNÓSTICO][ADV] PP2001,00 - ADV,ADV0406,https://www.instagram.com/p/DZNJc0nDANb/,"R$ 0,10",3,0,"0,00"
+2026-06-10,[JGT][FORMS][DIAGNÓSTICO][JUNHO][FECHADO] PP2001,00 - PROFISSÕES,ADE0105,https://www.instagram.com/p/DZXn_gBDF9M/,"R$ 2,07",21,1,"0,00"
+2026-06-10,[JGT][FORMS][DIAGNÓSTICO][JUNHO][FECHADO] PP2001,00 - PROFISSÕES,ADE0503,https://www.instagram.com/p/DZXn_dGjKCI/,"R$ 5,22",59,0,"0,00"
+2026-06-10,[JGT][FORMS][DIAGNÓSTICO][JUNHO][FECHADO] PP2001,00 - PROFISSÕES,ADE0603,https://www.instagram.com/p/DZXn_VLjGFV/,"R$ 5,91",64,2,"1,00"
+2026-06-11,[JGT][FORMS][DIAGNÓSTICO][JUNHO][FECHADO] PP2001,00 - PROFISSÕES,ADE0503,https://www.instagram.com/p/DZXn_dGjKCI/,"R$ 0,24",8,0,"0,00"
+2026-06-11,[JGT][FORMS][DIAGNÓSTICO][JUNHO][FECHADO] PP2001,00 - PROFISSÕES,ADE0603,https://www.instagram.com/p/DZXn_VLjGFV/,"R$ 2,07",17,0,"0,00"
+2026-06-11,[JGT][FORMS][DIAGNÓSTICO][JUNHO][FECHADO] PP2001,00 - PROFISSÕES,ADV0106,https://www.instagram.com/p/DZXoB1djJ49/,"R$ 5,80",43,2,"2,00"
+`;
+
+/* ============ STATE ============ */
+let RAW = [];           // linhas brutas {date,inv,imp,cliques,leads,campaign,adset,ad,link}
+let DIAS = [];          // agregado por dia (do período)
+let lastDataDate = null;
+let DEMO_MODE = false;
+let dateFrom=null, dateTo=null;
+let charts = {};
+let criSort={k:'cpl',dir:'asc'}, pubSort={k:'cpl',dir:'asc'};
+
+/* ============ HELPERS ============ */
+function parseMoneyBR(s){ if(s==null)return 0; s=String(s).replace(/R\$/g,'').replace(/\s/g,'').trim(); if(!s)return 0; s=s.replace(/\./g,'').replace(',','.'); const n=parseFloat(s); return isNaN(n)?0:n; }
+function parseNumBR(s){ if(s==null)return 0; s=String(s).replace(/\s/g,'').trim(); if(!s)return 0; if(s.includes(',')) s=s.replace(/\./g,'').replace(',','.'); const n=parseFloat(s); return isNaN(n)?0:n; }
+function findCol(row,kws){ const keys=Object.keys(row); for(const kw of kws){ const f=keys.find(k=>k.toLowerCase().includes(kw.toLowerCase())); if(f)return f; } return null; }
+function br(n,d=2){ if(n==null||isNaN(n)||!isFinite(n))return '—'; return new Intl.NumberFormat('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}).format(n); }
+function brl(n){ if(n==null||isNaN(n)||!isFinite(n))return '—'; return 'R$ '+br(n,2); }
+function int(n){ if(n==null||isNaN(n))return '—'; return new Intl.NumberFormat('pt-BR').format(Math.round(n)); }
+function pct(n){ if(n==null||isNaN(n)||!isFinite(n))return '—'; return br(n,2)+'%'; }
+function toISO(d){ return d; } // já vem ISO (yyyy-mm-dd)
+function isoToBR(iso){ const[y,m,d]=iso.split('-'); return `${d}/${m}/${y}`; }
+
+function weekKey(iso){ const[y,m,d]=iso.split('-').map(Number); const dt=new Date(y,m-1,d); const day=(dt.getDay()+6)%7; dt.setDate(dt.getDate()-day); const mon=dt; const e=new Date(mon); e.setDate(e.getDate()+6); return {key:mon.toISOString().slice(0,10), start:mon, end:e}; }
+const ptMon=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+function monthKey(iso){ const[y,m]=iso.split('-').map(Number); return {key:`${y}-${String(m).padStart(2,'0')}`, label:`${ptMon[m-1]} ${y}`}; }
+
+/* CPL color scale */
+function cplColor(cpl){ if(cpl==null||!isFinite(cpl)||cpl===0)return '#666'; if(cpl<=8)return '#00d68f'; if(cpl<=15)return '#ffaa00'; return '#ff3d71'; }
+function cplBadge(cpl,leads){
+  if(!leads)return '<span class="badge badge-red">Sem leads</span>';
+  if(cpl<=8)return '<span class="badge badge-green">Escalar</span>';
+  if(cpl<=15)return '<span class="badge badge-orange">Testar</span>';
+  if(cpl<=25)return '<span class="badge badge-yellow">Monitorar</span>';
+  return '<span class="badge badge-red">Pausar</span>';
+}
+
+/* ============ FETCH ============ */
+async function fetchCSV(sheetName){
+  const url=`https://docs.google.com/spreadsheets/d/${CONFIG.sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+  const resp=await fetch(url);
+  if(!resp.ok) throw new Error(sheetName+': HTTP '+resp.status);
+  const txt=await resp.text();
+  if(txt.trim().startsWith('<')) throw new Error('Planilha não pública (recebido HTML)');
+  return Papa.parse(txt,{header:true,skipEmptyLines:true}).data;
+}
+
+async function loadData(){
+  showLoading('Conectando com a planilha…');
+  try{
+    const rows=await fetchCSV(CONFIG.capSheet);
+    if(!rows.length) throw new Error('Aba vazia');
+    processRows(rows);
+    DEMO_MODE=false;
+    setSourceBadge(false);
+    hideLoading();
+    document.getElementById('upd-stamp').textContent='Atualizado '+new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+    renderAll();
+  }catch(err){
+    // Fallback: o preview do Claude (ou um servidor sem a planilha pública) bloqueia o fetch externo.
+    // Em vez de travar, carregamos o snapshot embutido em modo demonstração.
+    try{
+      const rows=Papa.parse(FALLBACK_CSV.trim(),{header:true,skipEmptyLines:true}).data;
+      processRows(rows);
+      DEMO_MODE=true;
+      setSourceBadge(true);
+      hideLoading();
+      document.getElementById('upd-stamp').textContent='Snapshot · 11/06/2026';
+      renderAll();
+    }catch(err2){
+      showError(err.message);
+    }
+  }
+}
+
+function processRows(rows){
+  const r0=rows[0];
+  const cDate=findCol(r0,['date','data']);
+  const cSpend=findCol(r0,['spend','amount','cost','invest']);
+  const cImp=findCol(r0,['impress']);
+  const cClk=findCol(r0,['link click','clicks','click','clique']);
+  const cLead=findCol(r0,['action lead','leads','lead','result']);
+  const cCamp=findCol(r0,['campaign','campanha']);
+  const cAdset=findCol(r0,['adset','conjunto']);
+  const cAd=findCol(r0,['ad name','anuncio','anúncio','criativo']);
+  const cLink=findCol(r0,['permalink','instagram','url','link']);
+  if(!cDate||!cSpend){ throw new Error('Colunas essenciais não encontradas'); }
+
+  RAW=[];
+  rows.forEach(r=>{
+    const dRaw=(r[cDate]||'').trim();
+    if(!/^\d{4}-\d{2}-\d{2}/.test(dRaw)) return; // só linhas com data ISO válida
+    const iso=dRaw.slice(0,10);
+    RAW.push({
+      date:iso,
+      inv:parseMoneyBR(r[cSpend]),
+      imp:parseNumBR(r[cImp]),
+      cliques:parseNumBR(r[cClk]),
+      leads:Math.round(parseNumBR(r[cLead])),
+      campaign:cCamp?(r[cCamp]||'').trim():'',
+      adset:cAdset?((r[cAdset]||'').trim()||'(sem público)'):'(sem público)',
+      ad:cAd?((r[cAd]||'').trim()||'(sem nome)'):'(sem nome)',
+      link:cLink?(r[cLink]||'').trim():''
+    });
+  });
+  if(!RAW.length) throw new Error('Nenhuma linha de dados válida');
+
+  const allDates=[...new Set(RAW.map(r=>r.date))].sort();
+  lastDataDate=allDates[allDates.length-1];
+  initDatePickers(allDates);
+}
+
+function setSourceBadge(demo){
+  const b=document.getElementById('src-badge');
+  const banner=document.getElementById('demo-banner');
+  if(!b) return;
+  if(demo){
+    b.classList.add('src-badge-demo');
+    b.innerHTML='<span class="live-dot"></span>Modo demonstração';
+    if(banner) banner.style.display='flex';
+  }else{
+    b.classList.remove('src-badge-demo');
+    b.innerHTML='<span class="live-dot"></span>Dados ao vivo';
+    if(banner) banner.style.display='none';
+  }
+}
+
+function showLoading(msg){ document.getElementById('loading').style.display='flex'; document.getElementById('ld-spin').style.display='block'; document.getElementById('ld-err').style.display='none'; document.getElementById('ld-msg').style.display='block'; document.getElementById('ld-msg').textContent=msg; }
+function hideLoading(){ document.getElementById('loading').style.display='none'; }
+function showError(detail){ document.getElementById('ld-spin').style.display='none'; document.getElementById('ld-msg').style.display='none'; document.getElementById('ld-err').style.display='block'; document.getElementById('ld-err-detail').textContent='Detalhe técnico: '+detail; document.getElementById('loading').style.display='flex'; }
+
+/* ============ PERIOD FILTER ============ */
+function initDatePickers(dates){
+  document.getElementById('dateFrom').value=dates[0];
+  document.getElementById('dateTo').value=dates[dates.length-1];
+  dateFrom=dates[0]; dateTo=dates[dates.length-1];
+  updateRangeDays();
+}
+function setPreset(days,btn){
+  document.querySelectorAll('.filterbar .fbtn').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
+  const last=lastDataDate;
+  if(days==='all'){ const d=[...new Set(RAW.map(r=>r.date))].sort(); document.getElementById('dateFrom').value=d[0]; document.getElementById('dateTo').value=d[d.length-1]; }
+  else{ const f=new Date(last+'T00:00:00'); f.setDate(f.getDate()-(days-1)); document.getElementById('dateFrom').value=f.toISOString().slice(0,10); document.getElementById('dateTo').value=last; }
+  dateFrom=document.getElementById('dateFrom').value; dateTo=document.getElementById('dateTo').value;
+  updateRangeDays(); renderAll();
+}
+function onDateChange(){
+  document.querySelectorAll('.filterbar .fbtn').forEach(b=>b.classList.remove('active'));
+  dateFrom=document.getElementById('dateFrom').value; dateTo=document.getElementById('dateTo').value;
+  updateRangeDays(); renderAll();
+}
+function updateRangeDays(){
+  if(!dateFrom||!dateTo){document.getElementById('range-days').textContent='';return;}
+  const diff=Math.round((new Date(dateTo)-new Date(dateFrom))/86400000)+1;
+  document.getElementById('range-days').textContent=diff+(diff===1?' dia':' dias');
+}
+function inRange(iso){ return (!dateFrom||iso>=dateFrom)&&(!dateTo||iso<=dateTo); }
+function filteredRaw(){ return RAW.filter(r=>inRange(r.date)); }
+
+/* ============ AGGREGATION ============ */
+function aggTotals(rows){
+  const t={inv:0,imp:0,cliques:0,leads:0};
+  rows.forEach(r=>{t.inv+=r.inv;t.imp+=r.imp;t.cliques+=r.cliques;t.leads+=r.leads;});
+  t.cpl=t.leads>0?t.inv/t.leads:null;
+  t.cpc=t.cliques>0?t.inv/t.cliques:null;
+  t.cpm=t.imp>0?t.inv/t.imp*1000:null;
+  t.ctr=t.imp>0?t.cliques/t.imp*100:null;
+  t.convRate=t.cliques>0?t.leads/t.cliques*100:null;
+  return t;
+}
+function aggByDay(rows){
+  const m={};
+  rows.forEach(r=>{ if(!m[r.date])m[r.date]={date:r.date,inv:0,imp:0,cliques:0,leads:0}; const o=m[r.date]; o.inv+=r.inv;o.imp+=r.imp;o.cliques+=r.cliques;o.leads+=r.leads; });
+  return Object.values(m).sort((a,b)=>a.date<b.date?-1:1).map(o=>({...o,cpl:o.leads>0?o.inv/o.leads:null}));
+}
+function aggBy(rows,key){
+  const m={};
+  rows.forEach(r=>{ const k=r[key]; if(!m[k])m[k]={nome:k,inv:0,imp:0,cliques:0,leads:0,lastDate:''}; const o=m[k]; o.inv+=r.inv;o.imp+=r.imp;o.cliques+=r.cliques;o.leads+=r.leads; if(r.inv>0&&r.date>o.lastDate)o.lastDate=r.date; if(r.link&&!o.link)o.link=r.link; });
+  return Object.values(m).map(o=>({
+    ...o,
+    cpl:o.leads>0?o.inv/o.leads:null, cpc:o.cliques>0?o.inv/o.cliques:null,
+    cpm:o.imp>0?o.inv/o.imp*1000:null, ctr:o.imp>0?o.cliques/o.imp*100:null,
+    convRate:o.cliques>0?o.leads/o.cliques*100:null,
+    ativo:o.lastDate===lastDataDate?1:0
+  }));
+}
+
+/* ============ RENDER ============ */
+function renderAll(){
+  const rows=filteredRaw();
+  DIAS=aggByDay(rows);
+  renderKpis(rows); renderFunnel(rows); renderDailyCharts();
+  renderCri(rows); renderPub(rows); renderSemanal(rows); renderMensal();
+}
+
+function kpiCard(label,val,sub,cls){ return `<div class="kpi-card"><div class="kpi-label">${label}</div><div class="kpi-value ${cls||''}">${val}</div>${sub?`<div class="kpi-sub">${sub}</div>`:''}</div>`; }
+function renderKpis(rows){
+  const t=aggTotals(rows);
+  const html=[
+    kpiCard('Investimento',brl(t.inv),DIAS.length+' dias','c-orange'),
+    kpiCard('Leads',int(t.leads),'',''),
+    kpiCard('CPL Médio',brl(t.cpl),'custo por lead','c-green'),
+    kpiCard('Cliques',int(t.cliques),'',''),
+    kpiCard('CTR',pct(t.ctr),'',''),
+    kpiCard('CPC',brl(t.cpc),'','c-blue'),
+    kpiCard('CPM',brl(t.cpm),'',''),
+    kpiCard('Impressões',int(t.imp),'',''),
+  ].join('');
+  document.getElementById('kpis').innerHTML=html;
+}
+
+function renderFunnel(rows){
+  const t=aggTotals(rows);
+  const steps=[
+    {n:'Impressões',v:t.imp,c:'var(--orange)'},
+    {n:'Cliques',v:t.cliques,c:'var(--orange-light)'},
+    {n:'Leads',v:t.leads,c:'var(--green)'}
+  ];
+  const max=Math.max(t.imp,1);
+  let bars='';
+  steps.forEach((s,i)=>{
+    const w=Math.max(8,s.v/max*100);
+    bars+=`<div class="fstep"><div class="fstep-top"><span class="fstep-name">${s.n}</span><span class="fstep-val">${int(s.v)}</span></div>
+      <div class="fbar" style="width:${w}%;background:${s.c}">${i===0?'100%':br(s.v/max*100,1)+'%'}</div></div>`;
+    if(i<steps.length-1){
+      const drop=steps[i].v>0?steps[i+1].v/steps[i].v*100:0;
+      bars+=`<div class="fdrop">↓ ${br(drop,2)}% avançam</div>`;
+    }
+  });
+  document.getElementById('funnel-bars').innerHTML=bars;
+
+  const ctrPart=t.imp>0?t.cliques/t.imp*100:null;
+  const convPart=t.cliques>0?t.leads/t.cliques*100:null;
+  // maior perda: comparar quão pouco passa em cada etapa
+  let lossTxt='', lossPct=999;
+  if(ctrPart!==null&&ctrPart<lossPct){lossPct=ctrPart;lossTxt='Impressões → Cliques (CTR '+pct(ctrPart)+')';}
+  if(convPart!==null&&convPart<lossPct){lossPct=convPart;lossTxt='Cliques → Leads (Conv. '+pct(convPart)+')';}
+  const side=`
+    <div class="fside-card"><div class="t">Impressões → Cliques · CTR</div><div class="v c-orange">${pct(ctrPart)}</div></div>
+    <div class="fside-card"><div class="t">Cliques → Leads · Conversão</div><div class="v c-green">${pct(convPart)}</div></div>
+    <div class="fside-3">
+      <div class="fside-card"><div class="t">CPC</div><div class="v c-blue">${brl(t.cpc)}</div></div>
+      <div class="fside-card"><div class="t">CPL</div><div class="v c-orange">${brl(t.cpl)}</div></div>
+      <div class="fside-card"><div class="t">CPM</div><div class="v">${brl(t.cpm)}</div></div>
+    </div>
+    <div class="loss-box"><div class="t">Maior gargalo do funil</div><div class="v c-red" style="font-size:14px">${lossTxt||'—'}</div></div>`;
+  document.getElementById('funnel-side').innerHTML=side;
+}
+
+/* ----- DAILY CHARTS ----- */
+function dieChart(id){ if(charts[id]){charts[id].destroy(); delete charts[id];} }
+const gridC='rgba(255,255,255,0.05)', tickC='#888';
+const baseScales={x:{grid:{color:gridC},ticks:{color:tickC,font:{size:10}}},y:{grid:{color:gridC},ticks:{color:tickC,font:{size:10}}}};
+
+function renderDailyCharts(){
+  const labels=DIAS.map(d=>isoToBR(d.date).slice(0,5));
+  const cpl=DIAS.map(d=>d.cpl);
+  const avgCpl=(()=>{const v=cpl.filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b,0)/v.length:0;})();
+  dieChart('ch-cpl');
+  charts['ch-cpl']=new Chart(document.getElementById('ch-cpl'),{
+    type:'line',
+    data:{labels,datasets:[
+      {label:'CPL',data:cpl,borderColor:'rgba(255,107,0,.95)',backgroundColor:'rgba(255,107,0,.12)',fill:true,tension:.3,spanGaps:true,
+        pointBackgroundColor:cpl.map(cplColor),pointRadius:3,pointBorderWidth:0},
+      {label:'Média',data:cpl.map(()=>avgCpl),borderColor:'rgba(255,255,255,.35)',borderDash:[5,5],pointRadius:0,fill:false}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:tickC,font:{size:10},boxWidth:12}},
+      tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.raw==null?'—':'R$ '+br(c.raw,2))}}},scales:baseScales}
+  });
+
+  dieChart('ch-invlead');
+  charts['ch-invlead']=new Chart(document.getElementById('ch-invlead'),{
+    data:{labels,datasets:[
+      {type:'bar',label:'Investimento',data:DIAS.map(d=>d.inv),backgroundColor:'rgba(255,107,0,.85)',yAxisID:'y',borderRadius:3},
+      {type:'line',label:'Leads',data:DIAS.map(d=>d.leads),borderColor:'rgba(0,214,143,.95)',backgroundColor:'rgba(0,214,143,.2)',yAxisID:'y1',tension:.3,pointRadius:2}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:tickC,font:{size:10},boxWidth:12}}},
+      scales:{x:baseScales.x,
+        y:{position:'left',grid:{color:gridC},ticks:{color:'#ff8533',font:{size:10},callback:v=>'R$'+v}},
+        y1:{position:'right',grid:{drawOnChartArea:false},ticks:{color:'#00d68f',font:{size:10}}}}}
+  });
+}
+
+/* ----- SORT HELPER ----- */
+function applySort(arr,sort){
+  const {k,dir}=sort, mul=dir==='asc'?1:-1;
+  return [...arr].sort((a,b)=>{
+    let va=a[k],vb=b[k];
+    if(k==='nome'){return mul*String(va).localeCompare(String(vb));}
+    va=(va==null||isNaN(va))?(dir==='asc'?Infinity:-Infinity):va;
+    vb=(vb==null||isNaN(vb))?(dir==='asc'?Infinity:-Infinity):vb;
+    return mul*(va-vb);
+  });
+}
+function bindSort(tableId,getData,sortState,render){
+  document.querySelectorAll('#'+tableId+' th.sortable').forEach(th=>{
+    th.onclick=()=>{
+      const k=th.dataset.k;
+      if(sortState.k===k){sortState.dir=sortState.dir==='asc'?'desc':'asc';}else{sortState.k=k;sortState.dir=(k==='nome')?'asc':'desc';}
+      document.querySelectorAll('#'+tableId+' th').forEach(h=>h.classList.remove('asc','desc'));
+      th.classList.add(sortState.dir);
+      render();
+    };
+  });
+}
+
+/* ----- CRIATIVOS ----- */
+function renderCri(rows){
+  const cris=aggBy(rows,'ad');
+  const draw=()=>{
+    const sorted=applySort(cris,criSort);
+    document.getElementById('tbody-cri').innerHTML=sorted.map(c=>{
+      const op=c.leads===0?'opacity:.5':'';
+      const linkCell=c.link?`<a class="cri-link" href="${c.link}" target="_blank">abrir ↗</a>`:'—';
+      return `<tr style="${op}">
+        <td><span class="status-dot ${c.ativo?'st-ativo':'st-inativo'}"><span class="d"></span>${c.ativo?'Ativo':'Inativo'}</span></td>
+        <td style="font-weight:600">${c.nome}</td>
+        <td>${brl(c.inv)}</td><td>${int(c.imp)}</td><td>${int(c.cliques)}</td><td>${int(c.leads)}</td>
+        <td>${pct(c.ctr)}</td><td>${brl(c.cpc)}</td>
+        <td style="color:${cplColor(c.cpl)};font-weight:700">${brl(c.cpl)}</td>
+        <td>${pct(c.convRate)}</td>
+        <td>${cplBadge(c.cpl,c.leads)}</td><td>${linkCell}</td></tr>`;
+    }).join('')||'<tr><td colspan="12" class="empty">Sem dados no período</td></tr>';
+  };
+  draw();
+  bindSort('tbl-cri',()=>cris,criSort,draw);
+
+  const withLeads=cris.filter(c=>c.leads>0).sort((a,b)=>a.cpl-b.cpl);
+  const topCpl=withLeads.slice(0,10);
+  dieChart('ch-cri-cpl');
+  charts['ch-cri-cpl']=new Chart(document.getElementById('ch-cri-cpl'),{
+    type:'bar',data:{labels:topCpl.map(c=>c.nome),datasets:[{label:'CPL',data:topCpl.map(c=>c.cpl),backgroundColor:topCpl.map(c=>cplColor(c.cpl)),borderRadius:4}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'R$ '+br(c.raw,2)}}},scales:baseScales}
+  });
+  const topVol=[...cris].sort((a,b)=>b.leads-a.leads).slice(0,10);
+  dieChart('ch-cri-vol');
+  charts['ch-cri-vol']=new Chart(document.getElementById('ch-cri-vol'),{
+    type:'bar',data:{labels:topVol.map(c=>c.nome),datasets:[{label:'Leads',data:topVol.map(c=>c.leads),backgroundColor:'rgba(255,107,0,.85)',borderRadius:4}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:baseScales}
+  });
+
+  const best=withLeads[0], worst=withLeads[withLeads.length-1];
+  const volLeader=topVol[0];
+  let ins='Sem leads suficientes no período para gerar insights de criativo.';
+  if(best){
+    ins=`<b>Melhor CPL:</b> <span class="hl">${best.nome}</span> a ${brl(best.cpl)} (${int(best.leads)} leads). `+
+        (volLeader?`<b>Maior volume:</b> <span class="hl">${volLeader.nome}</span> com ${int(volLeader.leads)} leads. `:'')+
+        (worst&&worst!==best?`<b>Pior CPL com leads:</b> ${worst.nome} a ${brl(worst.cpl)} — candidato a pausa ou nova oferta.`:'');
+  }
+  document.getElementById('cri-insight').innerHTML=ins;
+}
+
+/* ----- PÚBLICOS ----- */
+function renderPub(rows){
+  const pubs=aggBy(rows,'adset');
+  const draw=()=>{
+    const sorted=applySort(pubs,pubSort);
+    document.getElementById('tbody-pub').innerHTML=sorted.map(p=>`<tr>
+      <td><span class="status-dot ${p.ativo?'st-ativo':'st-inativo'}"><span class="d"></span>${p.ativo?'Ativo':'Inativo'}</span></td>
+      <td style="font-weight:600">${p.nome}</td>
+      <td>${brl(p.inv)}</td><td>${int(p.imp)}</td><td>${int(p.cliques)}</td><td>${int(p.leads)}</td>
+      <td>${pct(p.ctr)}</td><td>${brl(p.cpc)}</td>
+      <td style="color:${cplColor(p.cpl)};font-weight:700">${brl(p.cpl)}</td>
+      <td>${cplBadge(p.cpl,p.leads)}</td></tr>`).join('')||'<tr><td colspan="10" class="empty">Sem dados</td></tr>';
+  };
+  draw();
+  bindSort('tbl-pub',()=>pubs,pubSort,draw);
+
+  const byInv=[...pubs].sort((a,b)=>b.inv-a.inv);
+  dieChart('ch-pub-inv');
+  charts['ch-pub-inv']=new Chart(document.getElementById('ch-pub-inv'),{
+    type:'bar',data:{labels:byInv.map(p=>p.nome),datasets:[{label:'Invest.',data:byInv.map(p=>p.inv),backgroundColor:'rgba(255,107,0,.85)',borderRadius:4}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'R$ '+br(c.raw,2)}}},scales:baseScales}
+  });
+  const wl=pubs.filter(p=>p.leads>0).sort((a,b)=>a.cpl-b.cpl);
+  dieChart('ch-pub-cpl');
+  charts['ch-pub-cpl']=new Chart(document.getElementById('ch-pub-cpl'),{
+    type:'bar',data:{labels:wl.map(p=>p.nome),datasets:[{label:'CPL',data:wl.map(p=>p.cpl),backgroundColor:wl.map(p=>cplColor(p.cpl)),borderRadius:4}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'R$ '+br(c.raw,2)}}},scales:baseScales}
+  });
+
+  let ins='Sem leads suficientes por público no período.';
+  if(wl.length){
+    const best=wl[0], worst=wl[wl.length-1];
+    ins=`<b>Melhor público:</b> <span class="hl">${best.nome}</span> com CPL ${brl(best.cpl)} (${int(best.leads)} leads) — priorize verba aqui. `+
+        (worst!==best?`<b>Pior público:</b> ${worst.nome} a ${brl(worst.cpl)} — revisar segmentação ou criativo.`:'');
+  }
+  document.getElementById('pub-insight').innerHTML=ins;
+}
+
+/* ----- SEMANAL ----- */
+function buildWeeks(rows){
+  const m={};
+  rows.forEach(r=>{ const w=weekKey(r.date); if(!m[w.key])m[w.key]={key:w.key,start:w.start,end:w.end,inv:0,imp:0,cliques:0,leads:0}; const o=m[w.key]; o.inv+=r.inv;o.imp+=r.imp;o.cliques+=r.cliques;o.leads+=r.leads; });
+  return Object.values(m).sort((a,b)=>a.key<b.key?-1:1).map(o=>({...o,
+    cpl:o.leads>0?o.inv/o.leads:null,cpc:o.cliques>0?o.inv/o.cliques:null,
+    cpm:o.imp>0?o.inv/o.imp*1000:null,ctr:o.imp>0?o.cliques/o.imp*100:null,
+    convRate:o.cliques>0?o.leads/o.cliques*100:null}));
+}
+function fmtRange(s,e){ const f=d=>String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0'); return f(s)+'–'+f(e); }
+function renderSemanal(rows){
+  const wk=buildWeeks(rows);
+  document.getElementById('tbody-sem').innerHTML=wk.map((w,i)=>{
+    let trend='<span style="color:var(--text-muted)">►</span>';
+    if(i>0&&wk[i-1].cpl!=null&&w.cpl!=null){ const ch=(w.cpl-wk[i-1].cpl)/wk[i-1].cpl; if(ch<=-0.1)trend='<span style="color:var(--green)">▼ melhora</span>'; else if(ch>=0.1)trend='<span style="color:var(--red)">▲ piora</span>'; }
+    return `<tr><td style="font-weight:600">Sem ${i+1}</td><td>${fmtRange(w.start,w.end)}</td>
+      <td>${brl(w.inv)}</td><td>${int(w.imp)}</td><td>${int(w.cliques)}</td><td>${int(w.leads)}</td>
+      <td>${pct(w.ctr)}</td><td>${brl(w.cpc)}</td><td>${brl(w.cpm)}</td>
+      <td style="color:${cplColor(w.cpl)};font-weight:700">${brl(w.cpl)}</td><td>${pct(w.convRate)}</td><td>${trend}</td></tr>`;
+  }).join('')||'<tr><td colspan="12" class="empty">Sem dados</td></tr>';
+
+  const labels=wk.map((w,i)=>'S'+(i+1));
+  dieChart('ch-sem-cpl');
+  charts['ch-sem-cpl']=new Chart(document.getElementById('ch-sem-cpl'),{
+    data:{labels,datasets:[
+      {type:'bar',label:'CPL',data:wk.map(w=>w.cpl),backgroundColor:wk.map(w=>cplColor(w.cpl)),yAxisID:'y',borderRadius:4},
+      {type:'line',label:'Leads',data:wk.map(w=>w.leads),borderColor:'rgba(255,255,255,.6)',yAxisID:'y1',tension:.3,pointRadius:2}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:tickC,font:{size:10},boxWidth:12}}},
+      scales:{x:baseScales.x,y:{position:'left',grid:{color:gridC},ticks:{color:'#ff8533',font:{size:10},callback:v=>'R$'+v}},y1:{position:'right',grid:{drawOnChartArea:false},ticks:{color:tickC,font:{size:10}}}}}
+  });
+  dieChart('ch-sem-cpc');
+  charts['ch-sem-cpc']=new Chart(document.getElementById('ch-sem-cpc'),{
+    type:'bar',data:{labels,datasets:[
+      {label:'CPC',data:wk.map(w=>w.cpc),backgroundColor:'rgba(91,130,255,.8)',borderRadius:4},
+      {label:'CPM',data:wk.map(w=>w.cpm),backgroundColor:'rgba(255,107,0,.85)',borderRadius:4}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:tickC,font:{size:10},boxWidth:12}},tooltip:{callbacks:{label:c=>c.dataset.label+': R$ '+br(c.raw,2)}}},scales:baseScales}
+  });
+
+  if(wk.length>=2){
+    const a=wk[wk.length-2],b=wk[wk.length-1];
+    const best=[...wk].filter(w=>w.cpl!=null).sort((x,y)=>x.cpl-y.cpl)[0];
+    const wi=wk.indexOf(best)+1;
+    document.getElementById('sem-insight').innerHTML=
+      `<b>Melhor semana (CPL):</b> <span class="hl">Sem ${wi}</span> a ${brl(best.cpl)}. `+
+      `<b>Última vs anterior:</b> CPL ${b.cpl!=null&&a.cpl!=null?(b.cpl<a.cpl?'<span class="hl">caiu</span>':'subiu')+' de '+brl(a.cpl)+' para '+brl(b.cpl):'—'}, `+
+      `leads ${a.leads} → ${b.leads}.`;
+  } else document.getElementById('sem-insight').innerHTML='Período curto para comparação semanal.';
+}
+
+/* ----- MENSAL ----- */
+function buildMonths(rows){
+  const m={};
+  rows.forEach(r=>{ const mk=monthKey(r.date); if(!m[mk.key])m[mk.key]={key:mk.key,label:mk.label,inv:0,imp:0,cliques:0,leads:0,days:new Set()}; const o=m[mk.key]; o.inv+=r.inv;o.imp+=r.imp;o.cliques+=r.cliques;o.leads+=r.leads;o.days.add(r.date); });
+  return Object.values(m).sort((a,b)=>a.key<b.key?-1:1).map(o=>({...o,nd:o.days.size,
+    cpl:o.leads>0?o.inv/o.leads:null,cpc:o.cliques>0?o.inv/o.cliques:null,
+    cpm:o.imp>0?o.inv/o.imp*1000:null,ctr:o.imp>0?o.cliques/o.imp*100:null,
+    convRate:o.cliques>0?o.leads/o.cliques*100:null}));
+}
+function renderMensal(){
+  const rows=filteredRaw();
+  const mo=buildMonths(rows);
+  const cols=['var(--orange)','#5b82ff','var(--green)','var(--yellow)','#ff8533','#9b5bff'];
+  document.getElementById('mcards').innerHTML=mo.map((m,i)=>`<div class="mcard" style="border-top-color:${cols[i%cols.length]}">
+    <h3>${m.label}</h3><div class="days">${m.nd} dias ativos</div>
+    <div class="mrow"><span class="k">Investimento</span><span class="v">${brl(m.inv)}</span></div>
+    <div class="mrow"><span class="k">Leads</span><span class="v">${int(m.leads)}</span></div>
+    <div class="mrow"><span class="k">CPL</span><span class="v" style="color:${cplColor(m.cpl)}">${brl(m.cpl)}</span></div>
+    <div class="mrow"><span class="k">CPC</span><span class="v">${brl(m.cpc)}</span></div>
+    <div class="mrow"><span class="k">CTR</span><span class="v">${pct(m.ctr)}</span></div>
+    <div class="mrow"><span class="k">Cliques</span><span class="v">${int(m.cliques)}</span></div>
+  </div>`).join('')||'<div class="empty">Sem dados</div>';
+
+  // comparativo 2 últimos
+  if(mo.length>=2){
+    const a=mo[mo.length-2],b=mo[mo.length-1];
+    const metric=(lbl,va,vb,inv,fmt)=>{
+      let varTxt='—',cls='';
+      if(va!=null&&vb!=null&&va!==0){ const ch=(vb-va)/Math.abs(va)*100; const good=inv?ch<0:ch>0; cls=good?'badge-green':'badge-red'; varTxt=`<span class="badge ${cls}">${ch>=0?'+':''}${br(ch,1)}%</span>`; }
+      return `<tr><td style="text-align:left">${lbl}</td><td>${fmt(va)}</td><td>${fmt(vb)}</td><td>${varTxt}</td></tr>`;
+    };
+    document.getElementById('mcomp-wrap').innerHTML=`<table><thead><tr><th>Métrica</th><th>${a.label}</th><th>${b.label}</th><th>Variação</th></tr></thead><tbody>
+      ${metric('Investimento',a.inv,b.inv,false,brl)}
+      ${metric('Leads',a.leads,b.leads,false,int)}
+      ${metric('CPL',a.cpl,b.cpl,true,brl)}
+      ${metric('CPC',a.cpc,b.cpc,true,brl)}
+      ${metric('CPM',a.cpm,b.cpm,true,brl)}
+      ${metric('Cliques',a.cliques,b.cliques,false,int)}
+      ${metric('CTR',a.ctr,b.ctr,false,pct)}
+      ${metric('Conv. Clk→Lead',a.convRate,b.convRate,false,pct)}
+    </tbody></table>`;
+  } else document.getElementById('mcomp-wrap').innerHTML='<div class="empty">Apenas 1 mês no período — sem comparativo.</div>';
+
+  const labels=mo.map(m=>m.label);
+  dieChart('ch-mes-inv');
+  charts['ch-mes-inv']=new Chart(document.getElementById('ch-mes-inv'),{
+    type:'bar',data:{labels,datasets:[{label:'Invest.',data:mo.map(m=>m.inv),backgroundColor:mo.map((m,i)=>cols[i%cols.length]),borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'R$ '+br(c.raw,2)}}},scales:baseScales}
+  });
+  dieChart('ch-mes-cpl');
+  charts['ch-mes-cpl']=new Chart(document.getElementById('ch-mes-cpl'),{
+    data:{labels,datasets:[
+      {type:'bar',label:'CPL',data:mo.map(m=>m.cpl),backgroundColor:mo.map(m=>cplColor(m.cpl)),yAxisID:'y',borderRadius:4},
+      {type:'line',label:'Leads',data:mo.map(m=>m.leads),borderColor:'rgba(0,214,143,.95)',yAxisID:'y1',tension:.3,pointRadius:3}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:tickC,font:{size:10},boxWidth:12}}},
+      scales:{x:baseScales.x,y:{position:'left',grid:{color:gridC},ticks:{color:'#ff8533',font:{size:10},callback:v=>'R$'+v}},y1:{position:'right',grid:{drawOnChartArea:false},ticks:{color:'#00d68f',font:{size:10}}}}}
+  });
+
+  if(mo.length>=2){
+    const a=mo[mo.length-2],b=mo[mo.length-1];
+    const dInv=a.inv?((b.inv-a.inv)/a.inv*100):0, dLead=a.leads?((b.leads-a.leads)/a.leads*100):0, dCpl=(a.cpl&&b.cpl)?((b.cpl-a.cpl)/a.cpl*100):0;
+    document.getElementById('mes-insight').innerHTML=
+      `De <b>${a.label}</b> para <b>${b.label}</b>: investimento ${dInv>=0?'+':''}${br(dInv,1)}%, leads ${dLead>=0?'+':''}${br(dLead,1)}%, `+
+      `CPL <span class="hl">${dCpl<=0?'caiu':'subiu'} ${br(Math.abs(dCpl),1)}%</span> (${brl(a.cpl)} → ${brl(b.cpl)}).`;
+  } else document.getElementById('mes-insight').innerHTML='Selecione um período com 2+ meses para o comparativo.';
+}
+
+/* ============ TABS ============ */
+function switchTab(idx,el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active'); document.getElementById('page-'+idx).classList.add('active');
+}
+
+document.addEventListener('DOMContentLoaded',loadData);
+</script>
+</body>
+</html>
