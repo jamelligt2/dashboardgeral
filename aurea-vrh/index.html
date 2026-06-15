@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Dashboard VendeRH — Jamelli GT</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#1a1a2e;color:#e8e6f0;font-family:"DM Sans",sans-serif;min-height:100vh}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:#12121f}::-webkit-scrollbar-thumb{background:#ff6b2b55;border-radius:3px}
+.topbar{background:#12121f;padding:12px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.07);position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:10px}
+.logo-text strong{font-size:15px;font-weight:700;color:#ff6b2b}.logo-text span{font-size:10px;color:rgba(255,255,255,.35);display:block}
+.topbar-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.period-bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.period-bar label{font-size:11px;color:rgba(255,255,255,.45)}
+.date-input{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:#e8e6f0;padding:5px 8px;border-radius:6px;font-size:12px;outline:none}
+.date-input:focus{border-color:#ff6b2b}
+.date-input::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5}
+.sep{color:rgba(255,255,255,.2)}
+.pbtn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;transition:all .2s}
+.pbtn:hover,.pbtn.active{background:rgba(255,107,43,.2);border-color:#ff6b2b;color:#ff6b2b;font-weight:600}
+.dbtn{background:rgba(46,204,113,.1);border:1px solid rgba(46,204,113,.3);color:#2ecc71;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px}
+.dbtn:hover{background:rgba(46,204,113,.25)}
+#status-bar{background:#12121f;padding:3px 28px;font-size:10px;color:rgba(255,255,255,.35);border-bottom:1px solid rgba(255,255,255,.05)}
+.tabs{display:flex;border-bottom:1px solid rgba(255,255,255,.07);background:#12121f;padding:0 28px;overflow-x:auto;gap:0}
+.tab{padding:12px 18px;cursor:pointer;font-size:13px;color:rgba(255,255,255,.5);border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
+.tab:hover{color:#e8e6f0}.tab.active{color:#ff6b2b;border-bottom-color:#ff6b2b;font-weight:600}
+.content{padding:24px 28px;display:none}.content.active{display:block}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+.kpi-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:14px 16px}
+.kpi-label{font-size:10px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px}
+.kpi-value{font-size:20px;font-weight:700;font-family:"DM Mono",monospace}
+.orange{color:#ff6b2b}.green{color:#2ecc71}.red{color:#e74c3c}.yellow{color:#f1c40f}.blue{color:#3498db}
+.chart-full{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:16px;margin:16px 0}
+.chart-full h4,.chart-card h4{font-size:11px;color:rgba(255,255,255,.45);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
+.chart-full canvas{max-height:260px}.chart-card canvas{max-height:200px}
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0}
+.chart-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:16px}
+.funil-wrap{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:16px 0}
+.fbar{margin-bottom:14px}
+.fbar-label{display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px;color:rgba(255,255,255,.7)}
+.fbar-bg{background:rgba(255,255,255,.05);border-radius:4px;height:14px;overflow:hidden}
+.fbar-fill{background:linear-gradient(90deg,#ff6b2b,#ff9a3c);height:100%;border-radius:4px}
+.taxa-grid{display:grid;gap:8px}
+.taxa-item{background:rgba(255,255,255,.04);border-radius:8px;padding:11px 14px;display:flex;justify-content:space-between;align-items:center;font-size:12px;color:rgba(255,255,255,.7)}
+.taxa-val{font-family:"DM Mono",monospace;font-size:15px;font-weight:600;color:#ff6b2b}
+.sec-title{font-size:13px;font-weight:600;color:rgba(255,255,255,.65);margin:20px 0 10px;border-left:3px solid #ff6b2b;padding-left:10px}
+.cri-filterbar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.cri-sortbtn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 10px;border-radius:5px;cursor:pointer;font-size:12px;transition:all .2s}
+.cri-sortbtn.active{background:rgba(255,107,43,.2);border-color:#ff6b2b;color:#ff6b2b}
+.cri-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.cri-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:14px}
+.cri-name{font-size:11px;font-weight:600;color:#e8e6f0;margin-bottom:8px;line-height:1.4;word-break:break-word}
+.cri-badge{display:inline-block;font-size:10px;padding:2px 6px;border-radius:4px;margin-bottom:8px}
+.badge-top{background:rgba(46,204,113,.15);color:#2ecc71}.badge-mid{background:rgba(255,183,55,.15);color:#f1c40f}.badge-low{background:rgba(255,255,255,.06);color:rgba(255,255,255,.4)}
+.cri-metrics{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.cm{display:flex;flex-direction:column}.cm-lbl{color:rgba(255,255,255,.4);font-size:9px;text-transform:uppercase;margin-bottom:2px}.cm-val{font-family:"DM Mono",monospace;font-size:12px;font-weight:600}.cm-val.hl{color:#ff6b2b;font-size:14px}
+.tbl-wrap{overflow-x:auto;border-radius:8px;border:1px solid rgba(255,255,255,.07)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#12121f;color:rgba(255,255,255,.45);padding:8px 10px;text-align:right;font-weight:500;border-bottom:1px solid rgba(255,255,255,.07);white-space:nowrap}
+th:first-child{text-align:left}
+td{padding:7px 10px;text-align:right;border-bottom:1px solid rgba(255,255,255,.04);font-family:"DM Mono",monospace;font-size:11px}
+td:first-child{text-align:left;font-family:"DM Sans",sans-serif;font-size:12px}
+tr:hover td{background:rgba(255,255,255,.025)}
+@media(max-width:900px){.cri-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.cri-grid{grid-template-columns:1fr}.chart-grid{grid-template-columns:1fr}.funil-wrap{grid-template-columns:1fr}.content{padding:14px}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo-text"><strong>VendeRH</strong><span>Jamelli GT · Dashboard de Performance</span></div>
+  <div class="topbar-right">
+    <div class="period-bar">
+      <label>De</label><input type="date" class="date-input" id="dtFrom">
+      <span class="sep">→</span><input type="date" class="date-input" id="dtTo">
+    </div>
+    <button class="pbtn" id="p7" onclick="setPreset(7)">7d</button>
+    <button class="pbtn" id="p15" onclick="setPreset(15)">15d</button>
+    <button class="pbtn active" id="p30" onclick="setPreset(30)">30d</button>
+    <button class="pbtn" id="pAll" onclick="setPreset(0)">Tudo</button>
+    <button class="dbtn" onclick="downloadHTML()">⬇ HTML</button>
+  </div>
+</div>
+<div id="status-bar">Dados: jul/2025 → mar/2026 · 141 dias · <span id="stxt"></span></div>
+
+<div class="tabs">
+  <div class="tab active" data-tab="visao">Visão Geral</div>
+  <div class="tab" data-tab="funil">Funil</div>
+  <div class="tab" data-tab="criativos">Criativos</div>
+  <div class="tab" data-tab="diario">Dia a Dia</div>
+  <div class="tab" data-tab="mensal">Mês a Mês</div>
+</div>
+
+<div id="tab-visao" class="content active">
+  <div class="kpi-grid" id="kpis"></div>
+  <div class="chart-full"><h4>Faturamento &amp; Investimento — Evolução Diária</h4><canvas id="cEvo"></canvas></div>
+  <div class="chart-grid">
+    <div class="chart-card"><h4>Compras por Dia</h4><canvas id="cVendas"></canvas></div>
+    <div class="chart-card"><h4>ROAS Diário</h4><canvas id="cRoas"></canvas></div>
+  </div>
+</div>
+
+<div id="tab-funil" class="content">
+  <div class="funil-wrap">
+    <div><div class="sec-title">Funil de Conversão</div><div id="funilBars"></div></div>
+    <div><div class="sec-title">Taxas &amp; Custos</div><div class="taxa-grid" id="taxaGrid"></div></div>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-card"><h4>Cliques / Checkouts / Compras</h4><canvas id="cFunil"></canvas></div>
+    <div class="chart-card"><h4>CPC &amp; CPV</h4><canvas id="cCPV"></canvas></div>
+  </div>
+</div>
+
+<div id="tab-criativos" class="content">
+  <div class="cri-filterbar">
+    <span style="font-size:11px;color:rgba(255,255,255,.4)">Ordenar:</span>
+    <button class="cri-sortbtn active" id="cs-fat" onclick="setSort('fat')">Faturado</button>
+    <button class="cri-sortbtn" id="cs-roas" onclick="setSort('roas')">ROAS</button>
+    <button class="cri-sortbtn" id="cs-inv" onclick="setSort('inv')">Investido</button>
+    <button class="cri-sortbtn" id="cs-compras" onclick="setSort('compras')">Compras</button>
+    <button class="cri-sortbtn" id="cs-cliques" onclick="setSort('cliques')">Cliques</button>
+  </div>
+  <div class="cri-grid" id="criGrid"></div>
+</div>
+
+<div id="tab-diario" class="content">
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Data</th><th>Investido</th><th>Impressões</th><th>Cliques</th><th>PV</th><th>Checkout</th><th>Compras</th><th>Faturado</th><th>ROAS</th><th>CPV</th></tr></thead>
+    <tbody id="tblDiario"></tbody>
+  </table></div>
+</div>
+
+<div id="tab-mensal" class="content">
+  <div class="chart-full"><h4>Investimento vs Faturamento por Mês</h4><canvas id="cMensal"></canvas></div>
+  <div style="margin-top:20px" class="tbl-wrap"><table>
+    <thead><tr><th>Mês</th><th>Investido</th><th>Faturado</th><th>ROAS</th><th>Compras</th><th>Cliques</th><th>Checkouts</th><th>CPV</th></tr></thead>
+    <tbody id="tblMensal"></tbody>
+  </table></div>
+</div>
+
+<script>
+const RAW = [{"date":"2025-07-18","inv":38.73,"cliques":7,"pv":6,"ck":3,"imp":687,"compras":1.0,"fat":97.0},{"date":"2025-07-19","inv":39.78,"cliques":12,"pv":9,"ck":9,"imp":833,"compras":4.0,"fat":1858.0},{"date":"2025-07-20","inv":50.65,"cliques":29,"pv":20,"ck":3,"imp":1288,"compras":1.0,"fat":67.0},{"date":"2025-07-21","inv":47.63,"cliques":20,"pv":11,"ck":0,"imp":1321,"compras":0.0,"fat":0.0},{"date":"2025-07-22","inv":40.37,"cliques":12,"pv":4,"ck":2,"imp":834,"compras":0.0,"fat":0.0},{"date":"2025-07-23","inv":34.92,"cliques":15,"pv":8,"ck":1,"imp":851,"compras":0.0,"fat":0.0},{"date":"2025-07-24","inv":26.69,"cliques":9,"pv":6,"ck":0,"imp":709,"compras":0.0,"fat":0.0},{"date":"2025-07-25","inv":18.64,"cliques":9,"pv":4,"ck":1,"imp":614,"compras":0.0,"fat":0.0},{"date":"2025-07-26","inv":46.69,"cliques":25,"pv":1,"ck":1,"imp":1266,"compras":0.0,"fat":0.0},{"date":"2025-07-27","inv":46.56,"cliques":21,"pv":6,"ck":0,"imp":1087,"compras":0.0,"fat":0.0},{"date":"2025-07-28","inv":52.09,"cliques":19,"pv":6,"ck":0,"imp":1207,"compras":0.0,"fat":0.0},{"date":"2025-07-29","inv":24.4,"cliques":10,"pv":3,"ck":1,"imp":579,"compras":0.0,"fat":0.0},{"date":"2025-07-31","inv":61.53,"cliques":17,"pv":2,"ck":2,"imp":4140,"compras":0.0,"fat":0.0},{"date":"2025-08-01","inv":49.61,"cliques":12,"pv":7,"ck":4,"imp":1616,"compras":1.0,"fat":67.0},{"date":"2025-08-02","inv":15.21,"cliques":7,"pv":1,"ck":0,"imp":424,"compras":0.0,"fat":0.0},{"date":"2025-08-03","inv":18.59,"cliques":5,"pv":2,"ck":2,"imp":530,"compras":0.0,"fat":0.0},{"date":"2025-08-04","inv":19.01,"cliques":6,"pv":3,"ck":1,"imp":516,"compras":0.0,"fat":0.0},{"date":"2025-08-05","inv":20.95,"cliques":7,"pv":2,"ck":3,"imp":571,"compras":0.0,"fat":0.0},{"date":"2025-08-06","inv":19.59,"cliques":5,"pv":4,"ck":2,"imp":500,"compras":0.0,"fat":0.0},{"date":"2025-08-07","inv":25.59,"cliques":11,"pv":9,"ck":2,"imp":726,"compras":1.0,"fat":298.5},{"date":"2025-08-08","inv":33.8,"cliques":12,"pv":8,"ck":1,"imp":719,"compras":0.0,"fat":0.0},{"date":"2025-08-09","inv":25.34,"cliques":11,"pv":7,"ck":1,"imp":761,"compras":0.0,"fat":0.0},{"date":"2025-08-10","inv":36.4,"cliques":11,"pv":4,"ck":0,"imp":1084,"compras":0.0,"fat":0.0},{"date":"2025-08-11","inv":31.73,"cliques":12,"pv":6,"ck":2,"imp":1068,"compras":1.0,"fat":597.0},{"date":"2025-08-12","inv":40.84,"cliques":16,"pv":10,"ck":1,"imp":1259,"compras":1.0,"fat":597.0},{"date":"2025-08-13","inv":55.35,"cliques":20,"pv":14,"ck":0,"imp":1800,"compras":1.0,"fat":597.0},{"date":"2025-08-14","inv":58.2,"cliques":21,"pv":14,"ck":0,"imp":1918,"compras":0.0,"fat":0.0},{"date":"2025-08-15","inv":66.29,"cliques":40,"pv":21,"ck":1,"imp":2288,"compras":0.0,"fat":0.0},{"date":"2025-08-16","inv":61.86,"cliques":23,"pv":19,"ck":8,"imp":2026,"compras":3.0,"fat":201.0},{"date":"2025-08-17","inv":106.04,"cliques":52,"pv":35,"ck":12,"imp":3364,"compras":0.0,"fat":0.0},{"date":"2025-08-18","inv":130.57,"cliques":47,"pv":35,"ck":12,"imp":3999,"compras":1.0,"fat":67.0},{"date":"2025-08-19","inv":82.08,"cliques":29,"pv":22,"ck":27,"imp":2542,"compras":2.0,"fat":664.0},{"date":"2025-08-20","inv":74.51,"cliques":46,"pv":26,"ck":21,"imp":2320,"compras":2.0,"fat":134.0},{"date":"2025-08-21","inv":68.26,"cliques":21,"pv":14,"ck":13,"imp":2010,"compras":0.0,"fat":0.0},{"date":"2025-08-22","inv":67.74,"cliques":20,"pv":15,"ck":11,"imp":1860,"compras":3.0,"fat":201.0},{"date":"2025-08-23","inv":67.59,"cliques":20,"pv":5,"ck":4,"imp":2135,"compras":1.0,"fat":67.0},{"date":"2025-08-24","inv":90.5,"cliques":33,"pv":26,"ck":14,"imp":2752,"compras":4.0,"fat":268.0},{"date":"2025-08-25","inv":82.47,"cliques":33,"pv":21,"ck":15,"imp":2284,"compras":2.0,"fat":134.0},{"date":"2025-08-26","inv":84.12,"cliques":29,"pv":22,"ck":11,"imp":2215,"compras":5.0,"fat":865.0},{"date":"2025-08-27","inv":76.84,"cliques":22,"pv":14,"ck":4,"imp":1528,"compras":0.0,"fat":0.0},{"date":"2025-08-28","inv":70.78,"cliques":27,"pv":14,"ck":9,"imp":2020,"compras":2.0,"fat":664.0},{"date":"2025-08-29","inv":77.46,"cliques":16,"pv":8,"ck":4,"imp":2381,"compras":3.0,"fat":1791.0},{"date":"2025-08-30","inv":55.89,"cliques":11,"pv":5,"ck":5,"imp":1820,"compras":0.0,"fat":0.0},{"date":"2025-08-31","inv":85.27,"cliques":28,"pv":15,"ck":6,"imp":2538,"compras":3.0,"fat":1261.0},{"date":"2025-09-01","inv":80.8,"cliques":37,"pv":24,"ck":2,"imp":2908,"compras":0.0,"fat":0.0},{"date":"2025-09-02","inv":64.2,"cliques":29,"pv":19,"ck":11,"imp":2210,"compras":3.0,"fat":201.0},{"date":"2025-09-03","inv":51.08,"cliques":13,"pv":11,"ck":6,"imp":1364,"compras":1.0,"fat":67.0},{"date":"2025-09-05","inv":186.3,"cliques":45,"pv":30,"ck":19,"imp":4689,"compras":3.0,"fat":331.0},{"date":"2025-09-06","inv":97.41,"cliques":17,"pv":12,"ck":3,"imp":1611,"compras":1.0,"fat":197.0},{"date":"2025-09-08","inv":137.33,"cliques":31,"pv":20,"ck":9,"imp":3338,"compras":0.0,"fat":0.0},{"date":"2025-09-09","inv":178.9,"cliques":45,"pv":34,"ck":13,"imp":3749,"compras":1.0,"fat":67.0},{"date":"2025-09-10","inv":170.73,"cliques":25,"pv":16,"ck":7,"imp":3714,"compras":0.0,"fat":0.0},{"date":"2025-09-11","inv":165.99,"cliques":44,"pv":28,"ck":20,"imp":4145,"compras":3.0,"fat":201.0},{"date":"2025-09-12","inv":145.18,"cliques":47,"pv":28,"ck":10,"imp":3640,"compras":3.0,"fat":591.0},{"date":"2025-09-13","inv":132.55,"cliques":26,"pv":14,"ck":7,"imp":3486,"compras":2.0,"fat":361.0},{"date":"2025-09-14","inv":156.97,"cliques":34,"pv":22,"ck":9,"imp":3853,"compras":1.0,"fat":67.0},{"date":"2025-09-15","inv":154.89,"cliques":48,"pv":28,"ck":11,"imp":4215,"compras":1.0,"fat":197.0},{"date":"2025-09-16","inv":65.96,"cliques":13,"pv":8,"ck":7,"imp":1858,"compras":1.0,"fat":67.0},{"date":"2025-09-17","inv":197.24,"cliques":52,"pv":20,"ck":4,"imp":5253,"compras":0.0,"fat":0.0},{"date":"2025-09-18","inv":129.0,"cliques":42,"pv":26,"ck":6,"imp":3000,"compras":1.0,"fat":67.0},{"date":"2025-09-20","inv":233.94,"cliques":53,"pv":31,"ck":8,"imp":5955,"compras":2.0,"fat":264.0},{"date":"2025-09-21","inv":95.7,"cliques":22,"pv":14,"ck":6,"imp":2401,"compras":0.0,"fat":0.0},{"date":"2025-09-22","inv":67.21,"cliques":19,"pv":12,"ck":4,"imp":2493,"compras":0.0,"fat":0.0},{"date":"2025-09-23","inv":98.62,"cliques":25,"pv":15,"ck":6,"imp":2911,"compras":0.0,"fat":0.0},{"date":"2025-09-24","inv":65.29,"cliques":14,"pv":9,"ck":2,"imp":2014,"compras":1.0,"fat":67.0},{"date":"2025-09-25","inv":129.1,"cliques":20,"pv":12,"ck":5,"imp":3283,"compras":2.0,"fat":653.0},{"date":"2025-09-26","inv":102.7,"cliques":24,"pv":25,"ck":5,"imp":3069,"compras":0.0,"fat":0.0},{"date":"2025-09-27","inv":132.21,"cliques":34,"pv":30,"ck":11,"imp":3668,"compras":1.0,"fat":97.0},{"date":"2025-09-28","inv":114.07,"cliques":30,"pv":24,"ck":4,"imp":3334,"compras":1.0,"fat":97.0},{"date":"2025-09-29","inv":7.49,"cliques":2,"pv":1,"ck":3,"imp":168,"compras":1.0,"fat":97.0},{"date":"2025-09-30","inv":132.08,"cliques":19,"pv":17,"ck":17,"imp":3336,"compras":4.0,"fat":723.0},{"date":"2025-10-01","inv":151.65,"cliques":39,"pv":33,"ck":17,"imp":3464,"compras":6.0,"fat":539.0},{"date":"2025-10-02","inv":95.3,"cliques":27,"pv":20,"ck":5,"imp":2511,"compras":1.0,"fat":97.0},{"date":"2025-10-03","inv":80.02,"cliques":15,"pv":10,"ck":5,"imp":2594,"compras":0.0,"fat":0.0},{"date":"2025-10-04","inv":80.95,"cliques":17,"pv":14,"ck":6,"imp":2972,"compras":0.0,"fat":0.0},{"date":"2025-10-05","inv":90.47,"cliques":19,"pv":18,"ck":6,"imp":3619,"compras":1.0,"fat":67.0},{"date":"2025-10-06","inv":96.16,"cliques":31,"pv":25,"ck":17,"imp":3289,"compras":1.0,"fat":67.0},{"date":"2025-10-07","inv":98.62,"cliques":22,"pv":20,"ck":11,"imp":2751,"compras":2.0,"fat":264.0},{"date":"2025-10-08","inv":74.69,"cliques":20,"pv":18,"ck":5,"imp":2806,"compras":4.0,"fat":730.0},{"date":"2025-10-09","inv":75.16,"cliques":23,"pv":17,"ck":12,"imp":2499,"compras":1.0,"fat":197.0},{"date":"2025-10-10","inv":76.44,"cliques":16,"pv":10,"ck":1,"imp":2484,"compras":0.0,"fat":0.0},{"date":"2025-10-11","inv":81.18,"cliques":13,"pv":7,"ck":2,"imp":2422,"compras":2.0,"fat":164.0},{"date":"2025-10-12","inv":93.06,"cliques":21,"pv":19,"ck":4,"imp":2889,"compras":2.0,"fat":264.0},{"date":"2025-10-13","inv":9.98,"cliques":5,"pv":3,"ck":4,"imp":243,"compras":1.0,"fat":164.0},{"date":"2025-10-15","inv":145.49,"cliques":38,"pv":31,"ck":7,"imp":2911,"compras":0.0,"fat":0.0},{"date":"2025-10-16","inv":123.73,"cliques":20,"pv":18,"ck":4,"imp":2993,"compras":2.0,"fat":395.0},{"date":"2025-10-17","inv":117.73,"cliques":20,"pv":17,"ck":3,"imp":2764,"compras":0.0,"fat":0.0},{"date":"2025-10-18","inv":102.22,"cliques":23,"pv":18,"ck":2,"imp":2514,"compras":0.0,"fat":0.0},{"date":"2025-10-19","inv":88.18,"cliques":26,"pv":24,"ck":7,"imp":1933,"compras":1.0,"fat":67.0},{"date":"2025-10-20","inv":53.13,"cliques":10,"pv":8,"ck":1,"imp":1082,"compras":0.0,"fat":0.0},{"date":"2025-10-21","inv":67.86,"cliques":32,"pv":29,"ck":8,"imp":1769,"compras":1.0,"fat":164.0},{"date":"2025-10-22","inv":46.81,"cliques":15,"pv":18,"ck":7,"imp":1354,"compras":0.0,"fat":0.0},{"date":"2025-10-23","inv":42.36,"cliques":15,"pv":11,"ck":1,"imp":1320,"compras":0.0,"fat":0.0},{"date":"2025-10-24","inv":27.98,"cliques":4,"pv":2,"ck":0,"imp":697,"compras":0.0,"fat":0.0},{"date":"2026-01-20","inv":11.15,"cliques":8,"pv":7,"ck":0,"imp":574,"compras":0.0,"fat":0.0},{"date":"2026-01-21","inv":18.95,"cliques":15,"pv":14,"ck":2,"imp":894,"compras":0.0,"fat":0.0},{"date":"2026-01-22","inv":17.92,"cliques":12,"pv":12,"ck":5,"imp":759,"compras":1.0,"fat":298.0},{"date":"2026-01-23","inv":22.31,"cliques":8,"pv":7,"ck":2,"imp":822,"compras":1.0,"fat":67.0},{"date":"2026-01-24","inv":18.06,"cliques":11,"pv":8,"ck":0,"imp":732,"compras":0.0,"fat":0.0},{"date":"2026-01-25","inv":24.48,"cliques":7,"pv":5,"ck":2,"imp":670,"compras":1.0,"fat":67.0},{"date":"2026-01-26","inv":25.26,"cliques":11,"pv":6,"ck":2,"imp":1200,"compras":1.0,"fat":67.0},{"date":"2026-01-27","inv":20.06,"cliques":8,"pv":7,"ck":0,"imp":695,"compras":0.0,"fat":0.0},{"date":"2026-01-28","inv":16.73,"cliques":3,"pv":1,"ck":0,"imp":579,"compras":0.0,"fat":0.0},{"date":"2026-01-29","inv":17.87,"cliques":8,"pv":7,"ck":5,"imp":705,"compras":0.0,"fat":0.0},{"date":"2026-01-30","inv":17.34,"cliques":6,"pv":5,"ck":3,"imp":615,"compras":0.0,"fat":0.0},{"date":"2026-01-31","inv":17.71,"cliques":4,"pv":3,"ck":0,"imp":745,"compras":0.0,"fat":0.0},{"date":"2026-02-01","inv":24.59,"cliques":6,"pv":3,"ck":1,"imp":1099,"compras":0.0,"fat":0.0},{"date":"2026-02-02","inv":24.51,"cliques":11,"pv":8,"ck":3,"imp":999,"compras":1.0,"fat":134.0},{"date":"2026-02-03","inv":20.52,"cliques":4,"pv":3,"ck":0,"imp":775,"compras":0.0,"fat":0.0},{"date":"2026-02-04","inv":19.12,"cliques":11,"pv":8,"ck":2,"imp":873,"compras":0.0,"fat":0.0},{"date":"2026-02-05","inv":7.91,"cliques":0,"pv":0,"ck":1,"imp":251,"compras":0.0,"fat":0.0},{"date":"2026-02-26","inv":125.98,"cliques":50,"pv":47,"ck":0,"imp":3351,"compras":0.0,"fat":0.0},{"date":"2026-02-27","inv":58.3,"cliques":24,"pv":24,"ck":0,"imp":1791,"compras":0.0,"fat":0.0},{"date":"2026-02-28","inv":37.83,"cliques":17,"pv":14,"ck":0,"imp":1476,"compras":0.0,"fat":0.0},{"date":"2026-03-01","inv":72.85,"cliques":33,"pv":29,"ck":0,"imp":2593,"compras":0.0,"fat":0.0},{"date":"2026-03-02","inv":136.32,"cliques":43,"pv":42,"ck":2,"imp":3396,"compras":0.0,"fat":0.0},{"date":"2026-03-03","inv":122.57,"cliques":44,"pv":39,"ck":5,"imp":2648,"compras":0.0,"fat":0.0},{"date":"2026-03-04","inv":83.73,"cliques":19,"pv":17,"ck":5,"imp":1620,"compras":2.0,"fat":134.0},{"date":"2026-03-05","inv":57.82,"cliques":18,"pv":10,"ck":2,"imp":1374,"compras":0.0,"fat":0.0},{"date":"2026-03-06","inv":52.97,"cliques":7,"pv":7,"ck":1,"imp":1266,"compras":0.0,"fat":0.0},{"date":"2026-03-07","inv":48.6,"cliques":15,"pv":13,"ck":0,"imp":1397,"compras":0.0,"fat":0.0},{"date":"2026-03-08","inv":73.49,"cliques":25,"pv":26,"ck":3,"imp":2251,"compras":0.0,"fat":0.0},{"date":"2026-03-09","inv":46.14,"cliques":20,"pv":15,"ck":1,"imp":1657,"compras":0.0,"fat":0.0},{"date":"2026-03-10","inv":53.2,"cliques":9,"pv":7,"ck":8,"imp":1064,"compras":1.0,"fat":67.0},{"date":"2026-03-11","inv":91.38,"cliques":14,"pv":12,"ck":7,"imp":1756,"compras":2.0,"fat":864.0},{"date":"2026-03-12","inv":73.64,"cliques":17,"pv":13,"ck":1,"imp":1467,"compras":0.0,"fat":0.0},{"date":"2026-03-13","inv":41.45,"cliques":7,"pv":7,"ck":1,"imp":1183,"compras":0.0,"fat":0.0},{"date":"2026-03-14","inv":30.56,"cliques":13,"pv":12,"ck":4,"imp":1177,"compras":0.0,"fat":0.0},{"date":"2026-03-15","inv":35.5,"cliques":16,"pv":17,"ck":4,"imp":1223,"compras":2.0,"fat":134.0},{"date":"2026-03-16","inv":37.39,"cliques":20,"pv":21,"ck":7,"imp":1194,"compras":0.0,"fat":0.0},{"date":"2026-03-17","inv":39.89,"cliques":13,"pv":12,"ck":6,"imp":1321,"compras":0.0,"fat":0.0},{"date":"2026-03-18","inv":48.01,"cliques":22,"pv":17,"ck":8,"imp":1657,"compras":1.0,"fat":67.0},{"date":"2026-03-19","inv":41.5,"cliques":23,"pv":22,"ck":7,"imp":1796,"compras":1.0,"fat":67.0},{"date":"2026-03-20","inv":32.85,"cliques":19,"pv":20,"ck":8,"imp":1497,"compras":0.0,"fat":0.0},{"date":"2026-03-21","inv":39.76,"cliques":7,"pv":6,"ck":2,"imp":1760,"compras":0.0,"fat":0.0},{"date":"2026-03-22","inv":45.89,"cliques":25,"pv":24,"ck":3,"imp":1791,"compras":1.0,"fat":67.0},{"date":"2026-03-23","inv":29.61,"cliques":18,"pv":18,"ck":3,"imp":1173,"compras":1.0,"fat":67.0},{"date":"2026-03-24","inv":35.92,"cliques":13,"pv":12,"ck":2,"imp":1785,"compras":0.0,"fat":0.0},{"date":"2026-03-25","inv":46.93,"cliques":28,"pv":26,"ck":2,"imp":2354,"compras":0.0,"fat":0.0},{"date":"2026-03-26","inv":13.98,"cliques":8,"pv":7,"ck":1,"imp":541,"compras":0.0,"fat":0.0},{"date":"2026-03-30","inv":0.5,"cliques":0,"pv":0,"ck":0,"imp":19,"compras":0.0,"fat":0.0}];
+const CRIATIVOS = [{"name":"VRH-ADE02","inv":1583.4,"cliques":356,"compras":25,"fat":1675,"url":""},{"name":"VRH-ADE16","inv":1850.42,"cliques":717,"compras":28,"fat":1876,"url":""},{"name":"VRH-ADE11","inv":871.32,"cliques":213,"compras":13,"fat":871,"url":""},{"name":"VRH-ADE17 \u2014 C\u00f3pia","inv":503.55,"cliques":158,"compras":10,"fat":670,"url":""},{"name":"ADV0601","inv":219.86,"cliques":83,"compras":5,"fat":335,"url":""},{"name":"VRH-ADE01","inv":302.84,"cliques":59,"compras":5,"fat":335,"url":""},{"name":"ADV01RMK","inv":213.05,"cliques":21,"compras":0,"fat":0,"url":""},{"name":"VRH-ADE14","inv":284.32,"cliques":67,"compras":3,"fat":201,"url":""},{"name":"VRH-ADE28","inv":199.65,"cliques":41,"compras":0,"fat":0,"url":""},{"name":"VRH-ADE17","inv":222.37,"cliques":74,"compras":2,"fat":134,"url":""},{"name":"VRH-ADE08","inv":46.11,"cliques":9,"compras":2,"fat":134,"url":""},{"name":"VRH-ADE26","inv":132.54,"cliques":23,"compras":1,"fat":67,"url":""},{"name":"VRH-ADE38","inv":92.83,"cliques":27,"compras":2,"fat":134,"url":""},{"name":"VRH-ADE01 \u2014 C\u00f3pia","inv":41.04,"cliques":8,"compras":1,"fat":67,"url":""},{"name":"VRH-ADE25","inv":99.82,"cliques":24,"compras":2,"fat":134,"url":""},{"name":"VRH-ADE29","inv":60.96,"cliques":24,"compras":1,"fat":67,"url":""},{"name":"VRH-ADE41","inv":77.89,"cliques":15,"compras":1,"fat":67,"url":""},{"name":"VRH-ADE22 - bege","inv":38.7,"cliques":14,"compras":1,"fat":67,"url":""},{"name":"VRH-ADE62","inv":32.76,"cliques":11,"compras":1,"fat":67,"url":""},{"name":"VRH-ADE03","inv":111.18,"cliques":45,"compras":1,"fat":67,"url":""},{"name":"VRH-ADE10","inv":73.12,"cliques":24,"compras":1,"fat":67,"url":""},{"name":"VRH-ADE15","inv":84.7,"cliques":16,"compras":0,"fat":0,"url":""},{"name":"VRH-ADE12","inv":62.85,"cliques":22,"compras":0,"fat":0,"url":""},{"name":"VRH-ADE13","inv":33.64,"cliques":12,"compras":0,"fat":0,"url":""},{"name":"VRH-ADE04","inv":45.4,"cliques":13,"compras":0,"fat":0,"url":""},{"name":"VRH-ADE06","inv":8.05,"cliques":2,"compras":0,"fat":0,"url":""},{"name":"ADE0625","inv":351.54,"cliques":216,"compras":4,"fat":268,"url":""},{"name":"ADE0425","inv":201.46,"cliques":104,"compras":2,"fat":134,"url":""},{"name":"ADE1025","inv":259.59,"cliques":127,"compras":2,"fat":134,"url":""},{"name":"ADE0525","inv":203.18,"cliques":53,"compras":3,"fat":201,"url":""}];
+
+let criSort='fat', charts={};
+
+const fmtISO=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const fmtBR=d=>{const[y,m,dd]=d.split('-');return`${dd}/${m}/${y.slice(2)}`};
+const R=v=>v==null||isNaN(v)?'—':'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const Nb=v=>v==null||isNaN(v)?'—':Math.round(v).toLocaleString('pt-BR');
+const P=v=>v==null||isNaN(v)?'—':v.toFixed(1)+'%';
+
+// Parse dates
+const parsed = RAW.map(r=>{
+  const[y,m,d]=r.date.split('-').map(Number);
+  return{...r,dt:new Date(y,m-1,d)};
+});
+
+document.getElementById('stxt').textContent=new Date().toLocaleString('pt-BR');
+
+function getDateRange(){
+  const all=parsed.map(r=>r.dt);
+  return{min:new Date(Math.min(...all)),max:new Date(Math.max(...all))};
+}
+
+function setPreset(days){
+  ['p7','p15','p30','pAll'].forEach(id=>document.getElementById(id).classList.remove('active'));
+  if(days===7)document.getElementById('p7').classList.add('active');
+  else if(days===15)document.getElementById('p15').classList.add('active');
+  else if(days===30)document.getElementById('p30').classList.add('active');
+  else document.getElementById('pAll').classList.add('active');
+  const{min,max}=getDateRange();
+  let from=new Date(max);
+  if(days===0){from=new Date(min);}
+  else{from=new Date(max);from.setDate(from.getDate()-days+1);}
+  document.getElementById('dtFrom').value=fmtISO(from);
+  document.getElementById('dtTo').value=fmtISO(max);
+  applyFilter();
+}
+
+document.getElementById('dtFrom').addEventListener('change',applyFilter);
+document.getElementById('dtTo').addEventListener('change',applyFilter);
+
+let filteredRows=[];
+
+function applyFilter(){
+  const fv=document.getElementById('dtFrom').value;
+  const tv=document.getElementById('dtTo').value;
+  if(!fv||!tv){filteredRows=[...parsed];}
+  else{
+    const[fy,fm,fd]=fv.split('-').map(Number);
+    const[ty,tm,td]=tv.split('-').map(Number);
+    const fd2=new Date(fy,fm-1,fd),td2=new Date(ty,tm-1,td,23,59,59);
+    filteredRows=parsed.filter(r=>r.dt>=fd2&&r.dt<=td2);
+  }
+  renderAll();
+}
+
+function totals(){
+  return filteredRows.reduce((a,d)=>({
+    inv:a.inv+d.inv,imp:a.imp+d.imp,cliques:a.cliques+d.cliques,
+    pv:a.pv+d.pv,ck:a.ck+d.ck,compras:a.compras+d.compras,fat:a.fat+d.fat
+  }),{inv:0,imp:0,cliques:0,pv:0,ck:0,compras:0,fat:0});
+}
+
+function renderAll(){renderKPIs();renderEvo();renderVendas();renderRoas();renderFunil();renderCriativos();renderDiario();renderMensal();}
+
+function renderKPIs(){
+  const t=totals();
+  const roas=t.inv>0?t.fat/t.inv:0;
+  const cpv=t.compras>0?t.inv/t.compras:0;
+  const dias=filteredRows.length||1;
+  document.getElementById('kpis').innerHTML=`
+    <div class="kpi-card"><div class="kpi-label">Investido</div><div class="kpi-value orange">${R(t.inv)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Faturado</div><div class="kpi-value green">${R(t.fat)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">ROAS</div><div class="kpi-value ${roas>=2?'green':roas>=1?'yellow':'red'}">${roas.toFixed(2)}x</div></div>
+    <div class="kpi-card"><div class="kpi-label">Compras</div><div class="kpi-value yellow">${Nb(t.compras)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CPV</div><div class="kpi-value">${R(cpv)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Cliques</div><div class="kpi-value blue">${Nb(t.cliques)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Checkouts</div><div class="kpi-value">${Nb(t.ck)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Inv/Dia</div><div class="kpi-value">${R(t.inv/dias)}</div></div>`;
+}
+
+function mkChart(id,cfg){if(charts[id])charts[id].destroy();const el=document.getElementById(id);if(!el)return;charts[id]=new Chart(el.getContext('2d'),cfg);}
+const xCfg={ticks:{color:'rgba(255,255,255,.4)',font:{size:9},maxTicksLimit:14},grid:{color:'rgba(255,255,255,.04)'}};
+const yCfg={ticks:{color:'rgba(255,255,255,.4)'},grid:{color:'rgba(255,255,255,.04)'}};
+const legCfg={labels:{color:'rgba(255,255,255,.6)',font:{size:11}}};
+
+function renderEvo(){
+  const labels=filteredRows.map(d=>fmtBR(d.date));
+  mkChart('cEvo',{type:'bar',data:{labels,datasets:[
+    {label:'Investido',data:filteredRows.map(d=>+d.inv.toFixed(2)),backgroundColor:'rgba(255,107,43,.5)',borderColor:'#ff6b2b',borderWidth:1,order:2},
+    {label:'Faturado',data:filteredRows.map(d=>+d.fat.toFixed(2)),type:'line',borderColor:'#2ecc71',backgroundColor:'rgba(46,204,113,.08)',tension:.4,pointRadius:2,fill:true,order:1}
+  ]},options:{responsive:true,plugins:{legend:legCfg},scales:{x:xCfg,y:{...yCfg,ticks:{...yCfg.ticks,callback:v=>'R$'+Math.round(v).toLocaleString('pt-BR')}}}}});
+}
+function renderVendas(){
+  mkChart('cVendas',{type:'bar',data:{labels:filteredRows.map(d=>fmtBR(d.date)),datasets:[{label:'Compras',data:filteredRows.map(d=>d.compras),backgroundColor:'rgba(255,183,55,.6)',borderColor:'#f1c40f',borderWidth:1}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:xCfg,y:yCfg}}});
+}
+function renderRoas(){
+  mkChart('cRoas',{type:'line',data:{labels:filteredRows.map(d=>fmtBR(d.date)),datasets:[{label:'ROAS',data:filteredRows.map(d=>d.inv>0?+(d.fat/d.inv).toFixed(2):0),borderColor:'#ff6b2b',backgroundColor:'rgba(255,107,43,.1)',tension:.4,pointRadius:2,fill:true}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:xCfg,y:{...yCfg,ticks:{...yCfg.ticks,callback:v=>v+'x'}}}}});
+}
+function renderFunil(){
+  const t=totals();
+  const steps=[{l:'Cliques',v:t.cliques},{l:'Page Views',v:t.pv},{l:'Checkouts',v:t.ck},{l:'Compras',v:t.compras}];
+  const mx=steps[0].v||1;
+  document.getElementById('funilBars').innerHTML=steps.map(s=>`
+    <div class="fbar"><div class="fbar-label"><span>${s.l}</span><span>${Nb(s.v)}</span></div>
+    <div class="fbar-bg"><div class="fbar-fill" style="width:${Math.min(100,s.v/mx*100)}%"></div></div></div>`).join('');
+  const cpc=t.cliques>0?t.inv/t.cliques:0;
+  const cpv=t.compras>0?t.inv/t.compras:0;
+  const txPV=t.cliques>0?t.pv/t.cliques*100:0;
+  const txCK=t.cliques>0?t.ck/t.cliques*100:0;
+  const txConv=t.ck>0?t.compras/t.ck*100:0;
+  document.getElementById('taxaGrid').innerHTML=`
+    <div class="taxa-item"><span>Clique → PV</span><span class="taxa-val">${P(txPV)}</span></div>
+    <div class="taxa-item"><span>Clique → Checkout</span><span class="taxa-val">${P(txCK)}</span></div>
+    <div class="taxa-item"><span>Checkout → Compra</span><span class="taxa-val">${P(txConv)}</span></div>
+    <div class="taxa-item"><span>CPC</span><span class="taxa-val">${R(cpc)}</span></div>
+    <div class="taxa-item"><span>CPV</span><span class="taxa-val">${R(cpv)}</span></div>`;
+  const labels=filteredRows.map(d=>fmtBR(d.date));
+  mkChart('cFunil',{type:'bar',data:{labels,datasets:[
+    {label:'Cliques',data:filteredRows.map(d=>d.cliques),backgroundColor:'rgba(52,152,219,.5)'},
+    {label:'Checkouts',data:filteredRows.map(d=>d.ck),backgroundColor:'rgba(255,183,55,.6)'},
+    {label:'Compras',data:filteredRows.map(d=>d.compras),backgroundColor:'rgba(46,204,113,.6)'}
+  ]},options:{responsive:true,plugins:{legend:legCfg},scales:{x:xCfg,y:yCfg}}});
+  mkChart('cCPV',{type:'line',data:{labels,datasets:[
+    {label:'CPC',data:filteredRows.map(d=>d.cliques>0?+(d.inv/d.cliques).toFixed(2):0),borderColor:'#ff6b2b',backgroundColor:'rgba(255,107,43,.1)',tension:.4,pointRadius:2},
+    {label:'CPV',data:filteredRows.map(d=>d.compras>0?+(d.inv/d.compras).toFixed(2):0),borderColor:'#2ecc71',backgroundColor:'rgba(46,204,113,.08)',tension:.4,pointRadius:2}
+  ]},options:{responsive:true,plugins:{legend:legCfg},scales:{x:xCfg,y:{...yCfg,ticks:{...yCfg.ticks,callback:v=>'R$'+v}}}}});
+}
+
+function renderCriativos(){
+  let ads=[...CRIATIVOS];
+  if(criSort==='fat')ads.sort((a,b)=>b.fat-a.fat);
+  else if(criSort==='roas')ads.sort((a,b)=>(b.inv>0?b.fat/b.inv:0)-(a.inv>0?a.fat/a.inv:0));
+  else if(criSort==='inv')ads.sort((a,b)=>b.inv-a.inv);
+  else if(criSort==='compras')ads.sort((a,b)=>b.compras-a.compras);
+  else ads.sort((a,b)=>b.cliques-a.cliques);
+  const maxFat=Math.max(...ads.map(a=>a.fat),1);
+  document.getElementById('criGrid').innerHTML=ads.filter(a=>a.inv>0||a.cliques>0).map(a=>{
+    const roas=a.inv>0?a.fat/a.inv:0;
+    const cpv=a.compras>0?a.inv/a.compras:0;
+    const cls=a.fat>maxFat*.5?'badge-top':a.fat>maxFat*.1?'badge-mid':'badge-low';
+    const lbl=a.fat>maxFat*.5?'🔥 Top':a.fat>maxFat*.1?'⚡ Médio':'Baixo';
+    return `<div class="cri-card">
+      <div class="cri-name">${a.name}</div>
+      <span class="cri-badge ${cls}">${lbl}</span>
+      <div class="cri-metrics">
+        <div class="cm"><span class="cm-lbl">Investido</span><span class="cm-val">${R(a.inv)}</span></div>
+        <div class="cm"><span class="cm-lbl">Faturado</span><span class="cm-val hl">${R(a.fat)}</span></div>
+        <div class="cm"><span class="cm-lbl">ROAS</span><span class="cm-val" style="color:${roas>=2?'#2ecc71':roas>=1?'#f1c40f':'#e74c3c'}">${roas.toFixed(2)}x</span></div>
+        <div class="cm"><span class="cm-lbl">Compras</span><span class="cm-val">${Nb(a.compras)}</span></div>
+        <div class="cm"><span class="cm-lbl">Cliques</span><span class="cm-val">${Nb(a.cliques)}</span></div>
+        <div class="cm"><span class="cm-lbl">CPV</span><span class="cm-val">${R(cpv)}</span></div>
+      </div>
+    </div>`;
+  }).join('') || '<p style="color:rgba(255,255,255,.4);padding:20px">Nenhum criativo.</p>';
+}
+
+function renderDiario(){
+  const rows=[...filteredRows].reverse();
+  document.getElementById('tblDiario').innerHTML=rows.map(d=>{
+    const roas=d.inv>0?d.fat/d.inv:0;
+    const cpv=d.compras>0?d.inv/d.compras:0;
+    return `<tr><td>${fmtBR(d.date)}</td><td>${R(d.inv)}</td><td>${Nb(d.imp)}</td><td>${Nb(d.cliques)}</td>
+      <td>${Nb(d.pv)}</td><td>${Nb(d.ck)}</td>
+      <td style="color:${d.compras>0?'#f1c40f':'inherit'}">${Nb(d.compras)}</td>
+      <td style="color:${d.fat>0?'#2ecc71':'inherit'}">${R(d.fat)}</td>
+      <td style="color:${roas>=2?'#2ecc71':roas>=1?'#f1c40f':'#e74c3c'}">${roas.toFixed(2)}x</td>
+      <td>${R(cpv)}</td></tr>`;
+  }).join('');
+}
+
+function renderMensal(){
+  const byM={};
+  for(const d of filteredRows){
+    const k=`${d.dt.getFullYear()}-${String(d.dt.getMonth()+1).padStart(2,'0')}`;
+    if(!byM[k])byM[k]={k,inv:0,fat:0,compras:0,cliques:0,ck:0};
+    byM[k].inv+=d.inv;byM[k].fat+=d.fat;byM[k].compras+=d.compras;byM[k].cliques+=d.cliques;byM[k].ck+=d.ck;
+  }
+  const ms=Object.values(byM).sort((a,b)=>a.k.localeCompare(b.k));
+  const mn=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const fmt=k=>{const[y,m]=k.split('-');return mn[+m-1]+'/'+y.slice(2);};
+  mkChart('cMensal',{type:'bar',data:{labels:ms.map(m=>fmt(m.k)),datasets:[
+    {label:'Investido',data:ms.map(m=>+m.inv.toFixed(2)),backgroundColor:'rgba(255,107,43,.6)'},
+    {label:'Faturado',data:ms.map(m=>+m.fat.toFixed(2)),backgroundColor:'rgba(46,204,113,.6)'}
+  ]},options:{responsive:true,plugins:{legend:legCfg},scales:{x:xCfg,y:{...yCfg,ticks:{...yCfg.ticks,callback:v=>'R$'+Math.round(v).toLocaleString('pt-BR')}}}}});
+  document.getElementById('tblMensal').innerHTML=[...ms].reverse().map(m=>{
+    const roas=m.inv>0?m.fat/m.inv:0;
+    const cpv=m.compras>0?m.inv/m.compras:0;
+    return `<tr><td>${fmt(m.k)}</td><td>${R(m.inv)}</td><td style="color:${m.fat>0?'#2ecc71':'inherit'}">${R(m.fat)}</td>
+      <td style="color:${roas>=2?'#2ecc71':roas>=1?'#f1c40f':'#e74c3c'}">${roas.toFixed(2)}x</td>
+      <td>${Nb(m.compras)}</td><td>${Nb(m.cliques)}</td><td>${Nb(m.ck)}</td><td>${R(cpv)}</td></tr>`;
+  }).join('');
+}
+
+function setSort(k){
+  criSort=k;
+  document.querySelectorAll('.cri-sortbtn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('cs-'+k)?.classList.add('active');
+  renderCriativos();
+}
+
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',function(){
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.content').forEach(x=>x.classList.remove('active'));
+  this.classList.add('active');
+  document.getElementById('tab-'+this.dataset.tab).classList.add('active');
+}));
+
+function downloadHTML(){
+  const blob=new Blob([document.documentElement.outerHTML],{type:'text/html'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='dashboard-venderh-'+new Date().toISOString().slice(0,10)+'.html';a.click();
+}
+
+setPreset(30);
+</script>
+</body>
+</html>
