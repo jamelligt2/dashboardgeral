@@ -488,18 +488,20 @@ function renderVisao(from,to){
   document.querySelector('#visao-daily tfoot').innerHTML=days.length?`<tr><td>TOTAL</td><td>${fmtBRL(m.inv)}</td><td>${fmtBRL(v.fatTotal)}</td><td>${fmtROAS(roas)}</td><td>${fmtInt(v.nVendas)}</td><td>${HAS_UTM?fmtInt(v.nTraf):'—'}</td><td>${HAS_UTM?fmtInt(v.nOrg):'—'}</td><td>${fmtBRL(ticket)}</td><td>${fmtBRL(cac)}</td></tr>`:'';
 }
 
-function vendasPorChave(from,to,campo){ const map={}; if(!HAS_UTM)return map;
-  SALES.filter(s=>inRange(s.data,from,to)&&!s.isOB).forEach(s=>{ const k=(s[campo]||'').trim(); if(!k)return;
+function vendasPorChave(from,to,campos){ const map={}; if(!HAS_UTM)return map;
+  const arr=Array.isArray(campos)?campos:[campos];
+  SALES.filter(s=>inRange(s.data,from,to)&&!s.isOB).forEach(s=>{ const parts=arr.map(c=>(s[c]||'').trim());
+    if(parts.some(p=>!p))return; const k=parts.join('||');
     if(!map[k])map[k]={n:0,fat:0}; map[k].n++; map[k].fat+=s.valor; }); return map; }
 
 function renderCriativos(rows,from,to){
-  const vMap=vendasPorChave(from,to,'utmContent'); const map={};
+  const vMap=vendasPorChave(from,to,['utmContent','utmMedium']); const map={};
   rows.forEach(r=>{ const k=r.ad+'||'+r.adset;
     if(!map[k])map[k]={ad:r.ad,adset:r.adset,link:r.link,inv:0,imp:0,reach:0,cliques:0,pv:0,ck:0,status:r.status,lastDate:r.data};
     const o=map[k]; o.inv+=r.inv;o.imp+=r.imp;o.reach+=r.reach;o.cliques+=r.cliques;o.pv+=r.pv;o.ck+=r.ck;
     if(r.data>=o.lastDate){o.lastDate=r.data;o.status=r.status;} });
   let arr=Object.values(map).map(o=>{ o.ctr=o.imp?o.cliques/o.imp*100:0; o.cpc=o.cliques?o.inv/o.cliques:0; o.cpm=o.imp?o.inv/o.imp*1000:0;
-    o.cat=adCategory(o.status); const vv=vMap[o.ad]||{n:0,fat:0}; o.vendas=vv.n; o.fat=vv.fat; o.roas=o.inv?o.fat/o.inv:0; return o; });
+    o.cat=adCategory(o.status); const vv=vMap[o.ad+'||'+o.adset]||{n:0,fat:0}; o.vendas=vv.n; o.fat=vv.fat; o.roas=o.inv?o.fat/o.inv:0; return o; });
   if(criStatusFilter!=='all')arr=arr.filter(o=>o.cat===criStatusFilter);
   arr.sort((a,b)=>{ if(criSort==='ctr')return b.ctr-a.ctr; if(criSort==='cpc')return (a.cpc||1e9)-(b.cpc||1e9);
     if(criSort==='roas')return b.roas-a.roas; if(criSort==='vendas')return b.vendas-a.vendas; return b.inv-a.inv; });
@@ -516,16 +518,16 @@ function setCriStatus(s,btn){ criStatusFilter=s; document.querySelectorAll('.cri
 function setCriSort(s,btn){ criSort=s; document.querySelectorAll('.cri-sort-btn').forEach(b=>b.classList.remove('active')); if(btn)btn.classList.add('active'); const {from,to}=getRange(); renderCriativos(GROWS.filter(g=>inRange(g.data,from,to)),from,to); }
 
 function renderPublicos(rows,from,to){
-  const vMap=vendasPorChave(from,to,'utmMedium'); const map={};
-  rows.forEach(r=>{ const k=r.adset;
-    if(!map[k])map[k]={adset:r.adset,publico:r.publico,inv:0,imp:0,reach:0,cliques:0,pv:0,ck:0};
+  const vMap=vendasPorChave(from,to,['utmCampaign','utmMedium']); const map={};
+  rows.forEach(r=>{ const k=r.campaign+'||'+r.adset;
+    if(!map[k])map[k]={campaign:r.campaign,adset:r.adset,publico:r.publico,inv:0,imp:0,reach:0,cliques:0,pv:0,ck:0};
     const o=map[k]; o.inv+=r.inv;o.imp+=r.imp;o.reach+=r.reach;o.cliques+=r.cliques;o.pv+=r.pv;o.ck+=r.ck; if(r.publico)o.publico=r.publico; });
   let arr=Object.values(map).map(o=>{ o.ctr=o.imp?o.cliques/o.imp*100:0; o.cpc=o.cliques?o.inv/o.cliques:0;
-    const vv=vMap[o.adset]||{n:0,fat:0}; o.vendas=vv.n; o.fat=vv.fat; o.roas=o.inv?o.fat/o.inv:0; return o; });
+    const vv=vMap[o.campaign+'||'+o.adset]||{n:0,fat:0}; o.vendas=vv.n; o.fat=vv.fat; o.roas=o.inv?o.fat/o.inv:0; return o; });
   arr.sort((a,b)=>{ if(pubSort==='ctr')return b.ctr-a.ctr; if(pubSort==='cpc')return (a.cpc||1e9)-(b.cpc||1e9);
     if(pubSort==='roas')return b.roas-a.roas; if(pubSort==='vendas')return b.vendas-a.vendas; return b.inv-a.inv; });
-  document.getElementById('pub-grid').innerHTML=arr.map(o=>`<div class="pub-card"><div class="pub-card-header"><div class="pub-name">${esc(o.adset)}</div><span class="cri-badge" style="background:rgba(255,107,43,.12);color:#ff6b2b">${esc(o.publico||'—')}</span></div><div class="pub-metrics"><div class="pub-metric"><div class="pub-metric-val">${fmtBRL(o.inv)}</div><div class="pub-metric-lbl">Invest.</div></div><div class="pub-metric"><div class="pub-metric-val neutral">${fmtInt(o.cliques)}</div><div class="pub-metric-lbl">Cliques</div></div><div class="pub-metric"><div class="pub-metric-val neutral">${fmtPct(o.ctr)}</div><div class="pub-metric-lbl">CTR</div></div><div class="pub-metric"><div class="pub-metric-val neutral">${fmtBRL(o.cpc)}</div><div class="pub-metric-lbl">CPC</div></div><div class="pub-metric"><div class="pub-metric-val neutral">${fmtInt(o.ck)}</div><div class="pub-metric-lbl">Checkout</div></div><div class="pub-metric"><div class="pub-metric-val neutral">${HAS_UTM?fmtROAS(o.roas):'—'}</div><div class="pub-metric-lbl">ROAS</div></div></div></div>`).join('') || `<div class="empty-state" style="grid-column:1/-1"><div class="icon">📭</div><h3>Sem dados no período</h3><p>Selecione outro intervalo.</p></div>`;
-  document.querySelector('#pub-table tbody').innerHTML=arr.map(o=>`<tr><td>${esc(o.adset)}</td><td>${esc(o.publico||'—')}</td><td>${fmtBRL(o.inv)}</td><td>${fmtInt(o.imp)}</td><td>${fmtInt(o.reach)}</td><td>${fmtInt(o.cliques)}</td><td>${fmtPct(o.ctr)}</td><td>${fmtBRL(o.cpc)}</td><td>${fmtInt(o.pv)}</td><td>${fmtInt(o.ck)}</td><td>${HAS_UTM?fmtInt(o.vendas):'—'}</td><td>${HAS_UTM?fmtBRL(o.fat):'—'}</td><td>${HAS_UTM?fmtROAS(o.roas):'—'}</td></tr>`).join('') || `<tr><td colspan="13" style="text-align:center;color:rgba(255,255,255,.3);padding:16px">Sem dados no período</td></tr>`;
+  document.getElementById('pub-grid').innerHTML=arr.map(o=>`<div class="pub-card"><div class="pub-card-header"><div class="pub-name">${esc(o.adset)}</div><span class="cri-badge" style="background:rgba(255,107,43,.12);color:#ff6b2b">${esc(o.publico||'—')}</span></div><div class="cri-sub" style="margin-bottom:10px">${esc(o.campaign||'—')}</div><div class="pub-metrics"><div class="pub-metric"><div class="pub-metric-val">${fmtBRL(o.inv)}</div><div class="pub-metric-lbl">Invest.</div></div><div class="pub-metric"><div class="pub-metric-val neutral">${fmtInt(o.cliques)}</div><div class="pub-metric-lbl">Cliques</div></div><div class="pub-metric"><div class="pub-metric-val neutral">${fmtPct(o.ctr)}</div><div class="pub-metric-lbl">CTR</div></div><div class="pub-metric"><div class="pub-metric-val neutral">${fmtBRL(o.cpc)}</div><div class="pub-metric-lbl">CPC</div></div><div class="pub-metric"><div class="pub-metric-val neutral">${fmtInt(o.ck)}</div><div class="pub-metric-lbl">Checkout</div></div><div class="pub-metric"><div class="pub-metric-val">${HAS_UTM?fmtInt(o.vendas):'—'}</div><div class="pub-metric-lbl">Vendas</div></div><div class="pub-metric"><div class="pub-metric-val neutral">${HAS_UTM?fmtROAS(o.roas):'—'}</div><div class="pub-metric-lbl">ROAS</div></div></div></div>`).join('') || `<div class="empty-state" style="grid-column:1/-1"><div class="icon">📭</div><h3>Sem dados no período</h3><p>Selecione outro intervalo.</p></div>`;
+  document.querySelector('#pub-table tbody').innerHTML=arr.map(o=>`<tr><td>${esc(o.adset)}<br><span style="font-size:9px;color:rgba(255,255,255,.3)">${esc(o.campaign||'—')}</span></td><td>${esc(o.publico||'—')}</td><td>${fmtBRL(o.inv)}</td><td>${fmtInt(o.imp)}</td><td>${fmtInt(o.reach)}</td><td>${fmtInt(o.cliques)}</td><td>${fmtPct(o.ctr)}</td><td>${fmtBRL(o.cpc)}</td><td>${fmtInt(o.pv)}</td><td>${fmtInt(o.ck)}</td><td>${HAS_UTM?fmtInt(o.vendas):'—'}</td><td>${HAS_UTM?fmtBRL(o.fat):'—'}</td><td>${HAS_UTM?fmtROAS(o.roas):'—'}</td></tr>`).join('') || `<tr><td colspan="13" style="text-align:center;color:rgba(255,255,255,.3);padding:16px">Sem dados no período</td></tr>`;
 }
 function setPubSort(s,btn){ pubSort=s; document.querySelectorAll('.pub-sort-btn').forEach(b=>b.classList.remove('active')); if(btn)btn.classList.add('active'); const {from,to}=getRange(); renderPublicos(GROWS.filter(g=>inRange(g.data,from,to)),from,to); }
 
