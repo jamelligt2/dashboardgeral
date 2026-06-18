@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Conversa — Coração do Yoga · LL0307</title>
+<link rel="icon" href='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="18" fill="%230a0a0a"/><text x="50" y="68" font-family="Arial" font-size="42" font-weight="bold" fill="%23ff6b35" text-anchor="middle">JGT</text></svg>'>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#0a0a0a; --card:#151515; --card-2:#1c1c1c; --header:#111;
+  --border:#2a2a2a; --border-strong:#3a3a3a;
+  --orange:#ff6b35; --orange-dark:#c44a1a; --orange-deep:#8b2a0a;
+  --orange-bright:#ff8c42; --orange-pale:#ffb38a; --amber:#ff9500;
+  --text:#fff; --muted:#999; --muted-2:#b8b8b8;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:14px;line-height:1.45}
+.header{background:var(--header);border-bottom:2px solid var(--orange);padding:16px 26px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:50}
+.logo-badge{background:linear-gradient(135deg,#ff6b35,#c44a1a);border-radius:10px;width:52px;height:52px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:17px;letter-spacing:.5px;flex-shrink:0}
+.header-divider{width:1px;height:42px;background:var(--border-strong)}
+.header-text h1{font-size:18px;font-weight:700;letter-spacing:.3px}
+.header-text p{margin-top:5px;color:var(--muted);font-size:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tag{background:var(--orange);color:#0a0a0a;padding:2px 9px;border-radius:5px;font-weight:700;font-size:11px;letter-spacing:.4px}
+.tag.alt{background:var(--orange-dark);color:#fff}
+.tabs{background:var(--header);display:flex;gap:4px;padding:0 26px;border-bottom:1px solid var(--border);position:sticky;top:86px;z-index:49;overflow-x:auto}
+.tab{padding:13px 18px;color:var(--muted);cursor:pointer;font-weight:600;font-size:13px;border-bottom:3px solid transparent;white-space:nowrap;transition:.15s}
+.tab:hover{color:var(--muted-2)}
+.tab.active{color:var(--orange);border-bottom-color:var(--orange)}
+.wrap{padding:24px 26px;max-width:1500px;margin:0 auto}
+.panel{display:none;animation:fade .25s}
+.panel.active{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1}}
+.filterbar{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+.filterbar .flabel{color:var(--muted);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.chip{padding:7px 16px;border-radius:20px;border:1px solid var(--border-strong);background:var(--card);color:var(--muted-2);cursor:pointer;font-weight:600;font-size:13px;transition:.15s}
+.chip:hover{border-color:var(--orange-dark)}
+.chip.active{background:var(--orange);color:#0a0a0a;border-color:var(--orange)}
+.chip.active.wpp{background:var(--amber);border-color:var(--amber)}
+.chip.active.dm{background:var(--orange-dark);border-color:var(--orange-dark);color:#fff}
+.info-banner{background:rgba(255,107,53,.08);border:1px solid rgba(255,107,53,.3);border-left:3px solid var(--orange);border-radius:8px;padding:13px 16px;margin-bottom:20px;color:var(--muted-2);font-size:13px}
+.info-banner b{color:var(--orange-pale)}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+.kpi{background:var(--card);border:1px solid var(--border);border-top:3px solid var(--orange);border-radius:10px;padding:16px 18px}
+.kpi.k2{border-top-color:var(--orange-bright)}
+.kpi.k3{border-top-color:var(--amber)}
+.kpi.k4{border-top-color:var(--orange-dark)}
+.kpi .label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.6px;font-weight:600}
+.kpi .val{font-size:28px;font-weight:800;margin:6px 0 2px}
+.kpi .sub{color:var(--muted);font-size:11px}
+.section-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--orange-pale);margin:26px 0 14px;display:flex;align-items:center;gap:9px}
+.section-title:before{content:"";width:4px;height:15px;background:var(--orange);border-radius:2px}
+.cards-row{display:grid;gap:14px;margin-bottom:8px}
+.adset-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px}
+.adset-card.primary{border-left:3px solid var(--orange)}
+.adset-card.secondary{border-left:3px solid var(--orange-dark)}
+.adset-card .ac-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.adset-card .ac-name{font-weight:700;font-size:15px}
+.mini-tag{font-size:10px;padding:2px 8px;border-radius:4px;font-weight:700;letter-spacing:.4px}
+.mt-hot{background:rgba(255,107,53,.18);color:var(--orange)}
+.mt-cold{background:rgba(196,74,26,.2);color:var(--orange-pale)}
+.ac-main{display:flex;gap:22px;margin-bottom:12px}
+.ac-main .big{font-size:24px;font-weight:800}
+.ac-main .big.o{color:var(--orange)}
+.ac-main .big.b{color:var(--orange-bright)}
+.ac-main .cap{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+.ac-meta{display:grid;grid-template-columns:repeat(2,1fr);gap:6px 18px;font-size:12px;color:var(--muted-2);border-top:1px solid var(--border);padding-top:11px}
+.ac-meta span b{color:#fff;font-weight:700}
+.compare-card{background:var(--card-2);border:1px solid var(--border);border-radius:10px;padding:18px;display:flex;flex-direction:column;justify-content:center;gap:12px}
+.compare-card .cc-row{display:flex;align-items:center;justify-content:space-between;font-size:12px}
+.compare-card .cc-row .nm{color:var(--muted-2)}
+.compare-card .cc-row .vv{font-weight:800}
+.funnel-wrap{display:flex;gap:16px;align-items:stretch;flex-wrap:wrap}
+.funnel-svg{flex:0 0 58%;min-width:380px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px}
+.funnel-cards{flex:1;display:flex;flex-direction:column;gap:12px;min-width:200px}
+.fcard{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;position:relative;overflow:hidden;flex:1;display:flex;flex-direction:column;justify-content:center}
+.fcard:after{content:"";position:absolute;left:0;bottom:0;height:3px;width:100%}
+.fcard.f1:after{background:var(--orange)}
+.fcard.f2:after{background:var(--amber)}
+.fcard.f3:after{background:var(--orange-bright)}
+.fcard .label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.6px;font-weight:600}
+.fcard .val{font-size:26px;font-weight:800;margin-top:5px}
+.grid-2{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:8px}
+.chart-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px}
+.chart-card h4{font-size:12px;color:var(--muted-2);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
+.chart-box{position:relative;height:280px}
+.chart-box.sm{height:280px}
+.grid-2c{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+.table-card{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-top:8px}
+thead th{background:var(--bg);color:var(--muted-2);text-align:right;padding:11px 12px;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)}
+thead th.left{text-align:left}
+tbody td{padding:10px 12px;text-align:right;border-bottom:1px solid var(--border)}
+tbody td.left{text-align:left}
+tbody tr:hover{background:rgba(255,107,53,.06)}
+tbody tr.total{background:var(--bg);color:var(--orange);font-weight:800;border-top:2px solid var(--orange)}
+tbody tr.total td{border-bottom:none}
+.rank{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;font-weight:800;font-size:12px;background:var(--card-2);color:var(--muted-2)}
+.rank.g1{background:var(--orange-bright);color:#0a0a0a}
+.rank.g2{background:var(--orange-dark);color:#fff}
+.rank.g3{background:transparent;border:1px solid var(--orange-deep);color:var(--orange-pale)}
+.badge{padding:3px 9px;border-radius:5px;font-size:10.5px;font-weight:700;letter-spacing:.3px}
+.b-escalar{background:rgba(255,107,53,.18);color:var(--orange)}
+.b-manter{background:rgba(255,149,0,.16);color:var(--amber)}
+.b-pausar{background:rgba(196,74,26,.22);color:var(--orange-pale)}
+.b-avaliar{background:rgba(120,120,120,.2);color:var(--muted-2)}
+.chan-pill{padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.3px}
+.cp-wpp{background:rgba(255,149,0,.18);color:var(--amber)}
+.cp-dm{background:rgba(196,74,26,.2);color:var(--orange-pale)}
+.alink{color:var(--orange-bright);text-decoration:none;font-weight:600}
+.alink:hover{text-decoration:underline}
+.hot{color:var(--orange);font-weight:700}
+.cold{color:var(--orange-pale)}
+.conv-hi{color:var(--orange);font-weight:800}
+@media(max-width:980px){.kpi-grid{grid-template-columns:repeat(2,1fr)}.grid-2{grid-template-columns:1fr}.funnel-svg{flex:1 1 100%}.grid-2c{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="logo-badge">JGT</div>
+  <div class="header-divider"></div>
+  <div class="header-text">
+    <h1>DASHBOARD CONVERSA — CORAÇÃO DO YOGA · LL0307</h1>
+    <p>
+      <span class="tag">CAMPANHA DE MENSAGEM</span>
+      <span class="tag alt">WHATSAPP + DM</span>
+      Click-to-Message · 03/06 a 18/06/2026
+    </p>
+  </div>
+</div>
+<div class="tabs">
+  <div class="tab active" data-tab="geral">Visão Geral</div>
+  <div class="tab" data-tab="canais">Canais</div>
+  <div class="tab" data-tab="criativos">Criativos</div>
+  <div class="tab" data-tab="publicos">Públicos</div>
+  <div class="tab" data-tab="diaria">Análise Diária</div>
+</div>
+<div class="wrap">
+
+  <div class="filterbar">
+    <span class="flabel">Canal:</span>
+    <div class="chip active" data-chan="todos">Todos</div>
+    <div class="chip wpp" data-chan="WhatsApp">WhatsApp</div>
+    <div class="chip dm" data-chan="DM">DM (Direct)</div>
+  </div>
+
+  <!-- ============ VISAO GERAL ============ -->
+  <div class="panel active" id="panel-geral">
+    <div class="info-banner">
+      Campanha de <b>mensagem</b> com fluxo direto <b>Clique &rarr; Conversa</b>. As campanhas com <b>MSGWPP</b> no nome direcionam para o <b>WhatsApp</b>; as demais (<b>MSG</b>) abrem conversa no <b>Direct do Instagram (DM)</b>. Dois públicos ativos: <b>Engajamento 365D</b> (quente) e <b>Advantage+</b> (ampliação). Use o filtro acima para isolar cada canal.
+    </div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">Investimento</div><div class="val" id="kpi-inv">—</div><div class="sub" id="kpi-inv-sub">total no período</div></div>
+      <div class="kpi k2"><div class="label">Custo por Conversa</div><div class="val" id="kpi-cpc">—</div><div class="sub" id="kpi-cpc-sub">investimento / conversas</div></div>
+      <div class="kpi k3"><div class="label">CTR Médio</div><div class="val" id="kpi-ctr">—</div><div class="sub">cliques / impressões</div></div>
+      <div class="kpi k4"><div class="label">CPM Médio</div><div class="val" id="kpi-cpm">—</div><div class="sub">custo por 1k impressões</div></div>
+    </div>
+
+    <div class="section-title">Conjuntos ativos</div>
+    <div class="cards-row" id="adset-cards" style="grid-template-columns:1.1fr 1.1fr 0.8fr"></div>
+
+    <div class="section-title">Funil de conversão</div>
+    <div class="funnel-wrap">
+      <div class="funnel-svg" id="funnel-svg"></div>
+      <div class="funnel-cards">
+        <div class="fcard f1"><div class="label">CPC — Custo por Clique</div><div class="val" id="f-cpc">—</div></div>
+        <div class="fcard f2"><div class="label">CPM — por 1k impressões</div><div class="val" id="f-cpm">—</div></div>
+        <div class="fcard f3"><div class="label">TX Clique &rarr; Conversa</div><div class="val" id="f-tx">—</div></div>
+      </div>
+    </div>
+
+    <div class="section-title">Evolução diária</div>
+    <div class="grid-2">
+      <div class="chart-card"><h4>Conversas (barras) × Investimento (linha)</h4><div class="chart-box"><canvas id="chartDaily"></canvas></div></div>
+      <div class="chart-card"><h4>Custo por conversa diário</h4><div class="chart-box"><canvas id="chartCpl"></canvas></div></div>
+    </div>
+    <div class="table-card">
+      <table id="tbl-daily"><thead><tr>
+        <th class="left">Dia</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>Conversas</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Custo/Conv</th><th>Clq&rarr;Conv</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+  <!-- ============ CANAIS ============ -->
+  <div class="panel" id="panel-canais">
+    <div class="info-banner">Comparativo direto entre os dois canais de conversa. O <b>WhatsApp</b> entrou em 15/06; o <b>DM</b> roda desde 03/06. Custo por conversa e taxa de conversão lado a lado.</div>
+    <div class="cards-row" id="canal-cards" style="grid-template-columns:1fr 1fr"></div>
+    <div class="grid-2c" style="margin-top:18px">
+      <div class="chart-card"><h4>Investimento por canal</h4><div class="chart-box sm"><canvas id="chartChanInv"></canvas></div></div>
+      <div class="chart-card"><h4>Conversas por canal</h4><div class="chart-box sm"><canvas id="chartChanConv"></canvas></div></div>
+    </div>
+    <div class="section-title">Tabela comparativa</div>
+    <div class="table-card">
+      <table id="tbl-canal"><thead><tr>
+        <th class="left">Canal</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>Conversas</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Custo/Conv</th><th>Clq&rarr;Conv</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+  <!-- ============ CRIATIVOS ============ -->
+  <div class="panel" id="panel-criativos">
+    <div class="table-card">
+      <table id="tbl-crit"><thead><tr>
+        <th class="left">#</th><th class="left">Criativo</th><th class="left">Canal</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>Conversas</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Custo/Conv</th><th>Clq&rarr;Conv</th><th class="left">Link</th><th class="left">Status</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+  <!-- ============ PUBLICOS ============ -->
+  <div class="panel" id="panel-publicos">
+    <div class="table-card">
+      <table id="tbl-pub"><thead><tr>
+        <th class="left">#</th><th class="left">Conjunto</th><th class="left">Tipo</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>Conversas</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Custo/Conv</th><th>Clq&rarr;Conv</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+    <div class="grid-2c" style="margin-top:18px">
+      <div class="chart-card"><h4>Investimento por conjunto</h4><div class="chart-box sm"><canvas id="chartPubInv"></canvas></div></div>
+      <div class="chart-card"><h4>Conversas por conjunto</h4><div class="chart-box sm"><canvas id="chartPubConv"></canvas></div></div>
+    </div>
+  </div>
+
+  <!-- ============ DIARIA ============ -->
+  <div class="panel" id="panel-diaria">
+    <div class="table-card">
+      <table id="tbl-gran"><thead><tr>
+        <th class="left">Dia</th><th class="left">Conjunto</th><th class="left">Criativo</th><th class="left">Canal</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>Conversas</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Custo/Conv</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+</div>
+<script>
+const DATA = [{"data": "2026-06-03","campanha": "[JGT][MSG][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADE01","link": "https://www.instagram.com/p/DZJN6o0ADOZ/","canal": "DM","invest": 1.14,"impr": 84,"alcance": 83,"cliques": 2,"conv": 2},{"data": "2026-06-03","campanha": "[JGT][MSG][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADV01","link": "https://www.instagram.com/p/DZJN2E0AM1-/","canal": "DM","invest": 2.87,"impr": 124,"alcance": 115,"cliques": 1,"conv": 0},{"data": "2026-06-04","campanha": "[JGT][MSG][CORACAODOYOGA][ADV] LL0307","adset": "00 - ADV","ad": "ADE01","link": "https://www.instagram.com/p/DZJOSb1gP7A/","canal": "DM","invest": 13.96,"impr": 655,"alcance": 561,"cliques": 7,"conv": 1},{"data": "2026-06-04","campanha": "[JGT][MSG][CORACAODOYOGA][ADV] LL0307","adset": "00 - ADV","ad": "ADV01","link": "https://www.instagram.com/p/DZJOLudAJuT/","canal": "DM","invest": 6.91,"impr": 212,"alcance": 194,"cliques": 2,"conv": 0},{"data": "2026-06-04","campanha": "[JGT][MSG][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADE01","link": "https://www.instagram.com/p/DZJN6o0ADOZ/","canal": "DM","invest": 12.11,"impr": 746,"alcance": 599,"cliques": 4,"conv": 2},{"data": "2026-06-04","campanha": "[JGT][MSG][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADV01","link": "https://www.instagram.com/p/DZJN2E0AM1-/","canal": "DM","invest": 8.86,"impr": 383,"alcance": 317,"cliques": 3,"conv": 2},{"data": "2026-06-05","campanha": "[JGT][MSG][CORACAODOYOGA][ADV] LL0307","adset": "00 - ADV","ad": "ADE01","link": "https://www.instagram.com/p/DZJOSb1gP7A/","canal": "DM","invest": 0.82,"impr": 49,"alcance": 49,"cliques": 0,"conv": 0},{"data": "2026-06-05","campanha": "[JGT][MSG][CORACAODOYOGA][ADV] LL0307","adset": "00 - ADV","ad": "ADV01","link": "https://www.instagram.com/p/DZJOLudAJuT/","canal": "DM","invest": 17.24,"impr": 446,"alcance": 392,"cliques": 9,"conv": 2},{"data": "2026-06-05","campanha": "[JGT][MSG][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADE01","link": "https://www.instagram.com/p/DZJN6o0ADOZ/","canal": "DM","invest": 0.96,"impr": 58,"alcance": 57,"cliques": 1,"conv": 1},{"data": "2026-06-05","campanha": "[JGT][MSG][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADV01","link": "https://www.instagram.com/p/DZJN2E0AM1-/","canal": "DM","invest": 18.53,"impr": 821,"alcance": 649,"cliques": 12,"conv": 2},{"data": "2026-06-06","campanha": "[JGT][MSG][CORACAODOYOGA][ADV] LL0307","adset": "00 - ADV","ad": "ADV01","link": "https://www.instagram.com/p/DZJOLudAJuT/","canal": "DM","invest": 36.66,"impr": 793,"alcance": 687,"cliques": 22,"conv": 3},{"data": "2026-06-06","campanha": "[JGT][MSG][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADE01","link": "https://www.instagram.com/p/DZJN6o0ADOZ/","canal": "DM","invest": 2.31,"impr": 118,"alcance": 110,"cliques": 1,"conv": 0},{"data": "2026-06-06","campanha": "[JGT][MSG][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADV01","link": "https://www.instagram.com/p/DZJN2E0AM1-/","canal": "DM","invest": 28.54,"impr": 1427,"alcance": 1154,"cliques": 19,"conv": 3},{"data": "2026-06-07","campanha": "[JGT][MSG][CORACAODOYOGA][ADV] LL0307","adset": "00 - ADV","ad": "ADV01","link": "https://www.instagram.com/p/DZJOLudAJuT/","canal": "DM","invest": 26.7,"impr": 529,"alcance": 476,"cliques": 9,"conv": 1},{"data": "2026-06-07","campanha": "[JGT][MSG][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADV01","link": "https://www.instagram.com/p/DZJN2E0AM1-/","canal": "DM","invest": 25.16,"impr": 1243,"alcance": 987,"cliques": 18,"conv": 2},{"data": "2026-06-08","campanha": "[JGT][MSG][CORACAODOYOGA][ADV] LL0307","adset": "00 - ADV","ad": "ADV01","link": "https://www.instagram.com/p/DZJOLudAJuT/","canal": "DM","invest": 32.03,"impr": 544,"alcance": 464,"cliques": 8,"conv": 3},{"data": "2026-06-08","campanha": "[JGT][MSG][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADE01","link": "https://www.instagram.com/p/DZJN6o0ADOZ/","canal": "DM","invest": 4.94,"impr": 202,"alcance": 181,"cliques": 2,"conv": 1},{"data": "2026-06-08","campanha": "[JGT][MSG][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADV01","link": "https://www.instagram.com/p/DZJN2E0AM1-/","canal": "DM","invest": 22.92,"impr": 888,"alcance": 781,"cliques": 10,"conv": 0},{"data": "2026-06-09","campanha": "[JGT][MSG][CORACAODOYOGA][ADV] LL0307","adset": "00 - ADV","ad": "ADV01","link": "https://www.instagram.com/p/DZJOLudAJuT/","canal": "DM","invest": 23.71,"impr": 537,"alcance": 465,"cliques": 8,"conv": 7},{"data": "2026-06-09","campanha": "[JGT][MSG][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADV01","link": "https://www.instagram.com/p/DZJN2E0AM1-/","canal": "DM","invest": 27.54,"impr": 1143,"alcance": 975,"cliques": 10,"conv": 2},{"data": "2026-06-10","campanha": "[JGT][MSG][CORACAODOYOGA][ADV] LL0307","adset": "00 - ADV","ad": "ADV01","link": "https://www.instagram.com/p/DZJOLudAJuT/","canal": "DM","invest": 21.75,"impr": 434,"alcance": 367,"cliques": 7,"conv": 1},{"data": "2026-06-10","campanha": "[JGT][MSG][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADE01","link": "https://www.instagram.com/p/DZJN6o0ADOZ/","canal": "DM","invest": 0.77,"impr": 33,"alcance": 30,"cliques": 0,"conv": 0},{"data": "2026-06-10","campanha": "[JGT][MSG][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADV01","link": "https://www.instagram.com/p/DZJN2E0AM1-/","canal": "DM","invest": 22.14,"impr": 686,"alcance": 552,"cliques": 5,"conv": 1},{"data": "2026-06-11","campanha": "[JGT][MSG][CORACAODOYOGA][ADV] LL0307","adset": "00 - ADV","ad": "ADV01","link": "https://www.instagram.com/p/DZJOLudAJuT/","canal": "DM","invest": 25.58,"impr": 667,"alcance": 556,"cliques": 9,"conv": 3},{"data": "2026-06-11","campanha": "[JGT][MSG][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADE01","link": "https://www.instagram.com/p/DZJN6o0ADOZ/","canal": "DM","invest": 3.57,"impr": 149,"alcance": 140,"cliques": 0,"conv": 0},{"data": "2026-06-11","campanha": "[JGT][MSG][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADV01","link": "https://www.instagram.com/p/DZJN2E0AM1-/","canal": "DM","invest": 22.82,"impr": 849,"alcance": 681,"cliques": 12,"conv": 5},{"data": "2026-06-12","campanha": "[JGT][MSG][CORACAODOYOGA][ADV] LL0307","adset": "00 - ADV","ad": "ADV01","link": "https://www.instagram.com/p/DZJOLudAJuT/","canal": "DM","invest": 24.22,"impr": 551,"alcance": 451,"cliques": 12,"conv": 1},{"data": "2026-06-12","campanha": "[JGT][MSG][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADV01","link": "https://www.instagram.com/p/DZJN2E0AM1-/","canal": "DM","invest": 23.03,"impr": 943,"alcance": 778,"cliques": 9,"conv": 1},{"data": "2026-06-13","campanha": "[JGT][MSG][CORACAODOYOGA][ADV] LL0307","adset": "00 - ADV","ad": "ADV01","link": "https://www.instagram.com/p/DZJOLudAJuT/","canal": "DM","invest": 18.88,"impr": 489,"alcance": 424,"cliques": 2,"conv": 0},{"data": "2026-06-13","campanha": "[JGT][MSG][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADE01","link": "https://www.instagram.com/p/DZJN6o0ADOZ/","canal": "DM","invest": 4.92,"impr": 329,"alcance": 275,"cliques": 2,"conv": 1},{"data": "2026-06-13","campanha": "[JGT][MSG][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADV01","link": "https://www.instagram.com/p/DZJN2E0AM1-/","canal": "DM","invest": 16.7,"impr": 803,"alcance": 642,"cliques": 8,"conv": 2},{"data": "2026-06-14","campanha": "[JGT][MSG][CORACAODOYOGA][ADV] LL0307","adset": "00 - ADV","ad": "ADV01","link": "https://www.instagram.com/p/DZJOLudAJuT/","canal": "DM","invest": 24.82,"impr": 463,"alcance": 397,"cliques": 5,"conv": 2},{"data": "2026-06-14","campanha": "[JGT][MSG][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADV01","link": "https://www.instagram.com/p/DZJN2E0AM1-/","canal": "DM","invest": 24.75,"impr": 1002,"alcance": 772,"cliques": 9,"conv": 3},{"data": "2026-06-15","campanha": "[JGT][MSGWPP][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADV01","link": "https://www.instagram.com/p/DZqeVRsgItg/","canal": "WhatsApp","invest": 16.59,"impr": 852,"alcance": 634,"cliques": 4,"conv": 0},{"data": "2026-06-15","campanha": "[JGT][MSG][CORACAODOYOGA][ADV] LL0307","adset": "00 - ADV","ad": "ADV01","link": "https://www.instagram.com/p/DZJOLudAJuT/","canal": "DM","invest": 32.99,"impr": 651,"alcance": 571,"cliques": 12,"conv": 3},{"data": "2026-06-15","campanha": "[JGT][MSG][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADE01","link": "https://www.instagram.com/p/DZJN6o0ADOZ/","canal": "DM","invest": 2.2,"impr": 63,"alcance": 55,"cliques": 0,"conv": 0},{"data": "2026-06-15","campanha": "[JGT][MSG][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADV01","link": "https://www.instagram.com/p/DZJN2E0AM1-/","canal": "DM","invest": 36.37,"impr": 1212,"alcance": 974,"cliques": 17,"conv": 9},{"data": "2026-06-16","campanha": "[JGT][MSGWPP][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADE01","link": "https://www.instagram.com/p/DZqeaCbALyl/","canal": "WhatsApp","invest": 5.48,"impr": 256,"alcance": 215,"cliques": 1,"conv": 1},{"data": "2026-06-16","campanha": "[JGT][MSGWPP][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADV01","link": "https://www.instagram.com/p/DZqeVRsgItg/","canal": "WhatsApp","invest": 18.92,"impr": 848,"alcance": 649,"cliques": 8,"conv": 4},{"data": "2026-06-16","campanha": "[JGT][MSG][CORACAODOYOGA][ADV] LL0307","adset": "00 - ADV","ad": "ADV01","link": "https://www.instagram.com/p/DZJOLudAJuT/","canal": "DM","invest": 32.03,"impr": 682,"alcance": 604,"cliques": 15,"conv": 3},{"data": "2026-06-16","campanha": "[JGT][MSG][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADE01","link": "https://www.instagram.com/p/DZJN6o0ADOZ/","canal": "DM","invest": 2.76,"impr": 175,"alcance": 165,"cliques": 1,"conv": 1},{"data": "2026-06-16","campanha": "[JGT][MSG][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADV01","link": "https://www.instagram.com/p/DZJN2E0AM1-/","canal": "DM","invest": 28.13,"impr": 824,"alcance": 678,"cliques": 11,"conv": 3},{"data": "2026-06-17","campanha": "[JGT][MSGWPP][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADE01","link": "https://www.instagram.com/p/DZqeaCbALyl/","canal": "WhatsApp","invest": 1.32,"impr": 56,"alcance": 55,"cliques": 0,"conv": 0},{"data": "2026-06-17","campanha": "[JGT][MSGWPP][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADV01","link": "https://www.instagram.com/p/DZqeVRsgItg/","canal": "WhatsApp","invest": 27.56,"impr": 906,"alcance": 675,"cliques": 4,"conv": 2},{"data": "2026-06-17","campanha": "[JGT][MSG][CORACAODOYOGA][ADV] LL0307","adset": "00 - ADV","ad": "ADV01","link": "https://www.instagram.com/p/DZJOLudAJuT/","canal": "DM","invest": 25.7,"impr": 474,"alcance": 425,"cliques": 11,"conv": 1},{"data": "2026-06-17","campanha": "[JGT][MSG][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADE01","link": "https://www.instagram.com/p/DZJN6o0ADOZ/","canal": "DM","invest": 0.0,"impr": 0,"alcance": 0,"cliques": 0,"conv": 0},{"data": "2026-06-17","campanha": "[JGT][MSG][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADV01","link": "https://www.instagram.com/p/DZJN2E0AM1-/","canal": "DM","invest": 26.8,"impr": 707,"alcance": 583,"cliques": 11,"conv": 6},{"data": "2026-06-18","campanha": "[JGT][MSGWPP][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADE01","link": "https://www.instagram.com/p/DZqeaCbALyl/","canal": "WhatsApp","invest": 0.0,"impr": 0,"alcance": 0,"cliques": 0,"conv": 0},{"data": "2026-06-18","campanha": "[JGT][MSGWPP][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADV01","link": "https://www.instagram.com/p/DZqeVRsgItg/","canal": "WhatsApp","invest": 3.82,"impr": 119,"alcance": 104,"cliques": 0,"conv": 1},{"data": "2026-06-18","campanha": "[JGT][MSG][CORACAODOYOGA][ADV] LL0307","adset": "00 - ADV","ad": "ADV01","link": "https://www.instagram.com/p/DZJOLudAJuT/","canal": "DM","invest": 2.17,"impr": 38,"alcance": 35,"cliques": 1,"conv": 0},{"data": "2026-06-18","campanha": "[JGT][MSG][CORACAODOYOGA][PQ] LL0307","adset": "00 - Engajamento 365D","ad": "ADV01","link": "https://www.instagram.com/p/DZJN2E0AM1-/","canal": "DM","invest": 3.12,"impr": 68,"alcance": 60,"cliques": 0,"conv": 0}];
+let CHAN = 'todos';
+const charts = {};
+
+const fmtBR=(v,dec=2)=>(v||0).toLocaleString('pt-BR',{minimumFractionDigits:dec,maximumFractionDigits:dec});
+const BRL=v=>'R$ '+fmtBR(v||0,2);
+const PCT=v=>fmtBR(v||0,2)+'%';
+const INT=v=>(v||0).toLocaleString('pt-BR');
+
+function metrics(rows){
+  const inv=rows.reduce((a,r)=>a+r.invest,0);
+  const impr=rows.reduce((a,r)=>a+r.impr,0);
+  const cliq=rows.reduce((a,r)=>a+r.cliques,0);
+  const conv=rows.reduce((a,r)=>a+r.conv,0);
+  return {inv,impr,cliq,conv,
+    ctr:impr?cliq/impr*100:0, cpc:cliq?inv/cliq:0, cpm:impr?inv/impr*1000:0,
+    cpconv:conv?inv/conv:0, clq2conv:cliq?conv/cliq*100:0};
+}
+function filtered(){ return CHAN==='todos'?DATA:DATA.filter(r=>r.canal===CHAN); }
+function adsetType(name){
+  if(/engaj/i.test(name)) return {t:'Quente · Engajamento',c:'var(--orange)',hot:true};
+  if(/ADV/i.test(name)) return {t:'Frio · Ampliação (Advantage+)',c:'var(--orange-pale)',hot:false};
+  return {t:'—',c:'var(--muted-2)',hot:true};
+}
+function destroy(id){ if(charts[id]){charts[id].destroy(); delete charts[id];} }
+
+/* ---------- VISAO GERAL ---------- */
+function renderGeral(){
+  const rows=filtered();
+  const m=metrics(rows);
+  document.getElementById('kpi-inv').textContent=BRL(m.inv);
+  document.getElementById('kpi-inv-sub').textContent=rows.length+' linhas · '+INT(m.conv)+' conversas';
+  document.getElementById('kpi-cpc').textContent=m.conv?BRL(m.cpconv):'—';
+  document.getElementById('kpi-cpc-sub').textContent=INT(m.conv)+' conversas iniciadas';
+  document.getElementById('kpi-ctr').textContent=PCT(m.ctr);
+  document.getElementById('kpi-cpm').textContent=BRL(m.cpm);
+  document.getElementById('f-cpc').textContent=BRL(m.cpc);
+  document.getElementById('f-cpm').textContent=BRL(m.cpm);
+  document.getElementById('f-tx').textContent=PCT(m.clq2conv);
+
+  // adset cards
+  const byAds={};
+  rows.forEach(r=>{(byAds[r.adset]=byAds[r.adset]||[]).push(r)});
+  const entries=Object.entries(byAds).map(([k,v])=>[k,metrics(v),adsetType(k)])
+    .sort((a,b)=>b[1].conv-a[1].conv);
+  const cont=document.getElementById('adset-cards');
+  cont.innerHTML='';
+  entries.slice(0,2).forEach((e,i)=>{
+    const[name,mm,ty]=e;
+    const cls=i===0?'primary':'secondary';
+    const bigcls=i===0?'o':'b';
+    cont.innerHTML+=`<div class="adset-card ${cls}">
+      <div class="ac-head"><div class="ac-name">${name}</div>
+        <span class="mini-tag ${ty.hot?'mt-hot':'mt-cold'}">${ty.hot?'QUENTE':'FRIO'}</span></div>
+      <div class="ac-main">
+        <div><div class="big ${bigcls}">${BRL(mm.inv)}</div><div class="cap">investimento</div></div>
+        <div><div class="big ${bigcls}">${mm.conv?BRL(mm.cpconv):'—'}</div><div class="cap">custo/conversa</div></div>
+        <div><div class="big ${bigcls}">${INT(mm.conv)}</div><div class="cap">conversas</div></div>
+      </div>
+      <div class="ac-meta">
+        <span>Impressões <b>${INT(mm.impr)}</b></span><span>Cliques <b>${INT(mm.cliq)}</b></span>
+        <span>CTR <b>${PCT(mm.ctr)}</b></span><span>CPC <b>${BRL(mm.cpc)}</b></span>
+      </div></div>`;
+  });
+  // comparativo
+  if(entries.length>=2){
+    const a=entries[0],b=entries[1];
+    cont.innerHTML+=`<div class="compare-card">
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:2px">Comparativo</div>
+      <div class="cc-row"><span class="nm">Melhor custo/conv</span><span class="vv" style="color:var(--orange)">${a[1].cpconv<=b[1].cpconv?a[0].replace('00 - ',''):b[0].replace('00 - ','')}</span></div>
+      <div class="cc-row"><span class="nm">Mais conversas</span><span class="vv" style="color:var(--orange-bright)">${INT(Math.max(a[1].conv,b[1].conv))}</span></div>
+      <div class="cc-row"><span class="nm">Melhor Clq&rarr;Conv</span><span class="vv" style="color:var(--amber)">${PCT(Math.max(a[1].clq2conv,b[1].clq2conv))}</span></div>
+      <div class="cc-row"><span class="nm">Total conversas</span><span class="vv">${INT(m.conv)}</span></div>
+    </div>`;
+  }
+
+  renderFunnel(m);
+
+  // daily
+  const byDay={};
+  rows.forEach(r=>{(byDay[r.data]=byDay[r.data]||[]).push(r)});
+  const days=Object.keys(byDay).sort();
+  const dm=days.map(d=>({d,...metrics(byDay[d])}));
+  const lbl=days.map(d=>d.slice(8)+'/'+d.slice(5,7));
+
+  destroy('chartDaily');
+  charts.chartDaily=new Chart(document.getElementById('chartDaily'),{
+    data:{labels:lbl,datasets:[
+      {type:'bar',label:'Conversas',data:dm.map(x=>x.conv),backgroundColor:'#ff6b35',yAxisID:'y',borderRadius:4},
+      {type:'line',label:'Investimento',data:dm.map(x=>x.inv),borderColor:'#ff9500',backgroundColor:'#ff9500',yAxisID:'y1',tension:.3,pointRadius:2}
+    ]},
+    options:chOpts({y:{title:{display:true,text:'Conversas'}},y1:{position:'right',grid:{display:false},title:{display:true,text:'R$'}}})
+  });
+  destroy('chartCpl');
+  charts.chartCpl=new Chart(document.getElementById('chartCpl'),{
+    type:'line',
+    data:{labels:lbl,datasets:[{label:'Custo/Conversa',data:dm.map(x=>x.conv?x.cpconv:null),borderColor:'#ff8c42',backgroundColor:'rgba(255,140,66,.15)',fill:true,tension:.3,spanGaps:true,pointRadius:2}]},
+    options:chOpts({y:{title:{display:true,text:'R$'}}})
+  });
+
+  // daily table
+  const tb=document.querySelector('#tbl-daily tbody'); tb.innerHTML='';
+  dm.forEach(x=>{
+    tb.innerHTML+=`<tr><td class="left">${x.d.slice(8)}/${x.d.slice(5,7)}</td>
+      <td>${BRL(x.inv)}</td><td>${INT(x.impr)}</td><td>${INT(x.cliq)}</td>
+      <td class="${x.conv?'conv-hi':''}">${INT(x.conv)}</td><td>${PCT(x.ctr)}</td>
+      <td>${BRL(x.cpc)}</td><td>${BRL(x.cpm)}</td><td>${x.conv?BRL(x.cpconv):'—'}</td><td>${PCT(x.clq2conv)}</td></tr>`;
+  });
+  tb.innerHTML+=`<tr class="total"><td class="left">TOTAL</td><td>${BRL(m.inv)}</td><td>${INT(m.impr)}</td><td>${INT(m.cliq)}</td><td>${INT(m.conv)}</td><td>${PCT(m.ctr)}</td><td>${BRL(m.cpc)}</td><td>${BRL(m.cpm)}</td><td>${BRL(m.cpconv)}</td><td>${PCT(m.clq2conv)}</td></tr>`;
+}
+
+function renderFunnel(m){
+  const impr=m.impr,cliq=m.cliq,conv=m.conv;
+  const svg=`<svg viewBox="0 0 1200 520" width="100%" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="g1" x1="0" x2="1"><stop offset="0" stop-color="#2a1105"/><stop offset=".5" stop-color="#8b2a0a"/><stop offset="1" stop-color="#2a1105"/></linearGradient>
+      <linearGradient id="g2" x1="0" x2="1"><stop offset="0" stop-color="#5c2005"/><stop offset=".5" stop-color="#c44a1a"/><stop offset="1" stop-color="#5c2005"/></linearGradient>
+      <linearGradient id="g3" x1="0" x2="1"><stop offset="0" stop-color="#8b2a0a"/><stop offset=".5" stop-color="#ff6b35"/><stop offset="1" stop-color="#8b2a0a"/></linearGradient>
+      <filter id="glow"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    </defs>
+    <polygon points="100,20 1100,20 980,150 220,150" fill="url(#g1)" stroke="#c44a1a" stroke-width="2"/>
+    <text x="600" y="80" fill="#fff" font-size="22" text-anchor="middle" font-weight="600" opacity=".85">IMPRESSÕES</text>
+    <text x="600" y="125" fill="#fff" font-size="56" text-anchor="middle" font-weight="800">${INT(impr)}</text>
+    <text x="600" y="185" fill="#ff9500" font-size="24" text-anchor="middle" font-weight="700">CTR ${PCT(m.ctr)}</text>
+    <polygon points="240,210 960,210 850,340 350,340" fill="url(#g2)" stroke="#ff8c42" stroke-width="2"/>
+    <text x="600" y="262" fill="#fff" font-size="20" text-anchor="middle" font-weight="600" opacity=".85">CLIQUES NO LINK</text>
+    <text x="600" y="315" fill="#fff" font-size="56" text-anchor="middle" font-weight="800">${INT(cliq)}</text>
+    <text x="600" y="378" fill="#ff6b35" font-size="24" text-anchor="middle" font-weight="700">TX CLIQUE → CONVERSA ${PCT(m.clq2conv)}</text>
+    <polygon points="370,400 830,400 760,500 440,500" fill="url(#g3)" stroke="#ff6b35" stroke-width="2" filter="url(#glow)"/>
+    <text x="600" y="438" fill="#fff" font-size="18" text-anchor="middle" font-weight="600" opacity=".9">CONVERSAS INICIADAS</text>
+    <text x="600" y="480" fill="#fff" font-size="32" text-anchor="middle" font-weight="800">${INT(conv)}</text>
+  </svg>`;
+  document.getElementById('funnel-svg').innerHTML=svg;
+}
+
+function chOpts(scales){
+  return {responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:'#b8b8b8',font:{size:11}}}},
+    scales:Object.assign({x:{ticks:{color:'#999',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'}}},
+      Object.fromEntries(Object.entries(scales).map(([k,v])=>[k,Object.assign({ticks:{color:'#999',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'}},v)])))};
+}
+
+/* ---------- CANAIS ---------- */
+function renderCanais(){
+  const order=['WhatsApp','DM'];
+  const cont=document.getElementById('canal-cards'); cont.innerHTML='';
+  const stats={};
+  order.forEach((cn,i)=>{
+    const m=metrics(DATA.filter(r=>r.canal===cn)); stats[cn]=m;
+    const cls=i===0?'secondary':'primary';
+    const big=i===0?'b':'o';
+    const pill=cn==='WhatsApp'?'cp-wpp':'cp-dm';
+    cont.innerHTML+=`<div class="adset-card ${cls}">
+      <div class="ac-head"><div class="ac-name">${cn==='WhatsApp'?'WhatsApp (MSGWPP)':'Direct / DM (MSG)'}</div>
+        <span class="chan-pill ${pill}">${cn==='WhatsApp'?'CLICK-TO-WHATSAPP':'CLICK-TO-DIRECT'}</span></div>
+      <div class="ac-main">
+        <div><div class="big ${big}">${BRL(m.inv)}</div><div class="cap">investimento</div></div>
+        <div><div class="big ${big}">${m.conv?BRL(m.cpconv):'—'}</div><div class="cap">custo/conversa</div></div>
+        <div><div class="big ${big}">${INT(m.conv)}</div><div class="cap">conversas</div></div>
+      </div>
+      <div class="ac-meta">
+        <span>Impressões <b>${INT(m.impr)}</b></span><span>Cliques <b>${INT(m.cliq)}</b></span>
+        <span>CTR <b>${PCT(m.ctr)}</b></span><span>CPC <b>${BRL(m.cpc)}</b></span>
+        <span>CPM <b>${BRL(m.cpm)}</b></span><span>Clq&rarr;Conv <b>${PCT(m.clq2conv)}</b></span>
+      </div></div>`;
+  });
+  // charts
+  destroy('chartChanInv');
+  charts.chartChanInv=new Chart(document.getElementById('chartChanInv'),{
+    type:'doughnut',
+    data:{labels:order,datasets:[{data:order.map(c=>stats[c].inv),backgroundColor:['#ff9500','#c44a1a'],borderColor:'#0a0a0a',borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#b8b8b8'}}}}
+  });
+  destroy('chartChanConv');
+  charts.chartChanConv=new Chart(document.getElementById('chartChanConv'),{
+    type:'doughnut',
+    data:{labels:order,datasets:[{data:order.map(c=>stats[c].conv),backgroundColor:['#ffb38a','#ff6b35'],borderColor:'#0a0a0a',borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#b8b8b8'}}}}
+  });
+  // table
+  const tb=document.querySelector('#tbl-canal tbody'); tb.innerHTML='';
+  let tot=metrics(DATA);
+  order.forEach(cn=>{const m=stats[cn];
+    const pill=cn==='WhatsApp'?'cp-wpp':'cp-dm';
+    tb.innerHTML+=`<tr><td class="left"><span class="chan-pill ${pill}">${cn}</span></td>
+      <td>${BRL(m.inv)}</td><td>${INT(m.impr)}</td><td>${INT(m.cliq)}</td><td class="conv-hi">${INT(m.conv)}</td>
+      <td>${PCT(m.ctr)}</td><td>${BRL(m.cpc)}</td><td>${BRL(m.cpm)}</td><td>${BRL(m.cpconv)}</td><td>${PCT(m.clq2conv)}</td></tr>`;
+  });
+  tb.innerHTML+=`<tr class="total"><td class="left">TOTAL</td><td>${BRL(tot.inv)}</td><td>${INT(tot.impr)}</td><td>${INT(tot.cliq)}</td><td>${INT(tot.conv)}</td><td>${PCT(tot.ctr)}</td><td>${BRL(tot.cpc)}</td><td>${BRL(tot.cpm)}</td><td>${BRL(tot.cpconv)}</td><td>${PCT(tot.clq2conv)}</td></tr>`;
+}
+
+/* ---------- CRIATIVOS ---------- */
+function statusBadge(m){
+  if(m.conv>=3 && m.cpconv<=5) return ['ESCALAR','b-escalar'];
+  if(m.conv>=1 && m.cpconv<=15) return ['MANTER','b-manter'];
+  if(m.conv===0 && m.inv>=5) return ['PAUSAR','b-pausar'];
+  return ['AVALIAR','b-avaliar'];
+}
+function renderCriativos(){
+  const rows=filtered();
+  const grp={};
+  rows.forEach(r=>{const k=r.ad+'|'+r.canal;(grp[k]=grp[k]||{ad:r.ad,canal:r.canal,link:r.link,rows:[]}).rows.push(r)});
+  let arr=Object.values(grp).map(g=>({...g,m:metrics(g.rows)}));
+  arr.sort((a,b)=>{
+    const aw=a.m.conv>0, bw=b.m.conv>0;
+    if(aw&&bw) return a.m.cpconv-b.m.cpconv;
+    if(aw) return -1; if(bw) return 1;
+    return b.m.inv-a.m.inv;
+  });
+  const tb=document.querySelector('#tbl-crit tbody'); tb.innerHTML='';
+  arr.forEach((g,i)=>{
+    const m=g.m;const[bt,bc]=statusBadge(m);
+    const rk=i===0?'g1':i===1?'g2':i===2?'g3':'';
+    const pill=g.canal==='WhatsApp'?'cp-wpp':'cp-dm';
+    tb.innerHTML+=`<tr>
+      <td class="left"><span class="rank ${rk}">${i+1}</span></td>
+      <td class="left"><b>${g.ad}</b></td>
+      <td class="left"><span class="chan-pill ${pill}">${g.canal}</span></td>
+      <td>${BRL(m.inv)}</td><td>${INT(m.impr)}</td><td>${INT(m.cliq)}</td>
+      <td class="${m.conv?'conv-hi':''}">${INT(m.conv)}</td><td>${PCT(m.ctr)}</td>
+      <td>${BRL(m.cpc)}</td><td>${BRL(m.cpm)}</td><td>${m.conv?BRL(m.cpconv):'—'}</td><td>${PCT(m.clq2conv)}</td>
+      <td class="left"><a class="alink" href="${g.link}" target="_blank">Ver anúncio</a></td>
+      <td class="left"><span class="badge ${bc}">${bt}</span></td></tr>`;
+  });
+}
+
+/* ---------- PUBLICOS ---------- */
+function renderPublicos(){
+  const rows=filtered();
+  const grp={};
+  rows.forEach(r=>{(grp[r.adset]=grp[r.adset]||[]).push(r)});
+  let arr=Object.entries(grp).map(([k,v])=>({name:k,m:metrics(v),ty:adsetType(k)}))
+    .sort((a,b)=>b.m.conv-a.m.conv);
+  const tb=document.querySelector('#tbl-pub tbody'); tb.innerHTML='';
+  arr.forEach((g,i)=>{
+    const m=g.m;const[bt,bc]=statusBadge(m);
+    tb.innerHTML+=`<tr>
+      <td class="left"><span class="rank ${i===0?'g1':i===1?'g2':''}">${i+1}</span></td>
+      <td class="left"><b>${g.name}</b></td>
+      <td class="left" style="color:${g.ty.c};font-weight:700">${g.ty.t}</td>
+      <td>${BRL(m.inv)}</td><td>${INT(m.impr)}</td><td>${INT(m.cliq)}</td>
+      <td class="${m.conv?'conv-hi':''}">${INT(m.conv)}</td><td>${PCT(m.ctr)}</td>
+      <td>${BRL(m.cpc)}</td><td>${BRL(m.cpm)}</td><td>${m.conv?BRL(m.cpconv):'—'}</td><td>${PCT(m.clq2conv)}</td></tr>`;
+  });
+  destroy('chartPubInv');
+  charts.chartPubInv=new Chart(document.getElementById('chartPubInv'),{
+    type:'doughnut',data:{labels:arr.map(g=>g.name),datasets:[{data:arr.map(g=>g.m.inv),backgroundColor:['#ff6b35','#c44a1a','#8b2a0a'],borderColor:'#0a0a0a',borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#b8b8b8'}}}}});
+  destroy('chartPubConv');
+  charts.chartPubConv=new Chart(document.getElementById('chartPubConv'),{
+    type:'doughnut',data:{labels:arr.map(g=>g.name),datasets:[{data:arr.map(g=>g.m.conv),backgroundColor:['#ff8c42','#8b2a0a','#ffb38a'],borderColor:'#0a0a0a',borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#b8b8b8'}}}}});
+}
+
+/* ---------- DIARIA ---------- */
+function renderDiaria(){
+  let rows=filtered().slice().sort((a,b)=> a.data!==b.data?a.data.localeCompare(b.data): a.adset!==b.adset?a.adset.localeCompare(b.adset):a.ad.localeCompare(b.ad));
+  const tb=document.querySelector('#tbl-gran tbody'); tb.innerHTML='';
+  rows.forEach(r=>{
+    const m=metrics([r]);
+    const ty=adsetType(r.adset);
+    const pill=r.canal==='WhatsApp'?'cp-wpp':'cp-dm';
+    tb.innerHTML+=`<tr>
+      <td class="left">${r.data.slice(8)}/${r.data.slice(5,7)}</td>
+      <td class="left" style="color:${ty.c};font-weight:600">${r.adset}</td>
+      <td class="left">${r.ad}</td>
+      <td class="left"><span class="chan-pill ${pill}">${r.canal}</span></td>
+      <td>${BRL(r.invest)}</td><td>${INT(r.impr)}</td><td>${INT(r.cliques)}</td>
+      <td>${r.conv?'<b class="conv-hi">'+INT(r.conv)+'</b>':'0'}</td>
+      <td>${PCT(m.ctr)}</td><td>${BRL(m.cpc)}</td><td>${BRL(m.cpm)}</td><td>${r.conv?BRL(m.cpconv):'—'}</td></tr>`;
+  });
+}
+
+function renderAll(){ renderGeral(); renderCanais(); renderCriativos(); renderPublicos(); renderDiaria(); }
+
+// tabs
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active');
+  document.getElementById('panel-'+t.dataset.tab).classList.add('active');
+}));
+// channel filter
+document.querySelectorAll('.chip').forEach(c=>c.addEventListener('click',()=>{
+  document.querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));
+  c.classList.add('active');
+  CHAN=c.dataset.chan;
+  renderGeral(); renderCriativos(); renderPublicos(); renderDiaria();
+}));
+
+renderAll();
+</script>
+</body>
+</html>
