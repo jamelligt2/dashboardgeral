@@ -336,8 +336,51 @@ function processWebhook(text){
   const rows=parseCSV(text).filter(r=>r.some(c=>(c||'').trim()!==''));
   if(!rows.length)return;
   const H=rows[0].map(h=>(h||'').trim());
-  WH_OK=H.some(h=>h.indexOf('data.purchase')>-1||h.indexOf('data.buyer')>-1);
+  // Formato cru do Hotmart (data.purchase.* / data.buyer.*) — compatibilidade retroativa
+  if(H.some(h=>h.indexOf('data.purchase')>-1||h.indexOf('data.buyer')>-1)){ processWebhookRaw(rows,H); return; }
+  // Formato limpo (aba Webhook estruturada) — mapeia colunas por nome de cabeçalho
+  const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[\s_.\-]/g,'');
+  const Hn=H.map(norm);
+  const find=(...keys)=>{ for(const k of keys){ const kn=norm(k); const i=Hn.indexOf(kn); if(i>-1)return i; }
+    for(const k of keys){ const kn=norm(k); const i=Hn.findIndex(h=>h.includes(kn)); if(i>-1)return i; } return -1; };
+  const C={
+    data:        find('data'),
+    prod:        find('produto'),
+    status:      find('status'),
+    nome:        find('comprador','nome do comprador','nome'),
+    email:       find('email do comprador','e-mail do comprador','email'),
+    valor:       find('valor'),
+    tx:          find('id da transacao','transacao','transaction'),
+    parentTx:    find('id compra pai','compra pai'),
+    isOB:        find('e order bump','order bump','orderbump'),
+    utmSource:   find('utm source','utmsource'),
+    utmMedium:   find('utm medium','utmmedium'),
+    utmCampaign: find('utm campaign','utmcampaign'),
+    utmContent:  find('utm content','utmcontent'),
+    payType:     find('tipo de pagamento','meio de pagamento','payment'),
+  };
+  WH_OK = C.status>-1 && C.valor>-1 && (C.nome>-1||C.email>-1);
   if(!WH_OK)return;
+  HAS_UTM = C.utmSource>-1;
+  const get=(r,i)=> (i>=0&&i<r.length)?(r[i]||'').trim():'';
+  const apr=CONFIG.STATUS_APROVADO.map(s=>s.toUpperCase()); const dmin=CONFIG.DATA_MINIMA;
+  rows.slice(1).forEach(r=>{
+    if(!r.some(c=>(c||'').trim()!==''))return;
+    const status=get(r,C.status).toUpperCase();
+    if(C.status>=0 && status!=='' && !apr.includes(status))return;
+    let valor=numBR(get(r,C.valor)); if(CONFIG.VALORES_EM_CENTAVOS)valor/=100;
+    const data=normDate(get(r,C.data));
+    if(dmin && data && data<dmin)return;
+    SALES.push({ data, valor, nome:get(r,C.nome)||'—', email:get(r,C.email), produto:get(r,C.prod),
+      isOB:/^(true|1|sim|yes|verdadeiro)$/i.test(get(r,C.isOB)), parentTx:get(r,C.parentTx), tx:get(r,C.tx),
+      payType:get(r,C.payType), instal:'', city:'', uf:'', affil:'',
+      utmSource:get(r,C.utmSource), utmMedium:get(r,C.utmMedium), utmCampaign:get(r,C.utmCampaign), utmContent:get(r,C.utmContent) });
+  });
+  SALES.sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+}
+
+function processWebhookRaw(rows,H){
+  WH_OK=true;
   const idx=n=>H.indexOf(n);
   const findUtm=key=>{ const i=H.findIndex(h=>h.toLowerCase().replace(/[\s_.-]/g,'').includes(key)); return i; };
   const C={
