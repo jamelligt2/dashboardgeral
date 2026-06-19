@@ -140,9 +140,6 @@ tbody tr.total td{background:#0a0a0a;color:var(--orange);font-weight:700;border-
     <div class="kpi-card c4"><div class="kpi-label">CPM Médio</div><div class="kpi-val c4" id="kpi-cpm"></div><div class="kpi-sub" id="kpi-impr-sub"></div></div>
   </div>
 
-  <div class="section-title">Conjuntos — Top por Conversas</div>
-  <div class="adsets-grid" id="adsets-grid"></div>
-
   <div class="section-title">Funil de Conversão</div>
   <div class="funnel-section">
     <div class="funnel-svg-wrap">
@@ -277,7 +274,7 @@ const adsetAgg=aggBy(DATA,'adset');
 const adsetsSorted=Object.entries(adsetAgg).sort((a,b)=>b[1].conv-a[1].conv||b[1].spend-a[1].spend);
 const topAdsets=adsetsSorted.slice(0,6);
 const grid=document.getElementById('adsets-grid');
-for(const [name,d] of topAdsets){
+if(grid) for(const [name,d] of topAdsets){
   const cls=classifyAdset(name);
   const cpconv2=d.conv?d.spend/d.conv:0;
   const ctr2=d.impr?d.clk/d.impr*100:0;
@@ -570,6 +567,7 @@ window.renderAdsetsGrid = function(filtered){
   var byAdset=aggBy(filtered,'adset'),sorted=Object.entries(byAdset).sort(function(a,b){return b[1].conv-a[1].conv;});
   var totalSpend=filtered.reduce(function(acc,d){return acc+(d.spend||0);},0);
   var grid=document.getElementById('adsets-grid');
+  if(!grid)return;
   grid.className='pub-grid'; grid.id='adsets-grid';
   grid.innerHTML=sorted.map(function(e){return buildPubCard(e[0],e[1],totalSpend);}).join('');
 };
@@ -794,7 +792,7 @@ window.setDashPreset = function(days,btn){
 
 window.renderAll = function(){
   var f=getFilteredData();
-  updateRangeInfo(f);renderKPIs(f);renderFunnel(f);renderAdsetsGrid(f);
+  updateRangeInfo(f);renderKPIs(f);renderFunnel(f);
   renderDailyTable(f);renderDailyCharts(f);renderDoughnutCharts(f);
   window.criStatusFiltro='todos';window.pubStatusFiltro='todos';renderCriCards(f);renderPublicosTable(f);renderDiariaTable(f);
 };
@@ -816,6 +814,8 @@ if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded'
   var SHEET_NAME = '';
 
   var badge;
+  var firstLoad = true;
+  var REFRESH_MIN = 120; // auto-atualiza a cada 120 minutos com a aba aberta
   function two(n){return n<10?'0'+n:''+n;}
   function setStatus(txt,color){
     if(!badge){
@@ -860,9 +860,15 @@ if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded'
       }
       if(!out.length) throw new Error('planilha sem linhas de dados');
       window.DATA = out;
-      // Dispara o render mantendo o comportamento padrão (últimos 7 dias do período disponível)
-      if(window.setDashPreset){ window.setDashPreset(7, document.querySelector('.preset-btn')); }
-      else if(window.renderAll){ window.renderAll(); }
+      if(firstLoad){
+        // 1ª carga: comportamento padrão (últimos 7 dias do período disponível)
+        firstLoad = false;
+        if(window.setDashPreset){ window.setDashPreset(7, document.querySelector('.preset-btn')); }
+        else if(window.renderAll){ window.renderAll(); }
+      } else {
+        // Auto-refresh: re-renderiza preservando o filtro de data atual selecionado
+        if(window.renderAll){ window.renderAll(); }
+      }
       var now=new Date();
       setStatus('✓ Planilha · '+out.length+' linhas · '+two(now.getHours())+':'+two(now.getMinutes()), '#2ecc71');
     }catch(e){
@@ -882,6 +888,7 @@ if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded'
   }
   if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded',load); }
   else{ load(); }
+  setInterval(load, REFRESH_MIN*60*1000); // re-busca a planilha automaticamente a cada 120 min
 })();
 </script>
 
