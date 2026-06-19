@@ -464,20 +464,17 @@ window.getFilteredData = function() {
   return (window.DATA||DATA||[]).filter(function(r){return r.date>=from && r.date<=to;});
 };
 
+// Ativo = status efetivo do Meta ACTIVE ou WITH_ISSUES (veicula com aviso); resto = pausado.
+window.isStatusAtivo = function(s){ s=String(s||'').toUpperCase(); return s==='ACTIVE' || s==='WITH_ISSUES'; };
+
+// Conjunto (aba Públicos): usa a coluna L "Status Conjunto". Ativo se qualquer linha do conjunto estiver ativa.
 window.isAdsetAtivo = function(adsetName, filtered) {
-  var maxDate = filtered.reduce(function(m,r){return r.date>m?r.date:m;},'');
-  var adRows = filtered.filter(function(r){return r.adset===adsetName;});
-  if (!adRows.length) return false;
-  var lastDate = adRows.reduce(function(m,r){return r.date>m?r.date:m;},'');
-  return (new Date(maxDate) - new Date(lastDate)) <= 7*86400000;
+  return filtered.some(function(r){ return r.adset===adsetName && isStatusAtivo(r.statusAdset); });
 };
 
+// Anúncio (aba Criativos): usa a coluna M "Status Anúncio" (que já reflete campanha+conjunto+anúncio).
 window.isAdAtivo = function(adName, filtered) {
-  var maxDate = filtered.reduce(function(m,r){return r.date>m?r.date:m;},'');
-  var adRows = filtered.filter(function(r){return r.ad===adName;});
-  if (!adRows.length) return false;
-  var lastDate = adRows.reduce(function(m,r){return r.date>m?r.date:m;},'');
-  return (new Date(maxDate) - new Date(lastDate)) <= 7*86400000;
+  return filtered.some(function(r){ return r.ad===adName && isStatusAtivo(r.statusAd); });
 };
 
 window.aggBy = function aggBy(data,key){
@@ -612,7 +609,7 @@ window.buildCriCard = function(adName, d, isAtivo) {
   var clqConv= d.clk  > 0 ? (d.conv  / d.clk  * 100) : 0;
   var statusBadge = isAtivo
     ? '<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:rgba(46,204,113,0.15);color:#2ecc71;font-weight:600;">&#9679; Ativo</span>'
-    : '<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.4);font-weight:600;">Inativo</span>';
+    : '<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:rgba(196,74,26,0.18);color:#c44a1a;font-weight:600;">&#9632; Pausado</span>';
   return '<div class="cri-card'+(isAtivo?' ativo':'')+'">' +
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">' +
       '<div style="font-size:12px;font-weight:600;color:#e8e6f0;flex:1;line-height:1.4;">'+adName+'</div>' +
@@ -677,7 +674,7 @@ window.buildNewPubCard = function(name, d, isAtivo, totalSpend) {
   var barW   = Math.min(pct, 100).toFixed(1);
   var badgeHtml = isAtivo
     ? '<span class="pub-badge-ativo">&#9679; Ativo</span>'
-    : '<span class="pub-badge-inativo">Inativo</span>';
+    : '<span class="pub-badge-inativo">&#9632; Pausado</span>';
 
   return '<div class="pub-card ' + (isAtivo ? 'ativo' : 'inativo') + '">' +
     '<div class="pub-card-header"><div class="pub-name">' + name + '</div>' + badgeHtml + '</div>' +
@@ -800,7 +797,7 @@ window.renderAll = function(){
 window.renderPublicosTable = window.renderPubCards;
 
 
-function _buildFilterBar(panelId,type){var panel=document.getElementById(panelId);if(!panel)return;panel.innerHTML='';var fb=document.createElement('div');fb.className='pub-filterbar';fb.id=type+'-filterbar';fb.style.cssText='display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;';var ff=type==='cri'?'setCriFiltro':'setPubFiltro',sf=type==='cri'?'setCriSort':'setPubSort';var sk=type==='cri'?[['conversas','Conversas'],['invest','Investimento'],['ctr','CTR'],['cpc','CPC'],['cpconv','Custo/Conv']]:[['invest','Investimento'],['ctr','CTR'],['cpc','CPC'],['conv','Conversas'],['cpconv','Custo/Conv']];function mkB(cls,oc,html){var b=document.createElement('button');b.className=cls;b.setAttribute('onclick',oc);b.innerHTML=html;return b;}fb.appendChild(mkB('cri-filter-btn active',ff+"('todos',this)",'Todos'));fb.appendChild(mkB('cri-filter-btn',ff+"('ativos',this)",'&#9679; Ativos (<span id="'+type+'-count-ativos">0</span>)'));fb.appendChild(mkB('cri-filter-btn',ff+"('inativos',this)",'&#9679; Inativos (<span id="'+type+'-count-inativos">0</span>)'));var sp=document.createElement('div');sp.style.flex='1';fb.appendChild(sp);var lbl=document.createElement('span');lbl.style.cssText='font-size:11px;color:rgba(255,255,255,0.4)';lbl.textContent='Ordenar:';fb.appendChild(lbl);sk.forEach(function(p,i){fb.appendChild(mkB(i===0?'cri-sort-btn cri-filter-btn active':'cri-sort-btn cri-filter-btn',sf+"('"+p[0]+"',this)",p[1]));});panel.appendChild(fb);var grid=document.createElement('div');grid.id=type+'-cards';grid.className=type==='cri'?'cri-grid':'pub-grid';if(type==='cri')grid.style.cssText='display:grid;grid-template-columns:repeat(3,1fr);gap:12px;';panel.appendChild(grid);}
+function _buildFilterBar(panelId,type){var panel=document.getElementById(panelId);if(!panel)return;panel.innerHTML='';var fb=document.createElement('div');fb.className='pub-filterbar';fb.id=type+'-filterbar';fb.style.cssText='display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;';var ff=type==='cri'?'setCriFiltro':'setPubFiltro',sf=type==='cri'?'setCriSort':'setPubSort';var sk=type==='cri'?[['conversas','Conversas'],['invest','Investimento'],['ctr','CTR'],['cpc','CPC'],['cpconv','Custo/Conv']]:[['invest','Investimento'],['ctr','CTR'],['cpc','CPC'],['conv','Conversas'],['cpconv','Custo/Conv']];function mkB(cls,oc,html){var b=document.createElement('button');b.className=cls;b.setAttribute('onclick',oc);b.innerHTML=html;return b;}fb.appendChild(mkB('cri-filter-btn active',ff+"('todos',this)",'Todos'));fb.appendChild(mkB('cri-filter-btn',ff+"('ativos',this)",'&#9679; Ativos (<span id="'+type+'-count-ativos">0</span>)'));fb.appendChild(mkB('cri-filter-btn',ff+"('inativos',this)",'&#9632; Pausados (<span id="'+type+'-count-inativos">0</span>)'));var sp=document.createElement('div');sp.style.flex='1';fb.appendChild(sp);var lbl=document.createElement('span');lbl.style.cssText='font-size:11px;color:rgba(255,255,255,0.4)';lbl.textContent='Ordenar:';fb.appendChild(lbl);sk.forEach(function(p,i){fb.appendChild(mkB(i===0?'cri-sort-btn cri-filter-btn active':'cri-sort-btn cri-filter-btn',sf+"('"+p[0]+"',this)",p[1]));});panel.appendChild(fb);var grid=document.createElement('div');grid.id=type+'-cards';grid.className=type==='cri'?'cri-grid':'pub-grid';if(type==='cri')grid.style.cssText='display:grid;grid-template-columns:repeat(3,1fr);gap:12px;';panel.appendChild(grid);}
 function _agilicomInit(){try{if(typeof DATA!=='undefined')window.DATA=DATA;}catch(e){}var hdr=document.querySelector('.header');if(hdr){hdr.innerHTML='';var logo=document.createElement('div');logo.className='logo-badge';logo.textContent='JGT';var div1=document.createElement('div');div1.style.cssText='width:1px;height:32px;background:rgba(255,255,255,0.15);flex-shrink:0;';var txt=document.createElement('div');txt.className='header-text';var h1=document.createElement('h1');h1.textContent='AGILICOM';var sub=document.createElement('div');sub.className='header-sub';sub.innerHTML='<span class="header-dot">•</span><span>Dashboard de Conversa</span><span class="header-sep"> — </span><span class="header-campaign">Campanha de Mensagem</span>';txt.appendChild(h1);txt.appendChild(sub);var sp2=document.createElement('div');sp2.className='header-spacer';var pb=document.createElement('div');pb.className='period-bar';pb.id='period-bar';pb.innerHTML='<label>De</label><input type="date" id="dateFrom" class="date-input" value="2026-06-02"/><label>—</label><input type="date" id="dateTo" class="date-input" value="2026-06-09"/><button class="preset-btn" onclick="setDashPreset(7,this)">7d</button><button class="preset-btn" onclick="setDashPreset(14,this)">14d</button><button class="preset-btn" onclick="setDashPreset(30,this)">30d</button><button class="preset-btn" id="dash-btn-all" onclick="setDashPreset(\'all\',this)">Tudo</button><span class="range-info" id="dash-range-info">7 dias</span>';hdr.appendChild(logo);hdr.appendChild(div1);hdr.appendChild(txt);hdr.appendChild(sp2);hdr.appendChild(pb);var df=document.getElementById('dateFrom'),dt=document.getElementById('dateTo');if(df)df.addEventListener('change',function(){renderAll();});if(dt)dt.addEventListener('change',function(){renderAll();});}var b=document.querySelector('.info-banner');if(b)b.remove();_buildFilterBar('panel-criativos','cri');_buildFilterBar('panel-publicos','pub');var pg=document.getElementById('panel-geral');if(pg){var ag=document.getElementById('adsets-grid');if(ag){var ct=ag.previousElementSibling,fs=pg.querySelector('.funnel-section');if(fs&&ct){pg.removeChild(ct);pg.removeChild(ag);fs.parentNode.insertBefore(ct,fs.nextSibling);fs.parentNode.insertBefore(ag,ct.nextSibling);}}}setTimeout(function(){try{if(typeof DATA!=='undefined')window.DATA=DATA;}catch(e){}if(window.setDashPreset)setDashPreset(7,document.querySelector('.preset-btn'));else if(window.renderAll)renderAll();},150);}
 if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',_agilicomInit);}else{_agilicomInit();}
 
@@ -855,7 +852,10 @@ if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded'
           impr: +cell(6)||0,
           reach: +cell(7)||0,
           clk: +cell(8)||0,
-          conv: +cell(9)||0
+          conv: +cell(9)||0,
+          statusCamp: cell(10)||'',   // K - Status Campanha
+          statusAdset: cell(11)||'',  // L - Status Conjunto
+          statusAd: cell(12)||''      // M - Status Anúncio
         });
       }
       if(!out.length) throw new Error('planilha sem linhas de dados');
