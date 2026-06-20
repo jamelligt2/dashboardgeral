@@ -103,6 +103,25 @@ tfoot td{font-weight:700;border-top:1px solid rgba(255,107,43,.3);color:#ff6b2b}
 .empty-state p{font-size:12px;line-height:1.6;max-width:480px;margin:0 auto}
 .info-banner{background:rgba(241,196,15,.06);border:1px solid rgba(241,196,15,.22);border-radius:8px;padding:10px 14px;font-size:11px;color:rgba(255,255,255,.6);margin-bottom:16px;line-height:1.5}
 .muted{color:rgba(255,255,255,.35)}
+/* ===== TESTE A/B PÁGINA ===== */
+.ab-verdict{background:linear-gradient(90deg,rgba(255,107,43,.1),rgba(255,107,43,.02));border:1px solid rgba(255,107,43,.25);border-radius:10px;padding:14px 18px;margin-bottom:18px;font-size:13px;line-height:1.7;color:rgba(255,255,255,.8)}
+.ab-verdict b{color:#ff6b2b}.ab-verdict .win{color:#2ecc71;font-weight:700}
+.ab-wrap{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:22px}
+.ab-card{background:#12121f;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:18px;position:relative;transition:border-color .2s}
+.ab-card.pagB{border-color:rgba(255,107,43,.18)}
+.ab-card.winner{border-color:rgba(46,204,113,.5);box-shadow:0 0 0 1px rgba(46,204,113,.12)}
+.ab-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:2px}
+.ab-title{font-size:17px;font-weight:700}.ab-tag-a{color:#5dade2}.ab-tag-b{color:#ff6b2b}
+.ab-win-badge{font-size:10px;font-weight:700;background:rgba(46,204,113,.15);color:#2ecc71;padding:4px 10px;border-radius:20px;white-space:nowrap}
+.ab-sub2{font-size:11px;color:rgba(255,255,255,.45);margin-bottom:8px}
+.ab-camps{font-size:10px;color:rgba(255,255,255,.32);margin-bottom:14px;line-height:1.6;font-family:'DM Mono',monospace}
+.ab-hero{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.ab-hbox{background:rgba(255,255,255,.03);border-radius:8px;padding:11px 13px}
+.ab-hbox .l{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.4);margin-bottom:5px}
+.ab-hbox .v{font-size:21px;font-weight:700;font-family:'DM Mono',monospace}
+.ab-ob{font-size:11px;color:rgba(255,255,255,.4);font-weight:500}
+.ab-cmp-better{color:#2ecc71;font-weight:600}
+@media(max-width:760px){.ab-wrap{grid-template-columns:1fr}}
 @media(max-width:900px){.cri-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:600px){.cri-grid{grid-template-columns:1fr}.chart-grid-2x2{grid-template-columns:1fr}.funil-section{grid-template-columns:1fr}}
 </style>
@@ -146,6 +165,7 @@ tfoot td{font-weight:700;border-top:1px solid rgba(255,107,43,.3);color:#ff6b2b}
   <div class="tab" onclick="showTab('visao',this)">🌐 Visão Geral</div>
   <div class="tab" onclick="showTab('criativos',this)">Criativos</div>
   <div class="tab" onclick="showTab('publicos',this)">Públicos</div>
+  <div class="tab" onclick="showTab('abtest',this)">🧪 Teste A/B Página</div>
   <div class="tab" onclick="showTab('semanal',this)">Semana a Semana</div>
   <div class="tab" onclick="showTab('mensal',this)">Mês a Mês</div>
 </div>
@@ -209,6 +229,12 @@ tfoot td{font-weight:700;border-top:1px solid rgba(255,107,43,.3);color:#ff6b2b}
     <thead><tr><th>Conjunto</th><th>Público</th><th>Invest.</th><th>Impr.</th><th>Alcance</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>PV</th><th>Checkout</th><th>Vendas</th><th>Fat.</th><th>ROAS</th></tr></thead>
     <tbody></tbody>
   </table></div>
+</div>
+
+<!-- TESTE A/B PÁGINA -->
+<div class="content" id="tab-abtest">
+  <div class="info-banner">🧪 <b>Teste A/B de página de vendas.</b> A separação é feita pelo nome da campanha: <b>Página A</b> = campanhas sem especificação (o padrão); <b>Página B</b> = campanhas que trazem <b>“Página B”</b> no nome. As vendas são atribuídas pela mesma regra via UTM Campaign. Métricas de mídia (investimento, cliques, checkout…) sempre separam; vendas/ROAS dependem do UTM nas vendas.</div>
+  <div id="ab-body"></div>
 </div>
 
 <!-- SEMANA A SEMANA -->
@@ -449,6 +475,7 @@ function renderAll(){
   renderTrafego(from,to); renderVisao(from,to);
   renderCriativos(GROWS.filter(g=>inRange(g.data,from,to)),from,to);
   renderPublicos(GROWS.filter(g=>inRange(g.data,from,to)),from,to);
+  renderABTest(from,to);
   renderPeriodo('semanal',from,to); renderPeriodo('mensal',from,to);
 }
 function kpi(label,val,cls,sub){ return `<div class="kpi-card"><div class="kpi-label">${label}</div><div class="kpi-value ${cls||''}">${val}</div>${sub?`<div class="kpi-sub">${sub}</div>`:''}</div>`; }
@@ -530,6 +557,107 @@ function renderPublicos(rows,from,to){
   document.querySelector('#pub-table tbody').innerHTML=arr.map(o=>`<tr><td>${esc(o.adset)}<br><span style="font-size:9px;color:rgba(255,255,255,.3)">${esc(o.campaign||'—')}</span></td><td>${esc(o.publico||'—')}</td><td>${fmtBRL(o.inv)}</td><td>${fmtInt(o.imp)}</td><td>${fmtInt(o.reach)}</td><td>${fmtInt(o.cliques)}</td><td>${fmtPct(o.ctr)}</td><td>${fmtBRL(o.cpc)}</td><td>${fmtInt(o.pv)}</td><td>${fmtInt(o.ck)}</td><td>${HAS_UTM?fmtInt(o.vendas):'—'}</td><td>${HAS_UTM?fmtBRL(o.fat):'—'}</td><td>${HAS_UTM?fmtROAS(o.roas):'—'}</td></tr>`).join('') || `<tr><td colspan="13" style="text-align:center;color:rgba(255,255,255,.3);padding:16px">Sem dados no período</td></tr>`;
 }
 function setPubSort(s,btn){ pubSort=s; document.querySelectorAll('.pub-sort-btn').forEach(b=>b.classList.remove('active')); if(btn)btn.classList.add('active'); const {from,to}=getRange(); renderPublicos(GROWS.filter(g=>inRange(g.data,from,to)),from,to); }
+
+/* ====================== TESTE A/B PÁGINA ====================== */
+// Página B = nome da campanha contém "Página B"; qualquer outra = Página A (padrão, sem especificação)
+function paginaDe(nome){ return /p[áa]gina\s*b/i.test(String(nome||'')) ? 'B' : 'A'; }
+function abPagina(from,to,pag){
+  const rowsP=GROWS.filter(g=>inRange(g.data,from,to)&&paginaDe(g.campaign)===pag);
+  const m=aggMidia(rowsP);
+  const sales=SALES.filter(s=>inRange(s.data,from,to)&&(s.utmCampaign||'').trim()!==''&&paginaDe(s.utmCampaign)===pag);
+  const principais=sales.filter(s=>!s.isOB), obs=sales.filter(s=>s.isOB);
+  const sum=a=>a.reduce((x,s)=>x+s.valor,0);
+  const fat=sum(sales), fatPrincipal=sum(principais), nVendas=principais.length, nOB=obs.length;
+  const camps=[...new Set(rowsP.map(r=>r.campaign).filter(Boolean))];
+  return { pag, m, fat, nVendas, nOB,
+    roas:m.inv?fat/m.inv:0, cac:nVendas?m.inv/nVendas:0, ticket:nVendas?fatPrincipal/nVendas:0,
+    txClkPV:m.cliques?m.pv/m.cliques*100:0, txPVck:m.pv?m.ck/m.pv*100:0, txCkVenda:m.ck?nVendas/m.ck*100:0, camps };
+}
+function abHero(l,v,cls){ return `<div class="ab-hbox"><div class="l">${l}</div><div class="v ${cls||''}">${v}</div></div>`; }
+function abMini(l,v){ return `<div class="pub-metric"><div class="pub-metric-val neutral">${v}</div><div class="pub-metric-lbl">${l}</div></div>`; }
+function abTaxa(l,v){ return `<div class="taxa-item"><span>${l}</span><span class="taxa-val">${v}</span></div>`; }
+function abCard(a,isWin,winLabel){
+  const U=HAS_UTM, m=a.m;
+  const tag=a.pag==='A'?'<span class="ab-tag-a">Página A</span>':'<span class="ab-tag-b">Página B</span>';
+  const sub=a.pag==='A'?'Padrão — sem especificação no nome da campanha':'Variação — “Página B” no nome da campanha';
+  const badge=isWin?`<span class="ab-win-badge">🏆 ${winLabel}</span>`:'';
+  const camps=a.camps.length?a.camps.map(esc).join('<br>'):'—';
+  const vendasTxt=U?(fmtInt(a.nVendas)+(a.nOB?` <span class="ab-ob">+${a.nOB} OB</span>`:'')):'—';
+  return `<div class="ab-card ${a.pag==='B'?'pagB':''} ${isWin?'winner':''}">
+    <div class="ab-head"><div class="ab-title">${tag}</div>${badge}</div>
+    <div class="ab-sub2">${sub}</div>
+    <div class="ab-camps">${camps}</div>
+    <div class="ab-hero">
+      ${abHero('Investimento',fmtBRL(m.inv),'orange')}
+      ${abHero('Faturamento',U?fmtBRL(a.fat):'—','green')}
+      ${abHero('Vendas',vendasTxt,'')}
+      ${abHero('ROAS',U?fmtROAS(a.roas):'—','blue')}
+    </div>
+    <div class="pub-metrics">
+      ${abMini('Cliques',fmtInt(m.cliques))}${abMini('CTR',fmtPct(m.ctr))}${abMini('CPC',fmtBRL(m.cpc))}
+      ${abMini('Page View',fmtInt(m.pv))}${abMini('Checkout',fmtInt(m.ck))}${abMini('CPM',fmtBRL(m.cpm))}
+      ${abMini('Ticket Médio',U?fmtBRL(a.ticket):'—')}${abMini('CAC',U?fmtBRL(a.cac):'—')}${abMini('Alcance',fmtInt(m.reach))}
+    </div>
+    <div class="taxa-grid" style="margin-top:12px">
+      ${abTaxa('Clique → Page View',fmtPct(a.txClkPV))}
+      ${abTaxa('Page View → Checkout',fmtPct(a.txPVck))}
+      ${abTaxa('Checkout → Venda',U?fmtPct(a.txCkVenda):'—')}
+    </div>
+  </div>`;
+}
+function abCmpRow(label,va,vb,dir,fmt){
+  let ca='',cb='';
+  if(dir!=='neutral'&&isFinite(va)&&isFinite(vb)&&(va||vb)){
+    const aBetter = dir==='hi' ? va>vb : (va||1e12)<(vb||1e12);
+    if(va!==vb){ if(aBetter)ca='ab-cmp-better'; else cb='ab-cmp-better'; }
+  }
+  return `<tr><td>${label}</td><td class="${ca}">${fmt(va)}</td><td class="${cb}">${fmt(vb)}</td></tr>`;
+}
+function renderABTest(from,to){
+  const A=abPagina(from,to,'A'), B=abPagina(from,to,'B');
+  const orphans=SALES.filter(s=>inRange(s.data,from,to)&&!s.isOB&&(s.utmCampaign||'').trim()==='').length;
+  // vencedor
+  let winner=null, winLabel='';
+  if(HAS_UTM && (A.roas>0||B.roas>0)){ winner=A.roas>=B.roas?'A':'B'; winLabel='Melhor ROAS'; }
+  else if((A.m.cpc>0)||(B.m.cpc>0)){ winner=((A.m.cpc||1e12)<=(B.m.cpc||1e12))?'A':'B'; winLabel='Menor CPC'; }
+  // veredito
+  let verdict;
+  if(A.m.inv===0 && B.m.inv===0){ verdict='Sem investimento de mídia no período selecionado para nenhuma das páginas.'; }
+  else if(HAS_UTM){
+    const wt=winner==='A'?'Página A':'Página B';
+    verdict=`Comparando por ROAS: <b>Página A ${fmtROAS(A.roas)}</b> · <b>Página B ${fmtROAS(B.roas)}</b> → <span class="win">${wt} está performando melhor</span>. `
+      +`Investimento A ${fmtBRL(A.m.inv)} · B ${fmtBRL(B.m.inv)}. Vendas A ${fmtInt(A.nVendas)} · B ${fmtInt(B.nVendas)}.`
+      +(orphans?` <span style="color:rgba(255,255,255,.5)">(${orphans} venda${orphans>1?'s':''} sem UTM não atribuída${orphans>1?'s':''} a nenhuma página.)</span>`:'');
+  } else {
+    const wt=winner==='A'?'Página A':'Página B';
+    verdict=`As vendas não têm UTM, então só comparo a <b>mídia</b>. Por CPC: <b>A ${fmtBRL(A.m.cpc)}</b> · <b>B ${fmtBRL(B.m.cpc)}</b> → <span class="win">${wt} mais eficiente</span>. Investimento A ${fmtBRL(A.m.inv)} · B ${fmtBRL(B.m.inv)}.`;
+  }
+  const U=HAS_UTM;
+  const cmp=`<div class="sec-title">Comparativo lado a lado</div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Métrica</th><th>Página A</th><th>Página B</th></tr></thead>
+      <tbody>
+        ${abCmpRow('Investimento',A.m.inv,B.m.inv,'neutral',fmtBRL)}
+        ${abCmpRow('Faturamento',U?A.fat:NaN,U?B.fat:NaN,'hi',v=>U?fmtBRL(v):'—')}
+        ${abCmpRow('Vendas',U?A.nVendas:NaN,U?B.nVendas:NaN,'hi',v=>U?fmtInt(v):'—')}
+        ${abCmpRow('ROAS',U?A.roas:NaN,U?B.roas:NaN,'hi',v=>U?fmtROAS(v):'—')}
+        ${abCmpRow('CAC',U?A.cac:NaN,U?B.cac:NaN,'lo',v=>U?fmtBRL(v):'—')}
+        ${abCmpRow('Ticket Médio',U?A.ticket:NaN,U?B.ticket:NaN,'hi',v=>U?fmtBRL(v):'—')}
+        ${abCmpRow('Cliques',A.m.cliques,B.m.cliques,'hi',fmtInt)}
+        ${abCmpRow('CTR',A.m.ctr,B.m.ctr,'hi',fmtPct)}
+        ${abCmpRow('CPC',A.m.cpc,B.m.cpc,'lo',fmtBRL)}
+        ${abCmpRow('CPM',A.m.cpm,B.m.cpm,'lo',fmtBRL)}
+        ${abCmpRow('Page View',A.m.pv,B.m.pv,'hi',fmtInt)}
+        ${abCmpRow('Checkout',A.m.ck,B.m.ck,'hi',fmtInt)}
+        ${abCmpRow('Page View → Checkout',A.txPVck,B.txPVck,'hi',fmtPct)}
+        ${abCmpRow('Checkout → Venda',U?A.txCkVenda:NaN,U?B.txCkVenda:NaN,'hi',v=>U?fmtPct(v):'—')}
+      </tbody>
+    </table></div>`;
+  document.getElementById('ab-body').innerHTML=
+    `<div class="ab-verdict">${verdict}</div>
+     <div class="ab-wrap">${abCard(A,winner==='A',winLabel)}${abCard(B,winner==='B',winLabel)}</div>
+     ${cmp}`;
+}
 
 function isoWeek(dStr){ const d=new Date(dStr+'T00:00:00'); const day=(d.getDay()+6)%7; d.setDate(d.getDate()-day+3);
   const firstThu=new Date(d.getFullYear(),0,4); const week=1+Math.round(((d-firstThu)/86400000-3+((firstThu.getDay()+6)%7))/7);
