@@ -106,12 +106,14 @@ tfoot td{font-weight:700;border-top:1px solid rgba(255,107,43,.3);color:#ff6b2b}
 /* ===== TESTE A/B PÁGINA ===== */
 .ab-verdict{background:linear-gradient(90deg,rgba(255,107,43,.1),rgba(255,107,43,.02));border:1px solid rgba(255,107,43,.25);border-radius:10px;padding:14px 18px;margin-bottom:18px;font-size:13px;line-height:1.7;color:rgba(255,255,255,.8)}
 .ab-verdict b{color:#ff6b2b}.ab-verdict .win{color:#2ecc71;font-weight:700}
-.ab-wrap{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:22px}
+.ab-wrap{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:22px}
 .ab-card{background:#12121f;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:18px;position:relative;transition:border-color .2s}
 .ab-card.pagB{border-color:rgba(255,107,43,.18)}
+.ab-card.pagC{border-color:rgba(176,140,255,.2)}
 .ab-card.winner{border-color:rgba(46,204,113,.5);box-shadow:0 0 0 1px rgba(46,204,113,.12)}
 .ab-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:2px}
 .ab-title{font-size:17px;font-weight:700}.ab-tag-a{color:#5dade2}.ab-tag-b{color:#ff6b2b}
+.ab-tag-c{color:#b08cff}
 .ab-win-badge{font-size:10px;font-weight:700;background:rgba(46,204,113,.15);color:#2ecc71;padding:4px 10px;border-radius:20px;white-space:nowrap}
 .ab-sub2{font-size:11px;color:rgba(255,255,255,.45);margin-bottom:8px}
 .ab-camps{font-size:10px;color:rgba(255,255,255,.32);margin-bottom:14px;line-height:1.6;font-family:'DM Mono',monospace}
@@ -233,7 +235,7 @@ tfoot td{font-weight:700;border-top:1px solid rgba(255,107,43,.3);color:#ff6b2b}
 
 <!-- TESTE A/B PÁGINA -->
 <div class="content" id="tab-abtest">
-  <div class="info-banner">🧪 <b>Teste A/B de página de vendas.</b> A separação é feita pelo nome da campanha: <b>Página A</b> = campanhas sem especificação (o padrão); <b>Página B</b> = campanhas que trazem <b>“Página B”</b> no nome. As vendas são atribuídas pela mesma regra via UTM Campaign. Métricas de mídia (investimento, cliques, checkout…) sempre separam; vendas/ROAS dependem do UTM nas vendas.</div>
+  <div class="info-banner">🧪 <b>Teste A/B de página de vendas.</b> A separação é feita pelo nome da campanha: <b>Página A</b> = campanhas sem especificação (o padrão); <b>Página B</b> e <b>Página C</b> = campanhas que trazem <b>“Página B”</b> ou <b>“Página C”</b> no nome. As vendas são atribuídas pela mesma regra via UTM Campaign. Métricas de mídia (investimento, cliques, checkout…) sempre separam; vendas/ROAS dependem do UTM nas vendas.</div>
   <div id="ab-body"></div>
 </div>
 
@@ -560,7 +562,7 @@ function setPubSort(s,btn){ pubSort=s; document.querySelectorAll('.pub-sort-btn'
 
 /* ====================== TESTE A/B PÁGINA ====================== */
 // Página B = nome da campanha contém "Página B"; qualquer outra = Página A (padrão, sem especificação)
-function paginaDe(nome){ return /p[áa]gina\s*b/i.test(String(nome||'')) ? 'B' : 'A'; }
+function paginaDe(nome){ const s=String(nome||''); if(/p[áa]gina\s*c/i.test(s))return 'C'; if(/p[áa]gina\s*b/i.test(s))return 'B'; return 'A'; }
 function abPagina(from,to,pag){
   const rowsP=GROWS.filter(g=>inRange(g.data,from,to)&&paginaDe(g.campaign)===pag);
   const m=aggMidia(rowsP);
@@ -578,12 +580,13 @@ function abMini(l,v){ return `<div class="pub-metric"><div class="pub-metric-val
 function abTaxa(l,v){ return `<div class="taxa-item"><span>${l}</span><span class="taxa-val">${v}</span></div>`; }
 function abCard(a,isWin,winLabel){
   const U=HAS_UTM, m=a.m;
-  const tag=a.pag==='A'?'<span class="ab-tag-a">Página A</span>':'<span class="ab-tag-b">Página B</span>';
-  const sub=a.pag==='A'?'Padrão — sem especificação no nome da campanha':'Variação — “Página B” no nome da campanha';
+  const tagCls=a.pag==='A'?'ab-tag-a':a.pag==='B'?'ab-tag-b':'ab-tag-c';
+  const tag=`<span class="${tagCls}">Página ${a.pag}</span>`;
+  const sub=a.pag==='A'?'Padrão — sem especificação no nome da campanha':`Variação — “Página ${a.pag}” no nome da campanha`;
   const badge=isWin?`<span class="ab-win-badge">🏆 ${winLabel}</span>`:'';
   const camps=a.camps.length?a.camps.map(esc).join('<br>'):'—';
   const vendasTxt=U?(fmtInt(a.nVendas)+(a.nOB?` <span class="ab-ob">+${a.nOB} OB</span>`:'')):'—';
-  return `<div class="ab-card ${a.pag==='B'?'pagB':''} ${isWin?'winner':''}">
+  return `<div class="ab-card pag${a.pag} ${isWin?'winner':''}">
     <div class="ab-head"><div class="ab-title">${tag}</div>${badge}</div>
     <div class="ab-sub2">${sub}</div>
     <div class="ab-camps">${camps}</div>
@@ -605,57 +608,78 @@ function abCard(a,isWin,winLabel){
     </div>
   </div>`;
 }
-function abCmpRow(label,va,vb,dir,fmt){
-  let ca='',cb='';
-  if(dir!=='neutral'&&isFinite(va)&&isFinite(vb)&&(va||vb)){
-    const aBetter = dir==='hi' ? va>vb : (va||1e12)<(vb||1e12);
-    if(va!==vb){ if(aBetter)ca='ab-cmp-better'; else cb='ab-cmp-better'; }
+function abCmpRow(label,vals,dir,fmt){
+  let best=-1;
+  if(dir!=='neutral'){
+    const adj=vals.map(v=> isFinite(v) ? (dir==='lo' ? (v||1e12) : v) : null);
+    let bv=null;
+    adj.forEach((v,i)=>{ if(v==null)return; if(bv==null || (dir==='hi'? v>bv : v<bv)){ bv=v; best=i; } });
+    const distinct=new Set(vals.filter(v=>isFinite(v)));
+    if(distinct.size<2) best=-1;
   }
-  return `<tr><td>${label}</td><td class="${ca}">${fmt(va)}</td><td class="${cb}">${fmt(vb)}</td></tr>`;
+  const tds=vals.map((v,i)=>`<td class="${i===best?'ab-cmp-better':''}">${fmt(v)}</td>`).join('');
+  return `<tr><td>${label}</td>${tds}</tr>`;
 }
 function renderABTest(from,to){
-  const A=abPagina(from,to,'A'), B=abPagina(from,to,'B');
+  const U=HAS_UTM;
+  // calcula todas as páginas e mantém só as que têm presença no período (mídia, vendas ou campanhas)
+  const all=['A','B','C'].map(p=>abPagina(from,to,p));
+  let list=all.filter(p=> p.m.inv>0 || p.nVendas>0 || p.nOB>0 || p.camps.length>0);
+  if(!list.length) list=all.slice(0,2); // fallback: ao menos A e B
+  const nome=p=>'Página '+p;
   const orphans=SALES.filter(s=>inRange(s.data,from,to)&&!s.isOB&&(s.utmCampaign||'').trim()==='').length;
-  // vencedor
-  let winner=null, winLabel='';
-  if(HAS_UTM && (A.roas>0||B.roas>0)){ winner=A.roas>=B.roas?'A':'B'; winLabel='Melhor ROAS'; }
-  else if((A.m.cpc>0)||(B.m.cpc>0)){ winner=((A.m.cpc||1e12)<=(B.m.cpc||1e12))?'A':'B'; winLabel='Menor CPC'; }
+
+  // vencedor entre as páginas presentes
+  let winIdx=-1, winLabel='';
+  if(U && list.some(p=>p.roas>0)){ winLabel='Melhor ROAS'; let bv=-1; list.forEach((p,i)=>{ if(p.roas>bv){bv=p.roas;winIdx=i;} }); }
+  else if(list.some(p=>p.m.cpc>0)){ winLabel='Menor CPC'; let bv=1e12; list.forEach((p,i)=>{ const c=p.m.cpc||1e12; if(c<bv){bv=c;winIdx=i;} }); }
+
   // veredito
   let verdict;
-  if(A.m.inv===0 && B.m.inv===0){ verdict='Sem investimento de mídia no período selecionado para nenhuma das páginas.'; }
-  else if(HAS_UTM){
-    const wt=winner==='A'?'Página A':'Página B';
-    verdict=`Comparando por ROAS: <b>Página A ${fmtROAS(A.roas)}</b> · <b>Página B ${fmtROAS(B.roas)}</b> → <span class="win">${wt} está performando melhor</span>. `
-      +`Investimento A ${fmtBRL(A.m.inv)} · B ${fmtBRL(B.m.inv)}. Vendas A ${fmtInt(A.nVendas)} · B ${fmtInt(B.nVendas)}.`
+  if(!list.some(p=>p.m.inv>0)){ verdict='Sem investimento de mídia no período selecionado para nenhuma das páginas.'; }
+  else if(U){
+    const roasStr=list.map(p=>`<b>${nome(p.pag)} ${fmtROAS(p.roas)}</b>`).join(' · ');
+    const invStr=list.map(p=>`${p.pag} ${fmtBRL(p.m.inv)}`).join(' · ');
+    const vendStr=list.map(p=>`${p.pag} ${fmtInt(p.nVendas)}`).join(' · ');
+    const wt=winIdx>-1?nome(list[winIdx].pag):'—';
+    verdict=`Comparando por ROAS: ${roasStr} → <span class="win">${wt} está performando melhor</span>. `
+      +`Investimento ${invStr}. Vendas ${vendStr}.`
       +(orphans?` <span style="color:rgba(255,255,255,.5)">(${orphans} venda${orphans>1?'s':''} sem UTM não atribuída${orphans>1?'s':''} a nenhuma página.)</span>`:'');
   } else {
-    const wt=winner==='A'?'Página A':'Página B';
-    verdict=`As vendas não têm UTM, então só comparo a <b>mídia</b>. Por CPC: <b>A ${fmtBRL(A.m.cpc)}</b> · <b>B ${fmtBRL(B.m.cpc)}</b> → <span class="win">${wt} mais eficiente</span>. Investimento A ${fmtBRL(A.m.inv)} · B ${fmtBRL(B.m.inv)}.`;
+    const cpcStr=list.map(p=>`<b>${p.pag} ${fmtBRL(p.m.cpc)}</b>`).join(' · ');
+    const invStr=list.map(p=>`${p.pag} ${fmtBRL(p.m.inv)}`).join(' · ');
+    const wt=winIdx>-1?nome(list[winIdx].pag):'—';
+    verdict=`As vendas não têm UTM, então só comparo a <b>mídia</b>. Por CPC: ${cpcStr} → <span class="win">${wt} mais eficiente</span>. Investimento ${invStr}.`;
   }
-  const U=HAS_UTM;
+
+  // tabela comparativa dinâmica (uma coluna por página)
+  const heads=list.map(p=>`<th>${nome(p.pag)}</th>`).join('');
+  const col=g=>list.map(g);
+  const rows=[
+    abCmpRow('Investimento',col(p=>p.m.inv),'neutral',fmtBRL),
+    abCmpRow('Faturamento',col(p=>U?p.fat:NaN),'hi',v=>U?fmtBRL(v):'—'),
+    abCmpRow('Vendas',col(p=>U?p.nVendas:NaN),'hi',v=>U?fmtInt(v):'—'),
+    abCmpRow('ROAS',col(p=>U?p.roas:NaN),'hi',v=>U?fmtROAS(v):'—'),
+    abCmpRow('CAC',col(p=>U?p.cac:NaN),'lo',v=>U?fmtBRL(v):'—'),
+    abCmpRow('Ticket Médio',col(p=>U?p.ticket:NaN),'hi',v=>U?fmtBRL(v):'—'),
+    abCmpRow('Cliques',col(p=>p.m.cliques),'hi',fmtInt),
+    abCmpRow('CTR',col(p=>p.m.ctr),'hi',fmtPct),
+    abCmpRow('CPC',col(p=>p.m.cpc),'lo',fmtBRL),
+    abCmpRow('CPM',col(p=>p.m.cpm),'lo',fmtBRL),
+    abCmpRow('Page View',col(p=>p.m.pv),'hi',fmtInt),
+    abCmpRow('Checkout',col(p=>p.m.ck),'hi',fmtInt),
+    abCmpRow('Page View → Checkout',col(p=>p.txPVck),'hi',fmtPct),
+    abCmpRow('Checkout → Venda',col(p=>U?p.txCkVenda:NaN),'hi',v=>U?fmtPct(v):'—'),
+  ].join('');
   const cmp=`<div class="sec-title">Comparativo lado a lado</div>
     <div class="tbl-wrap"><table>
-      <thead><tr><th>Métrica</th><th>Página A</th><th>Página B</th></tr></thead>
-      <tbody>
-        ${abCmpRow('Investimento',A.m.inv,B.m.inv,'neutral',fmtBRL)}
-        ${abCmpRow('Faturamento',U?A.fat:NaN,U?B.fat:NaN,'hi',v=>U?fmtBRL(v):'—')}
-        ${abCmpRow('Vendas',U?A.nVendas:NaN,U?B.nVendas:NaN,'hi',v=>U?fmtInt(v):'—')}
-        ${abCmpRow('ROAS',U?A.roas:NaN,U?B.roas:NaN,'hi',v=>U?fmtROAS(v):'—')}
-        ${abCmpRow('CAC',U?A.cac:NaN,U?B.cac:NaN,'lo',v=>U?fmtBRL(v):'—')}
-        ${abCmpRow('Ticket Médio',U?A.ticket:NaN,U?B.ticket:NaN,'hi',v=>U?fmtBRL(v):'—')}
-        ${abCmpRow('Cliques',A.m.cliques,B.m.cliques,'hi',fmtInt)}
-        ${abCmpRow('CTR',A.m.ctr,B.m.ctr,'hi',fmtPct)}
-        ${abCmpRow('CPC',A.m.cpc,B.m.cpc,'lo',fmtBRL)}
-        ${abCmpRow('CPM',A.m.cpm,B.m.cpm,'lo',fmtBRL)}
-        ${abCmpRow('Page View',A.m.pv,B.m.pv,'hi',fmtInt)}
-        ${abCmpRow('Checkout',A.m.ck,B.m.ck,'hi',fmtInt)}
-        ${abCmpRow('Page View → Checkout',A.txPVck,B.txPVck,'hi',fmtPct)}
-        ${abCmpRow('Checkout → Venda',U?A.txCkVenda:NaN,U?B.txCkVenda:NaN,'hi',v=>U?fmtPct(v):'—')}
-      </tbody>
+      <thead><tr><th>Métrica</th>${heads}</tr></thead>
+      <tbody>${rows}</tbody>
     </table></div>`;
+
   document.getElementById('ab-body').innerHTML=
     `<div class="ab-verdict">${verdict}</div>
-     <div class="ab-wrap">${abCard(A,winner==='A',winLabel)}${abCard(B,winner==='B',winLabel)}</div>
+     <div class="ab-wrap">${list.map((p,i)=>abCard(p,i===winIdx,winLabel)).join('')}</div>
      ${cmp}`;
 }
 
