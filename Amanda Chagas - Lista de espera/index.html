@@ -118,6 +118,7 @@ body{background:
 .st.off{background:rgba(255,255,255,.07);color:var(--muted)}
 .tag-pub{display:inline-block;font-size:10px;font-weight:600;letter-spacing:.3px;padding:3px 10px;border-radius:20px;margin-bottom:13px}
 .tag-pub.quente{color:var(--orange);background:rgba(255,107,43,.12);border:1px solid rgba(255,107,43,.32)}
+.tag-pub.morno{color:var(--amber);background:rgba(255,183,55,.12);border:1px solid rgba(255,183,55,.32)}
 .tag-pub.frio{color:var(--cool);background:rgba(122,162,247,.12);border:1px solid rgba(122,162,247,.3)}
 .ec-lead{display:flex;align-items:baseline;gap:8px;margin-bottom:13px}
 .ec-lead .big{font-family:'DM Mono';font-size:28px;font-weight:500;color:var(--orange);line-height:1}
@@ -298,6 +299,10 @@ tr.total td{font-weight:600;background:rgba(255,255,255,.04);border-top:1px soli
       <div class="sec-title" id="cri-head-quente">🔥 Criativos — Público Quente</div>
       <div class="cards-grid" id="cri-cards-quente"></div>
     </div>
+    <div id="cri-block-morno" style="margin-top:26px">
+      <div class="sec-title" id="cri-head-morno">🌤️ Criativos — Público Morno</div>
+      <div class="cards-grid" id="cri-cards-morno"></div>
+    </div>
     <div id="cri-block-frio" style="margin-top:26px">
       <div class="sec-title" id="cri-head-frio">❄️ Criativos — Público Frio</div>
       <div class="cards-grid" id="cri-cards-frio"></div>
@@ -456,7 +461,7 @@ function renderCharts(f){
   });
 
   var byP=aggBy(f,'publico'), pubs=Object.entries(byP).sort(function(a,b){return b[1].lead-a[1].lead;});
-  var pcol=pubs.map(function(e){return /quente/i.test(e[0])?'#ff6b2b':'#ffb737';});
+  var pcol=pubs.map(function(e){return /quente/i.test(e[0])?'#ff6b2b':/morno/i.test(e[0])?'#ffb737':'#7aa2f7';});
   destroy('ch-pub');
   charts['ch-pub']=new Chart(document.getElementById('ch-pub'),{
     type:'doughnut',
@@ -480,8 +485,9 @@ function buildAdCard(name,d,on){
 }
 function buildConjCard(name,d,on,totSpend){
   var ctr=d.impr?d.clk/d.impr*100:0, cpc=d.clk?d.spend/d.clk:0, cpl=d.lead?d.spend/d.lead:0, pct=totSpend?d.spend/totSpend*100:0;
-  var quente=/quente/i.test(d.publico);
-  var pub=d.publico?'<span class="tag-pub '+(quente?'quente':'frio')+'">'+(quente?'🔥 ':'❄ ')+d.publico+'</span>':'';
+  var cls=/quente/i.test(d.publico)?'quente':/morno/i.test(d.publico)?'morno':'frio';
+  var ico=cls==='quente'?'🔥 ':cls==='morno'?'🌤️ ':'❄ ';
+  var pub=d.publico?'<span class="tag-pub '+cls+'">'+ico+d.publico+'</span>':'';
   return '<div class="ecard '+(on?'on':'off')+'">'+
     '<div class="ec-head"><div class="ec-name">'+name+'</div>'+stBadge(on)+'</div>'+pub+
     '<div class="ec-lead"><span class="big num">'+fN(d.lead)+'</span><span class="cap">leads</span></div>'+
@@ -533,13 +539,15 @@ function renderCriBlock(blockId,gridId,headId,label,arr){
 }
 function renderCriativos(f){
   var eQ=criEntries(f.filter(function(r){return /quente/i.test(r.publico);}));
+  var eM=criEntries(f.filter(function(r){return /morno/i.test(r.publico);}));
   var eF=criEntries(f.filter(function(r){return /frio/i.test(r.publico);}));
-  var all=eQ.concat(eF);
+  var all=eQ.concat(eM).concat(eF);
   var nOn=all.filter(function(x){return x.on;}).length;
   buildFilterBar('cri-filter','cri',nOn,all.length-nOn,[['leads','Leads'],['invest','Investimento'],['cpl','Custo/Lead'],['ctr','CTR'],['cliques','Cliques']]);
   var sQ=renderCriBlock('cri-block-quente','cri-cards-quente','cri-head-quente','🔥 Criativos — Público Quente',eQ);
+  var sM=renderCriBlock('cri-block-morno','cri-cards-morno','cri-head-morno','🌤️ Criativos — Público Morno',eM);
   var sF=renderCriBlock('cri-block-frio','cri-cards-frio','cri-head-frio','❄️ Criativos — Público Frio',eF);
-  document.getElementById('cri-empty').style.display=(sQ||sF)?'none':'';
+  document.getElementById('cri-empty').style.display=(sQ||sM||sF)?'none':'';
 }
 function renderConjuntos(f){
   var by=aggBy(f,'adset'), totSpend=totals(f).spend;
