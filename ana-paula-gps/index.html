@@ -147,7 +147,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
 
 <div id="trafego" class="content active">
   <div class="kpi-grid" id="traf-kpis"></div>
-  <div class="ob-info">Sem colunas de UTM na planilha de vendas: por definição do gestor, todas as vendas aprovadas são atribuídas ao tráfego pago (Meta Ads). ✅ = tráfego pago.</div>
+  <div class="ob-info">Sem colunas de UTM na planilha de vendas: por definição do gestor, todas as vendas aprovadas são atribuídas ao tráfego pago (Meta Ads). ✅ = tráfego pago. Custo/Visualização e Custo/Finalização em % do preço do produto (R$ 67) — metas: ≤ 4% e ≤ 23% (verde).</div>
   <div class="sec-title">Compradores</div>
   <div class="sale-cards" id="traf-sales"></div>
 </div>
@@ -156,7 +156,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
   <div class="kpi-grid" id="visao-kpis"></div>
   <div class="funil-section">
     <div class="chart-card">
-      <h4>Funil de Conversão (Meta)</h4>
+      <h4>Funil de Conversão</h4>
       <div id="funil-bars"></div>
     </div>
     <div class="chart-card">
@@ -229,6 +229,11 @@ const CONFIG = {
   PRODUTO_NOME:         'planner digital do gestor escolar',
   PRODUTO_PRECO_MINIMO: 0,
 
+  // Preço do produto e metas de custo (% sobre o preço)
+  PRODUTO_PRECO:  67,   // valor do produto em reais
+  META_CPV_PCT:   4,    // custo por visualização ≤ 4% do preço = verde
+  META_CPF_PCT:   23,   // custo por finalização  ≤ 23% do preço = verde
+
   // Sem agrupamento de OB nesta exportação Voompay (cada linha = 1 venda)
   USA_TX_ROOT: false,
   VALORES_EM_CENTAVOS: false,
@@ -253,7 +258,7 @@ const CONFIG = {
     inv:      1,   // Spend
     cliques:  2,   // Action Link Clicks
     pv:       3,   // Landing Page View
-    ck:       4,   // Initiated Checkout
+    ck:       4,   // Initiated Checkout (finalização)
     purch:    5,   // Omni Purchase (Meta)
     adset:    6,   // Adset Name
     ad:       7,   // Ad Name
@@ -267,6 +272,7 @@ const CONFIG = {
 };
 
 const SHEET_ID = CONFIG.SHEET_ID, G = CONFIG.G, V = CONFIG.V;
+const PRECO = CONFIG.PRODUTO_PRECO;
 
 // ─── Estado global ───────────────────────────────────────────────────
 let GROWS = [];   // linhas brutas do Gerenciador (objetos)
@@ -316,6 +322,8 @@ const fmtInt=n=>(n||0).toLocaleString('pt-BR');
 const fmtPct=n=>(n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%';
 const dash=(v,fn)=> (v&&v!==0)? fn(v) : '—';
 const brDate=d=>{ if(!d) return '—'; const p=d.split('-'); return p[2]+'/'+p[1]+'/'+p[0].slice(2); };
+// custo (menor é melhor): ≤ meta = verde, acima = vermelho
+const costCls=(pct,meta)=> pct>0 ? (pct<=meta?'green':'red') : '';
 
 async function fetchSheetCSV(sheetName){
   const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
@@ -462,7 +470,9 @@ function aggregate(g,s){
   const fat=s.reduce((a,b)=>a+b.fatTotal,0);
   const fatOB=s.reduce((a,b)=>a+b.fatOB,0);
   const obCount=s.filter(x=>x.hasOB).length;
-  const vendas=s.length;
+  const vendas=s.length;   // vendas reais (planilha Vendas)
+  const cpv=pv>0? inv/pv : 0;          // custo por visualização (page view)
+  const cpf=ck>0? inv/ck : 0;          // custo por finalização (checkout iniciado)
   return {
     inv,cliques,imp,pv,ck,purchMeta,reach,fat,fatOB,obCount,vendas,
     roas: inv>0? fat/inv : 0,
@@ -471,6 +481,10 @@ function aggregate(g,s){
     cpc: cliques>0? inv/cliques : 0,
     cpm: imp>0? inv/imp*1000 : 0,
     ctr: imp>0? cliques/imp*100 : 0,
+    cpv, cpf,
+    cpvPct: cpv>0? cpv/PRECO*100 : 0,    // custo/visualização em % do preço
+    cpfPct: cpf>0? cpf/PRECO*100 : 0,    // custo/finalização em % do preço
+    convPagina: pv>0? vendas/pv*100 : 0, // taxa conversão de página (vendas reais / pageview)
   };
 }
 function kpi(label,value,cls,sub){
@@ -490,6 +504,9 @@ function renderTrafego(t,sales){
   h+=kpi('Fat. OB Tráfego',dash(t.fatOB,fmtMoney),'');
   h+=kpi('CAC',dash(t.cac,fmtMoney),'yellow');
   h+=kpi('Ticket Médio',dash(t.ticket,fmtMoney),'');
+  h+=kpi('Custo/Visualização (% do produto)',dash(t.cpvPct,fmtPct),costCls(t.cpvPct,CONFIG.META_CPV_PCT),`Meta ≤ ${CONFIG.META_CPV_PCT}% · ${dash(t.cpv,fmtMoney)}/PV`);
+  h+=kpi('Custo/Finalização (% do produto)',dash(t.cpfPct,fmtPct),costCls(t.cpfPct,CONFIG.META_CPF_PCT),`Meta ≤ ${CONFIG.META_CPF_PCT}% · ${dash(t.cpf,fmtMoney)}/checkout`);
+  h+=kpi('Conv. Página',dash(t.convPagina,fmtPct),'green','vendas reais / page view');
   h+=kpi('Cliques',fmtInt(t.cliques),'');
   h+=kpi('Impressões',fmtInt(t.imp),'');
   h+=kpi('CPC',dash(t.cpc,fmtMoney),'');
@@ -520,10 +537,13 @@ function renderVisao(t,g,s){
   h+=kpi('Orgânicas','0','');
   h+=kpi('Ticket Médio',dash(t.ticket,fmtMoney),'');
   h+=kpi('CAC Total',dash(t.cac,fmtMoney),'yellow');
+  h+=kpi('Custo/Visualização (% do produto)',dash(t.cpvPct,fmtPct),costCls(t.cpvPct,CONFIG.META_CPV_PCT),`Meta ≤ ${CONFIG.META_CPV_PCT}%`);
+  h+=kpi('Custo/Finalização (% do produto)',dash(t.cpfPct,fmtPct),costCls(t.cpfPct,CONFIG.META_CPF_PCT),`Meta ≤ ${CONFIG.META_CPF_PCT}%`);
+  h+=kpi('Conv. Página',dash(t.convPagina,fmtPct),'green','vendas reais / page view');
   document.getElementById('visao-kpis').innerHTML=h;
 
-  // Funil Cliques → PV → Checkout → Compras (Meta)
-  const steps=[['Cliques',t.cliques],['Page Views',t.pv],['Checkouts',t.ck],['Compras (Meta)',t.purchMeta]];
+  // Funil Cliques → PV → Checkout → Compras (vendas reais)
+  const steps=[['Cliques',t.cliques],['Page Views',t.pv],['Checkouts',t.ck],['Compras (reais)',t.vendas]];
   const max=Math.max(...steps.map(x=>x[1]),1);
   document.getElementById('funil-bars').innerHTML=steps.map(([l,v])=>`
     <div class="funil-bar-wrap">
@@ -535,23 +555,30 @@ function renderVisao(t,g,s){
     <div class="taxa-item"><span>CTR (Cliques/Impr.)</span><span class="taxa-val">${fmtPct(t.ctr)}</span></div>
     <div class="taxa-item"><span>Cliques → PV</span><span class="taxa-val">${fmtPct(tx(t.pv,t.cliques))}</span></div>
     <div class="taxa-item"><span>PV → Checkout</span><span class="taxa-val">${fmtPct(tx(t.ck,t.pv))}</span></div>
-    <div class="taxa-item"><span>Checkout → Compra</span><span class="taxa-val">${fmtPct(tx(t.purchMeta,t.ck))}</span></div>`;
+    <div class="taxa-item"><span>Conv. Página (Venda/PV)</span><span class="taxa-val">${fmtPct(t.convPagina)}</span></div>
+    <div class="taxa-item"><span>Checkout → Venda</span><span class="taxa-val">${fmtPct(tx(t.vendas,t.ck))}</span></div>`;
 
   // Dia a dia
   const days={};
-  g.forEach(d=>{ (days[d.data]=days[d.data]||{inv:0,fat:0,v:0}).inv+=d.inv; });
-  s.forEach(x=>{ const o=(days[x.data]=days[x.data]||{inv:0,fat:0,v:0}); o.fat+=x.fatTotal; o.v+=1; });
+  g.forEach(d=>{ const o=(days[d.data]=days[d.data]||{inv:0,fat:0,v:0,pv:0,ck:0}); o.inv+=d.inv; o.pv+=d.pv; o.ck+=d.ck; });
+  s.forEach(x=>{ const o=(days[x.data]=days[x.data]||{inv:0,fat:0,v:0,pv:0,ck:0}); o.fat+=x.fatTotal; o.v+=1; });
   const keys=Object.keys(days).sort((a,b)=>b.localeCompare(a));
-  let rows=`<thead><tr><th>Data</th><th>Invest.</th><th>Fat. Total</th><th>ROAS</th><th>Compras</th><th>Tráfego</th><th>Orgânicas</th><th>Ticket Médio</th><th>CAC</th></tr></thead><tbody>`;
+  let rows=`<thead><tr><th>Data</th><th>Invest.</th><th>Fat. Total</th><th>ROAS</th><th>Vendas</th><th>Conv. Pág.</th><th>Custo/Vis. %</th><th>Custo/Final. %</th><th>Ticket</th><th>CAC</th></tr></thead><tbody>`;
   keys.forEach(k=>{
     const o=days[k]; const roas=o.inv>0?o.fat/o.inv:0;
     const ticket=o.v>0?o.fat/o.v:0; const cac=o.v>0?o.inv/o.v:0;
+    const cpvP=o.pv>0?(o.inv/o.pv)/PRECO*100:0;
+    const cpfP=o.ck>0?(o.inv/o.ck)/PRECO*100:0;
+    const convP=o.pv>0?o.v/o.pv*100:0;
     rows+=`<tr><td>${brDate(k)}</td><td>${fmtMoney(o.inv)}</td><td>${fmtMoney(o.fat)}</td>
       <td class="${roas>=1?'green':'red'}">${o.fat>0?roas.toFixed(2):'—'}</td>
-      <td>${fmtInt(o.v)}</td><td>${fmtInt(o.v)}</td><td>0</td>
+      <td>${fmtInt(o.v)}</td>
+      <td>${o.pv>0?fmtPct(convP):'—'}</td>
+      <td class="${costCls(cpvP,CONFIG.META_CPV_PCT)}">${o.pv>0?fmtPct(cpvP):'—'}</td>
+      <td class="${costCls(cpfP,CONFIG.META_CPF_PCT)}">${o.ck>0?fmtPct(cpfP):'—'}</td>
       <td>${o.v>0?fmtMoney(ticket):'—'}</td><td>${o.v>0?fmtMoney(cac):'—'}</td></tr>`;
   });
-  if(!keys.length) rows+=`<tr><td colspan="9" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados no período.</td></tr>`;
+  if(!keys.length) rows+=`<tr><td colspan="10" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados no período.</td></tr>`;
   rows+='</tbody>';
   document.getElementById('visao-tbl').innerHTML=rows;
 }
@@ -572,7 +599,14 @@ function buildCriPubMaps(from,to){
     const o=pub[k]||(pub[k]={adset:k,inv:0,imp:0,cliques:0,pv:0,ck:0,purch:0,reach:0});
     o.inv+=d.inv;o.imp+=d.imp;o.cliques+=d.cliques;o.pv+=d.pv;o.ck+=d.ck;o.purch+=d.purch;o.reach+=d.reach;
   });
-  const finish=o=>{o.ctr=o.imp>0?o.cliques/o.imp*100:0;o.cpc=o.cliques>0?o.inv/o.cliques:0;o.cpm=o.imp>0?o.inv/o.imp*1000:0;o.ativo=true;return o;};
+  const finish=o=>{
+    o.ctr=o.imp>0?o.cliques/o.imp*100:0;
+    o.cpc=o.cliques>0?o.inv/o.cliques:0;
+    o.cpm=o.imp>0?o.inv/o.imp*1000:0;
+    o.cpvPct=o.pv>0?(o.inv/o.pv)/PRECO*100:0;
+    o.cpfPct=o.ck>0?(o.inv/o.ck)/PRECO*100:0;
+    o.ativo=true;return o;
+  };
   window._CRI=Object.values(cri).map(finish);
   window._PUB=Object.values(pub).map(finish);
   renderCriativos(); renderPublicos();
@@ -602,18 +636,18 @@ function renderCriativos(){
       </div>
       <div class="cri-metrics">
         <div class="cri-metric"><span class="cri-metric-label">Invest.</span><span class="cri-metric-val hl">${fmtMoney(c.inv)}</span></div>
-        <div class="cri-metric"><span class="cri-metric-label">Compras</span><span class="cri-metric-val">${fmtInt(c.purch)}</span></div>
+        <div class="cri-metric"><span class="cri-metric-label">Compras (Meta)</span><span class="cri-metric-val">${fmtInt(c.purch)}</span></div>
         <div class="cri-metric"><span class="cri-metric-label">CTR</span><span class="cri-metric-val">${fmtPct(c.ctr)}</span></div>
         <div class="cri-metric"><span class="cri-metric-label">CPC</span><span class="cri-metric-val">${dash(c.cpc,fmtMoney)}</span></div>
-        <div class="cri-metric"><span class="cri-metric-label">Impressões</span><span class="cri-metric-val">${fmtInt(c.imp)}</span></div>
-        <div class="cri-metric"><span class="cri-metric-label">Cliques</span><span class="cri-metric-val">${fmtInt(c.cliques)}</span></div>
+        <div class="cri-metric"><span class="cri-metric-label">Custo/Vis. %</span><span class="cri-metric-val ${costCls(c.cpvPct,CONFIG.META_CPV_PCT)}">${dash(c.cpvPct,fmtPct)}</span></div>
+        <div class="cri-metric"><span class="cri-metric-label">Custo/Final. %</span><span class="cri-metric-val ${costCls(c.cpfPct,CONFIG.META_CPF_PCT)}">${dash(c.cpfPct,fmtPct)}</span></div>
       </div>
       ${c.link?`<a class="cri-link" href="${c.link}" target="_blank">🔗 ${c.link}</a>`:''}
     </div>`).join('');
 
-  let t=`<thead><tr><th>Anúncio</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>CPM</th><th>PV</th><th>Checkout</th><th>Compras</th></tr></thead><tbody>`;
-  arr.forEach(c=>{t+=`<tr><td>${c.ad}</td><td>${fmtMoney(c.inv)}</td><td>${fmtInt(c.imp)}</td><td>${fmtInt(c.cliques)}</td><td>${fmtPct(c.ctr)}</td><td>${dash(c.cpc,fmtMoney)}</td><td>${dash(c.cpm,fmtMoney)}</td><td>${fmtInt(c.pv)}</td><td>${fmtInt(c.ck)}</td><td>${fmtInt(c.purch)}</td></tr>`;});
-  if(!arr.length) t+=`<tr><td colspan="10" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados.</td></tr>`;
+  let t=`<thead><tr><th>Anúncio</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Custo/Vis. %</th><th>Custo/Final. %</th><th>PV</th><th>Checkout</th><th>Compras</th></tr></thead><tbody>`;
+  arr.forEach(c=>{t+=`<tr><td>${c.ad}</td><td>${fmtMoney(c.inv)}</td><td>${fmtInt(c.imp)}</td><td>${fmtInt(c.cliques)}</td><td>${fmtPct(c.ctr)}</td><td>${dash(c.cpc,fmtMoney)}</td><td class="${costCls(c.cpvPct,CONFIG.META_CPV_PCT)}">${dash(c.cpvPct,fmtPct)}</td><td class="${costCls(c.cpfPct,CONFIG.META_CPF_PCT)}">${dash(c.cpfPct,fmtPct)}</td><td>${fmtInt(c.pv)}</td><td>${fmtInt(c.ck)}</td><td>${fmtInt(c.purch)}</td></tr>`;});
+  if(!arr.length) t+=`<tr><td colspan="11" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados.</td></tr>`;
   t+='</tbody>';
   document.getElementById('cri-tbl').innerHTML=t;
 }
@@ -629,15 +663,15 @@ function renderPublicos(){
         <div class="pub-metric"><div class="pub-metric-val">${fmtMoney(p.inv)}</div><div class="pub-metric-lbl">Invest.</div></div>
         <div class="pub-metric"><div class="pub-metric-val neutral">${fmtPct(p.ctr)}</div><div class="pub-metric-lbl">CTR</div></div>
         <div class="pub-metric"><div class="pub-metric-val neutral">${fmtInt(p.purch)}</div><div class="pub-metric-lbl">Compras</div></div>
-        <div class="pub-metric"><div class="pub-metric-val neutral">${fmtInt(p.cliques)}</div><div class="pub-metric-lbl">Cliques</div></div>
-        <div class="pub-metric"><div class="pub-metric-val neutral">${fmtInt(p.imp)}</div><div class="pub-metric-lbl">Impr.</div></div>
+        <div class="pub-metric"><div class="pub-metric-val ${costCls(p.cpvPct,CONFIG.META_CPV_PCT)}">${dash(p.cpvPct,fmtPct)}</div><div class="pub-metric-lbl">Custo/Vis. %</div></div>
+        <div class="pub-metric"><div class="pub-metric-val ${costCls(p.cpfPct,CONFIG.META_CPF_PCT)}">${dash(p.cpfPct,fmtPct)}</div><div class="pub-metric-lbl">Custo/Final. %</div></div>
         <div class="pub-metric"><div class="pub-metric-val neutral">${dash(p.cpc,fmtMoney)}</div><div class="pub-metric-lbl">CPC</div></div>
       </div>
     </div>`).join('');
 
-  let t=`<thead><tr><th>Conjunto</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Compras</th></tr></thead><tbody>`;
-  arr.forEach(p=>{t+=`<tr><td>${p.adset}</td><td>${fmtMoney(p.inv)}</td><td>${fmtInt(p.imp)}</td><td>${fmtInt(p.cliques)}</td><td>${fmtPct(p.ctr)}</td><td>${dash(p.cpc,fmtMoney)}</td><td>${dash(p.cpm,fmtMoney)}</td><td>${fmtInt(p.purch)}</td></tr>`;});
-  if(!arr.length) t+=`<tr><td colspan="8" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados.</td></tr>`;
+  let t=`<thead><tr><th>Conjunto</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Custo/Vis. %</th><th>Custo/Final. %</th><th>Compras</th></tr></thead><tbody>`;
+  arr.forEach(p=>{t+=`<tr><td>${p.adset}</td><td>${fmtMoney(p.inv)}</td><td>${fmtInt(p.imp)}</td><td>${fmtInt(p.cliques)}</td><td>${fmtPct(p.ctr)}</td><td>${dash(p.cpc,fmtMoney)}</td><td class="${costCls(p.cpvPct,CONFIG.META_CPV_PCT)}">${dash(p.cpvPct,fmtPct)}</td><td class="${costCls(p.cpfPct,CONFIG.META_CPF_PCT)}">${dash(p.cpfPct,fmtPct)}</td><td>${fmtInt(p.purch)}</td></tr>`;});
+  if(!arr.length) t+=`<tr><td colspan="9" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados.</td></tr>`;
   t+='</tbody>';
   document.getElementById('pub-tbl').innerHTML=t;
 }
