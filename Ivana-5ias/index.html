@@ -166,25 +166,36 @@ const CONFIG = {
   CLIENTE:          'Ivana Souza',
   PRODUTO:          '5 IAs',
   ANO:              '2026',
+
   SHEET_ID:         '1w4oXdwI3s-Z_LpBCIsqW0Ctt1ekNcTyWir9W-4rr6J8',
   GERENCIADOR_SHEET:'Gerenciador',
   WEBHOOK_SHEET:    'Webhook',
   DATA_MINIMA:      '2026-06-22',
-  PRODUTO_NOME:         '5 ia',
+
+  PRODUTO_NOME:         '5 ia',      // col Produto contém isto (case-insensitive) — pega "5 IA's"
   PRODUTO_PRECO_MINIMO: 0,
-  USA_TX_ROOT: true,
-  VALORES_EM_CENTAVOS: false,
-  AUTO_REFRESH_MS: 2 * 60 * 60 * 1000,
+
+  USA_TX_ROOT: true,                 // planilha tem transaction_root
+  VALORES_EM_CENTAVOS: false,        // Faturado em reais (Hotmart). true só se for centavos (Kiwify)
+
+  AUTO_REFRESH_MS: 2 * 60 * 60 * 1000,  // atualização automática a cada 2h
+
+  // Colunas do Webhook (0-based)
   W: {
     data:0, produto:1, status:3, cliente:4, email:5,
     fatTotal:6, fatPrincipal:7, fatOB:8, txRoot:9, tipo:10, src:11,
     utmSource:12, utmMedium:13, utmCampaign:14, utmContent:15,
   },
+
+  // Colunas do Gerenciador (0-based) — padrão Stract
   G: {
     date:0, campaign:1, adset:2, ad:3, link:4, inv:5, reach:6, imp:7,
     cliques:8, pv:9, ck:10, statusCampaign:11, statusAdset:12, statusAd:13,
   },
+
   STATUS_APROVADO: ['APPROVED','COMPLETE','CONFIRMED','PAGO','PAID','APROVADO'],
+
+  // Classificação QUENTE x FRIO pelo nome do conjunto de anúncios
   QUENTE_KEYS: ['rmkt','remarket','quente','engaj','envolv','retarget','aquec',
                 'lookalike','lal','visitante','base','seguidor'],
 };
@@ -198,12 +209,14 @@ document.addEventListener('DOMContentLoaded',()=>{
   const s=document.getElementById('brand-subtitle'); if(s)s.textContent='Dashboard de Performance — Perpétuo · Jamelli GT · '+CONFIG.ANO;
 });
 
+// ─────────────────────────── ESTADO GLOBAL ───────────────────────────
 let GROWS=[], SALES=[], DIAS=[];
 let curFrom=null, curTo=null;
 let criStatusFilter='todos', criSortKey='inv', criAudFilter='todos';
 let pubAudFilter='todos', pubSortKey='inv';
 const CHARTS={};
 
+// ─────────────────────────── HELPERS ───────────────────────────
 function classAud(name){
   const n=(name||'').toLowerCase();
   return CONFIG.QUENTE_KEYS.some(k=>n.includes(k))?'quente':'frio';
@@ -217,18 +230,22 @@ function num(v){
   const f=parseFloat(s.replace(/[^0-9.\-]/g,''));
   return isNaN(f)?0:f;
 }
+// Normaliza qualquer formato de data para AAAA-MM-DD
 function normDate(v){
   let s=String(v||'').trim();
   if(!s) return '';
-  s=s.split(' ')[0].split('T')[0];
-  let m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/); if(m) return s;
-  m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  s=s.split(' ')[0].split('T')[0];           // remove hora
+  let m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/); if(m) return s;                    // AAAA-MM-DD
+  m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);                          // DD-MM-AAAA / DD/MM/AAAA
   if(m) return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
-  m=s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  m=s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);                          // AAAA/MM/DD
   if(m) return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
   return s.slice(0,10);
 }
-function money(v){ if(!v) return '—'; return 'R$ '+v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function money(v){
+  if(!v) return '—';
+  return 'R$ '+v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
 function int(v){ return (v||0).toLocaleString('pt-BR'); }
 function pct(v){ if(!isFinite(v)||!v) return '—'; return v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%'; }
 function roas(v){ if(!isFinite(v)||!v) return '—'; return v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'x'; }
@@ -238,11 +255,32 @@ function rowActive(r){
   if(isPaused(sc)||isPaused(sa)||isPaused(sad)) return false;
   return (String(sc||'')!=='')||(String(sa||'')!=='')||(String(sad||'')!=='');
 }
+// Tráfego pago = string de rastreio contém "meta_ads" (a UTM/SRC pode trazer o tracking inteiro)
 const isTrafego=s=>{
   const t=String(s.track||s.utmSource||'').toLowerCase();
   return t.includes('meta_ads')||t.replace(/[\s_-]/g,'').includes('metaads');
 };
 
+function parseCSV(text){
+  const rows=[]; let row=[], field='', inq=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(inq){
+      if(c==='"'){ if(text[i+1]==='"'){field+='"';i++;} else inq=false; }
+      else field+=c;
+    } else {
+      if(c==='"') inq=true;
+      else if(c===','){ row.push(field); field=''; }
+      else if(c==='\n'){ row.push(field); rows.push(row); row=[]; field=''; }
+      else if(c==='\r'){}
+      else field+=c;
+    }
+  }
+  if(field!==''||row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+
+// Extrai o valor de uma célula gviz respeitando o tipo (número/data/texto)
 function cellVal(cell,col){
   if(cell==null) return '';
   const t=col&&col.type;
@@ -258,30 +296,33 @@ function cellVal(cell,col){
   return cell.v==null?(cell.f!=null?String(cell.f):''):String(cell.v);
 }
 
+// Leitura via JSONP (endpoint JSON do gviz) — funciona rodando o arquivo do PC (file://),
+// sem bloqueio de CORS que o endpoint CSV causa. Retorna [header, ...linhas].
 function fetchSheet(sheetName){
   return new Promise((resolve,reject)=>{
     const cb='gv_'+Math.random().toString(36).slice(2);
-    const url='https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/gviz/tq?tqx=out:json;responseHandler:'+cb+'&sheet='+encodeURIComponent(sheetName)+'&t='+Date.now();
+    const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:${cb}&sheet=${encodeURIComponent(sheetName)}&t=${Date.now()}`;
     const script=document.createElement('script');
     let done=false;
-    const to=setTimeout(()=>{if(!done){cleanup();reject(new Error('Tempo esgotado ao carregar "'+sheetName+'".'));}},25000);
+    const to=setTimeout(()=>{if(!done){cleanup();reject(new Error(`Tempo esgotado ao carregar "${sheetName}". Verifique a conexão e se a planilha está pública.`));}},25000);
     function cleanup(){ try{delete window[cb];}catch(e){window[cb]=undefined;} if(script.parentNode)script.parentNode.removeChild(script); clearTimeout(to); }
     window[cb]=function(resp){
       done=true;
       try{
-        if(!resp||resp.status==='error'||!resp.table) throw new Error('Planilha "'+sheetName+'" sem dados ou inacessível.');
+        if(!resp||resp.status==='error'||!resp.table) throw new Error(`Planilha "${sheetName}" sem dados ou inacessível.`);
         const cols=resp.table.cols||[];
         const header=cols.map(c=>c.label||'');
         const rows=(resp.table.rows||[]).map(r=>cols.map((col,i)=>cellVal(r.c?r.c[i]:null,col)));
         cleanup(); resolve([header,...rows]);
       }catch(e){ cleanup(); reject(e); }
     };
-    script.onerror=function(){ if(!done){cleanup(); reject(new Error('Falha ao acessar "'+sheetName+'". Verifique se a planilha está pública.'));} };
+    script.onerror=function(){ if(!done){cleanup(); reject(new Error(`Falha ao acessar "${sheetName}". Verifique se a planilha está como "Qualquer pessoa com o link".`));} };
     script.src=url;
     document.head.appendChild(script);
   });
 }
 
+// ─────────────────────── PROCESSAMENTO ───────────────────────
 function processSales(rows){
   const groups={};
   for(const r of rows){
@@ -303,9 +344,11 @@ function processSales(rows){
     for(const r of lines){
       const tipo=String(r[W.tipo]||'').toLowerCase();
       const prodMatch=String(r[W.produto]||'').toLowerCase().includes(CONFIG.PRODUTO_NOME);
+      // receita da linha: prefere "Faturado Total"; se vazio, usa principal+OB
       let lineRev=num(r[W.fatTotal]);
       if(!lineRev) lineRev=num(r[W.fatPrincipal])+num(r[W.fatOB]);
       lineRev/=cent;
+      // é order bump se o Tipo indicar OB, ou se a linha não for do produto principal
       const isOB=tipo.includes('order')||tipo.includes('bump')||tipo.includes('ob')
                  ||(!tipo.includes('principal')&&!prodMatch);
       if(isOB) fo+=lineRev;
@@ -335,7 +378,9 @@ function gRowsInRange(from,to){
     return true;
   });
 }
-function salesInRange(from,to){ return SALES.filter(s=>(!from||s.data>=from)&&(!to||s.data<=to)); }
+function salesInRange(from,to){
+  return SALES.filter(s=>(!from||s.data>=from)&&(!to||s.data<=to));
+}
 
 function aggG(rows){
   let inv=0,reach=0,imp=0,clk=0,pv=0,ck=0;
@@ -346,6 +391,7 @@ function aggG(rows){
   return {inv,reach,imp,clk,pv,ck};
 }
 
+// ─────────── CRIATIVOS / PÚBLICOS recalculados por período ───────────
 function buildCriPubMaps(from,to){
   const gr=gRowsInRange(from,to);
   const fSales=salesInRange(from,to);
@@ -382,11 +428,13 @@ function ctr(o){ return o.imp? o.clk/o.imp*100 : 0; }
 function cpc(o){ return o.clk? o.inv/o.clk : 0; }
 function cpm(o){ return o.imp? o.inv/o.imp*1000 : 0; }
 
+// ─────────────────────────── RENDER ───────────────────────────
 function render(){
   const from=curFrom,to=curTo;
   const gr=gRowsInRange(from,to);
   const sales=salesInRange(from,to);
   const g=aggG(gr);
+
   const trafego=sales.filter(isTrafego);
   const organico=sales.filter(s=>!isTrafego(s));
   const fatTraf=trafego.reduce((a,s)=>a+s.fatTotal,0);
@@ -396,6 +444,7 @@ function render(){
   const nObTraf=trafego.filter(s=>s.fatOB>0).length;
   const nObOrg=organico.filter(s=>s.fatOB>0).length;
   const fatTotal=fatTraf+fatOrg;
+
   renderTrafego(g,sales,trafego,organico,{fatTraf,fatOrg,obTraf,obOrg,nObTraf,nObOrg,fatTotal});
   renderVisao(g,sales,gr,fatTotal,trafego,organico);
   renderCriativos(from,to);
@@ -405,45 +454,56 @@ function render(){
 }
 
 function kpi(label,value,cls,sub){
-  return '<div class="kpi-card"><div class="kpi-label">'+label+'</div><div class="kpi-value '+(cls||'')+'">'+value+'</div>'+(sub?'<div class="kpi-sub">'+sub+'</div>':'')+'</div>';
+  return `<div class="kpi-card"><div class="kpi-label">${label}</div>
+    <div class="kpi-value ${cls||''}">${value}</div>${sub?`<div class="kpi-sub">${sub}</div>`:''}</div>`;
 }
 
 function renderTrafego(g,sales,trafego,organico,x){
   const roasT=g.inv? x.fatTraf/g.inv : 0;
   const cac=trafego.length? g.inv/trafego.length : 0;
   const ticket=sales.length? x.fatTotal/sales.length : 0;
-  let html='<div class="kpi-grid">'
-    +kpi('Investimento (Meta)',money(g.inv),'orange')
-    +kpi('Fat. Tráfego',money(x.fatTraf),'green')
-    +kpi('Fat. Orgânico',money(x.fatOrg),'yellow')
-    +kpi('ROAS Tráfego',roas(roasT),'orange')
-    +kpi('Vendas Tráfego',trafego.length+(x.nObTraf?' <span style="font-size:12px" class="orange">+'+x.nObTraf+' OB</span>':''),'green')
-    +kpi('Vendas Orgânico',organico.length+(x.nObOrg?' <span style="font-size:12px" class="orange">+'+x.nObOrg+' OB</span>':''),'yellow')
-    +kpi('Fat. OB Tráfego',money(x.obTraf),'orange')
-    +kpi('Fat. OB Orgânico',money(x.obOrg),'orange')
-    +kpi('CAC',money(cac),'red')
-    +kpi('Ticket Médio',money(ticket),'')
-    +kpi('Cliques',int(g.clk),'')
-    +kpi('Impressões',int(g.imp),'')
-    +kpi('CPC',money(cpc(g)),'')
-    +kpi('CPM',money(cpm(g)),'')
-    +'</div>';
+  let html=`<div class="kpi-grid">
+    ${kpi('Investimento (Meta)',money(g.inv),'orange')}
+    ${kpi('Fat. Tráfego',money(x.fatTraf),'green')}
+    ${kpi('Fat. Orgânico',money(x.fatOrg),'yellow')}
+    ${kpi('ROAS Tráfego',roas(roasT),'orange')}
+    ${kpi('Vendas Tráfego',trafego.length+(x.nObTraf?` <span style="font-size:12px" class="orange">+${x.nObTraf} OB</span>`:''),'green')}
+    ${kpi('Vendas Orgânico',organico.length+(x.nObOrg?` <span style="font-size:12px" class="orange">+${x.nObOrg} OB</span>`:''),'yellow')}
+    ${kpi('Fat. OB Tráfego',money(x.obTraf),'orange')}
+    ${kpi('Fat. OB Orgânico',money(x.obOrg),'orange')}
+    ${kpi('CAC',money(cac),'red')}
+    ${kpi('Ticket Médio',money(ticket),'')}
+    ${kpi('Cliques',int(g.clk),'')}
+    ${kpi('Impressões',int(g.imp),'')}
+    ${kpi('CPC',money(cpc(g)),'')}
+    ${kpi('CPM',money(cpm(g)),'')}
+  </div>`;
+
   const f_clk=g.clk, f_pv=g.pv, f_ck=g.ck, f_compras=sales.length;
   const mx=Math.max(f_clk,f_pv,f_ck,f_compras,1);
-  const bar=(lbl,v)=>'<div class="funil-bar-wrap"><div class="funil-label"><span>'+lbl+'</span><span>'+int(v)+'</span></div><div class="funil-bar-bg"><div class="funil-bar-fill" style="width:'+(v/mx*100).toFixed(1)+'%"></div></div></div>';
-  html+='<div class="sec-title">Funil de Conversão</div><div class="funil-section"><div>'+bar('Cliques',f_clk)+bar('Page View',f_pv)+bar('Checkouts',f_ck)+bar('Compras',f_compras)+'</div><div class="taxa-grid">'
-    +'<div class="taxa-item"><span>Clique → Page View</span><span class="taxa-val">'+pct(f_clk?f_pv/f_clk*100:0)+'</span></div>'
-    +'<div class="taxa-item"><span>Page View → Checkout</span><span class="taxa-val">'+pct(f_pv?f_ck/f_pv*100:0)+'</span></div>'
-    +'<div class="taxa-item"><span>Checkout → Compra</span><span class="taxa-val">'+pct(f_ck?f_compras/f_ck*100:0)+'</span></div>'
-    +'<div class="taxa-item"><span>Clique → Compra</span><span class="taxa-val">'+pct(f_clk?f_compras/f_clk*100:0)+'</span></div></div></div>';
-  html+='<div class="sec-title">Vendas (compradores)</div>';
+  const bar=(lbl,v)=>`<div class="funil-bar-wrap"><div class="funil-label"><span>${lbl}</span><span>${int(v)}</span></div>
+    <div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${(v/mx*100).toFixed(1)}%"></div></div></div>`;
+  html+=`<div class="sec-title">Funil de Conversão</div><div class="funil-section">
+    <div>${bar('Cliques',f_clk)}${bar('Page View',f_pv)}${bar('Checkouts',f_ck)}${bar('Compras',f_compras)}</div>
+    <div class="taxa-grid">
+      <div class="taxa-item"><span>Clique → Page View</span><span class="taxa-val">${pct(f_clk?f_pv/f_clk*100:0)}</span></div>
+      <div class="taxa-item"><span>Page View → Checkout</span><span class="taxa-val">${pct(f_pv?f_ck/f_pv*100:0)}</span></div>
+      <div class="taxa-item"><span>Checkout → Compra</span><span class="taxa-val">${pct(f_ck?f_compras/f_ck*100:0)}</span></div>
+      <div class="taxa-item"><span>Clique → Compra</span><span class="taxa-val">${pct(f_clk?f_compras/f_clk*100:0)}</span></div>
+    </div></div>`;
+
+  html+=`<div class="sec-title">Vendas (compradores)</div>`;
   if(sales.length){
-    html+='<div class="sales-scroll">'+sales.map(s=>{
+    html+=`<div class="sales-scroll">`+sales.map(s=>{
       const t=isTrafego(s);
-      return '<div class="sale-card '+(t?'trafego':'organico')+'"><div class="sale-top"><span class="sale-name">'+(t?'✅':'⭐')+' '+s.nome+'</span><span class="sale-val">'+money(s.fatTotal)+'</span></div><div class="sale-meta">📅 '+s.data+'<br>'+(t?'Tráfego pago (meta_ads)':'Orgânico')+(s.criativo?'<br>🎯 '+s.criativo:'')+(s.publico?'<br>👥 '+s.publico:'')+'</div>'+(s.fatOB>0?'<div class="sale-ob">🛒 OB: '+money(s.fatOB)+'</div>':'')+'</div>';
-    }).join('')+'</div>';
+      return `<div class="sale-card ${t?'trafego':'organico'}">
+        <div class="sale-top"><span class="sale-name">${t?'✅':'⭐'} ${s.nome}</span><span class="sale-val">${money(s.fatTotal)}</span></div>
+        <div class="sale-meta">📅 ${s.data}<br>${t?'Tráfego pago (meta_ads)':'Orgânico'}${s.criativo?'<br>🎯 '+s.criativo:''}${s.publico?'<br>👥 '+s.publico:''}</div>
+        ${s.fatOB>0?`<div class="sale-ob">🛒 OB: ${money(s.fatOB)}</div>`:''}
+      </div>`;
+    }).join('')+`</div>`;
   } else {
-    html+='<div class="empty-note">Nenhuma venda registrada no período (aba Webhook ainda sem lançamentos a partir de '+DATA_MINIMA+').<br>Os investimentos e o funil acima já refletem os dados do Gerenciador.</div>';
+    html+=`<div class="empty-note">Nenhuma venda registrada no período (aba Webhook ainda sem lançamentos a partir de ${DATA_MINIMA}).<br>Os investimentos e o funil acima já refletem os dados do Gerenciador.</div>`;
   }
   document.getElementById('tab-trafego').innerHTML=html;
 }
@@ -452,26 +512,40 @@ function renderVisao(g,sales,gr,fatTotal,trafego,organico){
   const roasTot=g.inv? fatTotal/g.inv : 0;
   const cac=sales.length? g.inv/sales.length : 0;
   const ticket=sales.length? fatTotal/sales.length : 0;
-  let html='<div class="kpi-grid">'
-    +kpi('Investimento',money(g.inv),'orange')
-    +kpi('Fat. Total',money(fatTotal),'green')
-    +kpi('ROAS Total',roas(roasTot),'orange')
-    +kpi('Vendas Total',sales.length,'green')
-    +kpi('Tráfego',trafego.length,'green')
-    +kpi('Orgânicas',organico.length,'yellow')
-    +kpi('Ticket Médio',money(ticket),'')
-    +kpi('CAC Total',money(cac),'red')
-    +'</div>';
+  let html=`<div class="kpi-grid">
+    ${kpi('Investimento',money(g.inv),'orange')}
+    ${kpi('Fat. Total',money(fatTotal),'green')}
+    ${kpi('ROAS Total',roas(roasTot),'orange')}
+    ${kpi('Vendas Total',sales.length,'green')}
+    ${kpi('Tráfego',trafego.length,'green')}
+    ${kpi('Orgânicas',organico.length,'yellow')}
+    ${kpi('Ticket Médio',money(ticket),'')}
+    ${kpi('CAC Total',money(cac),'red')}
+  </div>`;
+
   const byDay={};
-  for(const r of gr){ const d=String(r[G.date]||'').slice(0,10); if(!d) continue; const o=byDay[d]||(byDay[d]={inv:0}); o.inv+=num(r[G.inv]); }
-  for(const s of sales){ const o=byDay[s.data]||(byDay[s.data]={inv:0}); o.fat=(o.fat||0)+s.fatTotal; o.tot=(o.tot||0)+1; if(isTrafego(s)) o.traf=(o.traf||0)+1; else o.org=(o.org||0)+1; }
-  const days=Object.keys(byDay).sort();
-  html+='<div class="sec-title">Desempenho dia a dia</div><div class="tbl-wrap"><table><thead><tr><th>Data</th><th>Invest.</th><th>Fat. Total</th><th>ROAS</th><th>Compras</th><th>Tráfego</th><th>Orgânicas</th><th>Ticket Médio</th><th>CAC</th></tr></thead><tbody>';
-  for(const d of days){ const o=byDay[d]; const fat=o.fat||0, tot=o.tot||0;
-    html+='<tr><td>'+d+'</td><td>'+money(o.inv)+'</td><td>'+money(fat)+'</td><td>'+roas(o.inv?fat/o.inv:0)+'</td><td>'+(tot||'—')+'</td><td>'+(o.traf||'—')+'</td><td>'+(o.org||'—')+'</td><td>'+(tot?money(fat/tot):'—')+'</td><td>'+((o.traf&&o.inv)?money(o.inv/o.traf):'—')+'</td></tr>';
+  for(const r of gr){
+    const d=String(r[G.date]||'').slice(0,10); if(!d) continue;
+    const o=byDay[d]||(byDay[d]={inv:0});
+    o.inv+=num(r[G.inv]);
   }
-  if(!days.length) html+='<tr><td colspan="9" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados no período</td></tr>';
-  html+='</tbody></table></div>';
+  for(const s of sales){
+    const o=byDay[s.data]||(byDay[s.data]={inv:0});
+    o.fat=(o.fat||0)+s.fatTotal;
+    o.tot=(o.tot||0)+1;
+    if(isTrafego(s)) o.traf=(o.traf||0)+1; else o.org=(o.org||0)+1;
+  }
+  const days=Object.keys(byDay).sort();
+  html+=`<div class="sec-title">Desempenho dia a dia</div><div class="tbl-wrap"><table>
+    <thead><tr><th>Data</th><th>Invest.</th><th>Fat. Total</th><th>ROAS</th><th>Compras</th><th>Tráfego</th><th>Orgânicas</th><th>Ticket Médio</th><th>CAC</th></tr></thead><tbody>`;
+  for(const d of days){
+    const o=byDay[d]; const fat=o.fat||0, tot=o.tot||0;
+    html+=`<tr><td>${d}</td><td>${money(o.inv)}</td><td>${money(fat)}</td>
+      <td>${roas(o.inv?fat/o.inv:0)}</td><td>${tot||'—'}</td><td>${o.traf||'—'}</td><td>${o.org||'—'}</td>
+      <td>${tot?money(fat/tot):'—'}</td><td>${(o.traf&&o.inv)?money(o.inv/o.traf):'—'}</td></tr>`;
+  }
+  if(!days.length) html+=`<tr><td colspan="9" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados no período</td></tr>`;
+  html+=`</tbody></table></div>`;
   document.getElementById('tab-visao').innerHTML=html;
 }
 
@@ -481,22 +555,49 @@ function renderCriativos(from,to){
   if(criStatusFilter==='ativos') list=list.filter(c=>c.ativo);
   else if(criStatusFilter==='inativos') list=list.filter(c=>!c.ativo);
   if(criAudFilter!=='todos') list=list.filter(c=>c.aud===criAudFilter);
-  const sortFns={inv:(a,b)=>b.inv-a.inv,ctr:(a,b)=>ctr(b)-ctr(a),cpc:(a,b)=>(cpc(a)||9e9)-(cpc(b)||9e9),roas:(a,b)=>(b.fat/(b.inv||1))-(a.fat/(a.inv||1)),vendas:(a,b)=>b.vendas-a.vendas};
+  const sortFns={inv:(a,b)=>b.inv-a.inv,ctr:(a,b)=>ctr(b)-ctr(a),
+    cpc:(a,b)=>(cpc(a)||9e9)-(cpc(b)||9e9),roas:(a,b)=>(b.fat/(b.inv||1))-(a.fat/(a.inv||1)),
+    vendas:(a,b)=>b.vendas-a.vendas};
   list.sort(sortFns[criSortKey]||sortFns.inv);
-  const sb=(k,l)=>'<button class="cri-sort-btn '+(criSortKey===k?'active':'')+'" onclick="setCriSort(\''+k+'\')">'+l+'</button>';
-  const stb=(k,l)=>'<button class="cri-status-btn '+(criStatusFilter===k?'active':'')+'" onclick="setCriStatus(\''+k+'\')">'+l+'</button>';
-  const ab=(k,l)=>'<button class="cri-filter-btn '+(criAudFilter===k?'active':'')+'" onclick="setCriAud(\''+k+'\')">'+l+'</button>';
-  let html='<div class="cri-filterbar">'+stb('todos','Todos')+stb('ativos','Ativos')+stb('inativos','Inativos')+'<span style="width:8px"></span>'+ab('todos','🌡️ Todos')+ab('quente','🔥 Quente')+ab('frio','❄️ Frio')+'<span class="cri-sort-label" style="margin-left:auto">Ordenar:</span>'+sb('inv','Investimento')+sb('ctr','CTR')+sb('cpc','CPC')+sb('roas','ROAS')+sb('vendas','Vendas')+'</div>';
-  html+='<div class="cri-grid">'+list.map(c=>{
+
+  const sb=(k,l)=>`<button class="cri-sort-btn ${criSortKey===k?'active':''}" onclick="setCriSort('${k}')">${l}</button>`;
+  const stb=(k,l)=>`<button class="cri-status-btn ${criStatusFilter===k?'active':''}" onclick="setCriStatus('${k}')">${l}</button>`;
+  const ab=(k,l)=>`<button class="cri-filter-btn ${criAudFilter===k?'active':''}" onclick="setCriAud('${k}')">${l}</button>`;
+
+  let html=`<div class="cri-filterbar">${stb('todos','Todos')}${stb('ativos','Ativos')}${stb('inativos','Inativos')}
+    <span style="width:8px"></span>${ab('todos','🌡️ Todos')}${ab('quente','🔥 Quente')}${ab('frio','❄️ Frio')}
+    <span class="cri-sort-label" style="margin-left:auto">Ordenar:</span>
+    ${sb('inv','Investimento')}${sb('ctr','CTR')}${sb('cpc','CPC')}${sb('roas','ROAS')}${sb('vendas','Vendas')}</div>`;
+
+  html+=`<div class="cri-grid">`+list.map(c=>{
     const r=c.fat/(c.inv||1);
-    return '<div class="cri-card '+(c.ativo?'ativo':'')+'"><div class="cri-card-header"><span class="cri-name">'+c.nome+'</span><span><span class="cri-badge '+(c.ativo?'ativo':'inativo')+'">'+(c.ativo?'Ativo':'Inativo')+'</span> <span class="cri-tag '+c.aud+'">'+(c.aud==='quente'?'🔥 Quente':'❄️ Frio')+'</span></span></div><div class="cri-metrics"><div class="cri-metric"><span class="cri-metric-label">Investido</span><span class="cri-metric-val hl">'+money(c.inv)+'</span></div><div class="cri-metric"><span class="cri-metric-label">Vendas</span><span class="cri-metric-val">'+(c.vendas||'—')+'</span></div><div class="cri-metric"><span class="cri-metric-label">CTR</span><span class="cri-metric-val">'+pct(ctr(c))+'</span></div><div class="cri-metric"><span class="cri-metric-label">CPC</span><span class="cri-metric-val">'+money(cpc(c))+'</span></div><div class="cri-metric"><span class="cri-metric-label">Cliques</span><span class="cri-metric-val">'+int(c.clk)+'</span></div><div class="cri-metric"><span class="cri-metric-label">ROAS</span><span class="cri-metric-val">'+roas(r)+'</span></div></div>'+(c.link?'<a class="cri-link" href="'+c.link+'" target="_blank">🔗 '+c.link+'</a>':'')+'</div>';
-  }).join('')+'</div>';
-  if(!list.length) html+='<div class="empty-note">Nenhum criativo no filtro selecionado.</div>';
-  html+='<div class="sec-title">Tabela de Criativos</div><div class="tbl-wrap"><table><thead><tr><th>Criativo</th><th>Público</th><th>Status</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Vendas</th><th>ROAS</th></tr></thead><tbody>';
+    return `<div class="cri-card ${c.ativo?'ativo':''}">
+      <div class="cri-card-header"><span class="cri-name">${c.nome}</span>
+        <span><span class="cri-badge ${c.ativo?'ativo':'inativo'}">${c.ativo?'Ativo':'Inativo'}</span>
+        <span class="cri-tag ${c.aud}">${c.aud==='quente'?'🔥 Quente':'❄️ Frio'}</span></span></div>
+      <div class="cri-metrics">
+        <div class="cri-metric"><span class="cri-metric-label">Investido</span><span class="cri-metric-val hl">${money(c.inv)}</span></div>
+        <div class="cri-metric"><span class="cri-metric-label">Vendas</span><span class="cri-metric-val">${c.vendas||'—'}</span></div>
+        <div class="cri-metric"><span class="cri-metric-label">CTR</span><span class="cri-metric-val">${pct(ctr(c))}</span></div>
+        <div class="cri-metric"><span class="cri-metric-label">CPC</span><span class="cri-metric-val">${money(cpc(c))}</span></div>
+        <div class="cri-metric"><span class="cri-metric-label">Cliques</span><span class="cri-metric-val">${int(c.clk)}</span></div>
+        <div class="cri-metric"><span class="cri-metric-label">ROAS</span><span class="cri-metric-val">${roas(r)}</span></div>
+      </div>
+      ${c.link?`<a class="cri-link" href="${c.link}" target="_blank">🔗 ${c.link}</a>`:''}
+    </div>`;
+  }).join('')+`</div>`;
+
+  if(!list.length) html+=`<div class="empty-note">Nenhum criativo no filtro selecionado.</div>`;
+
+  html+=`<div class="sec-title">Tabela de Criativos</div><div class="tbl-wrap"><table>
+    <thead><tr><th>Criativo</th><th>Público</th><th>Status</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Vendas</th><th>ROAS</th></tr></thead><tbody>`;
   for(const c of list){
-    html+='<tr><td>'+c.nome+'</td><td>'+(c.aud==='quente'?'🔥 Quente':'❄️ Frio')+'</td><td>'+(c.ativo?'<span class="green">●</span> Ativo':'<span style="color:rgba(255,255,255,.3)">●</span> Inativo')+'</td><td>'+money(c.inv)+'</td><td>'+int(c.imp)+'</td><td>'+int(c.clk)+'</td><td>'+pct(ctr(c))+'</td><td>'+money(cpc(c))+'</td><td>'+(c.vendas||'—')+'</td><td>'+roas(c.fat/(c.inv||1))+'</td></tr>';
+    html+=`<tr><td>${c.nome}</td><td>${c.aud==='quente'?'🔥 Quente':'❄️ Frio'}</td>
+      <td>${c.ativo?'<span class="green">●</span> Ativo':'<span style="color:rgba(255,255,255,.3)">●</span> Inativo'}</td>
+      <td>${money(c.inv)}</td><td>${int(c.imp)}</td><td>${int(c.clk)}</td><td>${pct(ctr(c))}</td>
+      <td>${money(cpc(c))}</td><td>${c.vendas||'—'}</td><td>${roas(c.fat/(c.inv||1))}</td></tr>`;
   }
-  html+='</tbody></table></div>';
+  html+=`</tbody></table></div>`;
   document.getElementById('tab-criativos').innerHTML=html;
 }
 
@@ -504,23 +605,48 @@ function renderPublicos(from,to){
   const {pub}=buildCriPubMaps(from,to);
   let list=pub.slice();
   if(pubAudFilter!=='todos') list=list.filter(p=>p.aud===pubAudFilter);
-  const sortFns={inv:(a,b)=>b.inv-a.inv,ctr:(a,b)=>ctr(b)-ctr(a),roas:(a,b)=>(b.fat/(b.inv||1))-(a.fat/(a.inv||1)),vendas:(a,b)=>b.vendas-a.vendas};
+  const sortFns={inv:(a,b)=>b.inv-a.inv,ctr:(a,b)=>ctr(b)-ctr(a),
+    roas:(a,b)=>(b.fat/(b.inv||1))-(a.fat/(a.inv||1)),vendas:(a,b)=>b.vendas-a.vendas};
   list.sort(sortFns[pubSortKey]||sortFns.inv);
-  const ab=(k,l)=>'<button class="pub-filter-btn '+(pubAudFilter===k?'active':'')+'" onclick="setPubAud(\''+k+'\')">'+l+'</button>';
-  const sb=(k,l)=>'<button class="pub-sort-btn '+(pubSortKey===k?'active':'')+'" onclick="setPubSort(\''+k+'\')">'+l+'</button>';
-  let html='<div class="ob-info">🔥 <strong>Quente</strong> = remarketing / engajamento / base · ❄️ <strong>Frio</strong> = prospecção / interesses (ex: Empreendedores). Classificação automática pelo nome do conjunto; ajuste as palavras-chave em <code>CONFIG.QUENTE_KEYS</code>.</div><div class="cri-filterbar">'+ab('todos','🌡️ Todos')+ab('quente','🔥 Quente')+ab('frio','❄️ Frio')+'<span class="cri-sort-label" style="margin-left:auto">Ordenar:</span>'+sb('inv','Investimento')+sb('ctr','CTR')+sb('roas','ROAS')+sb('vendas','Vendas')+'</div>';
-  html+='<div class="pub-grid">'+list.map(p=>{
+
+  const ab=(k,l)=>`<button class="pub-filter-btn ${pubAudFilter===k?'active':''}" onclick="setPubAud('${k}')">${l}</button>`;
+  const sb=(k,l)=>`<button class="pub-sort-btn ${pubSortKey===k?'active':''}" onclick="setPubSort('${k}')">${l}</button>`;
+
+  let html=`<div class="ob-info">🔥 <strong>Quente</strong> = remarketing / engajamento / base · ❄️ <strong>Frio</strong> = prospecção / interesses (ex: Empreendedores). Classificação automática pelo nome do conjunto; ajuste as palavras-chave em <code>CONFIG.QUENTE_KEYS</code> se necessário.</div>
+    <div class="cri-filterbar">${ab('todos','🌡️ Todos')}${ab('quente','🔥 Quente')}${ab('frio','❄️ Frio')}
+    <span class="cri-sort-label" style="margin-left:auto">Ordenar:</span>
+    ${sb('inv','Investimento')}${sb('ctr','CTR')}${sb('roas','ROAS')}${sb('vendas','Vendas')}</div>`;
+
+  html+=`<div class="pub-grid">`+list.map(p=>{
     const r=p.fat/(p.inv||1);
-    return '<div class="pub-card '+(p.ativo?'ativo':'')+'"><div class="pub-card-header"><span class="pub-name">'+(p.aud==='quente'?'🔥':'❄️')+' '+p.nome+'</span><span class="cri-badge '+(p.ativo?'ativo':'inativo')+'">'+(p.ativo?'Ativo':'Inativo')+'</span></div><div class="pub-metrics"><div class="pub-metric"><div class="pub-metric-val">'+money(p.inv)+'</div><div class="pub-metric-lbl">Investido</div></div><div class="pub-metric"><div class="pub-metric-val neutral">'+(p.vendas||'—')+'</div><div class="pub-metric-lbl">Vendas</div></div><div class="pub-metric"><div class="pub-metric-val neutral">'+roas(r)+'</div><div class="pub-metric-lbl">ROAS</div></div><div class="pub-metric"><div class="pub-metric-val neutral">'+pct(ctr(p))+'</div><div class="pub-metric-lbl">CTR</div></div><div class="pub-metric"><div class="pub-metric-val neutral">'+money(cpc(p))+'</div><div class="pub-metric-lbl">CPC</div></div><div class="pub-metric"><div class="pub-metric-val neutral">'+int(p.clk)+'</div><div class="pub-metric-lbl">Cliques</div></div></div></div>';
-  }).join('')+'</div>';
-  if(!list.length) html+='<div class="empty-note">Nenhum público no filtro selecionado.</div>';
+    return `<div class="pub-card ${p.ativo?'ativo':''}">
+      <div class="pub-card-header"><span class="pub-name">${p.aud==='quente'?'🔥':'❄️'} ${p.nome}</span>
+        <span class="cri-badge ${p.ativo?'ativo':'inativo'}">${p.ativo?'Ativo':'Inativo'}</span></div>
+      <div class="pub-metrics">
+        <div class="pub-metric"><div class="pub-metric-val">${money(p.inv)}</div><div class="pub-metric-lbl">Investido</div></div>
+        <div class="pub-metric"><div class="pub-metric-val neutral">${p.vendas||'—'}</div><div class="pub-metric-lbl">Vendas</div></div>
+        <div class="pub-metric"><div class="pub-metric-val neutral">${roas(r)}</div><div class="pub-metric-lbl">ROAS</div></div>
+        <div class="pub-metric"><div class="pub-metric-val neutral">${pct(ctr(p))}</div><div class="pub-metric-lbl">CTR</div></div>
+        <div class="pub-metric"><div class="pub-metric-val neutral">${money(cpc(p))}</div><div class="pub-metric-lbl">CPC</div></div>
+        <div class="pub-metric"><div class="pub-metric-val neutral">${int(p.clk)}</div><div class="pub-metric-lbl">Cliques</div></div>
+      </div></div>`;
+  }).join('')+`</div>`;
+  if(!list.length) html+=`<div class="empty-note">Nenhum público no filtro selecionado.</div>`;
   document.getElementById('tab-publicos').innerHTML=html;
 }
 
 function aggPeriod(keyFn){
   const map={};
-  for(const r of GROWS){ const d=String(r[G.date]||'').slice(0,10); if(!d||d<DATA_MINIMA) continue; const k=keyFn(d); const o=map[k]||(map[k]={k,inv:0,imp:0,clk:0,fat:0,vendas:0}); o.inv+=num(r[G.inv]); o.imp+=num(r[G.imp]); o.clk+=num(r[G.cliques]); }
-  for(const s of SALES){ if(s.data<DATA_MINIMA) continue; const k=keyFn(s.data); const o=map[k]||(map[k]={k,inv:0,imp:0,clk:0,fat:0,vendas:0}); o.fat+=s.fatTotal; o.vendas++; }
+  for(const r of GROWS){
+    const d=String(r[G.date]||'').slice(0,10); if(!d||d<DATA_MINIMA) continue;
+    const k=keyFn(d); const o=map[k]||(map[k]={k,inv:0,imp:0,clk:0,fat:0,vendas:0});
+    o.inv+=num(r[G.inv]); o.imp+=num(r[G.imp]); o.clk+=num(r[G.cliques]);
+  }
+  for(const s of SALES){
+    if(s.data<DATA_MINIMA) continue;
+    const k=keyFn(s.data); const o=map[k]||(map[k]={k,inv:0,imp:0,clk:0,fat:0,vendas:0});
+    o.fat+=s.fatTotal; o.vendas++;
+  }
   return Object.values(map).sort((a,b)=>a.k.localeCompare(b.k));
 }
 function isoWeek(dStr){
@@ -531,34 +657,51 @@ function isoWeek(dStr){
   const wn=Math.ceil((((dt-ys)/86400000)+1)/7);
   return dt.getUTCFullYear()+'-S'+String(wn).padStart(2,'0');
 }
+
 function renderPeriodTable(rows,label){
-  let html='<div class="tbl-wrap"><table><thead><tr><th>'+label+'</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Fat.</th><th>Vendas</th><th>ROAS</th></tr></thead><tbody>';
+  let html=`<div class="tbl-wrap"><table><thead><tr><th>${label}</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Fat.</th><th>Vendas</th><th>ROAS</th></tr></thead><tbody>`;
   for(const o of rows){
-    html+='<tr><td>'+o.k+'</td><td>'+money(o.inv)+'</td><td>'+int(o.imp)+'</td><td>'+int(o.clk)+'</td><td>'+pct(o.imp?o.clk/o.imp*100:0)+'</td><td>'+money(o.clk?o.inv/o.clk:0)+'</td><td>'+money(o.fat)+'</td><td>'+(o.vendas||'—')+'</td><td>'+roas(o.inv?o.fat/o.inv:0)+'</td></tr>';
+    html+=`<tr><td>${o.k}</td><td>${money(o.inv)}</td><td>${int(o.imp)}</td><td>${int(o.clk)}</td>
+      <td>${pct(o.imp?o.clk/o.imp*100:0)}</td><td>${money(o.clk?o.inv/o.clk:0)}</td>
+      <td>${money(o.fat)}</td><td>${o.vendas||'—'}</td><td>${roas(o.inv?o.fat/o.inv:0)}</td></tr>`;
   }
-  if(!rows.length) html+='<tr><td colspan="9" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados</td></tr>';
-  html+='</tbody></table></div>';
+  if(!rows.length) html+=`<tr><td colspan="9" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados</td></tr>`;
+  html+=`</tbody></table></div>`;
   return html;
 }
 function drawChart(id,labels,inv,ctrArr){
   const ctx=document.getElementById(id); if(!ctx) return;
   if(CHARTS[id]) CHARTS[id].destroy();
-  CHARTS[id]=new Chart(ctx,{type:'bar',data:{labels,datasets:[
-    {label:'Investimento',data:inv,backgroundColor:'rgba(255,107,43,0.85)',yAxisID:'y',order:2},
-    {label:'CTR %',data:ctrArr,type:'line',borderColor:'rgba(255,183,55,0.95)',backgroundColor:'rgba(255,183,55,0.3)',yAxisID:'y1',order:1,tension:.3}
-  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'rgba(255,255,255,.6)',font:{size:10}}}},scales:{x:{ticks:{color:'rgba(255,255,255,.45)',font:{size:9}},grid:{display:false}},y:{position:'left',ticks:{color:'rgba(255,255,255,.45)',font:{size:9}},grid:{color:'rgba(255,255,255,.05)'}},y1:{position:'right',ticks:{color:'rgba(255,183,55,.6)',font:{size:9}},grid:{display:false}}}}});
+  CHARTS[id]=new Chart(ctx,{type:'bar',
+    data:{labels,datasets:[
+      {label:'Investimento',data:inv,backgroundColor:'rgba(255,107,43,0.85)',yAxisID:'y',order:2},
+      {label:'CTR %',data:ctrArr,type:'line',borderColor:'rgba(255,183,55,0.95)',backgroundColor:'rgba(255,183,55,0.3)',yAxisID:'y1',order:1,tension:.3}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'rgba(255,255,255,.6)',font:{size:10}}}},
+      scales:{
+        x:{ticks:{color:'rgba(255,255,255,.45)',font:{size:9}},grid:{display:false}},
+        y:{position:'left',ticks:{color:'rgba(255,255,255,.45)',font:{size:9}},grid:{color:'rgba(255,255,255,.05)'}},
+        y1:{position:'right',ticks:{color:'rgba(255,183,55,.6)',font:{size:9}},grid:{display:false}}
+      }}});
 }
+
 function renderSemanal(){
   const rows=aggPeriod(isoWeek);
-  document.getElementById('tab-semanal').innerHTML='<div class="sec-title">Semana a Semana</div>'+renderPeriodTable(rows,'Semana')+'<div class="chart-grid-2x2" style="grid-template-columns:1fr"><div class="chart-card"><h4>Investimento × CTR por semana</h4><canvas id="chart-sem"></canvas></div></div>';
+  let html=`<div class="sec-title">Semana a Semana</div>${renderPeriodTable(rows,'Semana')}
+    <div class="chart-grid-2x2" style="grid-template-columns:1fr"><div class="chart-card"><h4>Investimento × CTR por semana</h4><canvas id="chart-sem"></canvas></div></div>`;
+  document.getElementById('tab-semanal').innerHTML=html;
   drawChart('chart-sem',rows.map(r=>r.k),rows.map(r=>+r.inv.toFixed(2)),rows.map(r=>+(r.imp?r.clk/r.imp*100:0).toFixed(2)));
 }
 function renderMensal(){
   const rows=aggPeriod(d=>d.slice(0,7));
-  document.getElementById('tab-mensal').innerHTML='<div class="sec-title">Mês a Mês</div>'+renderPeriodTable(rows,'Mês')+'<div class="chart-grid-2x2" style="grid-template-columns:1fr"><div class="chart-card"><h4>Investimento × CTR por mês</h4><canvas id="chart-mes"></canvas></div></div>';
+  let html=`<div class="sec-title">Mês a Mês</div>${renderPeriodTable(rows,'Mês')}
+    <div class="chart-grid-2x2" style="grid-template-columns:1fr"><div class="chart-card"><h4>Investimento × CTR por mês</h4><canvas id="chart-mes"></canvas></div></div>`;
+  document.getElementById('tab-mensal').innerHTML=html;
   drawChart('chart-mes',rows.map(r=>r.k),rows.map(r=>+r.inv.toFixed(2)),rows.map(r=>+(r.imp?r.clk/r.imp*100:0).toFixed(2)));
 }
 
+// ─────────────────────────── INTERAÇÃO ───────────────────────────
 function showTab(name,el){
   document.querySelectorAll('.content').forEach(c=>c.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -570,6 +713,7 @@ function setCriSort(k){criSortKey=k;renderCriativos(curFrom,curTo);}
 function setCriAud(k){criAudFilter=k;renderCriativos(curFrom,curTo);}
 function setPubAud(k){pubAudFilter=k;renderPublicos(curFrom,curTo);}
 function setPubSort(k){pubSortKey=k;renderPublicos(curFrom,curTo);}
+
 function onDateChange(){
   curFrom=document.getElementById('dateFrom').value||null;
   curTo=document.getElementById('dateTo').value||null;
@@ -583,13 +727,21 @@ function setPreset(days,btn){
   if(!allDates.length){updateRangeInfo();return;}
   const first=allDates[0], last=allDates[allDates.length-1];
   if(days==='all'){ curFrom=first; curTo=last; }
-  else{ const ld=new Date(last+'T00:00:00'); const fd=new Date(ld); fd.setDate(fd.getDate()-(days-1)); const fstr=fd.toISOString().slice(0,10); curFrom=fstr<first?first:fstr; curTo=last; }
+  else{
+    const ld=new Date(last+'T00:00:00'); const fd=new Date(ld); fd.setDate(fd.getDate()-(days-1));
+    const fstr=fd.toISOString().slice(0,10);
+    curFrom=fstr<first?first:fstr; curTo=last;
+  }
   document.getElementById('dateFrom').value=curFrom;
   document.getElementById('dateTo').value=curTo;
   updateRangeInfo(); render();
 }
-function updateRangeInfo(){ const el=document.getElementById('range-info'); if(el) el.textContent=(curFrom||'—')+' → '+(curTo||'—'); }
+function updateRangeInfo(){
+  const el=document.getElementById('range-info');
+  if(el) el.textContent=(curFrom||'—')+' → '+(curTo||'—');
+}
 
+// ─────────────────────────── CARGA ───────────────────────────
 async function loadData(silent){
   const ov=document.getElementById('loading-overlay');
   if(!silent&&ov){ov.style.display='flex';document.getElementById('loading-msg').textContent='Conectando com a planilha...';}
@@ -601,6 +753,7 @@ async function loadData(silent){
     const dset={};
     for(const r of GROWS){const d=String(r[G.date]||'').slice(0,10); if(d&&d>=DATA_MINIMA) dset[d]=1;}
     DIAS=Object.keys(dset).sort().map(d=>({data:d}));
+    // Enriquece cada venda com criativo/público encontrados dentro da string de rastreio
     const adNames=[...new Set(GROWS.map(r=>String(r[G.ad]||'').trim()).filter(Boolean))].sort((a,b)=>b.length-a.length);
     const adsetNames=[...new Set(GROWS.map(r=>String(r[G.adset]||'').trim()).filter(Boolean))].sort((a,b)=>b.length-a.length);
     for(const s of SALES){
@@ -622,6 +775,7 @@ async function loadData(silent){
   }
 }
 
+// Auto-refresh a cada 2h (silencioso, preservando janela de datas manual)
 setInterval(()=>{
   const f=curFrom,t=curTo;
   const btnAll=document.getElementById('btn-all');
