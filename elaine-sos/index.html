@@ -173,12 +173,12 @@ const CONFIG = {
   ANO:      '2026',
   SHEET_ID: '12gd7ymSh-s960DhRDtxYMSgv5B7NBvRVHcn37M_5O_A',
   GERENCIADOR_SHEET: 'Gerenciador',
-  WEBHOOK_SHEET:     'Vendas',          // vendas estão na aba "Vendas" (Webhook está vazia)
+  WEBHOOK_SHEET:     'Webhook',         // vendas em tempo real (webhook Eduzz)
   DATA_MINIMA:       '2026-06-01',
   PRODUTO_NOME:      'sos preciosa',
   PRODUTO_PRECO_MINIMO: 0,
   VALORES_EM_CENTAVOS: false,
-  STATUS_APROVADO: ['PAGA','PAGO','APPROVED','COMPLETE','CONFIRMED','APROVADA','COMPLETA'],
+  STATUS_APROVADO: ['PAID','PAGA','PAGO','APPROVED','COMPLETE','CONFIRMED','APROVADA','COMPLETA'],
   SPLIT_SOCIO_PCT: 0.5,                 // sociedade 50/50
   PRIMEIRO_VENCIMENTO: '2026-07-19',    // ciclo fecha dia 19; 1º vencimento
 
@@ -187,15 +187,16 @@ const CONFIG = {
     eduzzFixo:   2.49,   // R$ por venda
     eduzzPct:    0.043,  // 4,3% sobre o valor da venda
     impostoPct:  0.08,   // 8% sobre o valor do produto
-    sellfluxMes: 100,    // R$/mês
-    notaMes:     97,     // R$/mês (emissão de nota)
+    sellfluxMes: 0,      // feito por fora
+    notaMes:     0,      // feito por fora
   },
 
   // Colunas Gerenciador (0-based)
   G: { date:0, inv:1, cliques:2, pv:3, ck:4, purch:5, adset:6, ad:7, reach:8, link:9, campaign:10, imp:11 },
-  // Colunas Vendas / Eduzz (0-based)
-  W: { status:1, data:10, produto:17, valorProduto:22, fatTotal:23, liquido:36, cliente:37, email:38,
-       utmSource:50, utmCampaign:51, utmMedium:52, utmContent:53 },
+  // Colunas Webhook / Eduzz (0-based)
+  W: { status:3, event:1, txId:63, data:62, dataAlt:28, produto:39, valorProduto:44, valorProdutoAlt:31,
+       fatTotal:33, fatAlt:60, cliente:5, email:7,
+       utmSource:23, utmCampaign:24, utmMedium:25, utmContent:26 },
 };
 const SHEET_ID = CONFIG.SHEET_ID, G = CONFIG.G, W = CONFIG.W;
 
@@ -279,42 +280,40 @@ async function loadData(){
       fetchSheetCSV(CONFIG.WEBHOOK_SHEET),
     ]);
     const gRows=parseCSV(gTxt).slice(1).filter(r=>r.length>3 && r[G.date]);
-    const sRows=parseCSV(sTxt).slice(1).filter(r=>r.length>10 && r[W.produto]);
+    const sRows=parseCSV(sTxt).slice(1).filter(r=>r.length>40 && r[W.produto]);
 
-    // Gerenciador
-    GROWS = gRows.map(r=>({
-      data: isoDate(r[G.date]),
-      inv: num(r[G.inv]), cliques: num(r[G.cliques]), pv: num(r[G.pv]),
-      ck: num(r[G.ck]), purch: num(r[G.purch]), reach: num(r[G.reach]), imp: num(r[G.imp]),
-      adset:(r[G.adset]||'').trim(), ad:(r[G.ad]||'').trim(),
-      link:(r[G.link]||'').trim(), campaign:(r[G.campaign]||'').trim(),
-    })).filter(x=>x.data && x.data>=CONFIG.DATA_MINIMA);
-
-    // Vendas
+    // Webhook / Vendas
     const statusOK = st => CONFIG.STATUS_APROVADO.includes((st||'').trim().toUpperCase());
+    const T=CONFIG.TAXAS, seen=new Set();
     SALES = sRows.map(r=>{
-      const fat=num(r[W.fatTotal]);
-      let liq=num(r[W.liquido]); if(CONFIG.VALORES_EM_CENTAVOS){ liq/=100; }
+      const fat  = num(r[W.fatTotal]) || num(r[W.fatAlt]);
+      const prod = num(r[W.valorProduto]) || num(r[W.valorProdutoAlt]) || fat;
+      const eduzzV = T.eduzzFixo + (fat - T.eduzzFixo)*T.eduzzPct;
+      const liq = fat - eduzzV - prod*T.impostoPct;   // líquido estimado (Webhook não traz coluna)
+      const cent = CONFIG.VALORES_EM_CENTAVOS;
       return {
-        data: isoDate(r[W.data]),
+        data: isoDate(r[W.data]) || isoDate(r[W.dataAlt]),
+        txId:(r[W.txId]||'').trim(),
         nome:(r[W.cliente]||'').trim(),
         email:(r[W.email]||'').trim(),
         produto:(r[W.produto]||'').trim(),
         status:(r[W.status]||'').trim(),
-        fatTotal: CONFIG.VALORES_EM_CENTAVOS? fat/100 : fat,
-        valorProduto: (CONFIG.VALORES_EM_CENTAVOS? num(r[W.valorProduto])/100 : num(r[W.valorProduto])) || (CONFIG.VALORES_EM_CENTAVOS? fat/100 : fat),
-        liquido: liq,
+        fatTotal: cent? fat/100 : fat,
+        valorProduto: cent? prod/100 : prod,
+        liquido: cent? liq/100 : liq,
         utmSource:(r[W.utmSource]||'').trim(),
         utmCampaign:(r[W.utmCampaign]||'').trim(),
         utmMedium:(r[W.utmMedium]||'').trim(),
         utmContent:(r[W.utmContent]||'').trim(),
       };
-    }).filter(s=>
-      s.data && s.data>=CONFIG.DATA_MINIMA &&
-      statusOK(s.status) &&
-      s.produto.toLowerCase().includes(CONFIG.PRODUTO_NOME) &&
-      s.fatTotal>=CONFIG.PRODUTO_PRECO_MINIMO
-    );
+    }).filter(s=>{
+      if(!(s.data && s.data>=CONFIG.DATA_MINIMA)) return false;
+      if(!statusOK(s.status)) return false;
+      if(!s.produto.toLowerCase().includes(CONFIG.PRODUTO_NOME)) return false;
+      if(s.fatTotal<CONFIG.PRODUTO_PRECO_MINIMO) return false;
+      const k=s.txId||(s.email+'|'+s.data); if(seen.has(k)) return false; seen.add(k);
+      return true;
+    });
     SALES.forEach(s=>{ s.criativo=s.utmContent||'(sem criativo)'; s.publico=s.utmCampaign||'(sem público)'; s.traf=isTrafego(s); });
     SALES.sort((a,b)=>b.data.localeCompare(a.data));
 
@@ -417,7 +416,7 @@ function renderTrafego(from,to){
         <div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${p}%"></div></div></div>`;}).join('')}
     </div>
     <div class="chart-card"><h4>Indicadores-chave</h4><div class="taxa-grid">
-      <div class="taxa-item"><span>Conversão clique → compra</span><span class="taxa-val">${pct(g.cliques?(traf.length/g.cliques*100):0)}</span></div>
+      <div class="taxa-item"><span>Conversão PageView → compra</span><span class="taxa-val">${pct(g.pv?(traf.length/g.pv*100):0)}</span></div>
       <div class="taxa-item"><span>Lucro do tráfego (Fat − Invest.)</span><span class="taxa-val">${brl(fatTraf-g.inv)}</span></div>
       <div class="taxa-item"><span>Part. tráfego no faturamento</span><span class="taxa-val">${pct((fatTraf+fatOrg)?(fatTraf/(fatTraf+fatOrg)*100):0)}</span></div>
       <div class="taxa-item"><span>Vendas no período</span><span class="taxa-val">${fs.length}</span></div>
@@ -555,24 +554,33 @@ function monthKey(iso){ return iso.slice(0,7); }
 function buildPeriod(from,to,keyFn){
   const m={};
   DIAS.filter(d=>inRange(d.data,from,to)).forEach(d=>{ const k=keyFn(d.data);
-    const o=m[k]||(m[k]={k,inv:0,cliques:0,imp:0,fat:0,vendas:0}); o.inv+=d.inv; o.cliques+=d.cliques; o.imp+=d.imp; });
-  salesIn(from,to).forEach(s=>{ const k=keyFn(s.data); const o=m[k]||(m[k]={k,inv:0,cliques:0,imp:0,fat:0,vendas:0}); o.fat+=s.fatTotal; o.vendas++; });
+    const o=m[k]||(m[k]={k,inv:0,cliques:0,imp:0,pv:0,fat:0,vendas:0}); o.inv+=d.inv; o.cliques+=d.cliques; o.imp+=d.imp; o.pv+=d.pv; });
+  salesIn(from,to).forEach(s=>{ const k=keyFn(s.data); const o=m[k]||(m[k]={k,inv:0,cliques:0,imp:0,pv:0,fat:0,vendas:0}); o.fat+=s.fatTotal; o.vendas++; });
   return Object.values(m).sort((a,b)=>a.k.localeCompare(b.k));
 }
 function renderPeriodTab(elId,arr,labelFn,chartPrefix){
   let h=`<div class="chart-grid-2x2">
-    <div class="chart-card"><h4>Investimento</h4><canvas id="${chartPrefix}Inv"></canvas></div>
-    <div class="chart-card"><h4>CTR (%)</h4><canvas id="${chartPrefix}Ctr"></canvas></div></div>`;
-  h+=`<div class="tbl-wrap"><table><thead><tr><th>Período</th><th>Invest.</th><th>Cliques</th><th>Impr.</th><th>CTR</th><th>Fat.</th><th>Vendas</th><th>ROAS</th></tr></thead><tbody>`;
-  arr.forEach(o=>{ const ctr=o.imp?o.cliques/o.imp*100:0, roas=o.inv?o.fat/o.inv:0;
+    <div class="chart-card"><h4>Investimento (R$)</h4><canvas id="${chartPrefix}Inv"></canvas></div>
+    <div class="chart-card"><h4>Faturamento (R$)</h4><canvas id="${chartPrefix}Fat"></canvas></div>
+    <div class="chart-card"><h4>ROAS (x)</h4><canvas id="${chartPrefix}Roas"></canvas></div>
+    <div class="chart-card"><h4>CAC (R$)</h4><canvas id="${chartPrefix}Cac"></canvas></div>
+    <div class="chart-card"><h4>CTR (%)</h4><canvas id="${chartPrefix}Ctr"></canvas></div>
+    <div class="chart-card"><h4>Taxa de conversão — PageView → compra (%)</h4><canvas id="${chartPrefix}Conv"></canvas></div>
+  </div>`;
+  h+=`<div class="tbl-wrap"><table><thead><tr><th>Período</th><th>Invest.</th><th>Cliques</th><th>Impr.</th><th>CTR</th><th>Conv.</th><th>Fat.</th><th>Vendas</th><th>CAC</th><th>ROAS</th></tr></thead><tbody>`;
+  arr.forEach(o=>{ const ctr=o.imp?o.cliques/o.imp*100:0, roas=o.inv?o.fat/o.inv:0, conv=o.pv?o.vendas/o.pv*100:0, cac=o.vendas?o.inv/o.vendas:0;
     h+=`<tr><td>${labelFn(o.k)}</td><td>${brl(o.inv)}</td><td>${intf(o.cliques)}</td><td>${intf(o.imp)}</td>
-    <td>${pct(ctr)}</td><td>${brl(o.fat)}</td><td>${o.vendas}</td><td class="${roas>=1?'green':''}">${dash(roas,v=>v.toFixed(2)+'x')}</td></tr>`; });
-  if(!arr.length) h+=`<tr><td colspan="8" style="text-align:center;color:rgba(255,255,255,.3)">Sem dados no período</td></tr>`;
+    <td>${pct(ctr)}</td><td>${pct(conv)}</td><td>${brl(o.fat)}</td><td>${o.vendas}</td><td>${dash(cac,brl)}</td><td class="${roas>=1?'green':''}">${dash(roas,v=>v.toFixed(2)+'x')}</td></tr>`; });
+  if(!arr.length) h+=`<tr><td colspan="10" style="text-align:center;color:rgba(255,255,255,.3)">Sem dados no período</td></tr>`;
   h+=`</tbody></table></div>`;
   document.getElementById(elId).innerHTML=h;
   const labels=arr.map(o=>labelFn(o.k));
-  drawBar(chartPrefix+'Inv',labels,arr.map(o=>o.inv),'rgba(255,107,43,0.85)');
-  drawBar(chartPrefix+'Ctr',labels,arr.map(o=>o.imp?o.cliques/o.imp*100:0),'rgba(255,183,55,0.85)');
+  drawBar(chartPrefix+'Inv', labels, arr.map(o=>o.inv), 'rgba(255,107,43,0.85)');
+  drawBar(chartPrefix+'Fat', labels, arr.map(o=>o.fat), 'rgba(255,183,55,0.85)');
+  drawBar(chartPrefix+'Roas',labels, arr.map(o=>o.inv?o.fat/o.inv:0), 'rgba(255,140,60,0.85)');
+  drawBar(chartPrefix+'Cac', labels, arr.map(o=>o.vendas?o.inv/o.vendas:0), 'rgba(255,107,43,0.85)');
+  drawBar(chartPrefix+'Ctr', labels, arr.map(o=>o.imp?o.cliques/o.imp*100:0), 'rgba(255,183,55,0.85)');
+  drawBar(chartPrefix+'Conv',labels, arr.map(o=>o.pv?o.vendas/o.pv*100:0), 'rgba(255,160,50,0.85)');
 }
 function renderSemanal(from,to){ renderPeriodTab('semanal',buildPeriod(from,to,weekKey),k=>'Sem. '+fmtD(k),'sem'); }
 function renderMensal(from,to){
