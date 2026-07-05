@@ -169,6 +169,10 @@ tr:hover td{background:rgba(255,255,255,.025)}
       <div class="taxa-grid" id="taxa-grid"></div>
     </div>
   </div>
+  <div class="chart-grid-2x2">
+    <div class="chart-card"><h4>Investimento Diário</h4><canvas id="chart-visao-inv"></canvas></div>
+    <div class="chart-card"><h4>Connect Rate Diário (PV / Cliques)</h4><canvas id="chart-visao-connect"></canvas></div>
+  </div>
   <div class="sec-title">Desempenho Diário</div>
   <div class="tbl-wrap"><table id="tbl-visao">
     <thead><tr><th>Data</th><th>Invest.</th><th>Fat. Total</th><th>ROAS</th><th>Compras</th><th>Tráfego</th><th>Orgânicas</th><th>Ticket Médio</th><th>CAC</th></tr></thead>
@@ -178,7 +182,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
 
 <!-- CRIATIVOS -->
 <div class="content" id="tab-criativos">
-  <div class="ob-info">Origem do faturamento: vendas do Webhook cujo <b>utm_content</b> corresponde ao nome do anúncio no Gerenciador. Status "Ativo" é uma referência baseada na presença de investimento na data mais recente da planilha (esta conta não possui colunas de status de campanha/conjunto/anúncio).</div>
+  <div class="ob-info">Origem do faturamento: vendas mescladas das abas <b>Vendas</b> (relatório consolidado Eduzz) e <b>Webhook</b> (feed em tempo real, usado para pegar vendas ainda não refletidas na aba Vendas), deduplicadas por cliente + dia. Atribuição ao criativo via <b>utm_content</b>. Status "Ativo" é uma referência baseada na presença de investimento na data mais recente da planilha (esta conta não possui colunas de status de campanha/conjunto/anúncio).</div>
   <div class="cri-filterbar">
     <button class="cri-filter-btn active" data-f="todos" onclick="setCriFilter('todos',this)">Todos</button>
     <button class="cri-status-btn" data-f="ativos" onclick="setCriFilter('ativos',this)">Ativos</button>
@@ -251,6 +255,7 @@ const CONFIG = {
   SHEET_ID:         '1hAgLF5YhIg0dshd6-oVvFn4poGwwlbzUb8LKIg_MhSU',
   GERENCIADOR_SHEET:'Gerenciador',
   WEBHOOK_SHEET:    'Webhook',
+  VENDAS_SHEET:     'Vendas',
   DATA_MINIMA:      '2026-07-02',
 
   // Produto principal: linha entra se col produto contém PRODUTO_NOME (case-insensitive)
@@ -267,8 +272,8 @@ const CONFIG = {
   // Colunas do Webhook — planilha no padrão Eduzz.
   // A integração (Make/Eduzz) reordena e adiciona colunas dinamicamente
   // conforme novos campos aparecem, então resolvemos os índices em tempo
-  // real pelo NOME do cabeçalho (ver resolveWebhookCols()). Os números
-  // abaixo em W são apenas um fallback caso um nome não seja encontrado.
+  // real pelo NOME do cabeçalho (ver resolveCols()). Os números abaixo em
+  // W são apenas um fallback caso um nome não seja encontrado.
   W_NAMES: {
     data:         'trans_paiddate',
     dataFallback: 'trans_createdate',
@@ -285,19 +290,29 @@ const CONFIG = {
     utmContent:   'utm_content',
   },
   W: {
-    data:         16,  // trans_paiddate (fallback — snapshot 05/07/2026)
-    dataFallback: 15,  // trans_createdate
-    produto:      32,  // product_name
-    status:       12,  // trans_status
-    cliente:      42,  // cus_name
-    email:        43,  // cus_email
-    fatTotal:     10,  // trans_value (total da transação)
-    fatPrincipal: 105, // trans_items[0].item_value (valor do item principal)
-    txRoot:       8,   // trans_cod
-    utmSource:    73,  // utm_source
-    utmMedium:    75,  // utm_medium (público)
-    utmCampaign:  76,  // utm_campaign
-    utmContent:   74,  // utm_content (criativo)
+    data:16, dataFallback:15, produto:32, status:12, cliente:42, email:43,
+    fatTotal:10, fatPrincipal:105, txRoot:8, utmSource:73, utmMedium:75, utmCampaign:76, utmContent:74,
+  },
+
+  // Colunas da aba "Vendas" — relatório consolidado de vendas da Eduzz
+  // (uma linha = uma venda já fechada, sem precisar agrupar por fatura).
+  V_NAMES: {
+    status:        'Status',
+    dataPagamento: 'Data de Pagamento',
+    dataCriacao:   'Data de Criação',
+    produto:       'Produto',
+    fatTotal:      'Valor Total da Venda',
+    fatItem:       'Valor Total do Item',
+    cliente:       'Cliente / Nome',
+    email:         'Cliente / E-mail',
+    utmSource:     'UTM Source',
+    utmMedium:     'UTM Medium',
+    utmCampaign:   'UTM Campaign',
+    utmContent:    'UTM Content',
+  },
+  V: {
+    status:1, dataPagamento:10, dataCriacao:8, produto:17, fatTotal:23, fatItem:26,
+    cliente:37, email:38, utmSource:50, utmMedium:52, utmCampaign:51, utmContent:53,
   },
 
   // Colunas do Gerenciador (0-based) — esta conta não possui colunas de status
@@ -316,14 +331,15 @@ const CONFIG = {
     hasStatusCols:  false,
   },
 
-  // Eduzz: trans_status = '3' é "pago". '1' é apenas fatura aberta/aguardando
-  // pagamento (invoice_open) e NÃO deve contar como venda.
-  STATUS_APROVADO: ['3','PAID','PAGO','APPROVED','COMPLETE','CONFIRMED'],
+  // Eduzz Webhook: trans_status = '3' é "pago" ('1' = fatura aberta, não conta).
+  // Eduzz relatório de Vendas: Status = "Paga".
+  STATUS_APROVADO: ['3','PAID','PAGO','PAGA','APPROVED','COMPLETE','CONFIRMED'],
 };
 
 const SHEET_ID          = CONFIG.SHEET_ID;
 const GERENCIADOR_SHEET = CONFIG.GERENCIADOR_SHEET;
 const WEBHOOK_SHEET     = CONFIG.WEBHOOK_SHEET;
+const VENDAS_SHEET      = CONFIG.VENDAS_SHEET;
 const DATA_MINIMA       = CONFIG.DATA_MINIMA;
 const G                 = CONFIG.G;
 
@@ -338,7 +354,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 // ── Estado global ─────────────────────────────────────────────────────
 let DIAS = [];      // {data, inv, cliques, pv, ck, reach, imp}
 let GROWS = [];      // linhas brutas do Gerenciador (arrays)
-let SALES = [];      // {data, nome, email, fatTotal, fatPrincipal, fatOB, utmSource, utmMedium, utmCampaign, utmContent}
+let SALES = [];      // {data, nome, email, fatTotal, fatPrincipal, fatOB, utmSource, utmMedium, utmCampaign, utmContent, source}
 let lastGerDate = '';
 let criFilter = 'todos', criSort = 'inv';
 let pubFilter = 'todos', pubSort = 'inv';
@@ -405,27 +421,28 @@ function toISODate(s){
   if(!s) return '';
   let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if(m) return `${m[1]}-${m[2]}-${m[3]}`;
-  m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/); // DD/MM/YYYY [HH:MM]
   if(m) return `${m[3]}-${m[2]}-${m[1]}`;
-  m = s.match(/^(\d{4})(\d{2})(\d{2})$/); // Eduzz: "20260704"
+  m = s.match(/^(\d{4})(\d{2})(\d{2})$/); // Eduzz webhook: "20260704"
   if(m) return `${m[1]}-${m[2]}-${m[3]}`;
   return '';
 }
 
-// ── Resolve colunas do Webhook pelo NOME do cabeçalho ─────────────────
-// A integração Eduzz reordena/insere colunas conforme novos campos
+// ── Resolve colunas pelo NOME do cabeçalho (Webhook e Vendas) ─────────
+// As integrações Eduzz reordenam/inserem colunas conforme novos campos
 // aparecem na planilha, então nunca confiamos apenas em índices fixos.
-function resolveWebhookCols(headerRow){
+function resolveCols(headerRow, namesMap, fallbackMap){
   const idx = {};
   headerRow.forEach((h,i)=>{ const key = String(h||'').trim(); if(key && !(key in idx)) idx[key] = i; });
-  const W = {};
-  Object.keys(CONFIG.W_NAMES).forEach(k=>{
-    const name = CONFIG.W_NAMES[k];
-    W[k] = (name in idx) ? idx[name] : CONFIG.W[k];
+  const out = {};
+  Object.keys(namesMap).forEach(k=>{
+    const name = namesMap[k];
+    out[k] = (name in idx) ? idx[name] : (fallbackMap ? fallbackMap[k] : undefined);
   });
-  return W;
+  return out;
 }
 
+function norm(s){ return String(s||'').trim().toLowerCase(); }
 const isTrafego = s => (s.utmSource||'').toLowerCase().replace(/[\s_-]/g,'') === 'metaads';
 
 // ── Fetch Google Sheets como CSV ──────────────────────────────────────
@@ -463,15 +480,105 @@ function showError(msg){
   hideLoading();
 }
 
+// ── Processa a aba Webhook (feed em tempo real, precisa agrupar por trans_cod) ──
+function processWebhook(wText){
+  const wAll = parseCSV(wText);
+  const Wr = resolveCols(wAll[0]||[], CONFIG.W_NAMES, CONFIG.W);
+  const wRows = wAll.slice(1).filter(r => r.length > 1);
+
+  const groups = {};
+  wRows.forEach(r=>{
+    let data = toISODate(r[Wr.data]) || toISODate(r[Wr.dataFallback]);
+    if(!data) return;
+    if(DATA_MINIMA && data < DATA_MINIMA) return;
+    const status = String(r[Wr.status]||'').toUpperCase().trim();
+    if(!CONFIG.STATUS_APROVADO.includes(status)) return;
+    const key = CONFIG.USA_TX_ROOT ? String(r[Wr.txRoot]||'') : (String(r[Wr.email]||'')+'|'+data);
+    if(!key) return;
+    if(!groups[key]) groups[key] = { data, nome:r[Wr.cliente]||'(sem nome)', email:r[Wr.email]||'', rows:[] };
+    groups[key].rows.push(r);
+  });
+
+  const sales = [];
+  Object.values(groups).forEach(g=>{
+    let hasPrincipal = false, fatPrincipal = 0, fatTotal = 0;
+    let utmSource='', utmMedium='', utmCampaign='', utmContent='';
+    g.rows.forEach(r=>{
+      const prodName = String(r[Wr.produto]||'').toLowerCase();
+      let total = toNum(r[Wr.fatTotal]);
+      let itemVal = toNum(r[Wr.fatPrincipal]);
+      if(CONFIG.VALORES_EM_CENTAVOS){ total/=100; itemVal/=100; }
+      fatTotal += total;
+      if(prodName.includes(CONFIG.PRODUTO_NOME) && total >= CONFIG.PRODUTO_PRECO_MINIMO){
+        hasPrincipal = true;
+        fatPrincipal += (itemVal || total);
+        if(!utmSource) utmSource = r[Wr.utmSource]||'';
+        if(!utmMedium) utmMedium = r[Wr.utmMedium]||'';
+        if(!utmCampaign) utmCampaign = r[Wr.utmCampaign]||'';
+        if(!utmContent) utmContent = r[Wr.utmContent]||'';
+      }
+    });
+    if(!hasPrincipal) return;
+    const fatOB = Math.max(0, fatTotal - fatPrincipal);
+    sales.push({ source:'webhook', data:g.data, nome:g.nome, email:g.email, fatTotal, fatPrincipal, fatOB, utmSource, utmMedium, utmCampaign, utmContent });
+  });
+  return sales;
+}
+
+// ── Processa a aba Vendas (relatório consolidado — uma linha = uma venda) ──
+function processVendas(vText){
+  const vAll = parseCSV(vText);
+  const Vr = resolveCols(vAll[0]||[], CONFIG.V_NAMES, CONFIG.V);
+  const vRows = vAll.slice(1).filter(r => r.length > 1);
+
+  const sales = [];
+  vRows.forEach(r=>{
+    const status = String(r[Vr.status]||'').toUpperCase().trim();
+    if(!CONFIG.STATUS_APROVADO.includes(status)) return;
+    let data = toISODate(r[Vr.dataPagamento]) || toISODate(r[Vr.dataCriacao]);
+    if(!data) return;
+    if(DATA_MINIMA && data < DATA_MINIMA) return;
+    const prodName = String(r[Vr.produto]||'').toLowerCase();
+    if(!prodName.includes(CONFIG.PRODUTO_NOME)) return;
+    let fatTotal = toNum(r[Vr.fatTotal]);
+    if(CONFIG.VALORES_EM_CENTAVOS) fatTotal/=100;
+    if(fatTotal < CONFIG.PRODUTO_PRECO_MINIMO) return;
+    let fatPrincipal = toNum(r[Vr.fatItem]) || fatTotal;
+    if(CONFIG.VALORES_EM_CENTAVOS) fatPrincipal/=100;
+    const fatOB = Math.max(0, fatTotal - fatPrincipal);
+    sales.push({
+      source:'vendas', data, nome:r[Vr.cliente]||'(sem nome)', email:r[Vr.email]||'',
+      fatTotal, fatPrincipal, fatOB,
+      utmSource:r[Vr.utmSource]||'', utmMedium:r[Vr.utmMedium]||'', utmCampaign:r[Vr.utmCampaign]||'', utmContent:r[Vr.utmContent]||'',
+    });
+  });
+  return sales;
+}
+
+// ── Mescla Vendas + Webhook, deduplicando por cliente + dia ───────────
+// A aba "Vendas" é o relatório consolidado da Eduzz (autoritativo); a aba
+// "Webhook" é o feed em tempo real, usado só para pegar vendas recentes
+// que ainda não caíram no relatório consolidado.
+function mergeSales(vendasSales, webhookSales){
+  const map = new Map();
+  vendasSales.forEach(s=>{ map.set(norm(s.email)+'|'+s.data, s); });
+  webhookSales.forEach(s=>{
+    const key = norm(s.email)+'|'+s.data;
+    if(!map.has(key)) map.set(key, s);
+  });
+  return Array.from(map.values());
+}
+
 // ── Carregamento e processamento principal ───────────────────────────
 async function loadData(){
   document.getElementById('loading-overlay').style.display = 'flex';
   document.getElementById('error-box').style.display = 'none';
   setLoadingMsg('Conectando com a planilha...');
   try {
-    const [gText, wText] = await Promise.all([
+    const [gText, wText, vText] = await Promise.all([
       fetchSheetCSV(GERENCIADOR_SHEET),
-      fetchSheetCSV(WEBHOOK_SHEET)
+      fetchSheetCSV(WEBHOOK_SHEET),
+      fetchSheetCSV(VENDAS_SHEET)
     ]);
 
     setLoadingMsg('Processando dados de tráfego...');
@@ -496,49 +603,9 @@ async function loadData(){
     lastGerDate = DIAS.length ? DIAS[DIAS.length-1].data : '';
 
     setLoadingMsg('Processando vendas...');
-    const wAll = parseCSV(wText);
-    const wHeader = wAll[0] || [];
-    const Wr = resolveWebhookCols(wHeader);
-    const wRows = wAll.slice(1).filter(r => r.length > 1);
-
-    const groups = {};
-    wRows.forEach(r=>{
-      let data = toISODate(r[Wr.data]) || toISODate(r[Wr.dataFallback]);
-      if(!data) return;
-      if(DATA_MINIMA && data < DATA_MINIMA) return;
-      const status = String(r[Wr.status]||'').toUpperCase().trim();
-      if(!CONFIG.STATUS_APROVADO.includes(status)) return;
-      const key = CONFIG.USA_TX_ROOT ? String(r[Wr.txRoot]||'') : (String(r[Wr.email]||'')+'|'+data);
-      if(!key) return;
-      if(!groups[key]) groups[key] = { data, nome:r[Wr.cliente]||'(sem nome)', email:r[Wr.email]||'', rows:[] };
-      groups[key].rows.push(r);
-    });
-
-    const sales = [];
-    Object.values(groups).forEach(g=>{
-      let hasPrincipal = false, fatPrincipal = 0, fatTotal = 0;
-      let utmSource='', utmMedium='', utmCampaign='', utmContent='';
-      g.rows.forEach(r=>{
-        const prodName = String(r[Wr.produto]||'').toLowerCase();
-        let total = toNum(r[Wr.fatTotal]);
-        let itemVal = toNum(r[Wr.fatPrincipal]);
-        if(CONFIG.VALORES_EM_CENTAVOS){ total/=100; itemVal/=100; }
-        fatTotal += total;
-        if(prodName.includes(CONFIG.PRODUTO_NOME) && total >= CONFIG.PRODUTO_PRECO_MINIMO){
-          hasPrincipal = true;
-          fatPrincipal += (itemVal || total);
-          if(!utmSource) utmSource = r[Wr.utmSource]||'';
-          if(!utmMedium) utmMedium = r[Wr.utmMedium]||'';
-          if(!utmCampaign) utmCampaign = r[Wr.utmCampaign]||'';
-          if(!utmContent) utmContent = r[Wr.utmContent]||'';
-        }
-      });
-      if(!hasPrincipal) return;
-      const fatOB = Math.max(0, fatTotal - fatPrincipal);
-      sales.push({ data:g.data, nome:g.nome, email:g.email, fatTotal, fatPrincipal, fatOB, utmSource, utmMedium, utmCampaign, utmContent });
-    });
-
-    SALES = sales.sort((a,b)=> b.data.localeCompare(a.data));
+    const webhookSales = processWebhook(wText);
+    const vendasSales = processVendas(vText);
+    SALES = mergeSales(vendasSales, webhookSales).sort((a,b)=> b.data.localeCompare(a.data));
 
     setPreset('all', document.getElementById('btn-all'));
     hideLoading();
@@ -685,6 +752,7 @@ function renderVisaoGeral(from,to){
   const salesR = SALES.filter(s=>inRange(s.data,from,to));
   const invest = diasR.reduce((a,d)=>a+d.inv,0);
   const cliques = diasR.reduce((a,d)=>a+d.cliques,0);
+  const imp = diasR.reduce((a,d)=>a+d.imp,0);
   const pv = diasR.reduce((a,d)=>a+d.pv,0);
   const ck = diasR.reduce((a,d)=>a+d.ck,0);
   const fatTotal = salesR.reduce((a,s)=>a+s.fatTotal,0);
@@ -720,13 +788,18 @@ function renderVisaoGeral(from,to){
     </div>`).join('');
 
   const taxas = [
-    {label:'Cliques → Page View', val: safeDiv(pv,cliques)*100},
-    {label:'Page View → Checkout', val: safeDiv(ck,pv)*100},
-    {label:'Checkout → Compra', val: safeDiv(compras,ck)*100},
+    {label:'CTR (Cliques / Impressões)', val: safeDiv(cliques,imp)*100},
+    {label:'Connect Rate (PV / Cliques)', val: safeDiv(pv,cliques)*100},
+    {label:'Taxa Checkout (CK / PV)', val: safeDiv(ck,pv)*100},
+    {label:'Taxa Compra (Compras / CK)', val: safeDiv(compras,ck)*100},
     {label:'Cliques → Compra', val: safeDiv(compras,cliques)*100},
   ];
   document.getElementById('taxa-grid').innerHTML = taxas.map(t=>`
     <div class="taxa-item"><span>${t.label}</span><span class="taxa-val">${fmtPct(t.val)}</span></div>`).join('');
+
+  const diasOrd = diasR.slice().sort((a,b)=>a.data.localeCompare(b.data));
+  renderChart('chart-visao-inv', diasOrd.map(d=>fmtDateBR(d.data)), diasOrd.map(d=>d.inv), 'Investimento (R$)', 'rgba(255,107,43,0.85)', 'bar');
+  renderChart('chart-visao-connect', diasOrd.map(d=>fmtDateBR(d.data)), diasOrd.map(d=>Number((safeDiv(d.pv,d.cliques)*100).toFixed(2))), 'Connect Rate (%)', 'rgba(255,183,55,0.85)', 'line');
 
   const tbody = document.querySelector('#tbl-visao tbody');
   if(diasR.length === 0){
@@ -756,8 +829,6 @@ function renderVisaoGeral(from,to){
 }
 
 // ── CRIATIVOS & PÚBLICOS (recalculam do zero por período) ─────────────
-function norm(s){ return String(s||'').trim().toLowerCase(); }
-
 function buildCriPubMaps(from, to){
   const gRowsR = GROWS.filter(r=>{
     const d = toISODate(r[G.date]);
@@ -969,17 +1040,18 @@ function renderPeriodo(from,to,tipo){
 
   const invId = tipo==='semana' ? 'chart-semana-inv' : 'chart-mes-inv';
   const ctrId = tipo==='semana' ? 'chart-semana-ctr' : 'chart-mes-ctr';
-  renderChart(invId, arr.map(r=>r.key), arr.map(r=>r.inv), 'Investimento (R$)', 'rgba(255,107,43,0.85)');
-  renderChart(ctrId, arr.map(r=>r.key), arr.map(r=>Number(r.ctr.toFixed(2))), 'CTR (%)', 'rgba(255,183,55,0.85)');
+  renderChart(invId, arr.map(r=>r.key), arr.map(r=>r.inv), 'Investimento (R$)', 'rgba(255,107,43,0.85)', 'bar');
+  renderChart(ctrId, arr.map(r=>r.key), arr.map(r=>Number(r.ctr.toFixed(2))), 'CTR (%)', 'rgba(255,183,55,0.85)', 'bar');
 }
 
-function renderChart(canvasId, labels, data, label, color){
+function renderChart(canvasId, labels, data, label, color, type){
   const el = document.getElementById(canvasId);
   if(!el || typeof Chart==='undefined') return;
   if(charts[canvasId]) charts[canvasId].destroy();
+  type = type || 'bar';
   charts[canvasId] = new Chart(el, {
-    type:'bar',
-    data:{ labels, datasets:[{ label, data, backgroundColor:color, borderColor:color, borderRadius:4 }] },
+    type,
+    data:{ labels, datasets:[{ label, data, backgroundColor: type==='line' ? 'rgba(255,183,55,0.15)' : color, borderColor:color, borderRadius: type==='bar'?4:0, fill: type==='line', tension: type==='line'?0.3:0, pointRadius: type==='line'?2:0 }] },
     options:{
       responsive:true, maintainAspectRatio:false,
       plugins:{ legend:{display:false} },
