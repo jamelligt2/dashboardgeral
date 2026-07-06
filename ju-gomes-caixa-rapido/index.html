@@ -79,6 +79,8 @@
   .b-pausar { background:rgba(255,23,68,.15); color:#ff5a72; border:1px solid #ff1744; }
   .b-quente { background:rgba(255,23,68,.15); color:#ff5a72; }
   .b-frio { background:rgba(66,165,245,.15); color:#69b7f5; }
+  .b-ativo { background:rgba(0,200,83,.15); color:#00e676; border:1px solid #00c853; }
+  .b-pausado { background:rgba(136,144,168,.15); color:#8890a8; border:1px solid #444a63; }
   a.adlink { color:#42a5f5; text-decoration:none; font-size:12px; }
   a.adlink:hover { text-decoration:underline; }
   .chart-box { background:#1e1e35; border:1px solid #262640; border-radius:12px; padding:20px; margin-top:16px; }
@@ -137,7 +139,7 @@
       <div class="temp-metrics">
         <div class="m"><div class="n qf" id="fInv">R$ 0,00</div><div class="l">Investido</div></div>
         <div class="m"><div class="n qf" id="fCpl">—</div><div class="l">CPL</div></div>
-        <div class="m"><div class="n qf" id="fLd">0</div><div class="l">Leads</div></div>
+        <div class="m"><div class="n qf" id="frLd">0</div><div class="l">Leads</div></div>
       </div>
       <div class="breakdown" id="fBreak"><div class="b-row"><span class="muted">Nenhum conjunto frio ativo</span><span>—</span></div></div>
     </div>
@@ -203,7 +205,7 @@
     <table>
       <thead><tr>
         <th>#</th><th class="l">Criativo</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>PV</th><th>Leads</th>
-        <th>CTR</th><th>CPC</th><th>CPL</th><th>TX Entrada</th><th>TX Cadastro</th><th class="l">Anúncio</th><th class="l">Status</th>
+        <th>CTR</th><th>CPC</th><th>CPL</th><th>TX Entrada</th><th>TX Cadastro</th><th class="l">Anúncio</th><th class="l">Veiculação</th><th class="l">Status</th>
       </tr></thead>
       <tbody id="creativeBody"></tbody>
     </table>
@@ -247,6 +249,23 @@
 const SHEET_ID = '1UTSZAXUBggfti36Um7kx-jkdS2kLCHpnQ-vvoOklkqU';
 const GID = '295055587';
 const AUTO_REFRESH_MS = 5 * 60 * 1000; // 5 minutos
+
+/* =========================================================
+   OVERRIDES MANUAIS DE VEICULAÇÃO
+   A planilha não traz um status oficial do Meta Ads, então a coluna
+   "Veiculação" é inferida pelo gasto do dia mais recente. Quando o gestor
+   pausar/reativar um anúncio direto no Gerenciador (fora da planilha),
+   liste a URL do anúncio aqui para o dash refletir isso imediatamente,
+   sem esperar o próximo dia de dados.
+   ========================================================= */
+const MANUALLY_PAUSED_URLS = new Set([
+  'https://www.instagram.com/p/DaV0YehAbl3/', // ICR-ADE001 - Efeito Caixa Rápido
+  'https://www.instagram.com/p/DaV0YgjgXnR/', // ICR-ADE002 - Conteúdo para Compra
+  'https://www.instagram.com/p/DaV0YeLgGwM/', // ICR-ADE003 - Compra em 24h
+  'https://www.instagram.com/p/DaV0YfUgu-j/', // ICR-ADE004 - Criação de Conteúdo
+  'https://www.instagram.com/p/DaV0YgtgSha/', // ICR-ADE005 - Compra no Direct
+]);
+const MANUALLY_ACTIVE_URLS = new Set([]);
 
 const brl = v => 'R$ '+(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const pct = v => (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%';
@@ -401,7 +420,7 @@ function render(rows){
   if (frioRows.length){
     document.getElementById('fInv').textContent = brl(F.spend);
     document.getElementById('fCpl').textContent = F.cpl!==null? brl(F.cpl) : '—';
-    document.getElementById('fLd').textContent = F.ld;
+    document.getElementById('frLd').textContent = F.ld;
     const adsetsF = [...new Set(frioRows.map(r=>r.adset))];
     document.getElementById('fBreak').innerHTML = adsetsF.map(a=>{
       const o = met(sumRows(frioRows.filter(r=>r.adset===a)));
@@ -410,7 +429,7 @@ function render(rows){
   } else {
     document.getElementById('fInv').textContent = 'R$ 0,00';
     document.getElementById('fCpl').textContent = '—';
-    document.getElementById('fLd').textContent = '0';
+    document.getElementById('frLd').textContent = '0';
     document.getElementById('fBreak').innerHTML = '<div class="b-row"><span class="muted">Nenhum conjunto frio ativo</span><span>—</span></div>';
   }
 
@@ -439,6 +458,11 @@ function render(rows){
     const creativeRows = rows.filter(r=>(r.url||r.adName)===u);
     const o = met(sumRows(creativeRows));
     o.url = u; o.adName = creativeRows[0].adName; o.publico = creativeRows[0].publico; o.formato = creativeRows[0].formato;
+    // Veiculação: prioriza override manual (pausas/reativações feitas fora da planilha);
+    // na ausência de override, infere pelo gasto do criativo no dia mais recente da planilha.
+    if (MANUALLY_PAUSED_URLS.has(u)) o.active = false;
+    else if (MANUALLY_ACTIVE_URLS.has(u)) o.active = true;
+    else o.active = creativeRows.some(rr => rr.date === maxDate && rr.spend > 0);
     return o;
   });
   function statusFor(r){
@@ -461,6 +485,7 @@ function render(rows){
       <td>${pct(r.ctr)}</td><td>${brl(r.cpc)}</td><td>${r.cpl!==null?brl(r.cpl):'—'}</td>
       <td>${pct(r.txent)}</td><td>${pct(r.txcad)}</td>
       <td class="l">${r.url?`<a class="adlink" href="${r.url}" target="_blank">ver ↗</a>`:'—'}</td>
+      <td class="l"><span class="badge ${r.active?'b-ativo':'b-pausado'}">${r.active?'Ativo':'Pausado'}</span></td>
       <td class="l"><span class="badge ${c}">${s}</span></td></tr>`;
   }).join('');
 
