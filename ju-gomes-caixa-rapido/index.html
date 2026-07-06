@@ -9,11 +9,22 @@
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   body { background:#0f0f1a; color:#fff; font-family:'Segoe UI',system-ui,-apple-system,sans-serif; }
-  .header { background:#16213e; border-bottom:2px solid #ff6b35; display:flex; align-items:center; gap:16px; padding:18px 28px; }
+  .header { background:#16213e; border-bottom:2px solid #ff6b35; display:flex; align-items:center; gap:16px; padding:18px 28px; flex-wrap:wrap; }
   .logo-badge { background:linear-gradient(135deg,#ff6b35,#e04e1c); border-radius:10px; width:52px; height:52px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:18px; color:#fff; letter-spacing:1px; }
   .header-divider { width:2px; height:40px; background:#262640; }
   .header-text h1 { font-size:19px; font-weight:700; letter-spacing:.5px; }
   .header-text p { font-size:13px; color:#9aa; margin-top:4px; }
+  .sync-box { margin-left:auto; display:flex; align-items:center; gap:12px; }
+  .sync-status { font-size:12px; color:#9aa; text-align:right; line-height:1.5; }
+  .sync-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:#00c853; margin-right:6px; }
+  .sync-dot.err { background:#ff1744; }
+  .sync-dot.loading { background:#ffd600; animation:pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.3;} }
+  .btn-refresh { background:#1e1e35; border:1px solid #ff6b35; color:#ff8a5c; font-size:12px; font-weight:700; padding:8px 14px; border-radius:8px; cursor:pointer; white-space:nowrap; }
+  .btn-refresh:hover { background:#262640; }
+  .btn-refresh:disabled { opacity:.5; cursor:default; }
+  .error-banner { display:none; background:#2a0a0a; border:1px solid #ff1744; color:#ff8a95; font-size:13px; padding:12px 28px; }
+  .error-banner.show { display:block; }
   .tabs { display:flex; background:#16213e; border-bottom:1px solid #262640; padding:0 20px; overflow-x:auto; }
   .tab { padding:14px 22px; cursor:pointer; font-size:14px; font-weight:600; color:#8890a8; border-bottom:3px solid transparent; white-space:nowrap; transition:.15s; }
   .tab:hover { color:#cdd; }
@@ -73,7 +84,8 @@
   .chart-box { background:#1e1e35; border:1px solid #262640; border-radius:12px; padding:20px; margin-top:16px; }
   .muted { color:#777; }
   .note { font-size:12px; color:#777; margin-top:8px; font-style:italic; }
-  @media(max-width:900px){ .kpi-row,.temp-row{grid-template-columns:1fr;} .funnel-wrap{flex-direction:column;} .funnel-svg-wrap{max-width:100%;flex:1;} }
+  .loading-msg { text-align:center; padding:60px 20px; color:#8890a8; font-size:14px; }
+  @media(max-width:900px){ .kpi-row,.temp-row{grid-template-columns:1fr;} .funnel-wrap{flex-direction:column;} .funnel-svg-wrap{max-width:100%;flex:1;} .sync-box{margin-left:0; width:100%; justify-content:space-between;} }
 </style>
 </head>
 <body>
@@ -82,9 +94,14 @@
   <div class="header-divider"></div>
   <div class="header-text">
     <h1>DASHBOARD CAPTAÇÃO — JU GOMES · CAIXA RÁPIDO</h1>
-    <p>CAP210726 · 01–03/07/2026</p>
+    <p id="headerSub">Carregando dados da planilha…</p>
+  </div>
+  <div class="sync-box">
+    <div class="sync-status"><span class="sync-dot loading" id="syncDot"></span><span id="syncText">conectando à planilha…</span></div>
+    <button class="btn-refresh" id="btnRefresh">↻ Atualizar agora</button>
   </div>
 </div>
+<div class="error-banner" id="errorBanner"></div>
 
 <div class="tabs">
   <div class="tab active" data-t="geral">Visão Geral</div>
@@ -96,10 +113,10 @@
 <!-- ============ VISÃO GERAL ============ -->
 <div class="panel active" id="geral">
   <div class="kpi-row">
-    <div class="kpi accent"><div class="label">Investimento Total</div><div class="value" id="kInv"></div><div class="sub">01–03/07/2026 · 3 dias</div></div>
-    <div class="kpi"><div class="label">CTR Médio</div><div class="value" id="kCtr"></div><div class="sub" id="kCtrSub"></div></div>
-    <div class="kpi"><div class="label">CPM Médio</div><div class="value" id="kCpm"></div><div class="sub">custo por mil impressões</div></div>
-    <div class="kpi"><div class="label">CPL Médio</div><div class="value" id="kCpl"></div><div class="sub" id="kCplSub"></div></div>
+    <div class="kpi accent"><div class="label">Investimento Total</div><div class="value" id="kInv">—</div><div class="sub" id="kInvSub"></div></div>
+    <div class="kpi"><div class="label">CTR Médio</div><div class="value" id="kCtr">—</div><div class="sub" id="kCtrSub"></div></div>
+    <div class="kpi"><div class="label">CPM Médio</div><div class="value" id="kCpm">—</div><div class="sub">custo por mil impressões</div></div>
+    <div class="kpi"><div class="label">CPL Médio</div><div class="value" id="kCpl">—</div><div class="sub" id="kCplSub"></div></div>
   </div>
 
   <div class="section-title">Público Quente vs Público Frio</div>
@@ -108,28 +125,28 @@
       <h3 class="qh">🔥 PÚBLICO QUENTE</h3>
       <div class="subttl">Engajamento 365D</div>
       <div class="temp-metrics">
-        <div class="m"><div class="n qh" id="qInv"></div><div class="l">Investido</div></div>
-        <div class="m"><div class="n qh" id="qCpl"></div><div class="l">CPL</div></div>
-        <div class="m"><div class="n qh" id="qLd"></div><div class="l">Leads</div></div>
+        <div class="m"><div class="n qh" id="qInv">—</div><div class="l">Investido</div></div>
+        <div class="m"><div class="n qh" id="qCpl">—</div><div class="l">CPL</div></div>
+        <div class="m"><div class="n qh" id="qLd">—</div><div class="l">Leads</div></div>
       </div>
       <div class="breakdown" id="qBreak"></div>
     </div>
     <div class="temp-card temp-frio">
       <h3 class="qf">❄️ PÚBLICO FRIO</h3>
-      <div class="subttl">LAK / Interesses — sem veiculação neste período</div>
+      <div class="subttl">LAK / Interesses</div>
       <div class="temp-metrics">
-        <div class="m"><div class="n qf">R$ 0,00</div><div class="l">Investido</div></div>
-        <div class="m"><div class="n qf">—</div><div class="l">CPL</div></div>
-        <div class="m"><div class="n qf">0</div><div class="l">Leads</div></div>
+        <div class="m"><div class="n qf" id="fInv">R$ 0,00</div><div class="l">Investido</div></div>
+        <div class="m"><div class="n qf" id="fCpl">—</div><div class="l">CPL</div></div>
+        <div class="m"><div class="n qf" id="fLd">0</div><div class="l">Leads</div></div>
       </div>
-      <div class="breakdown"><div class="b-row"><span class="muted">Nenhum conjunto frio ativo</span><span>—</span></div></div>
+      <div class="breakdown" id="fBreak"><div class="b-row"><span class="muted">Nenhum conjunto frio ativo</span><span>—</span></div></div>
     </div>
     <div class="temp-card temp-comp">
       <h3>Comparativo</h3>
       <div class="subttl">Quente x Frio</div>
-      <div class="comp-item"><div class="big">100%</div><div class="small">dos leads vieram do público Quente</div></div>
-      <div class="comp-item"><div class="big">0%</div><div class="small">dos leads vieram do público Frio</div></div>
-      <div class="comp-item"><div class="big" id="cCpl"></div><div class="small">CPL do Quente (único ativo)</div></div>
+      <div class="comp-item"><div class="big" id="pQuenteLeads">—</div><div class="small">dos leads vieram do público Quente</div></div>
+      <div class="comp-item"><div class="big" id="pFrioLeads">—</div><div class="small">dos leads vieram do público Frio</div></div>
+      <div class="comp-item"><div class="big" id="cCpl">—</div><div class="small" id="cCplLabel">CPL do Quente</div></div>
     </div>
   </div>
 
@@ -162,9 +179,9 @@
       </svg>
     </div>
     <div class="funnel-metrics-row">
-      <div class="fm-card"><div class="l">CPC — Custo por Clique</div><div class="v" style="color:#ff6b35" id="mCpc"></div><div class="fm-bar" style="background:#ff6b35"></div></div>
-      <div class="fm-card"><div class="l">TX Entrada — cliques que chegam à página</div><div class="v" style="color:#ffd600" id="mEnt"></div><div class="fm-bar" style="background:#ffd600"></div></div>
-      <div class="fm-card"><div class="l">TX Cadastro — page views que viram lead</div><div class="v" style="color:#00c853" id="mCad"></div><div class="fm-bar" style="background:#00c853"></div></div>
+      <div class="fm-card"><div class="l">CPC — Custo por Clique</div><div class="v" style="color:#ff6b35" id="mCpc">—</div><div class="fm-bar" style="background:#ff6b35"></div></div>
+      <div class="fm-card"><div class="l">TX Entrada — cliques que chegam à página</div><div class="v" style="color:#ffd600" id="mEnt">—</div><div class="fm-bar" style="background:#ffd600"></div></div>
+      <div class="fm-card"><div class="l">TX Cadastro — page views que viram lead</div><div class="v" style="color:#00c853" id="mCad">—</div><div class="fm-bar" style="background:#00c853"></div></div>
     </div>
   </div>
 
@@ -176,7 +193,7 @@
     </table>
   </div>
   <div class="chart-box"><canvas id="dailyChart" height="90"></canvas></div>
-  <div class="note">03/07/2026 é um dia parcial (campanha em andamento).</div>
+  <div class="note" id="partialNote"></div>
 </div>
 
 <!-- ============ CRIATIVOS ============ -->
@@ -205,7 +222,7 @@
       <tbody id="audienceBody"></tbody>
     </table>
   </div>
-  <div class="note">Todo o investimento do período foi para o público Quente (Engajamento 365D). Segmentação por formato de criativo dentro do conjunto.</div>
+  <div class="note" id="pubNote"></div>
 </div>
 
 <!-- ============ ANÁLISE DIÁRIA ============ -->
@@ -222,116 +239,297 @@
 </div>
 
 <script>
-const brl = v => 'R$ '+v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
-const pct = v => v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%';
-const num = v => v.toLocaleString('pt-BR');
+/* =========================================================
+   FONTE DE DADOS — Google Sheets ao vivo
+   A planilha precisa estar compartilhada como
+   "Qualquer pessoa com o link pode ver" para este fetch funcionar.
+   ========================================================= */
+const SHEET_ID = '1UTSZAXUBggfti36Um7kx-jkdS2kLCHpnQ-vvoOklkqU';
+const GID = '295055587';
+const AUTO_REFRESH_MS = 5 * 60 * 1000; // 5 minutos
 
-const URLS = {
- ADE001:'https://www.instagram.com/p/DaOfqTjA02L/', ADE002:'https://www.instagram.com/p/DaOfphVgeCu/',
- ADE003:'https://www.instagram.com/p/DaOfq8MAxot/', ADE004:'https://www.instagram.com/p/DaOfpo5ghOM/',
- ADE005:'https://www.instagram.com/p/DaOfqPgAJmP/', ADV006:'https://www.instagram.com/p/DaOeHrwgvYx/',
- ADV007:'https://www.instagram.com/p/DaOeIM6gBA2/', ADV008:'https://www.instagram.com/p/DaOeHlsAT_Y/',
- ADV009:'https://www.instagram.com/p/DaOeI7LAcHj/', ADV010:'https://www.instagram.com/p/DaOeKdmAmP0/',
- ADV011:'https://www.instagram.com/p/DaOeJlTgVkO/', ADV012:'https://www.instagram.com/p/DaOeICJA7so/'};
-const NAMES = {
- ADE001:'ICR-ADE001 - Efeito Caixa Rápido', ADE002:'ICR-ADE002 - Conteúdo para Compra',
- ADE003:'ICR-ADE003 - Compra em 24h', ADE004:'ICR-ADE004 - Criação de Conteúdo',
- ADE005:'ICR-ADE005 - Compra no Direct', ADV006:'ICR-ADV006 - 638 vendas em 24h',
- ADV007:'ICR-ADV007 - 5 estratégias de caixa rápido', ADV008:'ICR-ADV008 - Sequência estratégica nos stories',
- ADV009:'ICR-ADV009 - História de Aluna no Caixa Rápido', ADV010:'ICR-ADV010 - Convite Direto para a Imersão',
- ADV011:'ICR-ADV011 - Procurando Mentora/Prestadora', ADV012:'ICR-ADV012 - Procurando Mentora/Prestadora'};
-// [dia, code, spend, imp, clk, pv, ld]
-const raw = [
- ['01/07','ADE001',12.89,316,3,1,0],['01/07','ADE002',12.45,295,5,2,1],['01/07','ADE003',11.92,323,4,3,1],
- ['01/07','ADE004',11.80,278,3,0,0],['01/07','ADE005',11.50,316,3,3,0],['01/07','ADV006',12.88,234,8,6,1],
- ['01/07','ADV007',12.96,259,1,1,0],['01/07','ADV008',12.42,282,8,7,2],['01/07','ADV009',13.82,221,6,3,2],
- ['01/07','ADV010',12.85,279,4,4,0],['01/07','ADV011',12.96,214,3,3,0],['01/07','ADV012',12.79,271,10,9,1],
- ['02/07','ADE001',9.60,264,6,6,2],['02/07','ADE002',11.23,296,2,0,0],['02/07','ADE003',11.08,367,6,4,0],
- ['02/07','ADE004',12.01,244,5,3,0],['02/07','ADE005',10.75,244,3,1,0],['02/07','ADV006',10.20,206,9,7,3],
- ['02/07','ADV007',10.05,189,1,0,0],['02/07','ADV008',9.89,214,5,4,2],['02/07','ADV009',10.77,165,4,4,2],
- ['02/07','ADV010',9.57,223,9,6,2],['02/07','ADV011',7.85,146,3,2,2],['02/07','ADV012',9.85,256,12,11,3],
- ['03/07','ADE001',2.43,72,0,0,0],['03/07','ADE002',2.58,69,1,0,0],['03/07','ADE003',4.61,127,0,1,0],
- ['03/07','ADE004',2.81,38,2,2,0],['03/07','ADE005',1.83,39,0,0,0],['03/07','ADV006',3.66,64,1,1,0],
- ['03/07','ADV007',3.34,76,1,1,0],['03/07','ADV008',3.25,46,1,2,0],['03/07','ADV009',3.41,58,5,2,1],
- ['03/07','ADV010',3.12,81,2,2,0],['03/07','ADV011',3.50,62,2,2,1],['03/07','ADV012',3.98,85,5,3,0],
-];
-const DAYS = ['01/07','02/07','03/07'];
-const met = o => ({...o,
-  ctr:o.imp?o.clk/o.imp*100:0, cpc:o.clk?o.spend/o.clk:0, cpm:o.imp?o.spend/o.imp*1000:0,
-  cpl:o.ld?o.spend/o.ld:null, txent:o.clk?o.pv/o.clk*100:0, txcad:o.pv?o.ld/o.pv*100:0});
-function sum(list){ return list.reduce((o,r)=>({spend:o.spend+r[2],imp:o.imp+r[3],clk:o.clk+r[4],pv:o.pv+r[5],ld:o.ld+r[6]}),{spend:0,imp:0,clk:0,pv:0,ld:0}); }
-
-const TOT = met(sum(raw));
-const CPL_MED = TOT.cpl;
-
-kInv.textContent = brl(TOT.spend);
-kCtr.textContent = pct(TOT.ctr); kCtrSub.textContent = TOT.clk+' cliques / '+num(TOT.imp)+' impressões';
-kCpm.textContent = brl(TOT.cpm);
-kCpl.textContent = brl(TOT.cpl); kCplSub.textContent = TOT.ld+' leads no total';
-
-qInv.textContent = brl(TOT.spend); qCpl.textContent = brl(TOT.cpl); qLd.textContent = TOT.ld;
-cCpl.textContent = brl(TOT.cpl);
-const est = met(sum(raw.filter(r=>r[1].startsWith('ADE'))));
-const vid = met(sum(raw.filter(r=>r[1].startsWith('ADV'))));
-qBreak.innerHTML =
-  `<div class="b-row"><span>Estático (5 anúncios)</span><span>${brl(est.spend)} · ${est.ld} leads · CPL ${brl(est.cpl)}</span></div>`+
-  `<div class="b-row"><span>Vídeo (7 anúncios)</span><span>${brl(vid.spend)} · ${vid.ld} leads · CPL ${brl(vid.cpl)}</span></div>`;
-
-fImp.textContent=num(TOT.imp); fClk.textContent=TOT.clk; fPv.textContent=TOT.pv; fLd.textContent=TOT.ld;
-fCtr.textContent='CTR '+pct(TOT.ctr); fEnt.textContent='TX Entrada '+pct(TOT.txent); fCad.textContent='TX Cadastro '+pct(TOT.txcad);
-mCpc.textContent=brl(TOT.cpc); mEnt.textContent=pct(TOT.txent); mCad.textContent=pct(TOT.txcad);
-
-const codes=[...new Set(raw.map(r=>r[1]))];
-const creatives = codes.map(c=>{ const o=met(sum(raw.filter(r=>r[1]===c))); o.code=c; return o; });
-function statusFor(r){
-  if(r.cpl!==null && r.cpl<=10) return ['ESCALAR','b-escalar'];
-  if(r.cpl!==null && r.cpl<=CPL_MED) return ['MANTER','b-manter'];
-  if(r.ld===0 && r.spend>=11) return ['PAUSAR','b-pausar'];
-  return ['AVALIAR','b-avaliar'];
+const brl = v => 'R$ '+(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const pct = v => (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%';
+const num = v => (v||0).toLocaleString('pt-BR');
+function parseBR(str){
+  if(str===undefined||str===null||str==='') return 0;
+  const cleaned = String(str).replace(/[^\d,.\-]/g,'').replace(/\./g,'').replace(',', '.');
+  return parseFloat(cleaned) || 0;
 }
-const sortedC=[...creatives].sort((a,b)=>{ if(a.cpl===null&&b.cpl===null)return b.ld-a.ld; if(a.cpl===null)return 1; if(b.cpl===null)return -1; return a.cpl-b.cpl; });
-creativeBody.innerHTML = sortedC.map((r,i)=>{ const [s,c]=statusFor(r); return `<tr>
-  <td>${i+1}</td><td class="l">${NAMES[r.code]}</td>
-  <td>${brl(r.spend)}</td><td>${num(r.imp)}</td><td>${r.clk}</td><td>${r.pv}</td><td><b>${r.ld}</b></td>
-  <td>${pct(r.ctr)}</td><td>${brl(r.cpc)}</td><td>${r.cpl!==null?brl(r.cpl):'—'}</td>
-  <td>${pct(r.txent)}</td><td>${pct(r.txcad)}</td>
-  <td class="l"><a class="adlink" href="${URLS[r.code]}" target="_blank">ver ↗</a></td>
-  <td class="l"><span class="badge ${c}">${s}</span></td></tr>`; }).join('');
+function ddmm(iso){ const p=iso.split('-'); return p[2]+'/'+p[1]; }
 
-const audiences=[{label:'Engajamento 365D · Vídeo',...vid},{label:'Engajamento 365D · Estático',...est}].sort((a,b)=>(a.cpl??1e9)-(b.cpl??1e9));
-audienceBody.innerHTML = audiences.map((r,i)=>{ const [s,c]=statusFor(r); return `<tr>
-  <td>${i+1}</td><td class="l">${r.label}</td><td class="l"><span class="badge b-quente">Quente</span></td>
-  <td>${brl(r.spend)}</td><td>${num(r.imp)}</td><td>${r.clk}</td><td>${r.pv}</td><td><b>${r.ld}</b></td>
-  <td>${pct(r.ctr)}</td><td>${brl(r.cpc)}</td><td>${brl(r.cpl)}</td><td>${pct(r.txent)}</td><td>${pct(r.txcad)}</td>
-  <td class="l"><span class="badge ${c}">${s}</span></td></tr>`; }).join('');
+function parseCSV(text){
+  const rows = []; let row = [], field = '', inQuotes = false;
+  for (let i=0;i<text.length;i++){
+    const c = text[i];
+    if (inQuotes){
+      if (c === '"'){ if (text[i+1] === '"'){ field+='"'; i++; } else inQuotes=false; }
+      else field += c;
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { row.push(field); field=''; }
+      else if (c === '\n') { row.push(field); rows.push(row); row=[]; field=''; }
+      else if (c === '\r') { /* skip */ }
+      else field += c;
+    }
+  }
+  if (field.length || row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
 
-diaryBody.innerHTML = raw.map(r=>{ const o=met({spend:r[2],imp:r[3],clk:r[4],pv:r[5],ld:r[6]}); const camp=r[1].startsWith('ADE')?'Estático':'Vídeo';
-  return `<tr><td class="l">${r[0]}/2026</td><td class="l">${camp}</td><td class="l">${NAMES[r[1]]}</td>
-  <td>${brl(o.spend)}</td><td>${num(o.imp)}</td><td>${o.clk}</td><td>${o.pv}</td><td>${o.ld}</td>
-  <td>${pct(o.ctr)}</td><td>${brl(o.cpc)}</td><td>${o.cpl!==null?brl(o.cpl):'—'}</td></tr>`; }).join('');
+function met(o){
+  return {...o,
+    ctr: o.imp? o.clk/o.imp*100 : 0,
+    cpc: o.clk? o.spend/o.clk : 0,
+    cpm: o.imp? o.spend/o.imp*1000 : 0,
+    cpl: o.ld? o.spend/o.ld : null,
+    txent: o.clk? o.pv/o.clk*100 : 0,
+    txcad: o.pv? o.ld/o.pv*100 : 0
+  };
+}
+function sumRows(list){
+  return list.reduce((o,r)=>({spend:o.spend+r.spend, imp:o.imp+r.imp, clk:o.clk+r.clk, pv:o.pv+r.pv, ld:o.ld+r.ld}),
+    {spend:0,imp:0,clk:0,pv:0,ld:0});
+}
+function formatoFromCampaign(camp){
+  const c = (camp||'').toLowerCase();
+  if (c.includes('vide')) return 'Vídeo';
+  if (c.includes('está') || c.includes('esta')) return 'Estático';
+  return 'Outro';
+}
 
-const days = DAYS.map(d=>{ const o=met(sum(raw.filter(r=>r[0]===d))); o.day=d; return o; });
-dailyBody.innerHTML = days.map(d=>`<tr>
-  <td class="l">${d.day}/2026</td><td>${brl(d.spend)}</td><td>${num(d.imp)}</td><td>${d.clk}</td><td>${d.pv}</td><td>${d.ld}</td>
-  <td>${pct(d.ctr)}</td><td>${brl(d.cpc)}</td><td>${d.cpl!==null?brl(d.cpl):'—'}</td><td>${pct(d.txcad)}</td></tr>`).join('')
-  + `<tr class="total"><td class="l">TOTAL</td><td>${brl(TOT.spend)}</td><td>${num(TOT.imp)}</td><td>${TOT.clk}</td><td>${TOT.pv}</td><td>${TOT.ld}</td><td>${pct(TOT.ctr)}</td><td>${brl(TOT.cpc)}</td><td>${brl(TOT.cpl)}</td><td>${pct(TOT.txcad)}</td></tr>`;
+let dailyChartInstance = null;
 
-new Chart(document.getElementById('dailyChart'),{
-  data:{ labels:days.map(d=>d.day+'/2026'), datasets:[
-    {type:'bar', label:'Leads', data:days.map(d=>d.ld), backgroundColor:'#00c853', yAxisID:'y', borderRadius:6, barThickness:70},
-    {type:'line', label:'CPL (R$)', data:days.map(d=>d.cpl), borderColor:'#ff6b35', backgroundColor:'#ff6b35', tension:.3, yAxisID:'y1', pointRadius:5}
-  ]},
-  options:{ responsive:true, plugins:{legend:{labels:{color:'#cdd'}}},
-    scales:{ x:{ticks:{color:'#9aa'},grid:{color:'#262640'}},
-      y:{position:'left',beginAtZero:true,ticks:{color:'#00e676'},grid:{color:'#262640'},title:{display:true,text:'Leads',color:'#00e676'}},
-      y1:{position:'right',beginAtZero:true,ticks:{color:'#ff8a5c'},grid:{drawOnChartArea:false},title:{display:true,text:'CPL (R$)',color:'#ff8a5c'}} }}
-});
+function setSyncStatus(state, msg){
+  const dot = document.getElementById('syncDot');
+  const txt = document.getElementById('syncText');
+  dot.className = 'sync-dot' + (state==='err' ? ' err' : state==='loading' ? ' loading' : '');
+  txt.textContent = msg;
+}
+function showError(msg){
+  const b = document.getElementById('errorBanner');
+  if (!msg){ b.className='error-banner'; b.textContent=''; return; }
+  b.className='error-banner show'; b.textContent = msg;
+}
+
+async function loadData(){
+  const btn = document.getElementById('btnRefresh');
+  btn.disabled = true;
+  setSyncStatus('loading','buscando dados atualizados da planilha…');
+  try{
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${GID}&_=${Date.now()}`;
+    const res = await fetch(url, {cache:'no-store'});
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    const text = await res.text();
+    if (text.trim().startsWith('<')) throw new Error('resposta não é CSV (a planilha pode não estar mais pública)');
+    const table = parseCSV(text);
+    const header = table[0].map(h=>h.trim());
+    const idx = name => header.indexOf(name);
+    const iDate=idx('Date'), iCamp=idx('Campaign Name'), iAdset=idx('Adset Name'), iAd=idx('Ad Name'),
+          iUrl=idx('Instagram Permalink URL'), iSpend=idx('Spend (Cost, Amount Spent)'), iImp=idx('Impressions'),
+          iClk=idx('Action Link Clicks'), iPv=idx('Action Landing Page View'), iLd=idx('Action Leads'), iPub=idx('Publico');
+
+    const rows = table.slice(1)
+      .filter(r => r[iDate] && r[iDate].trim() && r[iAd] && r[iAd].trim())
+      .map(r => ({
+        date: r[iDate].trim(),
+        campaign: (r[iCamp]||'').trim(),
+        adset: (r[iAdset]||'').trim(),
+        adName: (r[iAd]||'').trim(),
+        url: (r[iUrl]||'').trim(),
+        spend: parseBR(r[iSpend]),
+        imp: Math.round(parseBR(r[iImp])),
+        clk: Math.round(parseBR(r[iClk])),
+        pv: Math.round(parseBR(r[iPv])),
+        ld: Math.round(parseBR(r[iLd])),
+        publico: (r[iPub]||'').trim() || 'Quente',
+        formato: formatoFromCampaign(r[iCamp])
+      }));
+
+    if (!rows.length) throw new Error('nenhuma linha de dados encontrada na planilha');
+
+    render(rows);
+    setSyncStatus('ok', 'atualizado às '+new Date().toLocaleTimeString('pt-BR'));
+    showError(null);
+  } catch(err){
+    console.error(err);
+    setSyncStatus('err','falha ao atualizar');
+    showError('Não foi possível buscar dados novos da planilha agora (' + err.message + '). Verifique se ela ainda está compartilhada como "Qualquer pessoa com o link pode ver". Mostrando os últimos dados carregados com sucesso.');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function render(rows){
+  const dates = [...new Set(rows.map(r=>r.date))].sort();
+  const minDate = dates[0], maxDate = dates[dates.length-1];
+  const campCodeMatch = (rows[0].campaign.match(/CAP\d+/)||[])[0] || '';
+  const year = minDate.split('-')[0];
+
+  document.getElementById('headerSub').textContent =
+    `${campCodeMatch} · ${ddmm(minDate)}–${ddmm(maxDate)}/${year}`;
+
+  const TOT = met(sumRows(rows));
+  document.getElementById('kInv').textContent = brl(TOT.spend);
+  document.getElementById('kInvSub').textContent = `${ddmm(minDate)}–${ddmm(maxDate)}/${year} · ${dates.length} dia${dates.length>1?'s':''}`;
+  document.getElementById('kCtr').textContent = pct(TOT.ctr);
+  document.getElementById('kCtrSub').textContent = num(TOT.clk)+' cliques / '+num(TOT.imp)+' impressões';
+  document.getElementById('kCpm').textContent = brl(TOT.cpm);
+  document.getElementById('kCpl').textContent = TOT.cpl!==null? brl(TOT.cpl) : '—';
+  document.getElementById('kCplSub').textContent = TOT.ld+' leads no total';
+
+  // Quente x Frio
+  const quenteRows = rows.filter(r=>r.publico.toLowerCase()==='quente');
+  const frioRows = rows.filter(r=>r.publico.toLowerCase()!=='quente');
+  const Q = met(sumRows(quenteRows));
+  const F = met(sumRows(frioRows));
+
+  document.getElementById('qInv').textContent = brl(Q.spend);
+  document.getElementById('qCpl').textContent = Q.cpl!==null? brl(Q.cpl) : '—';
+  document.getElementById('qLd').textContent = Q.ld;
+  const qEst = met(sumRows(quenteRows.filter(r=>r.formato==='Estático')));
+  const qVid = met(sumRows(quenteRows.filter(r=>r.formato==='Vídeo')));
+  const qOut = met(sumRows(quenteRows.filter(r=>r.formato==='Outro')));
+  let qBreakHtml = '';
+  const nEst = new Set(quenteRows.filter(r=>r.formato==='Estático').map(r=>r.url)).size;
+  const nVid = new Set(quenteRows.filter(r=>r.formato==='Vídeo').map(r=>r.url)).size;
+  if (qEst.spend>0) qBreakHtml += `<div class="b-row"><span>Estático (${nEst} anúncio${nEst!==1?'s':''})</span><span>${brl(qEst.spend)} · ${qEst.ld} leads · CPL ${qEst.cpl!==null?brl(qEst.cpl):'—'}</span></div>`;
+  if (qVid.spend>0) qBreakHtml += `<div class="b-row"><span>Vídeo (${nVid} anúncio${nVid!==1?'s':''})</span><span>${brl(qVid.spend)} · ${qVid.ld} leads · CPL ${qVid.cpl!==null?brl(qVid.cpl):'—'}</span></div>`;
+  if (qOut.spend>0) qBreakHtml += `<div class="b-row"><span>Outros</span><span>${brl(qOut.spend)} · ${qOut.ld} leads · CPL ${qOut.cpl!==null?brl(qOut.cpl):'—'}</span></div>`;
+  document.getElementById('qBreak').innerHTML = qBreakHtml || '<div class="b-row"><span class="muted">Sem dados</span><span>—</span></div>';
+
+  if (frioRows.length){
+    document.getElementById('fInv').textContent = brl(F.spend);
+    document.getElementById('fCpl').textContent = F.cpl!==null? brl(F.cpl) : '—';
+    document.getElementById('fLd').textContent = F.ld;
+    const adsetsF = [...new Set(frioRows.map(r=>r.adset))];
+    document.getElementById('fBreak').innerHTML = adsetsF.map(a=>{
+      const o = met(sumRows(frioRows.filter(r=>r.adset===a)));
+      return `<div class="b-row"><span>${a}</span><span>${brl(o.spend)} · ${o.ld} leads · CPL ${o.cpl!==null?brl(o.cpl):'—'}</span></div>`;
+    }).join('');
+  } else {
+    document.getElementById('fInv').textContent = 'R$ 0,00';
+    document.getElementById('fCpl').textContent = '—';
+    document.getElementById('fLd').textContent = '0';
+    document.getElementById('fBreak').innerHTML = '<div class="b-row"><span class="muted">Nenhum conjunto frio ativo</span><span>—</span></div>';
+  }
+
+  const totalLeadsForPct = TOT.ld || 1;
+  document.getElementById('pQuenteLeads').textContent = pct(Q.ld/totalLeadsForPct*100);
+  document.getElementById('pFrioLeads').textContent = pct(F.ld/totalLeadsForPct*100);
+  document.getElementById('cCpl').textContent = Q.cpl!==null? brl(Q.cpl) : '—';
+  document.getElementById('cCplLabel').textContent = frioRows.length? 'CPL do Quente' : 'CPL do Quente (único ativo)';
+
+  // Funil
+  document.getElementById('fImp').textContent = num(TOT.imp);
+  document.getElementById('fClk').textContent = TOT.clk;
+  document.getElementById('fPv').textContent = TOT.pv;
+  document.getElementById('fLd').textContent = TOT.ld;
+  document.getElementById('fCtr').textContent = 'CTR '+pct(TOT.ctr);
+  document.getElementById('fEnt').textContent = 'TX Entrada '+pct(TOT.txent);
+  document.getElementById('fCad').textContent = 'TX Cadastro '+pct(TOT.txcad);
+  document.getElementById('mCpc').textContent = brl(TOT.cpc);
+  document.getElementById('mEnt').textContent = pct(TOT.txent);
+  document.getElementById('mCad').textContent = pct(TOT.txcad);
+
+  // Criativos (chave única = URL do anúncio)
+  const urls = [...new Set(rows.map(r=>r.url || r.adName))];
+  const avgSpendPerCreative = urls.length ? TOT.spend/urls.length : 0;
+  const creatives = urls.map(u=>{
+    const creativeRows = rows.filter(r=>(r.url||r.adName)===u);
+    const o = met(sumRows(creativeRows));
+    o.url = u; o.adName = creativeRows[0].adName; o.publico = creativeRows[0].publico; o.formato = creativeRows[0].formato;
+    return o;
+  });
+  function statusFor(r){
+    if (r.cpl!==null && TOT.cpl && r.cpl <= TOT.cpl*0.8) return ['ESCALAR','b-escalar'];
+    if (r.cpl!==null && TOT.cpl && r.cpl <= TOT.cpl) return ['MANTER','b-manter'];
+    if (r.ld===0 && r.spend >= avgSpendPerCreative*0.5) return ['PAUSAR','b-pausar'];
+    return ['AVALIAR','b-avaliar'];
+  }
+  const sortedC = [...creatives].sort((a,b)=>{
+    if (a.cpl===null && b.cpl===null) return b.ld-a.ld;
+    if (a.cpl===null) return 1;
+    if (b.cpl===null) return -1;
+    return a.cpl-b.cpl;
+  });
+  document.getElementById('creativeBody').innerHTML = sortedC.map((r,i)=>{
+    const [s,c] = statusFor(r);
+    return `<tr>
+      <td>${i+1}</td><td class="l">${r.adName}</td>
+      <td>${brl(r.spend)}</td><td>${num(r.imp)}</td><td>${r.clk}</td><td>${r.pv}</td><td><b>${r.ld}</b></td>
+      <td>${pct(r.ctr)}</td><td>${brl(r.cpc)}</td><td>${r.cpl!==null?brl(r.cpl):'—'}</td>
+      <td>${pct(r.txent)}</td><td>${pct(r.txcad)}</td>
+      <td class="l">${r.url?`<a class="adlink" href="${r.url}" target="_blank">ver ↗</a>`:'—'}</td>
+      <td class="l"><span class="badge ${c}">${s}</span></td></tr>`;
+  }).join('');
+
+  // Públicos (agrupado por adset + formato)
+  const groupKeys = [...new Set(rows.map(r=>r.adset+'||'+r.formato+'||'+r.publico))];
+  const audiences = groupKeys.map(k=>{
+    const [adset,formato,publico] = k.split('||');
+    const grpRows = rows.filter(r=>r.adset===adset && r.formato===formato && r.publico===publico);
+    const o = met(sumRows(grpRows));
+    const cleanAdset = adset.replace(/^\d+\s*-\s*/,'');
+    o.label = `${cleanAdset} · ${formato}`;
+    o.publico = publico;
+    return o;
+  }).sort((a,b)=>(a.cpl??1e9)-(b.cpl??1e9));
+  document.getElementById('audienceBody').innerHTML = audiences.map((r,i)=>{
+    const [s,c] = statusFor(r);
+    const tempBadge = r.publico.toLowerCase()==='quente' ? 'b-quente' : 'b-frio';
+    const tempLabel = r.publico.toLowerCase()==='quente' ? 'Quente' : 'Frio';
+    return `<tr>
+      <td>${i+1}</td><td class="l">${r.label}</td><td class="l"><span class="badge ${tempBadge}">${tempLabel}</span></td>
+      <td>${brl(r.spend)}</td><td>${num(r.imp)}</td><td>${r.clk}</td><td>${r.pv}</td><td><b>${r.ld}</b></td>
+      <td>${pct(r.ctr)}</td><td>${brl(r.cpc)}</td><td>${r.cpl!==null?brl(r.cpl):'—'}</td><td>${pct(r.txent)}</td><td>${pct(r.txcad)}</td>
+      <td class="l"><span class="badge ${c}">${s}</span></td></tr>`;
+  }).join('');
+  document.getElementById('pubNote').textContent = frioRows.length
+    ? 'Segmentação por conjunto, formato de criativo e temperatura de público.'
+    : 'Todo o investimento do período foi para público(s) Quente(s). Segmentação por formato de criativo dentro do conjunto.';
+
+  // Análise diária (uma linha por dia+criativo)
+  const sortedRows = [...rows].sort((a,b)=> a.date===b.date ? a.formato.localeCompare(b.formato) : a.date.localeCompare(b.date));
+  document.getElementById('diaryBody').innerHTML = sortedRows.map(r=>{
+    const o = met({spend:r.spend, imp:r.imp, clk:r.clk, pv:r.pv, ld:r.ld});
+    return `<tr><td class="l">${ddmm(r.date)}/${r.date.split('-')[0]}</td><td class="l">${r.formato}</td><td class="l">${r.adName}</td>
+      <td>${brl(o.spend)}</td><td>${num(o.imp)}</td><td>${o.clk}</td><td>${o.pv}</td><td>${o.ld}</td>
+      <td>${pct(o.ctr)}</td><td>${brl(o.cpc)}</td><td>${o.cpl!==null?brl(o.cpl):'—'}</td></tr>`;
+  }).join('');
+
+  // Evolução diária
+  const days = dates.map(d=>{ const o = met(sumRows(rows.filter(r=>r.date===d))); o.day=d; return o; });
+  document.getElementById('dailyBody').innerHTML = days.map(d=>`<tr>
+      <td class="l">${ddmm(d.day)}/${d.day.split('-')[0]}</td><td>${brl(d.spend)}</td><td>${num(d.imp)}</td><td>${d.clk}</td><td>${d.pv}</td><td>${d.ld}</td>
+      <td>${pct(d.ctr)}</td><td>${brl(d.cpc)}</td><td>${d.cpl!==null?brl(d.cpl):'—'}</td><td>${pct(d.txcad)}</td></tr>`).join('')
+    + `<tr class="total"><td class="l">TOTAL</td><td>${brl(TOT.spend)}</td><td>${num(TOT.imp)}</td><td>${TOT.clk}</td><td>${TOT.pv}</td><td>${TOT.ld}</td><td>${pct(TOT.ctr)}</td><td>${brl(TOT.cpc)}</td><td>${TOT.cpl!==null?brl(TOT.cpl):'—'}</td><td>${pct(TOT.txcad)}</td></tr>`;
+
+  document.getElementById('partialNote').textContent =
+    `${ddmm(maxDate)}/${year} pode ser um dia parcial, dependendo do horário da última sincronização com a planilha.`;
+
+  if (dailyChartInstance) dailyChartInstance.destroy();
+  dailyChartInstance = new Chart(document.getElementById('dailyChart'), {
+    data: { labels: days.map(d=>ddmm(d.day)+'/'+d.day.split('-')[0]), datasets: [
+      {type:'bar', label:'Leads', data:days.map(d=>d.ld), backgroundColor:'#00c853', yAxisID:'y', borderRadius:6, barThickness:70},
+      {type:'line', label:'CPL (R$)', data:days.map(d=>d.cpl), borderColor:'#ff6b35', backgroundColor:'#ff6b35', tension:.3, yAxisID:'y1', pointRadius:5}
+    ]},
+    options: { responsive:true, plugins:{legend:{labels:{color:'#cdd'}}},
+      scales: { x:{ticks:{color:'#9aa'},grid:{color:'#262640'}},
+        y:{position:'left',beginAtZero:true,ticks:{color:'#00e676'},grid:{color:'#262640'},title:{display:true,text:'Leads',color:'#00e676'}},
+        y1:{position:'right',beginAtZero:true,ticks:{color:'#ff8a5c'},grid:{drawOnChartArea:false},title:{display:true,text:'CPL (R$)',color:'#ff8a5c'}} } }
+  });
+}
 
 document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
   t.classList.add('active'); document.getElementById(t.dataset.t).classList.add('active');
 }));
+
+document.getElementById('btnRefresh').addEventListener('click', loadData);
+loadData();
+setInterval(loadData, AUTO_REFRESH_MS);
 </script>
 </body>
 </html>
