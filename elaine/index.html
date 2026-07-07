@@ -371,6 +371,25 @@ const DIAS = [
   {data:"31/03/2026",inv:87.09,fat:0,compras:0,cliques:76,pv:58,ck:5,imp:3858}
 ];
 
+// Dados de vídeo 3s e 75% (export Gerenciador de Anúncios)
+var VIDEO_DATA = {
+  "DES-ADE01":{v3s:47,v75:4},"DES-ADE02":{v3s:284,v75:9},"DES-ADE03":{v3s:104,v75:2},
+  "DES-ADE04":{v3s:603,v75:76},"DES-ADE05":{v3s:900,v75:144},"DES-ADE101 - PEIXE 2":{v3s:0,v75:0},
+  "DES-ADE11":{v3s:479,v75:126},"DES-ADE12":{v3s:79,v75:25},"DES-ADE13":{v3s:1834,v75:179},
+  "DES-ADE14":{v3s:331,v75:34},"DES-ADE20":{v3s:92,v75:0},
+  "DES-ADV-NOVO-0105":{v3s:8069,v75:1250},"DES-ADV01":{v3s:1112,v75:310},
+  "DES-ADV02":{v3s:34775,v75:7213},"DES-ADV03":{v3s:594,v75:94},
+  "DES-ADV04":{v3s:7458,v75:1310},"DES-ADV05":{v3s:5404,v75:463},
+  "DES-ADV1001":{v3s:1674,v75:352},"DES-ADV1002":{v3s:4119,v75:1058},
+  "DES-ADV1003":{v3s:7836,v75:541},"DES-ADV1004":{v3s:3926,v75:1957},
+  "DES-ADV1004 — Cópia":{v3s:4807,v75:2210},"DES-ADV1005":{v3s:2090,v75:427},
+  "DES-ADV1005 — Cópia":{v3s:605,v75:145},"DES-ADV1006":{v3s:3243,v75:458},
+  "DES-ADV1020":{v3s:4070,v75:2354},"DES-ADV1021":{v3s:998,v75:96},
+  "DES-ADV1022":{v3s:257,v75:29},"DES-ADV201":{v3s:57278,v75:3890},
+  "DES-ADV202 - 3 corrimentos":{v3s:14072,v75:3016},
+  "DES-ADV210 - vendedor":{v3s:48599,v75:11306},"DES-ADV211 - YPE":{v3s:8392,v75:623}
+};
+
 const CRIATIVOS = [
   {nome:"DES-ADV02",inv:2434.31,cliques:2143,imp:117705,pv:1895,ck:193,compras:49,fat:1716.76,link:"https://www.instagram.com/p/DU3QPNrADko/",cpc:1.14,cpm:20.68,ctr:1.82,cac:34.78,ticket:35.80,roas:1.03,ativo:true},
   {nome:"DES-ADE13",inv:1972.77,cliques:3121,imp:153376,pv:2465,ck:125,compras:15,fat:536.05,link:"https://www.instagram.com/p/DU3QCqaAMzn/",cpc:0.63,cpm:12.86,ctr:2.04,cac:75.88,ticket:35.42,roas:0.47,ativo:true},
@@ -388,6 +407,14 @@ const CRIATIVOS = [
   {nome:"DES-ADV03",inv:74.69,cliques:29,imp:2308,pv:26,ck:5,compras:0,fat:0,link:"https://www.instagram.com/p/DU3QO9AAK7c/",cpc:2.58,cpm:32.36,ctr:1.26,cac:0,ticket:0,roas:0,ativo:true},
   {nome:"DES-ADV01",inv:72.18,cliques:33,imp:3323,pv:24,ck:5,compras:1,fat:35.0,link:"https://www.instagram.com/p/DU3QPJzgH-I/",cpc:2.19,cpm:21.73,ctr:0.99,cac:72.18,ticket:35.0,roas:0.49,ativo:true}
 ];
+// Apply VIDEO_DATA (3s real) to CRIATIVOS
+CRIATIVOS.forEach(function(c){
+  var vd=VIDEO_DATA[c.nome];
+  if(vd){c.v3s=vd.v3s;c.v75=vd.v75;}else{c.v3s=0;c.v75=0;}
+  c.hookRate=c.imp>0?Math.round(c.v3s/c.imp*100*100)/100:0;
+  c.holdRate=c.v3s>0?Math.round(c.v75/c.v3s*100*100)/100:0;
+  c.bodyRate=0; // will be calculated after sales data loads
+});
 
 const PUBLICOS = [
   {nome:"00 - ADVANTAGE",inv:7483.41,cliques:7709,imp:403669,pv:6243,ck:517,cpc:0.97,cpm:18.55,ctr:1.91,connectRate:80.98,compras:74,fat:2671,ativo:true},
@@ -1002,6 +1029,7 @@ function renderCriativos(){
       fc.roas=fc.inv>0?Math.round(fc.fat/fc.inv*100)/100:0;
       fc.cac=fc.compras>0?Math.round(fc.inv/fc.compras*100)/100:0;
       fc.ticket=fc.compras>0?Math.round(fc.fat/fc.compras*100)/100:0;
+      fc.bodyRate=(fc.v75||0)>0?Math.round(fc.compras/(fc.v75||1)*100*100)/100:0;
       return fc;
     });
   }
@@ -1026,15 +1054,18 @@ function renderCriativos(){
         '<div class="cri-metric"><span class="cri-metric-label">CAC</span><span class="cri-metric-val">'+(c.compras>0?brl(c.cac):'—')+'</span></div>'+
         '<div class="cri-metric"><span class="cri-metric-label">CTR</span><span class="cri-metric-val">'+pct(c.ctr)+'</span></div>'+
         '<div class="cri-metric"><span class="cri-metric-label">CPC</span><span class="cri-metric-val">'+brl(c.cpc)+'</span></div>'+
+        '<div class="cri-metric"><span class="cri-metric-label">Hook Rate</span><span class="cri-metric-val">'+(c.hookRate?pct(c.hookRate):'—')+'</span></div>'+
+        '<div class="cri-metric"><span class="cri-metric-label">Hold Rate</span><span class="cri-metric-val">'+(c.holdRate?pct(c.holdRate):'—')+'</span></div>'+
+        '<div class="cri-metric"><span class="cri-metric-label">Body Rate</span><span class="cri-metric-val">'+(c.bodyRate?pct(c.bodyRate):'—')+'</span></div>'+
       '</div>'+
       (c.link?'<a class="cri-link" href="'+c.link+'" target="_blank">'+c.link+'</a>':'')+
     '</div>';
   });
   document.getElementById('cri-grid').innerHTML=gridHtml;
 
-  var h='<thead><tr><th>Criativo</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Ticket</th><th>CAC</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Status</th></tr></thead><tbody>';
+  var h='<thead><tr><th>Criativo</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Ticket</th><th>CAC</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Hook</th><th>Hold</th><th>Body</th><th>Status</th></tr></thead><tbody>';
   list.forEach(function(c){
-    h+='<tr><td>'+c.nome+'</td><td>'+brl(c.inv)+'</td><td>'+brl(c.fat)+'</td><td>'+br(c.roas)+'x</td><td>'+c.compras+'</td><td>'+brl(c.ticket)+'</td><td>'+brl(c.cac)+'</td><td>'+pct(c.ctr)+'</td><td>'+brl(c.cpc)+'</td><td>'+brl(c.cpm)+'</td><td>'+statusBadge(c.inv,c.fat)+'</td></tr>';
+    h+='<tr><td>'+c.nome+'</td><td>'+brl(c.inv)+'</td><td>'+brl(c.fat)+'</td><td>'+br(c.roas)+'x</td><td>'+c.compras+'</td><td>'+brl(c.ticket)+'</td><td>'+brl(c.cac)+'</td><td>'+pct(c.ctr)+'</td><td>'+brl(c.cpc)+'</td><td>'+brl(c.cpm)+'</td><td>'+(c.hookRate?pct(c.hookRate):'—')+'</td><td>'+(c.holdRate?pct(c.holdRate):'—')+'</td><td>'+(c.bodyRate?pct(c.bodyRate):'—')+'</td><td>'+statusBadge(c.inv,c.fat)+'</td></tr>';
   });
   h+='</tbody>';
   document.getElementById('tbl-criativos').innerHTML=h;
@@ -1426,7 +1457,8 @@ var DESAFIOS_RANGES = [
   {nome:"Desafio C", de:"2026-03-16", ate:"2026-04-05", cor:"#2ecc71", useLive:true, upsellQtd:6, upsellTicket:997},
   {nome:"Desafio D", de:"2026-04-06", ate:"2026-04-26", cor:"#e74c3c", useLive:true, upsellQtd:13, upsellTicket:997},
   {nome:"Desafio E", de:"2026-04-27", ate:"2026-05-17", cor:"#f59e0b", useLive:true, upsellQtd:0, upsellTicket:997},
-  {nome:"Desafio F", de:"2026-05-18", ate:"2026-06-14", cor:"#8b5cf6", useLive:true, upsellQtd:0, upsellTicket:997}
+  {nome:"Desafio F", de:"2026-05-18", ate:"2026-06-14", cor:"#8b5cf6", useLive:true, upsellQtd:0, upsellTicket:997},
+  {nome:"Desafio G", de:"2026-06-21", ate:"2026-07-13", cor:"#14b8a6", useLive:true, upsellQtd:0, upsellTicket:997}
 ];
 var OB_LIVE={}; // populated by Vendas fetch: {desafioNome: {qtd, fat}}
 
@@ -1699,14 +1731,14 @@ function fetchLiveData(){
   statusEl.textContent='Atualizando...';
 
   Promise.all([
-    fetch(GVIZ+'PP258').then(function(r){return r.text()}).catch(function(){return ''}),
+    fetch(GVIZ+'Greenn').then(function(r){return r.text()}).catch(function(){return ''}),
     fetch(GVIZ+'Vendas&range=A:A').then(function(r){return r.text()}).catch(function(){return ''}),
     fetch(GVIZ+'Vendas&range=H:H').then(function(r){return r.text()}).catch(function(){return ''}),
     fetch(GVIZ+'Vendas&range=K:K').then(function(r){return r.text()}).catch(function(){return ''}),
     fetch(GVIZ+'Vendas&range=R:R').then(function(r){return r.text()}).catch(function(){return ''}),
     fetch(GVIZ+'Vendas&range=AK:AK').then(function(r){return r.text()}).catch(function(){return ''}),
     fetch(GVIZ+'Vendas&range=AP:AP').then(function(r){return r.text()}).catch(function(){return ''}),
-    fetch(GVIZ+'Webhook').then(function(r){return r.text()}).catch(function(){return ''})
+    fetch(GVIZ+'Webhook%20Greenn').then(function(r){return r.text()}).catch(function(){return ''})
   ]).then(function(results){
     var adsCSV=results[0];
     var newDaysAdded=0;
@@ -1716,9 +1748,9 @@ function fetchLiveData(){
       var adsLines=adsCSV.split('\n').filter(function(l){return l.trim()});
       var adsHeaders=parseCSVLine(adsLines[0]);
       // Find column indices
-      var colDate=-1,colCamp=-1,colAdset=-1,colAd=-1,colSpend=-1,colImp=-1,colClicks=-1,colPV=-1,colPurchase=-1,colCK=-1,colLink=-1;
+      var colDate=-1,colCamp=-1,colAdset=-1,colAd=-1,colSpend=-1,colImp=-1,colClicks=-1,colPV=-1,colPurchase=-1,colCK=-1,colLink=-1,colV75=-1,colV3s=-1;
       adsHeaders.forEach(function(h,i){
-        var hl=h.toLowerCase();
+        var hl=h.toLowerCase().trim();
         if(hl==='date')colDate=i;
         if(hl==='campaign name')colCamp=i;
         if(hl==='adset name')colAdset=i;
@@ -1730,6 +1762,9 @@ function fetchLiveData(){
         if(hl.indexOf('purchase')>=0)colPurchase=i;
         if(hl.indexOf('checkout')>=0)colCK=i;
         if(hl.indexOf('permalink')>=0)colLink=i;
+        if(hl.indexOf('75 percent')>=0||hl.indexOf('75%')>=0)colV75=i;
+        if(hl.indexOf('3 sec')>=0||hl.indexOf('3sec')>=0||hl.indexOf('thruplays')>=0)colV3s=i;
+        if(colV3s<0&&(hl.indexOf('2 sec')>=0||hl.indexOf('continuous')>=0))colV3s=i; // fallback 2s
       });
 
       // Aggregate new ads data by date (only dates >= CUTOFF)
@@ -1751,6 +1786,8 @@ function fetchLiveData(){
         var cliq=parseInt(vals[colClicks])||0;
         var pv=parseInt(vals[colPV])||0;
         var ck=parseInt(vals[colCK])||0;
+        var v75=colV75>=0?(parseInt(vals[colV75])||0):0;
+        var v3s=colV3s>=0?(parseInt(vals[colV3s])||0):0;
         var criName=vals[colAd]||'';
         var pubName=vals[colAdset]||'';
         var campName=vals[colCamp]||'';
@@ -1764,9 +1801,9 @@ function fetchLiveData(){
 
         // Criativo
         if(criName){
-          if(!newAdsCri[criName])newAdsCri[criName]={inv:0,cliques:0,imp:0,pv:0,ck:0,link:link};
+          if(!newAdsCri[criName])newAdsCri[criName]={inv:0,cliques:0,imp:0,pv:0,ck:0,v75:0,v3s:0,link:link};
           var nc=newAdsCri[criName];
-          nc.inv+=inv;nc.cliques+=cliq;nc.imp+=imp;nc.pv+=pv;nc.ck+=ck;
+          nc.inv+=inv;nc.cliques+=cliq;nc.imp+=imp;nc.pv+=pv;nc.ck+=ck;nc.v75+=v75;nc.v3s+=v3s;
           if(!nc.link&&link)nc.link=link;
         }
         // Público
@@ -1830,12 +1867,23 @@ function fetchLiveData(){
           var c=criMap[nome];
           c.inv=Math.round((c.inv+nd.inv)*100)/100;
           c.cliques+=nd.cliques;c.imp+=nd.imp;c.pv+=nd.pv;c.ck+=nd.ck;
+          // v3s/v75: VIDEO_DATA é a fonte principal; Greenn só pra criativos novos sem VIDEO_DATA
+          if(!VIDEO_DATA[nome]){c.v75=(c.v75||0)+nd.v75;c.v3s=(c.v3s||0)+nd.v3s;}
           c.cpc=c.cliques>0?Math.round(c.inv/c.cliques*100)/100:0;
           c.cpm=c.imp>0?Math.round(c.inv/c.imp*1000*100)/100:0;
           c.ctr=c.imp>0?Math.round(c.cliques/c.imp*100*100)/100:0;
+          c.hookRate=c.imp>0?Math.round((c.v3s||0)/c.imp*100*100)/100:0;
+          c.holdRate=(c.v3s||0)>0?Math.round((c.v75||0)/c.v3s*100*100)/100:0;
+          c.bodyRate=(c.v75||0)>0?Math.round(c.compras/(c.v75||1)*100*100)/100:0;
           if(!c.link&&nd.link)c.link=nd.link;
         } else {
-          CRIATIVOS.push({nome:nome,inv:Math.round(nd.inv*100)/100,cliques:nd.cliques,imp:nd.imp,pv:nd.pv,ck:nd.ck,compras:0,fat:0,link:nd.link||'',cpc:nd.cliques>0?Math.round(nd.inv/nd.cliques*100)/100:0,cpm:nd.imp>0?Math.round(nd.inv/nd.imp*1000*100)/100:0,ctr:nd.imp>0?Math.round(nd.cliques/nd.imp*100*100)/100:0,cac:0,ticket:0,roas:0,ativo:true});
+          // Para criativos novos, usar VIDEO_DATA se existir, senão usar Greenn
+          var vdNew=VIDEO_DATA[nome];
+          var newV3s=vdNew?vdNew.v3s:nd.v3s;
+          var newV75=vdNew?vdNew.v75:nd.v75;
+          var hookR=nd.imp>0?Math.round(newV3s/nd.imp*100*100)/100:0;
+          var holdR=newV3s>0?Math.round(newV75/newV3s*100*100)/100:0;
+          CRIATIVOS.push({nome:nome,inv:Math.round(nd.inv*100)/100,cliques:nd.cliques,imp:nd.imp,pv:nd.pv,ck:nd.ck,v75:newV75,v3s:newV3s,compras:0,fat:0,link:nd.link||'',cpc:nd.cliques>0?Math.round(nd.inv/nd.cliques*100)/100:0,cpm:nd.imp>0?Math.round(nd.inv/nd.imp*1000*100)/100:0,ctr:nd.imp>0?Math.round(nd.cliques/nd.imp*100*100)/100:0,hookRate:hookR,holdRate:holdR,bodyRate:0,cac:0,ticket:0,roas:0,ativo:true});
         }
       });
 
@@ -1881,7 +1929,7 @@ function fetchLiveData(){
       OB_LIVE={};
       DESAFIOS_RANGES.forEach(function(r){OB_LIVE[r.nome]={qtd:0,fat:0}});
       // Reset CRIATIVOS sales
-      CRIATIVOS.forEach(function(c){c.compras=0;c.fat=0;c.roas=0;c.cac=0;c.ticket=0});
+      CRIATIVOS.forEach(function(c){c.compras=0;c.fat=0;c.roas=0;c.cac=0;c.ticket=0;c.bodyRate=0;if(!c.v75)c.v75=0;if(!c.v3s)c.v3s=0;if(!c.hookRate)c.hookRate=0;if(!c.holdRate)c.holdRate=0});
 
       var vDaySales={};
       var vCriSales={};
@@ -2001,41 +2049,51 @@ function fetchLiveData(){
           c.cac=c.compras>0?Math.round(c.inv/c.compras*100)/100:0;
           c.ticket=c.compras>0?Math.round(c.fat/c.compras*100)/100:0;
         }
+        c.bodyRate=(c.v75||0)>0?Math.round(c.compras/(c.v75||1)*100*100)/100:0;
       });
     }
 
-    // ===== PARSE WEBHOOK (automação nova — formato simples) =====
+    // ===== PARSE WEBHOOK GREENN (vendas da Greenn via webhook) =====
     var whCSV=results[7]||'';
     if(whCSV){
       var whLines=whCSV.split('\n').filter(function(l){return l.trim()});
       if(whLines.length>1){
-        // Cols: A=Nome, B=Produto, C=Data(DD/MM/YYYY), D=Hora, E=Valor, F=Origem(SCK)
+        var whHeaders=parseCSVLine(whLines[0]);
+        // Find column indices dynamically
+        var wColStatus=-1,wColAmount=-1,wColPaidAt=-1,wColBump=-1,wColProduct=-1,wColTotal=-1;
+        whHeaders.forEach(function(h,i){
+          var hl=h.toLowerCase().trim();
+          if(hl==='sale.status')wColStatus=i;
+          if(hl==='sale.amount')wColAmount=i;
+          if(hl==='sale.total')wColTotal=i;
+          if(hl==='sale.paid_at')wColPaidAt=i;
+          if(hl==='sale.bump_id')wColBump=i;
+          if(hl==='product.name')wColProduct=i;
+        });
+
         for(var wi=1;wi<whLines.length;wi++){
           var wv=parseCSVLine(whLines[wi]);
-          var wNome=wv[1]||''; // Produto
-          var wData=wv[2]||''; // DD/MM/YYYY
-          var wValor=parseFloat((wv[4]||'0').replace(',','.'))||0;
-          var wSck=wv[5]||''; // Origem
+          var wStatus=(wv[wColStatus]||'').toLowerCase();
+          if(wStatus!=='paid')continue;
 
-          if(!wData||wValor<=0)continue;
-          var wParts=wData.split('/');
-          if(wParts.length!==3)continue;
-          var wYmd=wParts[2]+'-'+wParts[1].padStart(2,'0')+'-'+wParts[0].padStart(2,'0');
-          var wDdmm=wParts[0].padStart(2,'0')+'/'+wParts[1].padStart(2,'0')+'/'+wParts[2];
+          var wProduct=wv[wColProduct]||'';
+          var wAmountStr=(wv[wColAmount]||'0').replace(',','.');
+          var wValor=parseFloat(wAmountStr)||0;
+          var wPaidAt=wv[wColPaidAt]||'';
+          var wBump=wv[wColBump]||'';
 
-          var wNmLow=wNome.toLowerCase();
+          if(!wPaidAt||wValor<=0)continue;
+
+          // Parse ISO date: "2026-07-03T22:00:19.000000Z" → "03/07/2026" + "2026-07-03"
+          var wYmd=wPaidAt.substring(0,10);
+          var wDdmm=wYmd.substring(8,10)+'/'+wYmd.substring(5,7)+'/'+wYmd.substring(0,4);
+
+          var wNmLow=wProduct.toLowerCase();
           var wIsIngresso=wNmLow.indexOf('desafio corrimento')>=0&&wNmLow.indexOf('gravação')<0;
           var wIsOB=wNmLow.indexOf('guia')>=0||wNmLow.indexOf('skincare')>=0||wNmLow.indexOf('elixir')>=0;
 
-          var wSkLow=wSck.toLowerCase();
-          var wIsAds=wSkLow.indexOf('meta_ads')>=0;
-          var wPgMatch=wSck.match(/PAGINA\s+([A-Z])/i);
-          var wPgLetter=wPgMatch?wPgMatch[1].toUpperCase():null;
-          var wCriMatch=wSck.match(/DES-\w+/);
+          // Greenn webhook não tem SCK/UTM — todas as vendas vão como "Outros" por padrão
           var wSource='C';
-          if(wIsAds)wSource='M';
-          else if(wSkLow.indexOf('bio')>=0)wSource='B';
-          else if(wSkLow.indexOf('grupovip')>=0)wSource='G';
 
           var wDesNome='';
           for(var wdi=0;wdi<DESAFIOS_RANGES.length;wdi++){
@@ -2051,37 +2109,16 @@ function fetchLiveData(){
 
           if(wIsIngresso){
             vDaySales[wDdmm].compras++;
-            if(wCriMatch){
-              var wCri=wCriMatch[0];
-              if(!vCriSales[wCri])vCriSales[wCri]={compras:0,fat:0};
-              vCriSales[wCri].compras++;
-              vCriSales[wCri].fat+=wValor;
-            }
-            // Page totals
-            if(wPgLetter){
-              var wPgKey='Página '+wPgLetter;
-              if(!PAGE_TOTALS[wPgKey])PAGE_TOTALS[wPgKey]={compras:0,fat:0,inv:0,cliques:0,pv:0,ck:0,imp:0};
-              PAGE_TOTALS[wPgKey].compras++;PAGE_TOTALS[wPgKey].fat+=wValor;
-              if(wCriMatch){
-                if(!PAGE_CRI[wPgKey])PAGE_CRI[wPgKey]={};
-                if(!PAGE_CRI[wPgKey][wCri])PAGE_CRI[wPgKey][wCri]={compras:0,fat:0};
-                PAGE_CRI[wPgKey][wCri].compras++;PAGE_CRI[wPgKey][wCri].fat+=wValor;
-              }
-            }else if(wIsAds){
-              PAGE_TOTALS["Ads (sem tag)"].compras++;PAGE_TOTALS["Ads (sem tag)"].fat+=wValor;
-            }else if(wSkLow.indexOf('bio')>=0||wSkLow.indexOf('grupovip')>=0){
-              PAGE_TOTALS["Orgânico"].compras++;PAGE_TOTALS["Orgânico"].fat+=wValor;
-            }else{
-              PAGE_TOTALS["Outros"].compras++;PAGE_TOTALS["Outros"].fat+=wValor;
-            }
-            SALE_LOG.push({d:wYmd,p:wPgLetter||'O',cr:wCriMatch?wCriMatch[0]:'',pr:wValor,s:wSource});
+            // Sem SCK → sem page/criativo tracking
+            PAGE_TOTALS["Outros"].compras++;PAGE_TOTALS["Outros"].fat+=wValor;
+            SALE_LOG.push({d:wYmd,p:'O',cr:'',pr:wValor,s:wSource});
           }else if(wIsOB&&wDesNome){
             OB_LIVE[wDesNome].qtd++;
             OB_LIVE[wDesNome].fat+=wValor;
           }
         }
 
-        // Merge Webhook day sales into DIAS
+        // Merge Webhook Greenn day sales into DIAS
         var diasMap2={};
         DIAS.forEach(function(d,idx){diasMap2[d.data]=idx});
         Object.keys(vDaySales).forEach(function(dt){
@@ -2094,15 +2131,9 @@ function fetchLiveData(){
           }
         });
 
-        // Update CRIATIVOS with Webhook sales
+        // Recalc bodyRate after all sales
         CRIATIVOS.forEach(function(c){
-          if(vCriSales[c.nome]){
-            c.compras=vCriSales[c.nome].compras;
-            c.fat=Math.round(vCriSales[c.nome].fat*100)/100;
-            c.roas=c.inv>0?Math.round(c.fat/c.inv*100)/100:0;
-            c.cac=c.compras>0?Math.round(c.inv/c.compras*100)/100:0;
-            c.ticket=c.compras>0?Math.round(c.fat/c.compras*100)/100:0;
-          }
+          c.bodyRate=(c.v75||0)>0?Math.round(c.compras/(c.v75||1)*100*100)/100:0;
         });
       }
     }
