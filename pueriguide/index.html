@@ -386,13 +386,13 @@ async function loadData(){
         const g=groups[k]; if(!g.some(x=>x.isPrinc))continue;
         const principal=g.find(x=>x.isPrinc)||g[0];
         const fatPrincipal=g.filter(x=>x.isPrinc).reduce((a,x)=>a+x.val,0);
-        const fatOB=g.filter(x=>!x.isPrinc).reduce((a,x)=>a+x.val,0);
-        finalSales.push({data:principal.data,nome:principal.nome,email:principal.email,fatTotal:fatPrincipal+fatOB,fatPrincipal,fatOB,utmSource:principal.utmSource,utmMedium:principal.utmMedium,utmCampaign:principal.utmCampaign,utmContent:principal.utmContent});
+        const obRows=g.filter(x=>!x.isPrinc);const fatOB=obRows.reduce((a,x)=>a+x.val,0);const fatOBTrf=obRows.filter(isTrafego).reduce((a,x)=>a+x.val,0);const fatOBOrg=fatOB-fatOBTrf;
+        finalSales.push({data:principal.data,nome:principal.nome,email:principal.email,fatTotal:fatPrincipal+fatOB,fatPrincipal,fatOB,fatOBTrf,fatOBOrg,utmSource:principal.utmSource,utmMedium:principal.utmMedium,utmCampaign:principal.utmCampaign,utmContent:principal.utmContent});
       }
     } else {
       for(const rec of sales){
         if(!(rec.prod.includes(CONFIG.PRODUTO_NOME)&&rec.val>=CONFIG.PRODUTO_PRECO_MINIMO))continue;
-        finalSales.push({data:rec.data,nome:rec.nome,email:rec.email,fatTotal:rec.val,fatPrincipal:rec.val,fatOB:0,utmSource:rec.utmSource,utmMedium:rec.utmMedium,utmCampaign:rec.utmCampaign,utmContent:rec.utmContent});
+        finalSales.push({data:rec.data,nome:rec.nome,email:rec.email,fatTotal:rec.val,fatPrincipal:rec.val,fatOB:0,fatOBTrf:0,fatOBOrg:0,utmSource:rec.utmSource,utmMedium:rec.utmMedium,utmCampaign:rec.utmCampaign,utmContent:rec.utmContent});
       }
     }
     SALES=finalSales.sort((a,b)=>b.data.localeCompare(a.data));
@@ -469,8 +469,8 @@ function renderTrafego(from,to){
   const sl=salesInRange(from,to);
   const trf=sl.filter(isTrafego), org=sl.filter(s=>!isTrafego(s));
   const fatTrf=trf.reduce((a,s)=>a+s.fatTotal,0), fatOrg=org.reduce((a,s)=>a+s.fatTotal,0);
-  const obTrf=trf.reduce((a,s)=>a+s.fatOB,0), obOrg=org.reduce((a,s)=>a+s.fatOB,0);
-  const obTrfN=trf.filter(s=>s.fatOB>0).length, obOrgN=org.filter(s=>s.fatOB>0).length;
+  const obTrf=sl.reduce((a,s)=>a+(s.fatOBTrf||0),0), obOrg=sl.reduce((a,s)=>a+(s.fatOBOrg||0),0);
+  const obTrfN=sl.filter(s=>(s.fatOBTrf||0)>0).length, obOrgN=sl.filter(s=>(s.fatOBOrg||0)>0).length;
   const roas=g.inv>0?fatTrf/g.inv:0;
   const cac=trf.length>0?g.inv/trf.length:0;
   const ticket=sl.length>0?(fatTrf+fatOrg)/sl.length:0;
@@ -507,7 +507,7 @@ function renderTrafego(from,to){
   if(!sl.length){ sc.innerHTML='<div class="empty-msg">Nenhuma venda no período.</div>'; }
   else sc.innerHTML=[...sl].sort((a,b)=>b.data.localeCompare(a.data)).map(s=>{
     const t=isTrafego(s);
-    return `<div class="sale-card ${t?'trafego':'organico'}"><div class="sale-top"><span class="sale-name">${t?'✅':'⭐'} ${s.nome}</span><span class="sale-val">${fmtBRL(s.fatTotal)}</span></div><div class="sale-meta">📅 ${s.data.split('-').reverse().join('/')}<br>${t?'Tráfego pago':'Orgânico'}${s.utmContent?' · '+s.utmContent:''}${s.utmMedium?'<br>👥 '+s.utmMedium:''}</div>${s.fatOB>0?`<div class="sale-ob">🛒 OB: ${fmtBRL(s.fatOB)}</div>`:''}</div>`;
+    return `<div class="sale-card ${t?'trafego':'organico'}"><div class="sale-top"><span class="sale-name">${t?'✅':'⭐'} ${s.nome}</span><span class="sale-val">${fmtBRL(s.fatTotal)}</span></div><div class="sale-meta">📅 ${s.data.split('-').reverse().join('/')}<br>${t?'Tráfego pago':'Orgânico'}${s.utmContent?' · '+s.utmContent:''}${s.utmMedium?'<br>👥 '+s.utmMedium:''}</div>${s.fatOB>0?`<div class="sale-ob">🛒 OB: ${fmtBRL(s.fatOB)}${s.fatOBTrf>0&&s.fatOBOrg>0?` (Tráfego ${fmtBRL(s.fatOBTrf)} · Orgânico ${fmtBRL(s.fatOBOrg)})`:s.fatOBTrf>0?' · Tráfego':' · Orgânico'}</div>`:''}</div>`;
   }).join('');
 }
 
