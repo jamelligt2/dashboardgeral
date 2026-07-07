@@ -1738,7 +1738,8 @@ function fetchLiveData(){
     fetch(GVIZ+'Vendas&range=R:R').then(function(r){return r.text()}).catch(function(){return ''}),
     fetch(GVIZ+'Vendas&range=AK:AK').then(function(r){return r.text()}).catch(function(){return ''}),
     fetch(GVIZ+'Vendas&range=AP:AP').then(function(r){return r.text()}).catch(function(){return ''}),
-    fetch(GVIZ+'Webhook%20Greenn').then(function(r){return r.text()}).catch(function(){return ''})
+    fetch(GVIZ+'Webhook%20Greenn').then(function(r){return r.text()}).catch(function(){return ''}),
+    fetch(GVIZ+'Greeenn').then(function(r){return r.text()}).catch(function(){return ''})
   ]).then(function(results){
     var adsCSV=results[0];
     var newDaysAdded=0;
@@ -2053,6 +2054,91 @@ function fetchLiveData(){
       });
     }
 
+    // ===== PARSE GREEENN (export de vendas da plataforma Greenn) =====
+    var gnCSV=results[8]||'';
+    var gnSaleIds={};
+    if(gnCSV){
+      var gnLines=gnCSV.split('\n').filter(function(l){return l.trim()});
+      if(gnLines.length>1){
+        var gnHeaders=parseCSVLine(gnLines[0]);
+        var gnColId=-1,gnColData=-1,gnColValor=-1,gnColProduto=-1,gnColStatus=-1;
+        gnHeaders.forEach(function(h,i){
+          var hl=h.toLowerCase().trim();
+          if(hl.indexOf('digo da venda')>=0||hl==='codigo da venda')gnColId=i;
+          if(hl==='data')gnColData=i;
+          if(hl==='valor bruto')gnColValor=i;
+          if(hl==='nome do produto')gnColProduto=i;
+          if(hl==='status da venda')gnColStatus=i;
+        });
+        // fallback column indices based on known position
+        if(gnColId<0)gnColId=0;
+        if(gnColData<0)gnColData=1;
+        if(gnColValor<0)gnColValor=5;
+        if(gnColProduto<0)gnColProduto=8;
+        if(gnColStatus<0)gnColStatus=11;
+
+        for(var gi=1;gi<gnLines.length;gi++){
+          var gv=parseCSVLine(gnLines[gi]);
+          var gStatus=(gv[gnColStatus]||'').toLowerCase();
+          if(gStatus!=='paid')continue;
+
+          var gId=gv[gnColId]||'';
+          var gData=gv[gnColData]||''; // DD/MM/YYYY HH:MM
+          var gValor=parseFloat((gv[gnColValor]||'0').replace(',','.'))||0;
+          var gProduto=gv[gnColProduto]||'';
+
+          if(!gData||gValor<=0)continue;
+          gnSaleIds[gId]=true; // track for dedup with webhook
+
+          var gParts=gData.split(/[\s\/]/);
+          if(gParts.length<3)continue;
+          var gYmd=gParts[2]+'-'+gParts[1].padStart(2,'0')+'-'+gParts[0].padStart(2,'0');
+          var gDdmm=gParts[0].padStart(2,'0')+'/'+gParts[1].padStart(2,'0')+'/'+gParts[2];
+
+          var gNmLow=gProduto.toLowerCase();
+          var gIsIngresso=gNmLow.indexOf('desafio corrimento')>=0&&gNmLow.indexOf('grava')<0;
+          var gIsOB=gNmLow.indexOf('guia')>=0||gNmLow.indexOf('skincare')>=0||gNmLow.indexOf('elixir')>=0;
+
+          var gDesNome='';
+          for(var gdi=0;gdi<DESAFIOS_RANGES.length;gdi++){
+            var gdr=DESAFIOS_RANGES[gdi];
+            if(gYmd>=gdr.de&&gYmd<=gdr.ate){gDesNome=gdr.nome;break;}
+          }
+
+          if(!gIsIngresso&&!gIsOB)continue;
+
+          if(!vDaySales[gDdmm])vDaySales[gDdmm]={compras:0,fat:0};
+          vDaySales[gDdmm].fat+=gValor;
+
+          if(gIsIngresso){
+            vDaySales[gDdmm].compras++;
+            PAGE_TOTALS["Outros"].compras++;PAGE_TOTALS["Outros"].fat+=gValor;
+            SALE_LOG.push({d:gYmd,p:'O',cr:'',pr:gValor,s:'C'});
+          }else if(gIsOB&&gDesNome){
+            OB_LIVE[gDesNome].qtd++;
+            OB_LIVE[gDesNome].fat+=gValor;
+          }
+        }
+
+        // Merge Greeenn sales into DIAS
+        var diasMapGn={};
+        DIAS.forEach(function(d,idx){diasMapGn[d.data]=idx});
+        Object.keys(vDaySales).forEach(function(dt){
+          var ws=vDaySales[dt];
+          if(diasMapGn[dt]!==undefined){
+            DIAS[diasMapGn[dt]].fat=Math.round(ws.fat*100)/100;
+            DIAS[diasMapGn[dt]].compras=ws.compras;
+          }else{
+            DIAS.push({data:dt,inv:0,fat:Math.round(ws.fat*100)/100,compras:ws.compras,cliques:0,pv:0,ck:0,imp:0});
+          }
+        });
+
+        CRIATIVOS.forEach(function(c){
+          c.bodyRate=(c.v75||0)>0?Math.round(c.compras/(c.v75||1)*100*100)/100:0;
+        });
+      }
+    }
+
     // ===== PARSE WEBHOOK GREENN (vendas da Greenn via webhook) =====
     var whCSV=results[7]||'';
     if(whCSV){
@@ -2060,9 +2146,10 @@ function fetchLiveData(){
       if(whLines.length>1){
         var whHeaders=parseCSVLine(whLines[0]);
         // Find column indices dynamically
-        var wColStatus=-1,wColAmount=-1,wColPaidAt=-1,wColBump=-1,wColProduct=-1,wColTotal=-1;
+        var wColStatus=-1,wColAmount=-1,wColPaidAt=-1,wColBump=-1,wColProduct=-1,wColTotal=-1,wColSaleId=-1;
         whHeaders.forEach(function(h,i){
           var hl=h.toLowerCase().trim();
+          if(hl==='sale.id')wColSaleId=i;
           if(hl==='sale.status')wColStatus=i;
           if(hl==='sale.amount')wColAmount=i;
           if(hl==='sale.total')wColTotal=i;
@@ -2075,6 +2162,10 @@ function fetchLiveData(){
           var wv=parseCSVLine(whLines[wi]);
           var wStatus=(wv[wColStatus]||'').toLowerCase();
           if(wStatus!=='paid')continue;
+
+          // Dedup: skip if already processed from Greeenn export
+          var wSaleId=wv[wColSaleId]||'';
+          if(wSaleId&&gnSaleIds[wSaleId])continue;
 
           var wProduct=wv[wColProduct]||'';
           var wAmountStr=(wv[wColAmount]||'0').replace(',','.');
