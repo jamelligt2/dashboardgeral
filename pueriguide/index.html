@@ -382,12 +382,27 @@ async function loadData(){
     }
     let finalSales=[];
     if(CONFIG.USA_TX_ROOT && W.txRoot>=0){
+      const principalKeyByEmailDate={};
+  for(const k in groups){
+  const p=groups[k].find(x=>x.isPrinc);
+    if(p){
+      const ek=(p.email||'').toLowerCase()+'|'+p.data;
+      if(!principalKeyByEmailDate[ek])principalKeyByEmailDate[ek]=k;
+    }
+  }
+      for(const k in groups){
+              const g=groups[k]; if(g.some(x=>x.isPrinc))continue;
+        const ek=(g[0].email||'').toLowerCase()+'|'+g[0].data;
+  const targetKey=principalKeyByEmailDate[ek];
+        if(targetKey&&targetKey!==k){ groups[targetKey].push(...g); delete groups[k]; }
+      }
       for(const k in groups){
         const g=groups[k]; if(!g.some(x=>x.isPrinc))continue;
         const principal=g.find(x=>x.isPrinc)||g[0];
-        const fatPrincipal=g.filter(x=>x.isPrinc).reduce((a,x)=>a+x.val,0);
+  const fatPrincipal=g.filter(x=>x.isPrinc).reduce((a,x)=>a+x.val,0);
         const obRows=g.filter(x=>!x.isPrinc);const fatOB=obRows.reduce((a,x)=>a+x.val,0);const fatOBTrf=obRows.filter(isTrafego).reduce((a,x)=>a+x.val,0);const fatOBOrg=fatOB-fatOBTrf;
-        finalSales.push({data:principal.data,nome:principal.nome,email:principal.email,fatTotal:fatPrincipal+fatOB,fatPrincipal,fatOB,fatOBTrf,fatOBOrg,utmSource:principal.utmSource,utmMedium:principal.utmMedium,utmCampaign:principal.utmCampaign,utmContent:principal.utmContent});
+        const obCountTrf=obRows.filter(isTrafego).length, obCountOrg=obRows.length-obCountTrf;
+        finalSales.push({data:principal.data,nome:principal.nome,email:principal.email,fatTotal:fatPrincipal+fatOB,fatPrincipal,fatOB,fatOBTrf,fatOBOrg,obCountTrf,obCountOrg,utmSource:principal.utmSource,utmMedium:principal.utmMedium,utmCampaign:principal.utmCampaign,utmContent:principal.utmContent});
       }
     } else {
       for(const rec of sales){
@@ -470,7 +485,7 @@ function renderTrafego(from,to){
   const trf=sl.filter(isTrafego), org=sl.filter(s=>!isTrafego(s));
   const fatTrf=trf.reduce((a,s)=>a+s.fatTotal,0), fatOrg=org.reduce((a,s)=>a+s.fatTotal,0);
   const obTrf=sl.reduce((a,s)=>a+(s.fatOBTrf||0),0), obOrg=sl.reduce((a,s)=>a+(s.fatOBOrg||0),0);
-  const obTrfN=sl.filter(s=>(s.fatOBTrf||0)>0).length, obOrgN=sl.filter(s=>(s.fatOBOrg||0)>0).length;
+const obTrfN=trf.reduce((a,s)=>a+(s.obCountTrf||0),0), obOrgN=sl.filter(s=>(s.fatOBOrg||0)>0).length; const vendasTrafego=trf.length+obTrfN;
   const roas=g.inv>0?fatTrf/g.inv:0;
   const cac=trf.length>0?g.inv/trf.length:0;
   const ticket=sl.length>0?(fatTrf+fatOrg)/sl.length:0;
@@ -481,7 +496,7 @@ function renderTrafego(from,to){
     ['Fat. Tráfego',fmtBRL(fatTrf),'green',''],
     ['Fat. Orgânico',fmtBRL(fatOrg),'yellow',''],
     ['ROAS Tráfego',fmtX(roas),'orange',''],
-    ['Vendas Tráfego',fmtNum(trf.length),'green',obTrfN?`+${obTrfN} OB`:''],
+    ['Vendas Tráfego',fmtNum(vendasTrafego),'green',obTrfN?`+${obTrfN} OB`:''],
     ['Vendas Orgânico',fmtNum(org.length),'yellow',obOrgN?`+${obOrgN} OB`:''],
     ['Fat. OB Tráfego',fmtBRL(obTrf),'green',''],
     ['Fat. OB Orgânico',fmtBRL(obOrg),'yellow',''],
@@ -517,7 +532,7 @@ function renderVisao(from,to){
   const sl=salesInRange(from,to);
   const inv=days.reduce((a,d)=>a+d.inv,0);
   const fatTotal=sl.reduce((a,s)=>a+s.fatTotal,0);
-  const trf=sl.filter(isTrafego);
+const trf=sl.filter(isTrafego); const obTrfN=trf.reduce((a,s)=>a+(s.obCountTrf||0),0); const vendasTrafego=trf.length+obTrfN, vendasTotal=sl.length+obTrfN;
   const roas=inv>0?fatTotal/inv:0;
   const ticket=sl.length>0?fatTotal/sl.length:0;
   const cac=sl.length>0?inv/sl.length:0;
@@ -525,8 +540,8 @@ function renderVisao(from,to){
     ['Investimento',fmtBRL(inv),'orange'],
     ['Fat. Total',fmtBRL(fatTotal),'green'],
     ['ROAS Total',fmtX(roas),'orange'],
-    ['Vendas Total',fmtNum(sl.length),''],
-    ['Tráfego',fmtNum(trf.length),'green'],
+    ['Vendas Total',fmtNum(vendasTotal),''],
+    ['Tráfego',fmtNum(vendasTrafego),'green'],
     ['Orgânicas',fmtNum(sl.length-trf.length),'yellow'],
     ['Ticket Médio',fmtBRL(ticket),''],
     ['CAC Total',fmtBRL(cac),'red'],
@@ -534,7 +549,7 @@ function renderVisao(from,to){
   document.getElementById('kpi-visao').innerHTML=k.map(([l,v,c])=>`<div class="kpi-card"><div class="kpi-label">${l}</div><div class="kpi-value ${c}">${v}</div></div>`).join('');
 
   const salesByDay={};
-  for(const s of sl){ const o=salesByDay[s.data]=salesByDay[s.data]||{tot:0,trf:0,org:0,fat:0}; o.tot++; if(isTrafego(s))o.trf++;else o.org++; o.fat+=s.fatTotal; }
+for(const s of sl){ const o=salesByDay[s.data]=salesByDay[s.data]||{tot:0,trf:0,org:0,fat:0}; const vc=1+(isTrafego(s)?(s.obCountTrf||0):0); o.tot+=vc; if(isTrafego(s))o.trf+=vc;else o.org++; o.fat+=s.fatTotal; }
   let rows=days.map(d=>{
     const sd=salesByDay[d.data]||{tot:0,trf:0,org:0,fat:0};
     const roasD=d.inv>0?sd.fat/d.inv:0;
@@ -646,7 +661,7 @@ function groupPeriod(keyFn){
   const rows=gerInRange(from,to), sl=salesInRange(from,to);
   const map={};
   for(const r of rows){ const d=dOnly(r[G.date]); const k=keyFn(d); const o=map[k]=map[k]||{k,inv:0,imp:0,cliques:0,pv:0,ck:0,vendas:0,fat:0}; o.inv+=parseBR(r[G.inv]); o.imp+=parseBR(r[G.imp]); o.cliques+=parseBR(r[G.cliques]); o.pv+=parseBR(r[G.pv]); o.ck+=parseBR(r[G.ck]); }
-  for(const s of sl){ const k=keyFn(s.data); const o=map[k]=map[k]||{k,inv:0,imp:0,cliques:0,pv:0,ck:0,vendas:0,fat:0}; o.vendas++; o.fat+=s.fatTotal; }
+  for(const s of sl){ const k=keyFn(s.data); const o=map[k]=map[k]||{k,inv:0,imp:0,cliques:0,pv:0,ck:0,vendas:0,fat:0}; o.vendas+=1+(isTrafego(s)?(s.obCountTrf||0):0); o.fat+=s.fatTotal; }
   return Object.values(map).sort((a,b)=>a.k.localeCompare(b.k)).map(o=>{o.ctr=o.imp>0?o.cliques/o.imp*100:0;o.roas=o.inv>0?o.fat/o.inv:0;o.cpc=o.cliques>0?o.inv/o.cliques:0;return o;});
 }
 function renderPeriodTable(tblId,data,label){
