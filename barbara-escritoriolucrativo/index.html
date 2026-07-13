@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Escritório Lucrativo · Jamelli GT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.0/chart.umd.min.js"></script>
+<style>
+/* ╔══════════════════════════════════════════════════════════════════╗
+   ║           CONFIGURAÇÃO DO CLIENTE — EDITE APENAS NO SCRIPT        ║
+   ╚══════════════════════════════════════════════════════════════════╝ */
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#1a1a2e;color:#e8e6f0;font-family:'DM Sans',sans-serif;min-height:100vh}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:#12121f}::-webkit-scrollbar-thumb{background:#ff6b2b55;border-radius:3px}
+.topbar{background:#12121f;padding:12px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.07);position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:10px}
+.brand{font-size:17px;font-weight:700;color:#ff6b2b}
+.subtitle{font-size:11px;color:rgba(255,255,255,0.4);margin-top:2px}
+.logo-jgt{display:flex;align-items:center;gap:10px}
+.logo-jgt svg{width:36px;height:36px;flex-shrink:0}
+.logo-text{display:flex;flex-direction:column}
+.logo-text strong{font-size:13px;font-weight:700;color:#ff6b2b;letter-spacing:.3px}
+.logo-text span{font-size:10px;color:rgba(255,255,255,.35);margin-top:1px}
+.period-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.period-bar label{font-size:11px;color:rgba(255,255,255,.45);white-space:nowrap}
+.date-input{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:#e8e6f0;padding:5px 10px;border-radius:6px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;outline:none;min-width:118px}
+.date-input:focus{border-color:#ff6b2b}
+.date-input::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;cursor:pointer}
+.period-sep{color:rgba(255,255,255,.2);font-size:13px;padding:0 2px}
+.preset-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;transition:all .2s;white-space:nowrap}
+.preset-btn:hover,.preset-btn.active{background:rgba(255,107,43,.2);border-color:#ff6b2b;color:#ff6b2b;font-weight:600}
+.range-info{font-size:11px;color:rgba(255,107,43,.75);font-family:'DM Mono',monospace;white-space:nowrap;padding-left:4px}
+.tabs{display:flex;border-bottom:1px solid rgba(255,255,255,0.07);background:#12121f;padding:0 28px;overflow-x:auto}
+.tab{padding:12px 20px;cursor:pointer;font-size:13px;color:rgba(255,255,255,0.5);border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
+.tab:hover{color:#e8e6f0}.tab.active{color:#ff6b2b;border-bottom-color:#ff6b2b;font-weight:600}
+.content{padding:24px 28px;display:none}.content.active{display:block}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:20px}
+.kpi-card{background:#12121f;border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:16px 18px}
+.kpi-label{font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.kpi-value{font-size:20px;font-weight:700;font-family:'DM Mono',monospace}
+.orange{color:#ff6b2b}.green{color:#2ecc71}.red{color:#e74c3c}.yellow{color:#f1c40f}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#12121f;color:rgba(255,255,255,.45);padding:8px 10px;text-align:right;font-weight:500;border-bottom:1px solid rgba(255,255,255,.07);white-space:nowrap;position:sticky;top:0}
+th:first-child{text-align:left}
+td{padding:7px 10px;text-align:right;border-bottom:1px solid rgba(255,255,255,.04);font-family:'DM Mono',monospace;font-size:11px;color:#e8e6f0}
+td:first-child{text-align:left;font-family:'DM Sans',sans-serif;font-size:12px}
+tr:hover td{background:rgba(255,255,255,.025)}
+.funil-section{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:16px 0}
+.funil-bar-wrap{margin-bottom:12px}
+.funil-label{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;color:rgba(255,255,255,.7)}
+.funil-bar-bg{background:rgba(255,255,255,.05);border-radius:4px;height:14px;overflow:hidden}
+.funil-bar-fill{background:linear-gradient(90deg,#ff6b2b,#ff9a3c);height:100%;border-radius:4px;transition:width .4s}
+.taxa-grid{display:grid;gap:8px}
+.taxa-item{background:rgba(255,255,255,.04);border-radius:8px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;font-size:12px;color:rgba(255,255,255,.7)}
+.taxa-val{font-family:'DM Mono',monospace;font-size:15px;font-weight:600;color:#ff6b2b}
+.chart-grid-2x2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0}
+.chart-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:16px}
+.chart-card h4{font-size:11px;color:rgba(255,255,255,.45);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
+.chart-card canvas{max-height:220px}
+.sec-title{font-size:13px;font-weight:600;color:rgba(255,255,255,.65);margin:20px 0 10px;border-left:3px solid #ff6b2b;padding-left:10px}
+.tbl-wrap{overflow-x:auto;border-radius:8px;border:1px solid rgba(255,255,255,.07);max-height:480px;overflow-y:auto}
+@media(max-width:900px){.chart-grid-2x2{grid-template-columns:1fr}.funil-section{grid-template-columns:1fr}}
+
+#loading-overlay{position:fixed;inset:0;background:#1a1a2e;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+.spinner{width:40px;height:40px;border:3px solid rgba(255,107,43,.2);border-top-color:#ff6b2b;border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loading-msg{color:rgba(255,255,255,.5);font-size:13px}
+#error-banner{display:none;background:rgba(231,76,60,.12);border:1px solid rgba(231,76,60,.4);color:#ff8a80;padding:10px 16px;border-radius:8px;font-size:12px;margin-bottom:16px}
+</style>
+</head>
+<body>
+
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <div id="loading-msg">Conectando com a planilha...</div>
+</div>
+
+<div class="topbar">
+  <div class="logo-jgt">
+    <svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+      <rect width="36" height="36" rx="8" fill="#ff6b2b" fill-opacity="0.9"/>
+      <text x="18" y="25" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="13" fill="white">JGT</text>
+    </svg>
+    <div class="logo-text">
+      <strong>Jamelli GT</strong>
+      <span>Tráfego Pago</span>
+    </div>
+  </div>
+  <div class="period-bar">
+    <label>De</label>
+    <input type="date" id="dateFrom" class="date-input" onchange="onDateChange()">
+    <span class="period-sep">→</span>
+    <input type="date" id="dateTo" class="date-input" onchange="onDateChange()">
+    <button class="preset-btn" onclick="setPreset(7,this)">7d</button>
+    <button class="preset-btn" onclick="setPreset(14,this)">14d</button>
+    <button class="preset-btn" onclick="setPreset(30,this)">30d</button>
+    <button class="preset-btn active" id="btn-all" onclick="setPreset('all',this)">Tudo</button>
+    <span class="range-info" id="range-info"></span>
+    <button class="preset-btn" onclick="loadData()" style="margin-left:4px">🔄 Atualizar</button>
+  </div>
+  <div>
+    <div class="brand" id="brand-title">📦 Escritório Lucrativo</div>
+    <div class="subtitle" id="brand-subtitle">Dashboard de Performance — Perpétuo · Jamelli GT · 2026</div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('gerenciador',this)">📊 Gerenciador</div>
+  <div class="tab" onclick="showTab('resumo',this)">🌐 Resumo</div>
+</div>
+
+<!-- ===================== ABA GERENCIADOR ===================== -->
+<div id="tab-gerenciador" class="content active">
+  <div id="error-banner-g" class="error-banner" style="display:none"></div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange" id="g-inv">—</div></div>
+    <div class="kpi-card"><div class="kpi-label">Impressões</div><div class="kpi-value" id="g-imp">—</div></div>
+    <div class="kpi-card"><div class="kpi-label">Alcance</div><div class="kpi-value" id="g-alc">—</div></div>
+    <div class="kpi-card"><div class="kpi-label">Cliques</div><div class="kpi-value" id="g-clk">—</div></div>
+    <div class="kpi-card"><div class="kpi-label">CTR</div><div class="kpi-value" id="g-ctr">—</div></div>
+    <div class="kpi-card"><div class="kpi-label">CPC</div><div class="kpi-value" id="g-cpc">—</div></div>
+    <div class="kpi-card"><div class="kpi-label">CPM</div><div class="kpi-value" id="g-cpm">—</div></div>
+    <div class="kpi-card"><div class="kpi-label">Page View</div><div class="kpi-value" id="g-pv">—</div></div>
+    <div class="kpi-card"><div class="kpi-label">Checkout</div><div class="kpi-value" id="g-ck">—</div></div>
+    <div class="kpi-card"><div class="kpi-label">Vendas</div><div class="kpi-value green" id="g-venda">—</div></div>
+    <div class="kpi-card"><div class="kpi-label">Retornos</div><div class="kpi-value green" id="g-ret">—</div></div>
+    <div class="kpi-card"><div class="kpi-label">Conversões (V+R)</div><div class="kpi-value green" id="g-conv">—</div></div>
+  </div>
+
+  <div class="chart-grid-2x2">
+    <div class="chart-card"><h4>Investimento por dia</h4><canvas id="chart-g-inv"></canvas></div>
+    <div class="chart-card"><h4>Cliques por dia</h4><canvas id="chart-g-clk"></canvas></div>
+  </div>
+
+  <div class="sec-title">Desempenho por Anúncio</div>
+  <div class="tbl-wrap">
+    <table id="tbl-anuncios">
+      <thead><tr>
+        <th>Anúncio</th><th>Campanha</th><th>Conjunto</th><th>Investimento</th><th>Impressões</th>
+        <th>Cliques</th><th>CTR</th><th>CPC</th><th>Page View</th><th>Checkout</th><th>Venda</th><th>Retorno</th>
+      </tr></thead>
+      <tbody id="tbl-anuncios-body"></tbody>
+    </table>
+  </div>
+
+  <div class="sec-title">Linhas do Gerenciador (bruto)</div>
+  <div class="tbl-wrap">
+    <table id="tbl-gerenciador">
+      <thead><tr>
+        <th>Data</th><th>Campanha</th><th>Conjunto</th><th>Anúncio</th><th>Investimento</th>
+        <th>Impressões</th><th>Alcance</th><th>Cliques</th><th>Page View</th><th>Checkout</th><th>Venda</th><th>Retorno</th>
+      </tr></thead>
+      <tbody id="tbl-gerenciador-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ===================== ABA RESUMO ===================== -->
+<div id="tab-resumo" class="content">
+  <div id="error-banner-r" class="error-banner" style="display:none"></div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card"><div class="kpi-label">Investido</div><div class="kpi-value orange" id="r-inv">—</div></div>
+    <div class="kpi-card"><div class="kpi-label">Faturamento</div><div class="kpi-value green" id="r-fat">—</div></div>
+    <div class="kpi-card"><div class="kpi-label">ROAS</div><div class="kpi-value" id="r-roas">—</div></div>
+    <div class="kpi-card"><div class="kpi-label">Vendas</div><div class="kpi-value green" id="r-vendas">—</div></div>
+    <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value" id="r-ticket">—</div></div>
+    <div class="kpi-card"><div class="kpi-label">Cliques</div><div class="kpi-value" id="r-clk">—</div></div>
+    <div class="kpi-card"><div class="kpi-label">Page View</div><div class="kpi-value" id="r-pv">—</div></div>
+    <div class="kpi-card"><div class="kpi-label">Checkout</div><div class="kpi-value" id="r-ck">—</div></div>
+    <div class="kpi-card"><div class="kpi-label">CPL</div><div class="kpi-value" id="r-cpl">—</div></div>
+  </div>
+
+  <div class="chart-card" style="margin-bottom:16px">
+    <h4>Investimento x Faturamento por dia</h4>
+    <canvas id="chart-r-invfat"></canvas>
+  </div>
+
+  <div class="sec-title">Funil de Conversão</div>
+  <div class="funil-section">
+    <div>
+      <div class="funil-bar-wrap">
+        <div class="funil-label"><span>Cliques</span><span id="f-clk-lbl">—</span></div>
+        <div class="funil-bar-bg"><div class="funil-bar-fill" id="f-clk-bar" style="width:100%"></div></div>
+      </div>
+      <div class="funil-bar-wrap">
+        <div class="funil-label"><span>Page View</span><span id="f-pv-lbl">—</span></div>
+        <div class="funil-bar-bg"><div class="funil-bar-fill" id="f-pv-bar" style="width:0%"></div></div>
+      </div>
+      <div class="funil-bar-wrap">
+        <div class="funil-label"><span>Checkout</span><span id="f-ck-lbl">—</span></div>
+        <div class="funil-bar-bg"><div class="funil-bar-fill" id="f-ck-bar" style="width:0%"></div></div>
+      </div>
+      <div class="funil-bar-wrap">
+        <div class="funil-label"><span>Vendas</span><span id="f-vd-lbl">—</span></div>
+        <div class="funil-bar-bg"><div class="funil-bar-fill" id="f-vd-bar" style="width:0%"></div></div>
+      </div>
+    </div>
+    <div class="taxa-grid">
+      <div class="taxa-item"><span>Cliques → Page View</span><span class="taxa-val" id="t-clk-pv">—</span></div>
+      <div class="taxa-item"><span>Page View → Checkout</span><span class="taxa-val" id="t-pv-ck">—</span></div>
+      <div class="taxa-item"><span>Checkout → Venda</span><span class="taxa-val" id="t-ck-vd">—</span></div>
+      <div class="taxa-item"><span>Cliques → Venda (geral)</span><span class="taxa-val" id="t-clk-vd">—</span></div>
+    </div>
+  </div>
+
+  <div class="sec-title">Dia a Dia</div>
+  <div class="tbl-wrap">
+    <table id="tbl-resumo">
+      <thead><tr>
+        <th>Data</th><th>Investido</th><th>Cliques</th><th>Page View</th><th>Checkout</th>
+        <th>Vendas</th><th>Fat. Tráfego</th><th>ROAS</th><th>CPL</th>
+      </tr></thead>
+      <tbody id="tbl-resumo-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║           CONFIGURAÇÃO DO CLIENTE — EDITE APENAS AQUI             ║
+// ╚══════════════════════════════════════════════════════════════════╝
+const CONFIG = {
+  CLIENTE: 'Escritório Lucrativo',
+  PRODUTO: 'Escritório Lucrativo',
+  ANO: '2026',
+  SHEET_ID: '1SzjunaASAIQVVG3uIUOjDn6nQxiYCCn--qLJOov7aUM',
+  GERENCIADOR_SHEET: 'Gerenciador',
+  RESUMO_SHEET: 'Resumo',
+};
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  document.title = CONFIG.PRODUTO + ' · ' + CONFIG.CLIENTE + ' — Jamelli GT';
+  document.getElementById('brand-title').textContent = '📦 ' + CONFIG.PRODUTO;
+  document.getElementById('brand-subtitle').textContent = 'Dashboard de Performance — Perpétuo · Jamelli GT · ' + CONFIG.ANO;
+});
+
+// ---------- Utils ----------
+function parseBRL(s){
+  if (s===undefined || s===null) return 0;
+  s = String(s).trim();
+  if (!s) return 0;
+  s = s.replace('R$','').trim();
+  // remove thousands dot, convert decimal comma to dot
+  s = s.replace(/\./g,'').replace(',','.');
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+function parseNum(s){
+  if (s===undefined || s===null) return 0;
+  s = String(s).trim();
+  if (!s) return 0;
+  const n = parseFloat(s.replace(/\./g,'').replace(',','.'));
+  return isNaN(n) ? 0 : n;
+}
+function fmtBRL(n){
+  if (!isFinite(n)) return '—';
+  return 'R$ ' + n.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function fmtInt(n){
+  if (!isFinite(n)) return '—';
+  return Math.round(n).toLocaleString('pt-BR');
+}
+function fmtPct(n){
+  if (!isFinite(n) || isNaN(n)) return '—';
+  return n.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) + '%';
+}
+function safeDiv(a,b){ return b>0 ? a/b : 0; }
+
+// Minimal CSV parser (handles quoted fields with commas) - kept for reference/manual paste fallback
+function parseCSV(text){
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  for (let i=0;i<text.length;i++){
+    const c = text[i];
+    if (inQuotes){
+      if (c === '"'){
+        if (text[i+1] === '"'){ field += '"'; i++; }
+        else inQuotes = false;
+      } else field += c;
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ','){ row.push(field); field=''; }
+      else if (c === '\n'){ row.push(field); field=''; rows.push(row); row=[]; }
+      else if (c === '\r'){ /* skip */ }
+      else field += c;
+    }
+  }
+  if (field.length || row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+
+// JSONP loader for the GViz endpoint — bypasses CORS (Google's gviz/tq CSV/JSON
+// response has no Access-Control-Allow-Origin header, so a normal fetch() is
+// blocked by the browser even when the sheet is public; a <script> tag is not
+// subject to CORS, which is why this is the standard trick for this API).
+function fetchSheetJSONP(sheetName){
+  return new Promise((resolve, reject)=>{
+    const cbName = 'gvizCB_' + Math.random().toString(36).slice(2) + Date.now();
+    let done = false;
+    const timeout = setTimeout(()=>{
+      if (done) return;
+      done = true;
+      cleanup();
+      reject(new Error(`Timeout ao carregar "${sheetName}".`));
+    }, 20000);
+    function cleanup(){
+      clearTimeout(timeout);
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+    window[cbName] = function(response){
+      if (done) return;
+      done = true;
+      cleanup();
+      if (!response || response.status === 'error'){
+        const detail = (response && response.errors && response.errors[0] && response.errors[0].detailed_message) || 'Verifique se a planilha está pública e o nome da aba está correto.';
+        reject(new Error(`Erro na aba "${sheetName}": ${detail}`));
+        return;
+      }
+      resolve(response);
+    };
+    const url = `https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:${cbName}&sheet=${encodeURIComponent(sheetName)}`;
+    const script = document.createElement('script');
+    script.onerror = ()=>{
+      if (done) return;
+      done = true;
+      cleanup();
+      reject(new Error(`Não foi possível carregar "${sheetName}". Verifique se a planilha está pública ("Qualquer pessoa com o link").`));
+    };
+    script.src = url;
+    document.head.appendChild(script);
+  });
+}
+
+// Converts a GViz table response into the same [header, ...rows] shape the
+// rest of the code expects (array of arrays of strings), using the formatted
+// display value ('f') when available so currency/date formatting matches
+// what's shown in the sheet.
+function gvizToRows(response){
+  const table = response.table || {cols:[], rows:[]};
+  const header = (table.cols||[]).map(c=> c.label || c.id || '');
+  const dataRows = (table.rows||[]).map(r=>{
+    return (r.c||[]).map(cell=>{
+      if (!cell) return '';
+      if (cell.f !== undefined && cell.f !== null) return String(cell.f);
+      if (cell.v === undefined || cell.v === null) return '';
+      return String(cell.v);
+    });
+  });
+  return [header, ...dataRows];
+}
+
+// ---------- Global state ----------
+let GROWS = [];  // raw gerenciador rows {data, campanha, conjunto, anuncio, inv, imp, alc, clk, pv, ck, venda, retorno, link}
+let RROWS = [];  // raw resumo rows {data, inv, clk, pv, ck, vendas, fat, imp}
+let chartGInv=null, chartGClk=null, chartRInvFat=null;
+
+async function loadData(){
+  document.getElementById('loading-overlay').style.display='flex';
+  document.getElementById('error-banner-g').style.display='none';
+  document.getElementById('error-banner-r').style.display='none';
+  try {
+    const [gResp, rResp] = await Promise.all([
+      fetchSheetJSONP(CONFIG.GERENCIADOR_SHEET),
+      fetchSheetJSONP(CONFIG.RESUMO_SHEET)
+    ]);
+
+    const gRows = gvizToRows(gResp);
+    GROWS = gRows.slice(1).filter(r=>r[0] && r[0].trim()).map(r=>({
+      data: r[0].trim(),
+      campanha: r[1]||'',
+      conjunto: r[2]||'',
+      anuncio: r[3]||'',
+      inv: parseBRL(r[4]),
+      imp: parseNum(r[5]),
+      alc: parseNum(r[6]),
+      clk: parseNum(r[7]),
+      pv: parseNum(r[8]),
+      ck: parseNum(r[9]),
+      venda: parseNum(r[10]),
+      retorno: parseNum(r[11]),
+      link: r[12]||''
+    }));
+
+    const rRows = gvizToRows(rResp);
+    RROWS = rRows.slice(1).filter(r=>r[0] && r[0].trim()).map(r=>({
+      data: r[0].trim(),
+      inv: parseBRL(r[1]),
+      clk: parseNum(r[2]),
+      pv: parseNum(r[3]),
+      ck: parseNum(r[4]),
+      vendas: parseNum(r[5]),
+      fat: parseNum(r[6]),
+      imp: parseNum(r[7])
+    }));
+
+    // set date bounds
+    const allDates = [...GROWS.map(r=>r.data), ...RROWS.map(r=>r.data)].filter(Boolean).sort();
+    if (allDates.length){
+      document.getElementById('dateFrom').min = allDates[0];
+      document.getElementById('dateFrom').max = allDates[allDates.length-1];
+      document.getElementById('dateTo').min = allDates[0];
+      document.getElementById('dateTo').max = allDates[allDates.length-1];
+    }
+    setPreset('all', document.getElementById('btn-all'));
+  } catch(e){
+    const hint = 'Se você está vendo isso dentro da pré-visualização do chat, abra o arquivo .html diretamente no navegador (duplo clique ou arraste para uma aba) — a pré-visualização embutida bloqueia requisições de rede externas.';
+    const msg = 'Erro ao carregar dados: ' + e.message + ' ' + hint;
+    document.getElementById('error-banner-g').textContent = msg;
+    document.getElementById('error-banner-g').style.display='block';
+    document.getElementById('error-banner-r').textContent = msg;
+    document.getElementById('error-banner-r').style.display='block';
+  } finally {
+    document.getElementById('loading-overlay').style.display='none';
+  }
+}
+
+function onDateChange(){
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+  render();
+}
+
+function setPreset(days, btn){
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const allDates = [...GROWS.map(r=>r.data), ...RROWS.map(r=>r.data)].filter(Boolean).sort();
+  if (!allDates.length) return;
+  const last = allDates[allDates.length-1];
+  let first = allDates[0];
+  if (days !== 'all'){
+    const d = new Date(last+'T00:00:00');
+    d.setDate(d.getDate() - (days-1));
+    const candidate = d.toISOString().slice(0,10);
+    first = candidate > allDates[0] ? candidate : allDates[0];
+  }
+  document.getElementById('dateFrom').value = first;
+  document.getElementById('dateTo').value = last;
+  render();
+}
+
+function showTab(id, el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.content').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-'+id).classList.add('active');
+}
+
+function inRange(dateStr, from, to){
+  if (!dateStr) return false;
+  if (from && dateStr < from) return false;
+  if (to && dateStr > to) return false;
+  return true;
+}
+
+function render(){
+  const from = document.getElementById('dateFrom').value;
+  const to = document.getElementById('dateTo').value;
+  document.getElementById('range-info').textContent = (from&&to) ? `${from} → ${to}` : '';
+
+  const gRows = GROWS.filter(r=>inRange(r.data, from, to));
+  const rRows = RROWS.filter(r=>inRange(r.data, from, to));
+
+  renderGerenciador(gRows);
+  renderResumo(rRows);
+}
+
+// ---------- Gerenciador ----------
+function renderGerenciador(rows){
+  const inv = rows.reduce((s,r)=>s+r.inv,0);
+  const imp = rows.reduce((s,r)=>s+r.imp,0);
+  const alc = rows.reduce((s,r)=>s+r.alc,0);
+  const clk = rows.reduce((s,r)=>s+r.clk,0);
+  const pv = rows.reduce((s,r)=>s+r.pv,0);
+  const ck = rows.reduce((s,r)=>s+r.ck,0);
+  const venda = rows.reduce((s,r)=>s+r.venda,0);
+  const retorno = rows.reduce((s,r)=>s+r.retorno,0);
+
+  document.getElementById('g-inv').textContent = fmtBRL(inv);
+  document.getElementById('g-imp').textContent = fmtInt(imp);
+  document.getElementById('g-alc').textContent = fmtInt(alc);
+  document.getElementById('g-clk').textContent = fmtInt(clk);
+  document.getElementById('g-ctr').textContent = fmtPct(safeDiv(clk,imp)*100);
+  document.getElementById('g-cpc').textContent = fmtBRL(safeDiv(inv,clk));
+  document.getElementById('g-cpm').textContent = fmtBRL(safeDiv(inv,imp)*1000);
+  document.getElementById('g-pv').textContent = fmtInt(pv);
+  document.getElementById('g-ck').textContent = fmtInt(ck);
+  document.getElementById('g-venda').textContent = fmtInt(venda);
+  document.getElementById('g-ret').textContent = fmtInt(retorno);
+  document.getElementById('g-conv').textContent = fmtInt(venda+retorno);
+
+  // daily aggregation for charts
+  const byDay = {};
+  rows.forEach(r=>{
+    if(!byDay[r.data]) byDay[r.data] = {inv:0, clk:0};
+    byDay[r.data].inv += r.inv;
+    byDay[r.data].clk += r.clk;
+  });
+  const days = Object.keys(byDay).sort();
+  const invSeries = days.map(d=>byDay[d].inv);
+  const clkSeries = days.map(d=>byDay[d].clk);
+
+  try {
+    if (typeof Chart === 'undefined') throw new Error('Chart.js não carregou');
+    const ctxInv = document.getElementById('chart-g-inv').getContext('2d');
+    if (chartGInv) chartGInv.destroy();
+    chartGInv = new Chart(ctxInv, {
+      type:'bar',
+      data:{labels:days, datasets:[{label:'Investimento (R$)', data:invSeries, backgroundColor:'rgba(255,107,43,0.85)', borderRadius:4}]},
+      options:{plugins:{legend:{display:false}}, scales:{x:{ticks:{color:'rgba(255,255,255,.5)'}, grid:{color:'rgba(255,255,255,.05)'}}, y:{ticks:{color:'rgba(255,255,255,.5)'}, grid:{color:'rgba(255,255,255,.05)'}}}}
+    });
+
+    const ctxClk = document.getElementById('chart-g-clk').getContext('2d');
+    if (chartGClk) chartGClk.destroy();
+    chartGClk = new Chart(ctxClk, {
+      type:'line',
+      data:{labels:days, datasets:[{label:'Cliques', data:clkSeries, borderColor:'rgba(255,183,55,0.9)', backgroundColor:'rgba(255,183,55,0.15)', tension:.3, fill:true}]},
+      options:{plugins:{legend:{display:false}}, scales:{x:{ticks:{color:'rgba(255,255,255,.5)'}, grid:{color:'rgba(255,255,255,.05)'}}, y:{ticks:{color:'rgba(255,255,255,.5)'}, grid:{color:'rgba(255,255,255,.05)'}}}}
+    });
+  } catch(chartErr){
+    console.warn('Gráficos indisponíveis:', chartErr.message);
+  }
+
+  // aggregated by anuncio
+  const byAd = {};
+  rows.forEach(r=>{
+    const key = r.anuncio + '||' + r.campanha + '||' + r.conjunto;
+    if (!byAd[key]) byAd[key] = {anuncio:r.anuncio, campanha:r.campanha, conjunto:r.conjunto, inv:0, imp:0, clk:0, pv:0, ck:0, venda:0, retorno:0};
+    const o = byAd[key];
+    o.inv+=r.inv; o.imp+=r.imp; o.clk+=r.clk; o.pv+=r.pv; o.ck+=r.ck; o.venda+=r.venda; o.retorno+=r.retorno;
+  });
+  const adList = Object.values(byAd).sort((a,b)=>b.inv-a.inv);
+  const adBody = document.getElementById('tbl-anuncios-body');
+  adBody.innerHTML = adList.map(o=>`
+    <tr>
+      <td>${o.anuncio||'—'}</td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.campanha||'—'}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.conjunto||'—'}</td>
+      <td>${fmtBRL(o.inv)}</td>
+      <td>${fmtInt(o.imp)}</td>
+      <td>${fmtInt(o.clk)}</td>
+      <td>${fmtPct(safeDiv(o.clk,o.imp)*100)}</td>
+      <td>${fmtBRL(safeDiv(o.inv,o.clk))}</td>
+      <td>${fmtInt(o.pv)}</td>
+      <td>${fmtInt(o.ck)}</td>
+      <td>${fmtInt(o.venda)}</td>
+      <td>${fmtInt(o.retorno)}</td>
+    </tr>`).join('') || '<tr><td colspan="12" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados no período</td></tr>';
+
+  // raw rows table
+  const rawSorted = [...rows].sort((a,b)=> b.data.localeCompare(a.data));
+  const rawBody = document.getElementById('tbl-gerenciador-body');
+  rawBody.innerHTML = rawSorted.map(r=>`
+    <tr>
+      <td>${r.data}</td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.campanha||'—'}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.conjunto||'—'}</td>
+      <td>${r.anuncio||'—'}</td>
+      <td>${fmtBRL(r.inv)}</td>
+      <td>${fmtInt(r.imp)}</td>
+      <td>${fmtInt(r.alc)}</td>
+      <td>${fmtInt(r.clk)}</td>
+      <td>${fmtInt(r.pv)}</td>
+      <td>${fmtInt(r.ck)}</td>
+      <td>${fmtInt(r.venda)}</td>
+      <td>${fmtInt(r.retorno)}</td>
+    </tr>`).join('') || '<tr><td colspan="12" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados no período</td></tr>';
+}
+
+// ---------- Resumo ----------
+function renderResumo(rows){
+  const inv = rows.reduce((s,r)=>s+r.inv,0);
+  const clk = rows.reduce((s,r)=>s+r.clk,0);
+  const pv = rows.reduce((s,r)=>s+r.pv,0);
+  const ck = rows.reduce((s,r)=>s+r.ck,0);
+  const vendas = rows.reduce((s,r)=>s+r.vendas,0);
+  const fat = rows.reduce((s,r)=>s+r.fat,0);
+  const roas = safeDiv(fat, inv);
+  const ticket = safeDiv(fat, vendas);
+  const cpl = safeDiv(inv, clk);
+
+  document.getElementById('r-inv').textContent = fmtBRL(inv);
+  document.getElementById('r-fat').textContent = fmtBRL(fat);
+  document.getElementById('r-roas').textContent = (isFinite(roas)&&inv>0) ? roas.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'x' : '—';
+  document.getElementById('r-vendas').textContent = fmtInt(vendas);
+  document.getElementById('r-ticket').textContent = vendas>0 ? fmtBRL(ticket) : '—';
+  document.getElementById('r-clk').textContent = fmtInt(clk);
+  document.getElementById('r-pv').textContent = fmtInt(pv);
+  document.getElementById('r-ck').textContent = fmtInt(ck);
+  document.getElementById('r-cpl').textContent = clk>0 ? fmtBRL(cpl) : '—';
+
+  // chart
+  const sortedRows = [...rows].sort((a,b)=>a.data.localeCompare(b.data));
+  const days = sortedRows.map(r=>r.data);
+  const invSeries = sortedRows.map(r=>r.inv);
+  const fatSeries = sortedRows.map(r=>r.fat);
+
+  try {
+    if (typeof Chart === 'undefined') throw new Error('Chart.js não carregou');
+    const ctx = document.getElementById('chart-r-invfat').getContext('2d');
+    if (chartRInvFat) chartRInvFat.destroy();
+    chartRInvFat = new Chart(ctx, {
+      data:{labels:days, datasets:[
+        {type:'bar', label:'Investimento', data:invSeries, backgroundColor:'rgba(255,107,43,0.85)', borderRadius:4},
+        {type:'line', label:'Faturamento', data:fatSeries, borderColor:'rgba(46,204,113,0.9)', backgroundColor:'rgba(46,204,113,0.15)', tension:.3, fill:false}
+      ]},
+      options:{plugins:{legend:{labels:{color:'rgba(255,255,255,.6)'}}}, scales:{x:{ticks:{color:'rgba(255,255,255,.5)'}, grid:{color:'rgba(255,255,255,.05)'}}, y:{ticks:{color:'rgba(255,255,255,.5)'}, grid:{color:'rgba(255,255,255,.05)'}}}}
+    });
+  } catch(chartErr){
+    console.warn('Gráfico indisponível:', chartErr.message);
+  }
+
+  // funil
+  const max = Math.max(clk,1);
+  document.getElementById('f-clk-lbl').textContent = fmtInt(clk);
+  document.getElementById('f-pv-lbl').textContent = fmtInt(pv);
+  document.getElementById('f-ck-lbl').textContent = fmtInt(ck);
+  document.getElementById('f-vd-lbl').textContent = fmtInt(vendas);
+  document.getElementById('f-clk-bar').style.width = '100%';
+  document.getElementById('f-pv-bar').style.width = (safeDiv(pv,max)*100)+'%';
+  document.getElementById('f-ck-bar').style.width = (safeDiv(ck,max)*100)+'%';
+  document.getElementById('f-vd-bar').style.width = (safeDiv(vendas,max)*100)+'%';
+
+  document.getElementById('t-clk-pv').textContent = fmtPct(safeDiv(pv,clk)*100);
+  document.getElementById('t-pv-ck').textContent = fmtPct(safeDiv(ck,pv)*100);
+  document.getElementById('t-ck-vd').textContent = fmtPct(safeDiv(vendas,ck)*100);
+  document.getElementById('t-clk-vd').textContent = fmtPct(safeDiv(vendas,clk)*100);
+
+  // daily table
+  const bodyRows = [...rows].sort((a,b)=>b.data.localeCompare(a.data));
+  document.getElementById('tbl-resumo-body').innerHTML = bodyRows.map(r=>{
+    const rRoas = safeDiv(r.fat, r.inv);
+    const rCpl = safeDiv(r.inv, r.clk);
+    return `<tr>
+      <td>${r.data}</td>
+      <td>${fmtBRL(r.inv)}</td>
+      <td>${fmtInt(r.clk)}</td>
+      <td>${fmtInt(r.pv)}</td>
+      <td>${fmtInt(r.ck)}</td>
+      <td>${fmtInt(r.vendas)}</td>
+      <td>${r.fat>0?fmtBRL(r.fat):'—'}</td>
+      <td>${(r.inv>0 && r.fat>0)?rRoas.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'x':'—'}</td>
+      <td>${r.clk>0?fmtBRL(rCpl):'—'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="9" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados no período</td></tr>';
+}
+
+loadData();
+</script>
+</body>
+</html>
