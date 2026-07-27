@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dashboard de Performance — Jamelli GT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#1a1a2e;color:#e8e6f0;font-family:'DM Sans',sans-serif;min-height:100vh}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:#12121f}::-webkit-scrollbar-thumb{background:#ff6b2b55;border-radius:3px}
+.topbar{background:#12121f;padding:12px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.07);position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:10px}
+.brand{font-size:17px;font-weight:700;color:#ff6b2b}
+.subtitle{font-size:11px;color:rgba(255,255,255,0.4);margin-top:2px}
+.logo-jgt{display:flex;align-items:center;gap:10px}
+.logo-jgt svg{width:36px;height:36px;flex-shrink:0}
+.logo-text{display:flex;flex-direction:column}
+.logo-text strong{font-size:13px;font-weight:700;color:#ff6b2b;letter-spacing:.3px}
+.logo-text span{font-size:10px;color:rgba(255,255,255,.35);margin-top:1px}
+.period-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.period-bar label{font-size:11px;color:rgba(255,255,255,.45);white-space:nowrap}
+.date-input{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:#e8e6f0;padding:5px 10px;border-radius:6px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;outline:none;min-width:118px}
+.date-input:focus{border-color:#ff6b2b}
+.date-input::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;cursor:pointer}
+.period-sep{color:rgba(255,255,255,.2);font-size:13px;padding:0 2px}
+.preset-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;transition:all .2s;white-space:nowrap}
+.preset-btn:hover,.preset-btn.active{background:rgba(255,107,43,.2);border-color:#ff6b2b;color:#ff6b2b;font-weight:600}
+.range-info{font-size:11px;color:rgba(255,107,43,.75);font-family:'DM Mono',monospace;white-space:nowrap;padding-left:4px}
+.tabs{display:flex;border-bottom:1px solid rgba(255,255,255,0.07);background:#12121f;padding:0 28px;overflow-x:auto}
+.tab{padding:12px 20px;cursor:pointer;font-size:13px;color:rgba(255,255,255,0.5);border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
+.tab:hover{color:#e8e6f0}.tab.active{color:#ff6b2b;border-bottom-color:#ff6b2b;font-weight:600}
+.content{padding:24px 28px;display:none}.content.active{display:block}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:20px}
+.kpi-card{background:#12121f;border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:16px 18px}
+.kpi-label{font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.kpi-value{font-size:20px;font-weight:700;font-family:'DM Mono',monospace}
+.kpi-sub{font-size:10px;color:rgba(255,255,255,.3);margin-top:4px;font-family:'DM Mono',monospace}
+.orange{color:#ff6b2b}.green{color:#2ecc71}.red{color:#e74c3c}.yellow{color:#f1c40f}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#12121f;color:rgba(255,255,255,.45);padding:8px 10px;text-align:right;font-weight:500;border-bottom:1px solid rgba(255,255,255,.07);white-space:nowrap}
+th:first-child{text-align:left}
+td{padding:7px 10px;text-align:right;border-bottom:1px solid rgba(255,255,255,.04);font-family:'DM Mono',monospace;font-size:11px;color:#e8e6f0}
+td:first-child{text-align:left;font-family:'DM Sans',sans-serif;font-size:12px}
+tr:hover td{background:rgba(255,255,255,.025)}
+tfoot td{font-weight:700;color:#ff6b2b;border-top:1px solid rgba(255,107,43,.3);background:rgba(255,107,43,.05)}
+.funil-section{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:16px 0}
+.funil-bar-wrap{margin-bottom:12px}
+.funil-label{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;color:rgba(255,255,255,.7)}
+.funil-bar-bg{background:rgba(255,255,255,.05);border-radius:4px;height:14px;overflow:hidden}
+.funil-bar-fill{background:linear-gradient(90deg,#ff6b2b,#ff9a3c);height:100%;border-radius:4px;transition:width .4s}
+.taxa-grid{display:grid;gap:8px}
+.taxa-item{background:rgba(255,255,255,.04);border-radius:8px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;font-size:12px;color:rgba(255,255,255,.7)}
+.taxa-val{font-family:'DM Mono',monospace;font-size:15px;font-weight:600;color:#ff6b2b}
+.chart-grid-2x2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0}
+.chart-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:16px}
+.chart-card h4{font-size:11px;color:rgba(255,255,255,.45);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
+.chart-card canvas{max-height:190px}
+.sec-title{font-size:13px;font-weight:600;color:rgba(255,255,255,.65);margin:20px 0 10px;border-left:3px solid #ff6b2b;padding-left:10px}
+.cri-filterbar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.cri-filter-btn,.cri-status-btn,.cri-sort-btn,.pub-filter-btn,.pub-sort-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 12px;border-radius:5px;cursor:pointer;font-size:12px;transition:all .2s;font-family:'DM Sans',sans-serif}
+.cri-filter-btn.active,.cri-status-btn.active,.cri-sort-btn.active,.pub-filter-btn.active,.pub-sort-btn.active{background:rgba(255,107,43,.2);border-color:#ff6b2b;color:#ff6b2b}
+.cri-sort-label{font-size:11px;color:rgba(255,255,255,.4);white-space:nowrap}
+.cri-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
+.cri-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:14px}
+.cri-card.ativo{border-color:rgba(46,204,113,.25)}
+.cri-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.cri-name{font-size:11px;font-weight:600;word-break:break-all;flex:1;margin-right:6px;color:#e8e6f0}
+.cri-badge{font-size:10px;padding:2px 6px;border-radius:4px;white-space:nowrap}
+.cri-badge.ativo{background:rgba(46,204,113,.15);color:#2ecc71}
+.cri-badge.inativo{background:rgba(255,255,255,.08);color:rgba(255,255,255,.4)}
+.cri-metrics{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.cri-metric{display:flex;flex-direction:column}
+.cri-metric-label{color:rgba(255,255,255,.4);font-size:9px;margin-bottom:2px;text-transform:uppercase}
+.cri-metric-val{font-family:'DM Mono',monospace;font-size:12px;font-weight:600;color:#e8e6f0}
+.cri-metric-val.hl{color:#ff6b2b;font-size:14px}
+.cri-link{display:block;margin-top:8px;font-size:10px;color:rgba(255,107,43,.7);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tbl-wrap{overflow-x:auto;border-radius:8px;border:1px solid rgba(255,255,255,.07)}
+.pub-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-bottom:24px}
+.pub-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:16px}
+.pub-card.ativo{border-color:rgba(46,204,113,.2)}
+.pub-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+.pub-name{font-size:12px;font-weight:600;flex:1;margin-right:8px;color:#e8e6f0;line-height:1.4}
+.pub-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.pub-metric{text-align:center;padding:8px 6px;background:rgba(255,255,255,.03);border-radius:6px}
+.pub-metric-val{font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:#ff6b2b}
+.pub-metric-val.neutral{color:#e8e6f0}
+.pub-metric-lbl{font-size:9px;color:rgba(255,255,255,.35);margin-top:2px;text-transform:uppercase;letter-spacing:.4px}
+.ob-info{background:rgba(255,107,43,.07);border:1px solid rgba(255,107,43,.2);border-radius:8px;padding:10px 14px;font-size:11px;color:rgba(255,255,255,.55);margin-bottom:16px;line-height:1.5}
+.sales-scroll{display:flex;gap:10px;overflow-x:auto;padding:2px 2px 10px}
+.sale-card{min-width:236px;max-width:236px;background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:12px 14px;flex:0 0 auto}
+.sale-card.traf{border-color:rgba(46,204,113,.28)}
+.sale-top{display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:6px}
+.sale-nome{font-size:12px;font-weight:600;color:#e8e6f0;line-height:1.3}
+.sale-val{font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:#ff6b2b;white-space:nowrap}
+.sale-meta{font-size:10px;color:rgba(255,255,255,.4);font-family:'DM Mono',monospace;margin-bottom:3px}
+.sale-tag{display:inline-block;font-size:9px;padding:2px 6px;border-radius:4px;margin-top:6px;background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);word-break:break-all}
+.sale-tag.paid{background:rgba(46,204,113,.14);color:#2ecc71}
+.err-box{background:rgba(231,76,60,.1);border:1px solid rgba(231,76,60,.35);border-radius:8px;padding:20px;color:#e74c3c;font-size:13px;margin:20px 28px;line-height:1.6}
+.manual-box{margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1)}
+.manual-row{display:flex;flex-direction:column;gap:5px;margin-bottom:10px}
+.manual-row label{font-size:11px;color:rgba(255,255,255,.5);font-weight:400}
+.manual-row input[type=file]{font-size:11px;color:rgba(255,255,255,.6);font-family:'DM Sans',sans-serif;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:7px 9px;cursor:pointer}
+.manual-row input[type=file]::file-selector-button{background:rgba(255,107,43,.18);border:1px solid rgba(255,107,43,.4);color:#ff6b2b;border-radius:5px;padding:4px 10px;margin-right:10px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:11px}
+.err-box code{background:rgba(255,255,255,.08);padding:1px 5px;border-radius:3px;font-family:'DM Mono',monospace;font-size:11px}
+.empty{color:rgba(255,255,255,.3);font-size:12px;padding:20px;text-align:center}
+@media(max-width:900px){.cri-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.cri-grid{grid-template-columns:1fr}.chart-grid-2x2{grid-template-columns:1fr}.funil-section{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div id="loading-overlay" style="position:fixed;inset:0;background:#1a1a2e;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;overflow-y:auto;padding:20px">
+  <div style="width:40px;height:40px;border:3px solid rgba(255,107,43,.2);border-top-color:#ff6b2b;border-radius:50%;animation:spin 1s linear infinite"></div>
+  <div style="color:rgba(255,255,255,.5);font-size:13px" id="loading-msg">Conectando com a planilha...</div>
+</div>
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+
+<div class="topbar">
+  <div class="logo-jgt">
+    <svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+      <rect width="36" height="36" rx="8" fill="#ff6b2b" fill-opacity="0.9"/>
+      <text x="18" y="25" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="13" fill="white">JGT</text>
+    </svg>
+    <div class="logo-text">
+      <strong>Jamelli GT</strong>
+      <span>Tráfego Pago</span>
+    </div>
+  </div>
+  <div class="period-bar">
+    <label>De</label>
+    <input type="date" id="dateFrom" class="date-input" onchange="onDateChange()">
+    <span class="period-sep">→</span>
+    <input type="date" id="dateTo" class="date-input" onchange="onDateChange()">
+    <button class="preset-btn" onclick="setPreset(7,this)">7d</button>
+    <button class="preset-btn" onclick="setPreset(14,this)">14d</button>
+    <button class="preset-btn" onclick="setPreset(30,this)">30d</button>
+    <button class="preset-btn active" id="btn-all" onclick="setPreset('all',this)">Tudo</button>
+    <span class="range-info" id="range-info"></span>
+    <button class="preset-btn" onclick="loadData()" style="margin-left:4px">🔄 Atualizar</button>
+  </div>
+  <div>
+    <div class="brand" id="brand-title">📦 Carregando...</div>
+    <div class="subtitle" id="brand-subtitle">Dashboard de Performance — Jamelli GT</div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('trafego',this)">📊 Tráfego</div>
+  <div class="tab" onclick="showTab('visao',this)">🌐 Visão Geral</div>
+  <div class="tab" onclick="showTab('criativos',this)">Criativos</div>
+  <div class="tab" onclick="showTab('publicos',this)">Públicos</div>
+  <div class="tab" onclick="showTab('paginas',this)">📄 Páginas</div>
+  <div class="tab" onclick="showTab('semanal',this)">Semana a Semana</div>
+  <div class="tab" onclick="showTab('mensal',this)">Mês a Mês</div>
+</div>
+
+<div id="snap-banner" style="display:none"></div>
+
+<div id="tab-trafego" class="content active">
+  <div class="ob-info" id="info-trafego"></div>
+  <div class="kpi-grid" id="kpi-trafego"></div>
+  <div class="sec-title">Funil de conversão (Meta Ads)</div>
+  <div class="funil-section">
+    <div id="funil-bars"></div>
+    <div class="taxa-grid" id="funil-taxas"></div>
+  </div>
+  <div class="sec-title">Vendas do período</div>
+  <div class="sales-scroll" id="sales-cards"></div>
+</div>
+
+<div id="tab-visao" class="content">
+  <div class="kpi-grid" id="kpi-visao"></div>
+  <div class="chart-grid-2x2">
+    <div class="chart-card"><h4>Investimento x Faturamento por dia</h4><canvas id="ch-invfat"></canvas></div>
+    <div class="chart-card"><h4>Vendas por dia (tráfego x orgânico)</h4><canvas id="ch-vendas"></canvas></div>
+    <div class="chart-card"><h4>ROAS por dia</h4><canvas id="ch-roas"></canvas></div>
+    <div class="chart-card"><h4>Cliques x Page Views</h4><canvas id="ch-cliques"></canvas></div>
+  </div>
+  <div class="sec-title">Dia a dia</div>
+  <div class="tbl-wrap"><table id="tbl-visao"></table></div>
+</div>
+
+<div id="tab-criativos" class="content">
+  <div class="ob-info" id="info-criativos"></div>
+  <div class="cri-filterbar">
+    <button class="cri-status-btn active" data-f="todos" onclick="setCriFilter('todos',this)">Todos</button>
+    <button class="cri-status-btn" data-f="ativos" onclick="setCriFilter('ativos',this)">Ativos</button>
+    <button class="cri-status-btn" data-f="inativos" onclick="setCriFilter('inativos',this)">Inativos</button>
+    <span class="cri-sort-label" style="margin-left:12px">Ordenar por</span>
+    <button class="cri-sort-btn active" data-s="inv" onclick="setCriSort('inv',this)">Investimento</button>
+    <button class="cri-sort-btn" data-s="ctr" onclick="setCriSort('ctr',this)">CTR</button>
+    <button class="cri-sort-btn" data-s="cpc" onclick="setCriSort('cpc',this)">CPC</button>
+    <button class="cri-sort-btn" data-s="roas" onclick="setCriSort('roas',this)">ROAS</button>
+    <button class="cri-sort-btn" data-s="vendas" onclick="setCriSort('vendas',this)">Vendas</button>
+  </div>
+  <div class="cri-grid" id="cri-cards"></div>
+  <div class="tbl-wrap"><table id="tbl-criativos"></table></div>
+</div>
+
+<div id="tab-publicos" class="content">
+  <div class="ob-info" id="info-publicos"></div>
+  <div class="cri-filterbar">
+    <button class="pub-filter-btn active" data-f="todos" onclick="setPubFilter('todos',this)">Todos</button>
+    <button class="pub-filter-btn" data-f="ativos" onclick="setPubFilter('ativos',this)">Ativos</button>
+    <button class="pub-filter-btn" data-f="inativos" onclick="setPubFilter('inativos',this)">Inativos</button>
+    <span class="cri-sort-label" style="margin-left:12px">Ordenar por</span>
+    <button class="pub-sort-btn active" data-s="inv" onclick="setPubSort('inv',this)">Investimento</button>
+    <button class="pub-sort-btn" data-s="ctr" onclick="setPubSort('ctr',this)">CTR</button>
+    <button class="pub-sort-btn" data-s="cpc" onclick="setPubSort('cpc',this)">CPC</button>
+    <button class="pub-sort-btn" data-s="roas" onclick="setPubSort('roas',this)">ROAS</button>
+    <button class="pub-sort-btn" data-s="vendas" onclick="setPubSort('vendas',this)">Vendas</button>
+  </div>
+  <div class="pub-grid" id="pub-cards"></div>
+  <div class="sec-title">Campanhas</div>
+  <div class="tbl-wrap"><table id="tbl-campanhas"></table></div>
+</div>
+
+<div id="tab-paginas" class="content">
+  <div class="ob-info" id="info-paginas"></div>
+  <div class="kpi-grid" id="kpi-paginas"></div>
+  <div class="chart-grid-2x2">
+    <div class="chart-card"><h4>Investimento por página</h4><canvas id="ch-pag-inv"></canvas></div>
+    <div class="chart-card"><h4>Taxas do funil por página (%)</h4><canvas id="ch-pag-taxas"></canvas></div>
+  </div>
+  <div class="sec-title">Páginas</div>
+  <div class="pub-grid" id="pag-cards"></div>
+  <div class="sec-title">Comparativo</div>
+  <div class="tbl-wrap"><table id="tbl-paginas"></table></div>
+  <div class="sec-title">Campanhas por página</div>
+  <div class="tbl-wrap"><table id="tbl-pag-camp"></table></div>
+</div>
+
+<div id="tab-semanal" class="content">
+  <div class="chart-grid-2x2">
+    <div class="chart-card"><h4>Investimento por semana</h4><canvas id="ch-sem-inv"></canvas></div>
+    <div class="chart-card"><h4>CTR por semana</h4><canvas id="ch-sem-ctr"></canvas></div>
+  </div>
+  <div class="tbl-wrap"><table id="tbl-semanal"></table></div>
+</div>
+
+<div id="tab-mensal" class="content">
+  <div class="chart-grid-2x2">
+    <div class="chart-card"><h4>Investimento por mês</h4><canvas id="ch-men-inv"></canvas></div>
+    <div class="chart-card"><h4>CTR por mês</h4><canvas id="ch-men-ctr"></canvas></div>
+  </div>
+  <div class="tbl-wrap"><table id="tbl-mensal"></table></div>
+</div>
+
+
+<script type="text/csv" id="snap-ger">
+"Date","Campaign Name","Adset Name","Ad Name","Instagram Permalink URL","Spend (Cost, Amount Spent)","Reach (Estimated)","Action Link Clicks","Action Landing Page View","Action Omni Initiated Checkout","Action Omni Purchase","Campaign Status","Adset Status","Ad Status"
+"2026-07-21","[JGT][VENDAS][WORKSHOP][PG1] LL0108","00 - Engajamento 365D","ADE01","https://www.instagram.com/p/DbE_beWArFe/","R$ 2,54","103,00","2","2","0","0","ACTIVE","ACTIVE","PAUSED"
+"2026-07-21","[JGT][VENDAS][WORKSHOP][PG1] LL0108","00 - Engajamento 365D","ADV02","https://www.instagram.com/p/DbE_cr0gUo4/","R$ 0,15","6,00","0","0","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-21","[JGT][VENDAS][WORKSHOP][PG1] LL0108","00 - Engajamento 365D","ADV04","https://www.instagram.com/p/DbE_caSANx3/","R$ 0,01","2,00","0","0","0","0","ACTIVE","ACTIVE","PAUSED"
+"2026-07-21","[JGT][VENDAS][WORKSHOP][PG1] LL0108","00 - Engajamento 365D","ADV05","https://www.instagram.com/p/DbE_cbNgJXx/","R$ 0,00","2,00","0","0","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-21","[JGT][VENDAS][WORKSHOP][PG2] LL0108","00 - Engajamento 365D","ADE01","https://www.instagram.com/p/DbE_wnhAnM7/","R$ 0,80","29,00","2","0","0","0","PAUSED","CAMPAIGN_PAUSED","PAUSED"
+"2026-07-21","[JGT][VENDAS][WORKSHOP][PG2] LL0108","00 - Engajamento 365D","ADV01","https://www.instagram.com/p/DbE_w7pgGF6/","R$ 0,17","9,00","0","0","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-21","[JGT][VENDAS][WORKSHOP][PG2] LL0108","00 - Engajamento 365D","ADV02","https://www.instagram.com/p/DbE_wu6AcDG/","R$ 0,01","3,00","0","0","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-21","[JGT][VENDAS][WORKSHOP][PG2] LL0108","00 - Engajamento 365D","ADV03","https://www.instagram.com/p/DbE_wmJgwPJ/","R$ 0,87","34,00","2","2","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-21","[JGT][VENDAS][WORKSHOP][PG2] LL0108","00 - Engajamento 365D","ADV05","https://www.instagram.com/p/DbE_wuPgOGp/","R$ 0,98","30,00","2","1","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-21","[JGT][VENDAS][WORKSHOP][PG3] LL0108","00 - Engajamento 365D","ADE01","https://www.instagram.com/p/DbE_8t6AUzY/","R$ 1,90","57,00","2","0","0","0","PAUSED","CAMPAIGN_PAUSED","PAUSED"
+"2026-07-21","[JGT][VENDAS][WORKSHOP][PG3] LL0108","00 - Engajamento 365D","ADV02","https://www.instagram.com/p/DbE_9K3AyKQ/","R$ 0,03","5,00","0","0","0","0","PAUSED","CAMPAIGN_PAUSED","PAUSED"
+"2026-07-21","[JGT][VENDAS][WORKSHOP][PG3] LL0108","00 - Engajamento 365D","ADV03","https://www.instagram.com/p/DbE_88jgU5C/","R$ 0,08","1,00","0","0","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-21","[JGT][VENDAS][WORKSHOP][PG3] LL0108","00 - Engajamento 365D","ADV04","https://www.instagram.com/p/DbE_87egNub/","R$ 0,52","26,00","2","1","0","0","PAUSED","CAMPAIGN_PAUSED","PAUSED"
+"2026-07-21","[JGT][VENDAS][WORKSHOP][PG3] LL0108","00 - Engajamento 365D","ADV05","https://www.instagram.com/p/DbE_89XAagt/","R$ 0,15","10,00","1","1","0","0","PAUSED","CAMPAIGN_PAUSED","PAUSED"
+"2026-07-22","[JGT][VENDAS][WORKSHOP][PG1] LL0108","00 - Engajamento 365D","ADE01","https://www.instagram.com/p/DbE_beWArFe/","R$ 18,21","561,00","12","12","1","0","ACTIVE","ACTIVE","PAUSED"
+"2026-07-22","[JGT][VENDAS][WORKSHOP][PG1] LL0108","00 - Engajamento 365D","ADV01","https://www.instagram.com/p/DbE_cVOghdR/","R$ 10,83","334,00","5","5","1","0","ACTIVE","ACTIVE","PAUSED"
+"2026-07-22","[JGT][VENDAS][WORKSHOP][PG1] LL0108","00 - Engajamento 365D","ADV02","https://www.instagram.com/p/DbE_cr0gUo4/","R$ 2,49","86,00","4","2","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-22","[JGT][VENDAS][WORKSHOP][PG1] LL0108","00 - Engajamento 365D","ADV03","https://www.instagram.com/p/DbE_ctDgvOb/","R$ 2,56","56,00","2","2","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-22","[JGT][VENDAS][WORKSHOP][PG1] LL0108","00 - Engajamento 365D","ADV04","https://www.instagram.com/p/DbE_caSANx3/","R$ 3,68","104,00","4","3","0","0","ACTIVE","ACTIVE","PAUSED"
+"2026-07-22","[JGT][VENDAS][WORKSHOP][PG1] LL0108","00 - Engajamento 365D","ADV05","https://www.instagram.com/p/DbE_cbNgJXx/","R$ 14,56","315,00","10","7","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-22","[JGT][VENDAS][WORKSHOP][PG2] LL0108","00 - Engajamento 365D","ADE01","https://www.instagram.com/p/DbE_wnhAnM7/","R$ 18,21","498,00","8","8","0","0","PAUSED","CAMPAIGN_PAUSED","PAUSED"
+"2026-07-22","[JGT][VENDAS][WORKSHOP][PG2] LL0108","00 - Engajamento 365D","ADV01","https://www.instagram.com/p/DbE_w7pgGF6/","R$ 1,17","43,00","0","0","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-22","[JGT][VENDAS][WORKSHOP][PG2] LL0108","00 - Engajamento 365D","ADV02","https://www.instagram.com/p/DbE_wu6AcDG/","R$ 2,10","71,00","1","1","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-22","[JGT][VENDAS][WORKSHOP][PG2] LL0108","00 - Engajamento 365D","ADV03","https://www.instagram.com/p/DbE_wmJgwPJ/","R$ 4,04","107,00","8","5","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-22","[JGT][VENDAS][WORKSHOP][PG2] LL0108","00 - Engajamento 365D","ADV04","https://www.instagram.com/p/DbE_w_2gIjD/","R$ 12,88","320,00","8","7","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-22","[JGT][VENDAS][WORKSHOP][PG2] LL0108","00 - Engajamento 365D","ADV05","https://www.instagram.com/p/DbE_wuPgOGp/","R$ 9,25","302,00","5","4","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-22","[JGT][VENDAS][WORKSHOP][PG3] LL0108","00 - Engajamento 365D","ADE01","https://www.instagram.com/p/DbE_8t6AUzY/","R$ 3,41","99,00","1","1","1","0","PAUSED","CAMPAIGN_PAUSED","PAUSED"
+"2026-07-22","[JGT][VENDAS][WORKSHOP][PG3] LL0108","00 - Engajamento 365D","ADV01","https://www.instagram.com/p/DbE_9GZAC1z/","R$ 3,94","110,00","3","3","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-22","[JGT][VENDAS][WORKSHOP][PG3] LL0108","00 - Engajamento 365D","ADV02","https://www.instagram.com/p/DbE_9K3AyKQ/","R$ 4,55","148,00","5","4","0","0","PAUSED","CAMPAIGN_PAUSED","PAUSED"
+"2026-07-22","[JGT][VENDAS][WORKSHOP][PG3] LL0108","00 - Engajamento 365D","ADV03","https://www.instagram.com/p/DbE_88jgU5C/","R$ 6,24","178,00","2","1","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-22","[JGT][VENDAS][WORKSHOP][PG3] LL0108","00 - Engajamento 365D","ADV04","https://www.instagram.com/p/DbE_87egNub/","R$ 24,00","522,00","20","17","0","0","PAUSED","CAMPAIGN_PAUSED","PAUSED"
+"2026-07-22","[JGT][VENDAS][WORKSHOP][PG3] LL0108","00 - Engajamento 365D","ADV05","https://www.instagram.com/p/DbE_89XAagt/","R$ 6,37","175,00","5","4","0","0","PAUSED","CAMPAIGN_PAUSED","PAUSED"
+"2026-07-23","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE012307","https://www.instagram.com/p/DbLOU_iglK_/","R$ 6,29","142,00","2","2","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-23","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE022307","https://www.instagram.com/p/DbLOVUxA7dN/","R$ 0,93","44,00","0","0","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-23","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE032307","https://www.instagram.com/p/DbLORgDAKxc/","R$ 6,72","168,00","1","0","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-23","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE042307","https://www.instagram.com/p/DbLOVgSgNnm/","R$ 0,08","6,00","0","0","0","0","PAUSED","CAMPAIGN_PAUSED","PAUSED"
+"2026-07-23","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE052307","https://www.instagram.com/p/DbLOVQXg_TK/","R$ 7,02","190,00","1","1","0","0","PAUSED","PAUSED","ADSET_PAUSED"
+"2026-07-23","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE062307","https://www.instagram.com/p/DbLOYxDAJCc/","R$ 0,83","31,00","0","0","0","0","PAUSED","PAUSED","ADSET_PAUSED"
+"2026-07-23","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE072307","https://www.instagram.com/p/DbLOVFfgNWV/","R$ 6,47","180,00","3","3","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-23","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE082307","https://www.instagram.com/p/DbLOVo1AsQU/","R$ 0,18","13,00","0","0","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-23","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE092307","https://www.instagram.com/p/DbLOYqvACM1/","R$ 1,61","57,00","2","2","0","0","PAUSED","PAUSED","ADSET_PAUSED"
+"2026-07-23","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE102307","https://www.instagram.com/p/DbLOVQLgISG/","R$ 4,09","144,00","2","1","0","0","PAUSED","PAUSED","ADSET_PAUSED"
+"2026-07-23","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE112307","https://www.instagram.com/p/DbLOVIzgCGJ/","R$ 0,49","26,00","0","0","0","0","PAUSED","PAUSED","ADSET_PAUSED"
+"2026-07-23","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE122307","https://www.instagram.com/p/DbLOP93gxyZ/","R$ 4,71","117,00","3","2","0","0","PAUSED","PAUSED","ADSET_PAUSED"
+"2026-07-23","[JGT][VENDAS][WORKSHOP][PG1] LL0108","00 - Engajamento 365D","ADV01","https://www.instagram.com/p/DbE_cVOghdR/","R$ 11,38","270,00","9","9","1","0","ACTIVE","ACTIVE","PAUSED"
+"2026-07-23","[JGT][VENDAS][WORKSHOP][PG1] LL0108","00 - Engajamento 365D","ADV02","https://www.instagram.com/p/DbE_cr0gUo4/","R$ 4,95","81,00","0","0","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-23","[JGT][VENDAS][WORKSHOP][PG1] LL0108","00 - Engajamento 365D","ADV03","https://www.instagram.com/p/DbE_ctDgvOb/","R$ 2,46","73,00","3","3","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-23","[JGT][VENDAS][WORKSHOP][PG1] LL0108","00 - Engajamento 365D","ADV04","https://www.instagram.com/p/DbE_caSANx3/","R$ 8,23","218,00","8","7","0","0","ACTIVE","ACTIVE","PAUSED"
+"2026-07-23","[JGT][VENDAS][WORKSHOP][PG1] LL0108","00 - Engajamento 365D","ADV05","https://www.instagram.com/p/DbE_cbNgJXx/","R$ 11,56","299,00","2","1","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-23","[JGT][VENDAS][WORKSHOP][PG2] LL0108","00 - Engajamento 365D","ADV01","https://www.instagram.com/p/DbE_w7pgGF6/","R$ 0,75","23,00","0","0","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-23","[JGT][VENDAS][WORKSHOP][PG2] LL0108","00 - Engajamento 365D","ADV02","https://www.instagram.com/p/DbE_wu6AcDG/","R$ 2,25","65,00","1","1","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-23","[JGT][VENDAS][WORKSHOP][PG2] LL0108","00 - Engajamento 365D","ADV03","https://www.instagram.com/p/DbE_wmJgwPJ/","R$ 3,88","89,00","4","2","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-23","[JGT][VENDAS][WORKSHOP][PG2] LL0108","00 - Engajamento 365D","ADV04","https://www.instagram.com/p/DbE_w_2gIjD/","R$ 18,82","419,00","10","8","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-23","[JGT][VENDAS][WORKSHOP][PG2] LL0108","00 - Engajamento 365D","ADV05","https://www.instagram.com/p/DbE_wuPgOGp/","R$ 11,60","242,00","6","6","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-23","[JGT][VENDAS][WORKSHOP][PG3] LL0108","00 - Engajamento 365D","ADE01","https://www.instagram.com/p/DbE_8t6AUzY/","R$ 0,00","0,00","0","0","0","0","PAUSED","CAMPAIGN_PAUSED","PAUSED"
+"2026-07-23","[JGT][VENDAS][WORKSHOP][PG3] LL0108","00 - Engajamento 365D","ADV01","https://www.instagram.com/p/DbE_9GZAC1z/","R$ 1,86","57,00","1","1","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-23","[JGT][VENDAS][WORKSHOP][PG3] LL0108","00 - Engajamento 365D","ADV02","https://www.instagram.com/p/DbE_9K3AyKQ/","R$ 1,08","46,00","0","0","0","0","PAUSED","CAMPAIGN_PAUSED","PAUSED"
+"2026-07-23","[JGT][VENDAS][WORKSHOP][PG3] LL0108","00 - Engajamento 365D","ADV03","https://www.instagram.com/p/DbE_88jgU5C/","R$ 15,62","366,00","13","11","1","1","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-23","[JGT][VENDAS][WORKSHOP][PG3] LL0108","00 - Engajamento 365D","ADV04","https://www.instagram.com/p/DbE_87egNub/","R$ 16,14","498,00","3","2","0","0","PAUSED","CAMPAIGN_PAUSED","PAUSED"
+"2026-07-23","[JGT][VENDAS][WORKSHOP][PG3] LL0108","00 - Engajamento 365D","ADV05","https://www.instagram.com/p/DbE_89XAagt/","R$ 2,65","51,00","1","1","0","0","PAUSED","CAMPAIGN_PAUSED","PAUSED"
+"2026-07-24","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE012307","https://www.instagram.com/p/DbLOU_iglK_/","R$ 7,77","222,00","6","4","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-24","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE022307","https://www.instagram.com/p/DbLOVUxA7dN/","R$ 5,59","212,00","3","3","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-24","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE032307","https://www.instagram.com/p/DbLORgDAKxc/","R$ 9,44","232,00","3","3","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-24","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE042307","https://www.instagram.com/p/DbLOVgSgNnm/","R$ 4,77","142,00","0","0","0","0","PAUSED","CAMPAIGN_PAUSED","PAUSED"
+"2026-07-24","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE052307","https://www.instagram.com/p/DbLOVQXg_TK/","R$ 6,33","163,00","0","0","0","0","PAUSED","PAUSED","ADSET_PAUSED"
+"2026-07-24","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE062307","https://www.instagram.com/p/DbLOYxDAJCc/","R$ 6,94","228,00","2","1","0","0","PAUSED","PAUSED","ADSET_PAUSED"
+"2026-07-24","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE072307","https://www.instagram.com/p/DbLOVFfgNWV/","R$ 7,29","183,00","5","3","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-24","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE082307","https://www.instagram.com/p/DbLOVo1AsQU/","R$ 6,65","239,00","6","4","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-24","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE092307","https://www.instagram.com/p/DbLOYqvACM1/","R$ 7,02","257,00","3","2","0","0","PAUSED","PAUSED","ADSET_PAUSED"
+"2026-07-24","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE102307","https://www.instagram.com/p/DbLOVQLgISG/","R$ 3,80","143,00","0","0","0","0","PAUSED","PAUSED","ADSET_PAUSED"
+"2026-07-24","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE112307","https://www.instagram.com/p/DbLOVIzgCGJ/","R$ 6,04","231,00","1","0","0","0","PAUSED","PAUSED","ADSET_PAUSED"
+"2026-07-24","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE122307","https://www.instagram.com/p/DbLOP93gxyZ/","R$ 4,18","131,00","1","1","0","0","PAUSED","PAUSED","ADSET_PAUSED"
+"2026-07-24","[JGT][VENDAS][WORKSHOP][PG1] LL0108","00 - Engajamento 365D","ADV02","https://www.instagram.com/p/DbE_cr0gUo4/","R$ 4,45","87,00","2","2","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-24","[JGT][VENDAS][WORKSHOP][PG1] LL0108","00 - Engajamento 365D","ADV03","https://www.instagram.com/p/DbE_ctDgvOb/","R$ 0,16","11,00","0","0","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-24","[JGT][VENDAS][WORKSHOP][PG1] LL0108","00 - Engajamento 365D","ADV04","https://www.instagram.com/p/DbE_caSANx3/","R$ 3,61","85,00","0","0","0","0","ACTIVE","ACTIVE","PAUSED"
+"2026-07-24","[JGT][VENDAS][WORKSHOP][PG1] LL0108","00 - Engajamento 365D","ADV05","https://www.instagram.com/p/DbE_cbNgJXx/","R$ 34,62","664,00","19","18","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-24","[JGT][VENDAS][WORKSHOP][PG2] LL0108","00 - Engajamento 365D","ADV03","https://www.instagram.com/p/DbE_wmJgwPJ/","R$ 0,00","0,00","0","0","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-24","[JGT][VENDAS][WORKSHOP][PG3] LL0108","00 - Engajamento 365D","ADV01","https://www.instagram.com/p/DbE_9GZAC1z/","R$ 1,29","32,00","0","0","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-24","[JGT][VENDAS][WORKSHOP][PG3] LL0108","00 - Engajamento 365D","ADV02","https://www.instagram.com/p/DbE_9K3AyKQ/","R$ 0,61","11,00","0","0","0","0","PAUSED","CAMPAIGN_PAUSED","PAUSED"
+"2026-07-24","[JGT][VENDAS][WORKSHOP][PG3] LL0108","00 - Engajamento 365D","ADV03","https://www.instagram.com/p/DbE_88jgU5C/","R$ 39,75","886,00","30","23","1","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-25","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE012307","https://www.instagram.com/p/DbLOU_iglK_/","R$ 1,46","76,00","0","0","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-25","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE022307","https://www.instagram.com/p/DbLOVUxA7dN/","R$ 0,99","52,00","0","0","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-25","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE032307","https://www.instagram.com/p/DbLORgDAKxc/","R$ 1,66","64,00","0","0","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-25","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE042307","https://www.instagram.com/p/DbLOVgSgNnm/","R$ 0,38","29,00","0","0","0","0","PAUSED","CAMPAIGN_PAUSED","PAUSED"
+"2026-07-25","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE052307","https://www.instagram.com/p/DbLOVQXg_TK/","R$ 0,60","31,00","1","1","0","0","PAUSED","PAUSED","ADSET_PAUSED"
+"2026-07-25","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE062307","https://www.instagram.com/p/DbLOYxDAJCc/","R$ 1,32","84,00","0","0","0","0","PAUSED","PAUSED","ADSET_PAUSED"
+"2026-07-25","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE072307","https://www.instagram.com/p/DbLOVFfgNWV/","R$ 0,51","30,00","0","0","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-25","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE082307","https://www.instagram.com/p/DbLOVo1AsQU/","R$ 1,94","110,00","0","0","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-25","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE092307","https://www.instagram.com/p/DbLOYqvACM1/","R$ 3,29","113,00","0","0","0","0","PAUSED","PAUSED","ADSET_PAUSED"
+"2026-07-25","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE102307","https://www.instagram.com/p/DbLOVQLgISG/","R$ 1,99","62,00","0","0","0","0","PAUSED","PAUSED","ADSET_PAUSED"
+"2026-07-25","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE112307","https://www.instagram.com/p/DbLOVIzgCGJ/","R$ 6,68","191,00","0","0","0","0","PAUSED","PAUSED","ADSET_PAUSED"
+"2026-07-25","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE122307","https://www.instagram.com/p/DbLOP93gxyZ/","R$ 0,13","9,00","0","0","0","0","PAUSED","PAUSED","ADSET_PAUSED"
+"2026-07-25","[JGT][VENDAS][WORKSHOP][PG1] LL0108","00 - Engajamento 365D","ADV02","https://www.instagram.com/p/DbE_cr0gUo4/","R$ 4,57","74,00","2","2","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-25","[JGT][VENDAS][WORKSHOP][PG1] LL0108","00 - Engajamento 365D","ADV04","https://www.instagram.com/p/DbE_caSANx3/","R$ 9,24","207,00","2","1","0","0","ACTIVE","ACTIVE","PAUSED"
+"2026-07-25","[JGT][VENDAS][WORKSHOP][PG1] LL0108","00 - Engajamento 365D","ADV05","https://www.instagram.com/p/DbE_cbNgJXx/","R$ 50,62","846,00","14","11","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-25","[JGT][VENDAS][WORKSHOP][PG3] LL0108","00 - Engajamento 365D","ADV01","https://www.instagram.com/p/DbE_9GZAC1z/","R$ 24,94","620,00","12","7","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-25","[JGT][VENDAS][WORKSHOP][PG3] LL0108","00 - Engajamento 365D","ADV02","https://www.instagram.com/p/DbE_9K3AyKQ/","R$ 0,66","29,00","1","1","0","0","PAUSED","CAMPAIGN_PAUSED","PAUSED"
+"2026-07-25","[JGT][VENDAS][WORKSHOP][PG3] LL0108","00 - Engajamento 365D","ADV03","https://www.instagram.com/p/DbE_88jgU5C/","R$ 45,48","915,00","26","18","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-26","[JGT][VENDAS][WORKSHOP][ADV][PG1] LL0108","00 - ADV + YOGA","ADV02NV","https://www.instagram.com/p/DbRwh-oA-6X/","R$ 2,16","74,00","5","3","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-26","[JGT][VENDAS][WORKSHOP][ADV][PG1] LL0108","00 - ADV + YOGA","ADV03","https://www.instagram.com/p/DbRwh_KgsoZ/","R$ 0,75","34,00","0","0","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-26","[JGT][VENDAS][WORKSHOP][ADV][PG1] LL0108","00 - ADV + YOGA","ADV03NV","https://www.instagram.com/p/DbRwiE9gma4/","R$ 0,05","6,00","0","0","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-26","[JGT][VENDAS][WORKSHOP][ADV][PG3] LL0108","00 - ADV + YOGA","ADV01","https://www.instagram.com/p/DbRwRVAA1Gx/","R$ 0,29","21,00","1","1","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-26","[JGT][VENDAS][WORKSHOP][ADV][PG3] LL0108","00 - ADV + YOGA","ADV01NV","https://www.instagram.com/p/DbRwUlgAiDl/","R$ 0,16","8,00","0","0","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-26","[JGT][VENDAS][WORKSHOP][ADV][PG3] LL0108","00 - ADV + YOGA","ADV02NV","https://www.instagram.com/p/DbRwUO8A_SZ/","R$ 1,58","50,00","2","1","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-26","[JGT][VENDAS][WORKSHOP][ADV][PG3] LL0108","00 - ADV + YOGA","ADV03","https://www.instagram.com/p/DbRwTiNAYCn/","R$ 0,56","27,00","0","0","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-26","[JGT][VENDAS][WORKSHOP][ADV][PG3] LL0108","00 - ADV + YOGA","ADV03NV","https://www.instagram.com/p/DbRwUUoggIV/","R$ 0,28","9,00","0","0","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-26","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE012307","https://www.instagram.com/p/DbLOU_iglK_/","R$ 9,43","267,00","2","0","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-26","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE022307","https://www.instagram.com/p/DbLOVUxA7dN/","R$ 0,45","13,00","1","1","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-26","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE032307","https://www.instagram.com/p/DbLORgDAKxc/","R$ 10,09","303,00","4","4","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-26","[JGT][VENDAS][WORKSHOP][CRIATIVO-ESTATICO] LL0108","00 - Engajamento 365D","ADE082307","https://www.instagram.com/p/DbLOVo1AsQU/","R$ 9,51","237,00","1","0","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-26","[JGT][VENDAS][WORKSHOP][PG1] LL0108","00 - Engajamento 365D","ADV02","https://www.instagram.com/p/DbE_cr0gUo4/","R$ 35,12","665,00","20","18","2","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-26","[JGT][VENDAS][WORKSHOP][PG1] LL0108","00 - Engajamento 365D","ADV03","https://www.instagram.com/p/DbE_ctDgvOb/","R$ 1,58","38,00","0","0","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-26","[JGT][VENDAS][WORKSHOP][PG1] LL0108","00 - Engajamento 365D","ADV05","https://www.instagram.com/p/DbE_cbNgJXx/","R$ 10,98","319,00","5","6","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-26","[JGT][VENDAS][WORKSHOP][PG2] LL0108","00 - Engajamento 365D","ADE01","https://www.instagram.com/p/DbE_wnhAnM7/","R$ 0,00","0,00","0","0","0","0","PAUSED","CAMPAIGN_PAUSED","PAUSED"
+"2026-07-26","[JGT][VENDAS][WORKSHOP][PG2] LL0108","00 - Engajamento 365D","ADV02","https://www.instagram.com/p/DbE_wu6AcDG/","R$ 0,00","0,00","0","0","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-26","[JGT][VENDAS][WORKSHOP][PG3] LL0108","00 - Engajamento 365D","ADV01","https://www.instagram.com/p/DbE_9GZAC1z/","R$ 55,79","1.054,00","18","14","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-26","[JGT][VENDAS][WORKSHOP][PG3] LL0108","00 - Engajamento 365D","ADV02","https://www.instagram.com/p/DbE_9K3AyKQ/","R$ 7,35","205,00","5","2","0","0","PAUSED","CAMPAIGN_PAUSED","PAUSED"
+"2026-07-26","[JGT][VENDAS][WORKSHOP][PG3] LL0108","00 - Engajamento 365D","ADV04","https://www.instagram.com/p/DbE_87egNub/","R$ 0,00","0,00","0","0","0","0","PAUSED","CAMPAIGN_PAUSED","PAUSED"
+"2026-07-27","[JGT][VENDAS][WORKSHOP][ADV][PG1] LL0108","00 - ADV + YOGA","ADE01","https://www.instagram.com/p/DbRwmi3AZTB/","R$ 5,32","97,00","3","3","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-27","[JGT][VENDAS][WORKSHOP][ADV][PG1] LL0108","00 - ADV + YOGA","ADV01","https://www.instagram.com/p/DbRwiNrAHAu/","R$ 0,81","12,00","1","1","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-27","[JGT][VENDAS][WORKSHOP][ADV][PG1] LL0108","00 - ADV + YOGA","ADV01NV","https://www.instagram.com/p/DbRwiDhAeey/","R$ 21,21","263,00","9","7","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-27","[JGT][VENDAS][WORKSHOP][ADV][PG1] LL0108","00 - ADV + YOGA","ADV02NV","https://www.instagram.com/p/DbRwh-oA-6X/","R$ 12,87","212,00","11","8","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-27","[JGT][VENDAS][WORKSHOP][ADV][PG1] LL0108","00 - ADV + YOGA","ADV03","https://www.instagram.com/p/DbRwh_KgsoZ/","R$ 1,53","37,00","1","0","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-27","[JGT][VENDAS][WORKSHOP][ADV][PG1] LL0108","00 - ADV + YOGA","ADV03NV","https://www.instagram.com/p/DbRwiE9gma4/","R$ 0,72","17,00","0","0","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-27","[JGT][VENDAS][WORKSHOP][ADV][PG3] LL0108","00 - ADV + YOGA","ADE01","https://www.instagram.com/p/DbRwYlTgBtp/","R$ 8,72","172,00","2","2","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-27","[JGT][VENDAS][WORKSHOP][ADV][PG3] LL0108","00 - ADV + YOGA","ADV01","https://www.instagram.com/p/DbRwRVAA1Gx/","R$ 8,50","123,00","3","1","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-27","[JGT][VENDAS][WORKSHOP][ADV][PG3] LL0108","00 - ADV + YOGA","ADV01NV","https://www.instagram.com/p/DbRwUlgAiDl/","R$ 2,47","41,00","2","1","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-27","[JGT][VENDAS][WORKSHOP][ADV][PG3] LL0108","00 - ADV + YOGA","ADV02NV","https://www.instagram.com/p/DbRwUO8A_SZ/","R$ 26,81","453,00","11","9","1","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-27","[JGT][VENDAS][WORKSHOP][ADV][PG3] LL0108","00 - ADV + YOGA","ADV03","https://www.instagram.com/p/DbRwTiNAYCn/","R$ 1,45","43,00","2","3","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-27","[JGT][VENDAS][WORKSHOP][ADV][PG3] LL0108","00 - ADV + YOGA","ADV03NV","https://www.instagram.com/p/DbRwUUoggIV/","R$ 0,57","5,00","0","0","0","0","ACTIVE","ACTIVE","ACTIVE"
+"2026-07-27","[JGT][VENDAS][WORKSHOP][PG3] LL0108","00 - Engajamento 365D","ADV01","https://www.instagram.com/p/DbE_9GZAC1z/","R$ 12,21","342,00","3","1","3","1","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+"2026-07-27","[JGT][VENDAS][WORKSHOP][PG3] LL0108","00 - Engajamento 365D","ADV02","https://www.instagram.com/p/DbE_9K3AyKQ/","R$ 1,12","44,00","1","1","0","0","PAUSED","CAMPAIGN_PAUSED","PAUSED"
+"2026-07-27","[JGT][VENDAS][WORKSHOP][PG3] LL0108","00 - Engajamento 365D","ADV03","https://www.instagram.com/p/DbE_88jgU5C/","R$ 0,16","8,00","0","0","0","0","PAUSED","CAMPAIGN_PAUSED","CAMPAIGN_PAUSED"
+</script>
+<script type="text/csv" id="snap-web">
+"Orgânico ou Pago?","id transação","nome marketplace","","status","tipo","pagamento","parcelas","moeda","valor venda","valor marketplace","valor afiliado","valor frete","valor líquido","valor produtos","valor desconto","valor imposto","valor parcelas","id produto","nome produto","nome produto exibicao","quantidade produto","retorno marketplace","motivo reembolso","","","id contato","nome empresa contato","nome contato","doc contato","email contato","logradouro contato","número contato","complemento contato","bairro contato","cidade contato","estado contato","país contato","cep contato","codigo telefone contato","telefone contato","primeira captura","primeira origem","data 1ª captura","última captura","última origem","data última captura","data pedido","data aprovacao","data cancelamento","data garantia","data indisponível","rppc venda","origem rppc venda","rppc utm campaign","rppc utm medium","rppc utm term","rppc utm content","rppc checkout","origem 1","origem 2","origem 3","utm_source","utm_campaign","utm_medium","utm_content","","","vencimento do boleto","nome oferta","","nome da transportadora","serviço da transportadora","código de rastreamento","valor da transportadora","tempo de entrega","assinatura código","assinatura ciclo","cupom código","cupom valor","adquirente nome","adquirente tid","","resposta auto atribuição"
+"","a239a54a-aee4-4f66-b841-2f9e57806d87","Stone","","Reembolsada","Produtor","Cartão de Crédito","1","BRL","5","0,3","0","0","4,7","5","0","0","5","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","","teste de integração","","","9faca74c-ca81-4282-8045-1ac9cf618bfb","","Teste Ws","46639570807","biancafr.k@gmail.com","Rua Mateus Garcia","919","","Vila Irmãos Arnoni","São Paulo","SP","BR","2374000","55","11975992249","","","","","","","10/07/2026 08:58:19","10/07/2026 09:11:15","10/07/2026 09:15:48","09/08/2026 09:11:15","09/08/2026 09:11:15","","","","","","","","","","","","","","","","","","Oferta Única | Teste","","Standard","","","0","","","","","0","pagarme","4470460615","",""
+"","a241b832-e39c-4876-a83e-83c660173d9b","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0,58","0","0","58,42","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a241b8bc-de6f-4ebb-91a0-7e54ab309363","","Glória Deorce","59978961704","gloriadeorce@yahoo.com","Avenida Mauro Ramos","1512","409","Centro","Florianópolis","SC","BR","88020302","55","48996178979","","","","","","","14/07/2026 09:17:49","14/07/2026 09:21:29","","13/08/2026 09:21:29","13/08/2026 09:21:29","WS | Celebração Os 4 Pilares do Yoga Clássico","Instagram","lancamento-WS_4_pilares-misto","email","Brevo","Yogalaya_2026_lancamento_WS_4_pilares-misto_Venda_Email-MKT_conteudo_semanal_13jul_","WS | Os 4 Pilares do Yoga Clássico","a2400a8e2def49c39d5b0946c1debd19-a23ff07e322344639cedd64d945d740d","","","","","","","","","15/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4475955312","",""
+"","a2445a03-1349-416a-87ab-43824f9c76bf","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a2445a28-df82-4a87-96b5-8f24a908c431","","Tatiana Kelly Viana","25413099886","tatiana.viana35@gmail.com","Rua Godofredo Fraga","10","217 D","Marapé","Santos","SP","BR","11070400","55","13981271001","","","","","","","15/07/2026 16:41:56","15/07/2026 16:44:48","","14/08/2026 16:44:48","14/08/2026 16:44:48","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","","","","","","","","","16/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4477838681","",""
+"","a244b609-b98d-4c31-a6da-c1316b1498ae","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a244b69e-20cf-45b5-a81c-ac79f524d353","","Maria Luiza Abreu Dias","80461980720","mlzadias1202@gmail.com","Rua Maurício da Costa Faria","720","204","Recreio dos Bandeirantes","Rio de Janeiro","RJ","BR","22790285","55","31996998679","","","","","","","15/07/2026 20:59:15","15/07/2026 21:01:54","","14/08/2026 21:01:54","14/08/2026 21:01:54","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","","","","","","","","","16/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4478161081","",""
+"","a2478ea8-7d1a-45af-88c4-1ff0fa77224a","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a2478f14-6077-417b-a9cb-9fd5501c2dba","","Eliana Barros Quintslr","66357683787","elianambq@gmail.com","Rua Almirante Alexandrino","2603","Casa 32 apt.101","Santa Teresa","Rio de Janeiro","RJ","BR","20241263","55","21991423451","","","","","","","17/07/2026 06:56:37","17/07/2026 07:00:09","","16/08/2026 07:00:09","16/08/2026 07:00:09","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","","","","","","","","","18/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4479585302","",""
+"","a247c3da-2e96-41ef-b383-4359581a2f86","Stone","","Expirada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a247c40a-91a8-43a5-81d1-a012562a36cd","","Luciana Vicentini","14121745892","luciana.bere.vicentini@gmail.com","Via Veneto","300","","Residencial Spazio Verde","Botucatu","SP","BR","18607771","55","14997400207","","","","","","","17/07/2026 09:25:22","","24/07/2026 00:35:11","","","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","","","","","","","","","18/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4479713407","",""
+"","a247c5e8-8782-4366-85c0-0f44e72beb27","Stone","","Cancelada","Produtor","Cartão de Crédito","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","","","","","9e4e22cf-3a0a-41eb-ab29-d46dea56db6f","","Dorinha Ricciardi","4262","dorinharicciardi@gmail.com","253 STE","6705","","","Myakka City","FL","US","34251","1","9415246670","","","","","","","17/07/2026 09:31:07","","17/07/2026 09:39:02","","","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","","","","","","","","","","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","pagarme","4479727614","",""
+"","a247f25b-48b7-430f-ab94-7edb850c2094","Stone","","Aprovada","Produtor","Cartão de Crédito","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","","","","","a247f2c1-28aa-436c-b296-05249bc93f88","","Nadja Pimentel","17391490253","nadja_mp@yahoo.com.br","Rua Aristides Espinola","20","303","Leblon","Rio de Janeiro","RJ","BR","22440050","55","21999828338","","","","","","","17/07/2026 11:35:24","17/07/2026 11:40:47","","16/08/2026 11:40:47","16/08/2026 11:40:47","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","","","","","","","","","","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","pagarme","4479874884","",""
+"","a24814e4-50c1-4222-a888-f884250216de","Stone","","Aprovada","Produtor","Cartão de Crédito","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","","","","","9e283cce-84b2-4dd5-af40-2f45d6418a26","","Aline Saccol Pinto","81168535034","alinesaccol@gmail.com","Rua Gustavo Sampaio","598","lado par","Leme","Rio de Janeiro","RJ","BR","22010010","55","21983568554","","","","","","","17/07/2026 13:11:58","17/07/2026 13:13:25","","16/08/2026 13:13:25","16/08/2026 13:13:25","WS | Celebração Os 4 Pilares do Yoga Clássico","Instagram","lancamento-WS_4_pilares-misto","email","Brevo","Yogalaya_2026_lancamento_WS_4_pilares-misto_Conversao_Email-MKT_convite01_16jul_","WS | Os 4 Pilares do Yoga Clássico","a2463eab22224e8bbe5630d6e4aff23d-a23ff07e322344639cedd64d945d740d","","","","","","","","","","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","pagarme","4479982347","",""
+"","a2481f60-cbab-4175-a108-1a5484c771f9","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a2481f76-1bf8-4fad-8a65-bf6551858e73","","Leonardo José Bezerra Portela","3901413480","lportela@leonardoportela.com","Rua Santa Terezinha","639","Apto 01","Jardim Atlântico","Olinda","PE","BR","53140170","55","81998083439","","","","","","","17/07/2026 13:41:17","17/07/2026 13:43:08","","16/08/2026 13:43:08","16/08/2026 13:43:08","WS | Celebração Os 4 Pilares do Yoga Clássico","Instagram","lancamento-WS_4_pilares-misto","email","Brevo","Yogalaya_2026_lancamento_WS_4_pilares-misto_Conversao_Email-MKT_convite01_16jul_","WS | Os 4 Pilares do Yoga Clássico","a2463eab22224e8bbe5630d6e4aff23d-a23ff07e322344639cedd64d945d740d","","","","","","","","","18/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4480014478","",""
+"","a2486de6-a9ff-47ce-b5b5-21a2b7605cf3","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a2486e53-0ed0-4b65-a775-54cc4202de29","","Beatriz Simões","8861349862","bgasimoes@gmail.com","Rua Helena","70","","Vila Olímpia","São Paulo","SP","BR","4552050","55","11999320305","","","","","","","17/07/2026 17:20:51","17/07/2026 17:23:38","","16/08/2026 17:23:38","16/08/2026 17:23:38","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","","","","","","","","","18/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4480270891","",""
+"","a24919d1-4d4c-4ef1-98ff-a16f9c6f002f","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a12da48f-e0d3-4423-86d5-e1dfbdd866e7","","Zuleica Vita","28691372818","zuleicavita@gmail.com","Rua dos Abacateiros","127","","Jardim do Colégio (Zona Norte)","São Paulo","SP","BR","2431010","55","11941561621","","","","","","","18/07/2026 01:21:34","18/07/2026 01:23:46","","17/08/2026 01:23:46","17/08/2026 01:23:46","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","","","","","","","","","19/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4480723801","",""
+"","a24a1fe4-a29e-4759-ae76-0061d25eca5f","Stone","","Aprovada","Produtor","Cartão de Crédito","1","BRL","59","3,53","0","0","55,47","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","","","","","a24a200b-59fd-4a35-8e15-4b4165ce134f","","Marianna Siqueira Reis","10552349771","mari.ounaum@gmail.com","Rua Carvalho de Mendonça","13","Apto 207","Copacabana","Rio de Janeiro","RJ","BR","22020050","55","21969928875","","","","","","","18/07/2026 13:34:23","18/07/2026 13:36:13","","17/08/2026 13:36:13","17/08/2026 13:36:13","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","","","","","","","","","","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","pagarme","4481197184","",""
+"","a24a2b99-cc49-4c71-8ae0-361b0ef16245","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","9f4c5674-32f7-44b6-a295-20dc16873e34","","Marcia Fratogianni","57007969887","marcia.fratogianni@gmail.com","Rua Doutor Samuel de Castro Neves","148","121","Vila Cruzeiro","São Paulo","SP","BR","4726240","55","11996366068","","","","","","","18/07/2026 14:07:07","18/07/2026 14:09:20","","17/08/2026 14:09:20","17/08/2026 14:09:20","WS | Celebração Os 4 Pilares do Yoga Clássico","Instagram","lancamento-WS_4_pilares-misto","email","Brevo","Yogalaya_2026_lancamento_WS_4_pilares-misto_Conversao_Email-MKT_convite01_16jul_","WS | Os 4 Pilares do Yoga Clássico","a2463eab22224e8bbe5630d6e4aff23d-a23ff07e322344639cedd64d945d740d","","","","","","","","","19/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4481233276","",""
+"","a24abe7d-7d0e-40e2-b328-6391209a8e3e","Stone","","Aprovada","Produtor","Cartão de Crédito","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","","","","","a24abea4-816d-4663-84b4-7ff471100c3a","","Daniel Reis","4599139645","danielreisefi1@yahoo.com.br","Rua Ipuera","546","304","Novo Eldorado","Contagem","MG","BR","32341240","55","31997451335","","","","","","","18/07/2026 20:57:51","18/07/2026 21:00:02","","17/08/2026 21:00:02","17/08/2026 21:00:02","WS | Celebração Os 4 Pilares do Yoga Clássico","Instagram","lancamento-WS_4_pilares-misto","email","Brevo","Yogalaya_2026_lancamento_WS_4_pilares-misto_Venda_Email-MKT_conteudo_semanal_13jul_","WS | Os 4 Pilares do Yoga Clássico","a2400a8e2def49c39d5b0946c1debd19-a23ff07e322344639cedd64d945d740d","","","","","","","","","","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","pagarme","4481706918","",""
+"","a24be430-9d39-4847-9f58-736f9e12a07f","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a24be49d-126f-44d3-9db4-03b00f19e03e","","Míriam Bonora Dos Santos","37660482874","miriamsurya@gmail.com","Rua Jerônimo Rosa","94","","Vila Santana","Sorocaba","SP","BR","18080725","55","15991069221","","","","","","","19/07/2026 10:39:06","19/07/2026 10:41:24","","18/08/2026 10:41:24","18/08/2026 10:41:24","WS | Celebração Os 4 Pilares do Yoga Clássico","Instagram","lancamento-WS_4_pilares-misto","organic","instagram","Yogalaya_2026_lancamento_WS_4_pilares-misto_Conversao_bio-ig_bioinsta_13jul_","WS | Os 4 Pilares do Yoga Clássico","a2405f7231d14e11bc24a308ca89c880-a23ff07e322344639cedd64d945d740d","","","","","","","","","20/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4482109821","",""
+"","a24bfe1c-49b9-45eb-b7c9-d0bcef67dd93","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a18a6c47-5ba3-4201-be5c-cb4c1c3ca870","","Delma Odete Ribeiro","9752706304","delmaodete@gmail.com","Quadra ARSE 72 Alameda 2 lote 2","","Res. Cidade Jardim, BL. B AP. 103","Plano Diretor Sul","Palmas","TO","BR","77022372","55","63984323634","","","","","","","19/07/2026 11:51:35","19/07/2026 11:55:12","","18/08/2026 11:55:12","18/08/2026 11:55:12","WS | Celebração Os 4 Pilares do Yoga Clássico","Instagram","lancamento-WS_4_pilares-misto","organic","whatsapp","Yogalaya_2026_lancamento_WS_4_pilares-misto_Conversao_grupos_ry_convite01_video_14jul_","WS | Os 4 Pilares do Yoga Clássico","a2424a149821435091435b204dcc29b7-a23ff07e322344639cedd64d945d740d","","","","","","","","","20/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4482194353","",""
+"","a24bff05-361b-4867-939d-a08e4fbdaef6","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a24bff31-15b1-4832-b2cd-db43667cab98","","Vanessa De Barros","1844233090","vanessadebarros82@gmail.com","João Scariot","143","Casa","São Cristóvão","Sananduva","RS","BR","99840000","55","54984039496","","","","","","","19/07/2026 11:54:07","19/07/2026 11:58:37","","18/08/2026 11:58:37","18/08/2026 11:58:37","WS | Celebração Os 4 Pilares do Yoga Clássico","Instagram","lancamento-WS_4_pilares-misto","organic","whatsapp","Yogalaya_2026_lancamento_WS_4_pilares-misto_Conversao_grupos_ry_convite01_video_14jul_","WS | Os 4 Pilares do Yoga Clássico","a2424a149821435091435b204dcc29b7-a23ff07e322344639cedd64d945d740d","","","","","","","","","20/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4482196032","",""
+"","a24c16c2-af20-4a2a-bbe7-fd0438b0ec8d","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a24c16e5-3858-41f6-adb1-1c4a0cc315e9","","Tanise Bidegain","10561804800","tanise4@yahoo.com.br","Rua Irmã Maria Demetria Kfuri","167","","Jardim Esplanada","São José dos Campos","SP","BR","12242500","55","11994959224","","","","","","","19/07/2026 13:00:30","19/07/2026 13:02:45","","18/08/2026 13:02:45","18/08/2026 13:02:45","WS | Celebração Os 4 Pilares do Yoga Clássico","Instagram","lancamento-WS_4_pilares-misto","organic","whatsapp","Yogalaya_2026_lancamento_WS_4_pilares-misto_Conversao_grupos_ry_convite01_video_14jul_","WS | Os 4 Pilares do Yoga Clássico","a2424a149821435091435b204dcc29b7-a23ff07e322344639cedd64d945d740d","","","","","","","","","20/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4482276677","",""
+"","a24c1fb9-fb2e-40a8-9242-265e7e5493bd","Stone","","Aprovada","Produtor","Cartão de Crédito","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","","","","","9f882bb9-e082-479a-afe3-9a8e8b2f5182","","Fernanda Lima Moreira","94387540087","fernanda.limamoreira@outlook.com","Av. Benjamin Constant","1641","302A","São Geraldo","Porto Alegre","RS","BR","90230255","55","51998376686","","","","","","","19/07/2026 13:25:34","19/07/2026 13:28:11","","18/08/2026 13:28:11","18/08/2026 13:28:11","WS | Celebração Os 4 Pilares do Yoga Clássico","Instagram","lancamento-WS_4_pilares-misto","organic","whatsapp","Yogalaya_2026_lancamento_WS_4_pilares-misto_Conversao_grupos_ry_convite01_video_14jul_","WS | Os 4 Pilares do Yoga Clássico","a2424a149821435091435b204dcc29b7-a23ff07e322344639cedd64d945d740d","","","","","","","","","","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","pagarme","4482310595","",""
+"","a24c251c-7f0b-4940-a366-17f1b48d73d5","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a24c2547-18f4-491d-812d-c7074a10a4bb","","Felipe Tadeu","10639319670","felipetadeuslack@gmail.com","Rua Monte Cristo","42","Vila real","Jardim de Alá (Justinópolis)","Ribeirão das Neves","MG","BR","33943250","55","31988243012","","","","","","","19/07/2026 13:40:38","19/07/2026 13:42:35","","18/08/2026 13:42:35","18/08/2026 13:42:35","WS | Celebração Os 4 Pilares do Yoga Clássico","Instagram","lancamento-WS_4_pilares-misto","organic","whatsapp","Yogalaya_2026_lancamento_WS_4_pilares-misto_Conversao_grupos_ry_convite01_video_14jul_","WS | Os 4 Pilares do Yoga Clássico","a2424a149821435091435b204dcc29b7-a23ff07e322344639cedd64d945d740d","","","","","","","","","20/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4482327257","",""
+"","a24c2bc6-fe0a-433f-b5db-f05dde8c2b1d","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a24c2bdc-ae35-4a92-aad7-4adf7a1ea1af","","Zenilde Cardoso Teles","50615408753","zcteles@gmail.com","R. Barão de Mesquita","518","702","Andaraí","Rio de Janeiro","RJ","BR","20540156","55","21997812181","","","","","","","19/07/2026 13:59:16","19/07/2026 14:01:38","","18/08/2026 14:01:38","18/08/2026 14:01:38","WS | Celebração Os 4 Pilares do Yoga Clássico","Instagram","lancamento-WS_4_pilares-misto","organic","whatsapp","Yogalaya_2026_lancamento_WS_4_pilares-misto_Conversao_grupos_ry_convite01_video_14jul_","WS | Os 4 Pilares do Yoga Clássico","a2424a149821435091435b204dcc29b7-a23ff07e322344639cedd64d945d740d","","","","","","","","","20/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4482350672","",""
+"","a24c2c7f-d12c-4069-8cc2-f8aa0e436b3b","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a24c2cb9-51d0-4b48-9896-61dd86a1e820","","Elaine Maria Fabrício Lopes","7388756","elainemarialopes8@gmail.com","Rua Gustavo Augusto de Resende","520","102 Fundos","Portuguesa","Rio de Janeiro","RJ","BR","21931576","55","21996544388","","","","","","","19/07/2026 14:01:17","19/07/2026 14:04:19","","18/08/2026 14:04:19","18/08/2026 14:04:19","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","","","","","","","","","20/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4482353992","",""
+"","a24c5012-67f8-4f51-a88f-6cc8c3d8bf3d","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a24c5080-c82f-4e86-a944-2f23c6fa34e9","","Maria Tereza Serratto","31393870","terezaserratto@hotmail.com","Av. JURACY MAGALHÃES","169","CONTABILIDADE","CENTRO","Entre Rios","BA","BR","48180000","55","75999985105","","","","","","","19/07/2026 15:40:45","19/07/2026 15:56:24","","18/08/2026 15:56:24","18/08/2026 15:56:24","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","","","","","","","","","20/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4482502760","",""
+"","a24c930a-121a-489a-bd35-a373d2b961f2","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0,58","0","0","58,42","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a24c934c-9eb3-4eda-9800-13ee862ad741","","Marina Fioratti","4850449867","marinafioratti@hotmail.com","Condomínio Campos do Conde","215","Rua 12, 116","Jardim do Horto","Rio Claro","SP","BR","13506898","55","11971335631","","","","","","","19/07/2026 18:48:01","19/07/2026 18:51:18","","18/08/2026 18:51:18","18/08/2026 18:51:18","WS | Celebração Os 4 Pilares do Yoga Clássico","Instagram","lancamento-WS_4_pilares-misto","organic","whatsapp","Yogalaya_2026_lancamento_WS_4_pilares-misto_Conversao_grupos_ry_convite01_video_14jul_","WS | Os 4 Pilares do Yoga Clássico","a2424a149821435091435b204dcc29b7-a23ff07e322344639cedd64d945d740d","","","","","","","","","20/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4482687772","",""
+"","a24cec54-de2f-419f-ab63-478f3ac5ea97","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","9f8842a8-9a73-4372-843a-f4a832fbe1ec","","Ana Luiza Vainboim","90724496734","alvainboim@me.com","Rua Salvador Cardoso","95","111","Itaim Bibi","São Paulo","SP","BR","4533050","55","11996331078","","","","","","","19/07/2026 22:57:41","19/07/2026 23:00:35","","18/08/2026 23:00:35","18/08/2026 23:00:35","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","","","","","","","","","20/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4482910816","",""
+"","a24dcbfd-0286-4135-99ca-9b1a8da6d9f1","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a24bf758-fbbd-4256-8aab-8e684998a7fa","","Débora Martinelli Saggioratto","29444177890","debsaggio@gmail.com","Rua Siqueira Campos","980","até 1770/1771","Centro","Pirassununga","SP","BR","13630085","55","19998493007","","","","","","","20/07/2026 09:23:05","20/07/2026 09:27:19","","19/08/2026 09:27:19","19/08/2026 09:27:19","","","","","","","","","","","","","","","","","21/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4483197413","",""
+"","a24e146a-9cc3-4534-99e5-3419947d065c","Stone","","Cancelada","Produtor","Cartão de Crédito","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","","","","","a24e14b9-99d8-4152-a7f0-74236c3f8474","","Giulia Zattera","17852166784","giuliazattera@gmail.com","Rua Bartolomeu Bueno da Silva","44","Condomínio vilarejo","Anil","Rio de Janeiro","RJ","BR","22755310","55","21971677474","","","","","","","20/07/2026 12:45:36","","20/07/2026 12:48:18","","","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","","","","","","","","","","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","pagarme","4483474601","",""
+"","a24e16b0-f406-4a50-b5d3-11a527ce1ae2","Stone","","Aprovada","Produtor","Cartão de Crédito","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","","","","","a24e14b9-99d8-4152-a7f0-74236c3f8474","","Giulia Zattera","17852166784","giuliazattera@gmail.com","Rua Bartolomeu Bueno da Silva","44","Condomínio vilarejo","Anil","Rio de Janeiro","RJ","BR","22755310","55","21971677474","","","","","","","20/07/2026 12:51:58","20/07/2026 12:53:40","","19/08/2026 12:53:40","19/08/2026 12:53:40","","","","","","","","","","","","","","","","","","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","pagarme","4483481740","",""
+"","a24e331f-47a8-4aea-ba8d-276bcb0b3ef6","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","9f118b27-216d-4b5a-b5ee-d0c3c41a46e1","","Lerrita Rubinoff","66599792804","tlgbrasil@yahoo.com.br","Rua José Pinto Vieira n 111","111","apt 105","Itapuã","Vila Velha","ES","BR","29101609","55","27995141544","","","","","","","20/07/2026 14:11:28","20/07/2026 14:14:17","","19/08/2026 14:14:17","19/08/2026 14:14:17","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","","","","","","","","","21/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4483578589","",""
+"","a24e809b-be69-43d1-8a3e-ffb2bd2f13a2","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a24e80b5-25f8-4c86-9b6c-f0388e974a33","","Leticia Pessanha","12034099745","leticiapessanharj@gmail.com","Rua Henrique Sarzedas","500","Casa 1","Parque Zabulão","Rio das Ostras","RJ","BR","28893812","55","21980146319","","","","","","","20/07/2026 17:48:08","20/07/2026 17:49:53","","19/08/2026 17:49:53","19/08/2026 17:49:53","WS | Celebração Os 4 Pilares do Yoga Clássico","Instagram","lancamento-WS_4_pilares-misto","organic","whatsapp","Yogalaya_2026_lancamento_WS_4_pilares-misto_Conversao_grupos_ry_convite01_video_14jul_","WS | Os 4 Pilares do Yoga Clássico","a2424a149821435091435b204dcc29b7-a23ff07e322344639cedd64d945d740d","","","","","","","","","21/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4483838783","",""
+"","a24f9295-825b-4064-b052-012e46c3d431","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a24f930a-eb29-4359-b5a7-7816e1439334","","Juliana Moreschi","95068201049","jumoreschi@hotmail.com","Rua Portugal","503","4","Centro","Tramandaí","RS","BR","95590000","55","51998873456","","","","","","","21/07/2026 06:34:13","21/07/2026 06:38:37","","20/08/2026 06:38:37","20/08/2026 06:38:37","WS | Celebração Os 4 Pilares do Yoga Clássico","Instagram","lancamento-WS_4_pilares-misto","email","Brevo","Yogalaya_2026_lancamento_WS_4_pilares-misto_Conversao_Email-MKT_convite03_20jul_","WS | Os 4 Pilares do Yoga Clássico","a24e114905df48798d52f35a5c5cc521-a23ff07e322344639cedd64d945d740d","","","","","","","","","22/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4484269488","",""
+"","a24f9a6e-4947-48d5-acba-119d83690cfa","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a24f9aa8-35d9-4e6c-9084-0d8f6f60435d","","Raquel Novaes Amorim Almeida","31690735830","raquelnaa@gmail.com","Rua Antônio Carlos","396","lado par","Consolação","São Paulo","SP","BR","1309010","55","11989119886","","","","","","","21/07/2026 06:56:10","21/07/2026 06:57:55","","20/08/2026 06:57:55","20/08/2026 06:57:55","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","","","","","","","","","22/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4484279770","",""
+"","a24fa224-e614-4c0e-ba6f-ad5035f735d9","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a180e012-189a-41bc-a267-8388da5d60b9","","Cristina Maria Meirelles","8520389767","cristinameirellespagotto@hotmail.com","Avenida Estudante José Júlio de Souza","610","lado par","Itapuã","Vila Velha","ES","BR","29101830","55","27995149473","","","","","","","21/07/2026 07:17:44","21/07/2026 07:24:16","","20/08/2026 07:24:16","20/08/2026 07:24:16","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","","","","","","","","","22/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4484300113","",""
+"","a2505784-a2b4-4684-ba1d-0f12d06de550","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a178a388-88c8-46c4-baec-f4593a13be32","","Lais Wetzel","5049438802","lais_diana@hotmail.com","Estrada Municipal Governador André Franco Montoro","801","Casa308","Condomínio Residencial Lago da Barra","Jaguariúna","SP","BR","13913340","55","12997166440","","","","","","","21/07/2026 15:44:53","21/07/2026 15:47:02","","20/08/2026 15:47:02","20/08/2026 15:47:02","WS | Celebração Os 4 Pilares do Yoga Clássico","Instagram","lancamento-WS_4_pilares-misto","organic","whatsapp","Yogalaya_2026_lancamento_WS_4_pilares-misto_Conversao_grupos_ry_convite01_video_14jul_","WS | Os 4 Pilares do Yoga Clássico","a2424a149821435091435b204dcc29b7-a23ff07e322344639cedd64d945d740d","","","","","","","","","22/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4484912467","",""
+"","a251b2e9-6860-4f5f-8af4-6e5dd44ef00a","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a251b328-e67d-4c66-90cf-4ec51f0d74e8","","Beto Avaha Atmajyoti","19753125895","betoprofdeyoga@gmail.com","Rua José Clemente Pereira","5","ap 86","Campo Grande","Santos","SP","BR","11070320","55","13997130108","","","","","","","22/07/2026 07:56:16","22/07/2026 07:58:51","","21/08/2026 07:58:51","21/08/2026 07:58:51","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","","","","","","","","","23/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4485621765","",""
+"","a2520167-fb4e-4fc7-85c6-c1af056641f7","Stone","","Boleto Impresso","Produtor","Boleto Bancário","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a2520191-0ceb-4b7e-af1d-a4a368544d0e","","Jaqueline Siqueira","33501546890","jaqueline.ve1985@gmail.com","Avenida Antônio de Almeida","335","73-b","Jardim Marica","Mogi das Cruzes","SP","BR","8775420","55","11914834913","","","","","","","22/07/2026 11:35:46","","","","","WS | Celebração Os 4 Pilares do Yoga Clássico","Instagram","lancamento-WS_4_pilares-misto","organic","instagram","Yogalaya_2026_lancamento_WS_4_pilares-misto_Conversao_bio-ig_bioinsta_13jul_","WS | Os 4 Pilares do Yoga Clássico","a2405f7231d14e11bc24a308ca89c880-a23ff07e322344639cedd64d945d740d","","","","","","","","","23/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","198","4485885164","",""
+"","a25218a8-3b6c-484d-8eef-306df228adc0","Stone","","Aprovada","Produtor","Boleto Bancário","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","9d7914b6-f98a-494a-a998-e2923599cf6e","","Anachrystina Almeida Krahn","4121420748","a.souleve.a@gmail.com","Rua Oscar da Fonseca","56","Casa","Fonseca","Niterói","RJ","BR","24120395","49","1749464868","","","","","","","22/07/2026 12:40:46","22/07/2026 16:53:27","","21/08/2026 16:53:27","22/07/2026 16:54:25","WS | Celebração Os 4 Pilares do Yoga Clássico","Instagram","lancamento-WS_4_pilares-misto","organic","whatsapp","Yogalaya_2026_lancamento_WS_4_pilares-misto_Conversao_grupos_ry_convite01_video_14jul_","WS | Os 4 Pilares do Yoga Clássico","a2424a149821435091435b204dcc29b7-a23ff07e322344639cedd64d945d740d","","","","","","","","","23/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","198","4485974930","",""
+"","a2521e8a-da69-4a7b-a96e-920f02f3861b","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a2521ee5-c319-4097-b603-e1f811f49aea","","Fabiola Hellen Tinto Maziero","32138886808","tintofabiola@gmail.com","Rua Morro Agudo","55","(Res Prq Piracicaba - Balbo)","Santa Terezinha","Piracicaba","SP","BR","13409003","55","19999088291","","","","","","","22/07/2026 12:57:14","22/07/2026 13:00:28","","21/08/2026 13:00:28","21/08/2026 13:00:28","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","","","","","","","","","23/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4485981261","",""
+"","a2524707-394c-41d7-82ef-cc5a53e4911a","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0,58","0","0","58,42","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a2524718-20cb-475c-8c15-890b2a837a00","","Fernanda Maitê Leon Drula","76673138904","fernandadrula525@gmail.com","Avenida São Jerônimo","93","Casa","Vila David Antônio","Campo Largo","PR","BR","83609340","55","41997441426","","","","","","","22/07/2026 14:50:26","22/07/2026 14:52:14","","21/08/2026 14:52:14","21/08/2026 14:52:14","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","","","","","","","","","23/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4486114797","",""
+"","a25268ea-ae6b-43b8-97ca-7e2c5896d50f","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a2526941-0e53-410b-957b-26d00d21205c","","Sandra Amendola","8831070827","srnamendola@gmail.com","Rua Aristides Quintino","587","Casa 25","Armação da Piedade","Governador Celso Ramos","SC","BR","88192070","55","48991790079","","","","","","","22/07/2026 16:25:12","22/07/2026 16:28:07","","21/08/2026 16:28:07","21/08/2026 16:28:07","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","","","","","","","","","23/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4486230416","",""
+"","a2526cb9-56a0-4d93-8cf3-c5913557be9b","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0,58","0","0","58,42","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a2526d05-1440-47ae-9a15-f5503ccaeff5","","Ivonete Pereira Gama","60717009572","ivogamaromano@gmail.com","Rua Emílio Odebrecht","626","Lagoa Dourada Apto 803","Pituba","Salvador","BA","BR","41830300","55","71982585742","","","","","","","22/07/2026 16:35:51","22/07/2026 16:38:45","","21/08/2026 16:38:45","21/08/2026 16:38:45","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","","","","","","","","","23/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4486243070","",""
+"","a2530c9e-104c-48e8-a4e3-62ca4c5ee422","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a2530cfc-e38b-49a8-9dbd-e8bec697c951","","Maurelys Betancourt","70807622273","maurelysbetancourt@gmail.com","Rua Riachuelo","50","apartamento","Centro","Curitiba","PR","BR","80020250","55","41996956107","","","","","","","23/07/2026 00:02:56","23/07/2026 00:05:50","","22/08/2026 00:05:50","22/08/2026 00:05:50","WS | Celebração Os 4 Pilares do Yoga Clássico","Instagram","lancamento-WS_4_pilares-misto","organic","instagram","Yogalaya_2026_lancamento_WS_4_pilares-misto_Conversao_bio-ig_bioinsta_13jul_","WS | Os 4 Pilares do Yoga Clássico","a2405f7231d14e11bc24a308ca89c880-a23ff07e322344639cedd64d945d740d","","","","","","","","","24/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4486676169","",""
+"","a2532045-9b39-429c-b5ff-6996c094f4a7","Stone","","Aprovada","Produtor","Cartão de Crédito","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","","","","","a253208d-c862-4a8b-8a48-065726172d1e","","Fernanda Hayama","7235367911","feritimura@hotmail.com","Rua Osamu Saito","195","","Condomínio Royal Golf Residence","Londrina","PR","BR","86055547","55","43999653158","","","","","","","23/07/2026 00:57:54","23/07/2026 01:00:35","","22/08/2026 01:00:35","22/08/2026 01:00:35","WS | Celebração Os 4 Pilares do Yoga Clássico","Instagram","lancamento-WS_4_pilares-misto","organic","instagram","Yogalaya_2026_lancamento_WS_4_pilares-misto_Conversao_bio-ig_bioinsta_13jul_","WS | Os 4 Pilares do Yoga Clássico","a2405f7231d14e11bc24a308ca89c880-a23ff07e322344639cedd64d945d740d","","","","","","","","","","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","pagarme","4486706540","",""
+"","a253ad8d-9017-4d9b-b2d0-c68214c63a48","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a253adcb-f8a1-49ae-be88-c455cd68a8ef","","Maria Eliza Barbosa","270134727","melizaasb@gmail.com","Rua Edmundo Lins","20","Apt 901","Copacabana","Rio de Janeiro","RJ","BR","22031020","55","21996252203","","","","","","","23/07/2026 07:32:57","23/07/2026 07:35:19","","22/08/2026 07:35:19","22/08/2026 07:35:19","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","","","","","","","","","24/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4486812688","",""
+"","a25472e0-6d98-4b42-b370-09f3d3cd7da4","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a18aae8b-1ee9-46eb-9eb4-edd87435d79a","","Edna Ritis","8445723812","edna.ritis@gmail.com","Rua Ignácio Polessi","22","Cond. Reserva Santa Rosa","Reserva Santa Rosa","Itatiba","SP","BR","13255129","55","11991143183","","","","","","","23/07/2026 16:44:42","23/07/2026 16:47:38","","22/08/2026 16:47:38","22/08/2026 16:47:38","WS | Celebração Os 4 Pilares do Yoga Clássico","Instagram","lancamento-WS_4_pilares-misto","email","Brevo","Yogalaya_2026_lancamento_WS_4_pilares-misto_Conversao_Email-MKT_convite03_22jul_","WS | Os 4 Pilares do Yoga Clássico","a25212b56fe94e448920fe5d6c20c302-a23ff07e322344639cedd64d945d740d","","","","","","","","","24/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4487430915","",""
+"","a256a68e-b93a-4cd1-b232-ecfb1b16b206","Stone","","Boleto Impresso","Produtor","Boleto Bancário","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a256a6c1-a34a-4bb9-9d6b-8210ba60445c","","William Passos","61018791191","wac22061973@gmail.com","Rua Humberto de Campos","802","","Leblon","Rio de Janeiro","RJ","BR","22430190","55","11933607243","","","","","","","24/07/2026 19:00:52","","","","","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","","","","","","","","","25/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","198","4488793326","",""
+"","a257ec6e-1a67-4833-ad63-100c21863227","Stone","","Aprovada","Produtor","Cartão de Crédito","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","","","","","a257eca2-8707-4a2a-9d31-b6424ff665f5","","Ana Paula Da Silva Visgueira","29899626899","apsiv2012@gmail.com","Rua Paula Ney","357","ap 71","Vila Mariana","São Paulo","SP","BR","4107020","55","11971039725","","","","","","","25/07/2026 10:12:04","25/07/2026 10:14:59","","24/08/2026 10:14:59","24/08/2026 10:14:59","","","","","","","","","","","","","","","","","","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","pagarme","4489375685","",""
+"","a257f44f-f021-4c0f-97a7-fd1bc7dbd50a","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a257f496-3bd9-4d1e-80eb-7aeb309801c5","","Paula De Assis Bettarello","16504700885","paulabettsol@hotmail.com","Avenida Germano Moreira","430","","Castelo","Batatais","SP","BR","14300218","55","16981514313","","","","","","","25/07/2026 10:34:07","25/07/2026 10:36:48","","24/08/2026 10:36:48","24/08/2026 10:36:48","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","null|manychat|lancamento-WS_4_pilares-misto|instagram|Yogalaya_2026_lancamento_WS_4_pilares-misto_Venda_Text-Ad_automacao_ig_17jul_","instagram","","lancamento-WS_4_pilares-misto","manychat","Yogalaya_2026_lancamento_WS_4_pilares-misto_Venda_Text-Ad_automacao_ig_17jul_","","","26/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4489400182","",""
+"","a257f76e-cb17-4ffc-a75d-e10c0568501c","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a257f78e-0606-4efd-92c9-114162d908ba","","Daiane Rosolen","2476294993","daivirginia@yahoo.com.br","Rua Luiz Foggiatto","","380 C casa 44","Orleans","Curitiba","PR","BR","82310260","55","41996376020","","","","","","","25/07/2026 10:42:50","25/07/2026 10:46:11","","24/08/2026 10:46:11","24/08/2026 10:46:11","WS | Celebração Os 4 Pilares do Yoga Clássico","Instagram","lancamento-WS_4_pilares-Quente","organic","youtube","Vida_veda_2026_lancamento_WS_4_pilares-Quente_Conversao_descricao-yt_0800_1075_25jul_","WS | Os 4 Pilares do Yoga Clássico","a256d518a67241c1af32a58eb8343379-a23ff07e322344639cedd64d945d740d","null|organic|lancamento-WS_4_pilares-Quente|youtube|Vida_veda_2026_lancamento_WS_4_pilares-Quente_Conversao_descricao-yt_0800_1075_25jul_","youtube","","lancamento-WS_4_pilares-Quente","organic","Vida_veda_2026_lancamento_WS_4_pilares-Quente_Conversao_descricao-yt_0800_1075_25jul_","","","26/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4489408752","",""
+"","a258151c-d091-4213-973c-7138d4881d3d","Stone","","Aprovada","Produtor","Cartão de Crédito","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","","","","","a258155f-616e-4f11-87fb-de1a4754ec16","","Roseanna Aguiar","63924951772","roseannaguiar@gmail.com","Rua Francisco Aquill Filho","81","(Lot Vle Feliz)","Engenho do Mato","Niterói","RJ","BR","24344112","55","21982719020","","","","","","","25/07/2026 12:05:50","25/07/2026 12:10:36","","24/08/2026 12:10:36","24/08/2026 12:10:36","WS | Celebração Os 4 Pilares do Yoga Clássico","Instagram","lancamento-WS_4_pilares-Quente","organic","youtube","Vida_veda_2026_lancamento_WS_4_pilares-Quente_Conversao_descricao-yt_0800_1075_25jul_","WS | Os 4 Pilares do Yoga Clássico","a256d518a67241c1af32a58eb8343379-a23ff07e322344639cedd64d945d740d","null|organic|lancamento-WS_4_pilares-Quente|youtube|Vida_veda_2026_lancamento_WS_4_pilares-Quente_Conversao_descricao-yt_0800_1075_25jul_","youtube","","lancamento-WS_4_pilares-Quente","organic","Vida_veda_2026_lancamento_WS_4_pilares-Quente_Conversao_descricao-yt_0800_1075_25jul_","","","","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","pagarme","4489508232","",""
+"","a25878c3-9b71-435c-a2b0-5c237b31fc3b","Stone","","Aprovada","Produtor","Cartão de Crédito","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","","","","","a21ba179-6c65-4d79-ae46-bb08b2c67ec5","","Regina Xara","263927644","regina.xara@gmail.com","padre luís germano","","8A","","santo estêvão das gales","11","PT","2665410","351","914908125","","","","","","","25/07/2026 16:44:29","25/07/2026 16:49:23","","24/08/2026 16:49:23","24/08/2026 16:49:23","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","null|manychat|lancamento-WS_4_pilares-misto|instagram|Yogalaya_2026_lancamento_WS_4_pilares-misto_Venda_Text-Ad_automacao_ig_17jul_","instagram","","lancamento-WS_4_pilares-misto","manychat","Yogalaya_2026_lancamento_WS_4_pilares-misto_Venda_Text-Ad_automacao_ig_17jul_","","","","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","pagarme","4489845290","",""
+"","a259af09-f1b8-4744-8f2e-17d638e3e7ad","Stone","","Aprovada","Produtor","Cartão de Crédito","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","","","","","a259af72-a92f-4bbe-89b8-689964faaee1","","Maristela Yamacita","9106950833","marisyamacita@gmail.com","Rua Vereda da Alvorada","481","","Veredas das Geraes","Nova Lima","MG","BR","34012065","55","31992089660","","","","","","","26/07/2026 07:12:04","26/07/2026 07:15:05","","25/08/2026 07:15:05","25/08/2026 07:15:05","WS | Celebração Os 4 Pilares do Yoga Clássico","Instagram","lancamento-WS_4_pilares-misto","organic","whatsapp","Yogalaya_2026_lancamento_WS_4_pilares-misto_Conversao_grupos_ry_convite01_video_14jul_","WS | Os 4 Pilares do Yoga Clássico","a2424a149821435091435b204dcc29b7-a23ff07e322344639cedd64d945d740d","null|banner|lancamento-WS_4_pilares-misto|cativa|Yogalaya_2026_lancamento_WS_4_pilares-misto_Venda_Banner_banner_univedas_13jul_","cativa","","lancamento-WS_4_pilares-misto","banner","Yogalaya_2026_lancamento_WS_4_pilares-misto_Venda_Banner_banner_univedas_13jul_","","","","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","pagarme","4490416794","",""
+"","a259c1f7-25b5-44d2-936e-13369a302f6d","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a259c23f-84ba-480c-bba5-85c705f2da00","","Ilka Fachini","30175318808","ilka@gmail.com","Rua Java","213","(Cond Res Ia Bali)","Residencial Ilha de Bali","Limeira","SP","BR","13482882","55","19991743416","","","","","","","26/07/2026 08:04:59","26/07/2026 08:07:00","","25/08/2026 08:07:00","25/08/2026 08:07:00","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","META_ADS|120249823558730573|120249823558740573|120249823558730573|120249823700750573","120249823558730573","META_ADS","120249823558740573","120249823558730573","120249823700750573","","","27/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4490437753","",""
+"","a25a0db0-ebbf-4b58-88c9-c777854ec049","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a25a0de9-d67a-49bd-8e66-7185d3f4c420","","Isabela Garcoa","8071803782","belagarcia30@gmail.com","Rua Deputado José Lages","1139","","Ponta Verde","Maceió","AL","BR","57035330","55","82998107800","","","","","","","26/07/2026 11:36:44","26/07/2026 11:39:19","","25/08/2026 11:39:19","25/08/2026 11:39:19","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","META_ADS|120249823558730573|120249823558740573|120249823558730573|120249823700750573","120249823558730573","META_ADS","120249823558740573","120249823558730573","120249823700750573","","","27/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4490626259","",""
+"","a25a58b0-2e56-440c-aaff-3597232609b3","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a247c40a-91a8-43a5-81d1-a012562a36cd","","Luciana Vicentini","14121745892","luciana.bere.vicentini@gmail.com","Via Vêneto","300","","Residencial Spazio Verde","Botucatu","SP","BR","18607771","55","14997400207","","","","","","","26/07/2026 15:06:26","26/07/2026 15:08:54","","25/08/2026 15:08:54","25/08/2026 15:08:54","WS | Celebração Os 4 Pilares do Yoga Clássico","Instagram","lancamento-WS_4_pilares-misto","organic","whatsapp","Yogalaya_2026_lancamento_WS_4_pilares-misto_Conversao_grupos_ry_convite01_video_14jul_","WS | Os 4 Pilares do Yoga Clássico","a2424a149821435091435b204dcc29b7-a23ff07e322344639cedd64d945d740d","null|organic|lancamento-WS_4_pilares-misto|whatsapp|Yogalaya_2026_lancamento_WS_4_pilares-misto_Conversao_grupos_ry_convite01_video_14jul_","whatsapp","","lancamento-WS_4_pilares-misto","organic","Yogalaya_2026_lancamento_WS_4_pilares-misto_Conversao_grupos_ry_convite01_video_14jul_","","","27/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4490878750","",""
+"","a25a7ed8-7331-4dfe-8bd5-9adac78cf990","Stone","","Ag. Pagamento","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a25a7c2b-d53e-49c4-9637-a32427237df3","","Maria Teresa Milanez","54842808772","teresamilanez@gmail.com","Quadra SQS 415 Bloco F","107","apt 107","Asa Sul","Brasília","DF","BR","70298060","55","61984293883","","","","","","","26/07/2026 16:53:08","","","","","WS | Celebração Os 4 Pilares do Yoga Clássico","Instagram","lancamento-WS_4_pilares-Quente","organic","youtube","Vida_veda_2026_lancamento_WS_4_pilares-Quente_Conversao_descricao-yt_0800_1075_25jul_","WS | Os 4 Pilares do Yoga Clássico","a256d518a67241c1af32a58eb8343379-a23ff07e322344639cedd64d945d740d","null|organic|lancamento-WS_4_pilares-Quente|youtube|Vida_veda_2026_lancamento_WS_4_pilares-Quente_Conversao_descricao-yt_0800_1075_25jul_","youtube","","lancamento-WS_4_pilares-Quente","organic","Vida_veda_2026_lancamento_WS_4_pilares-Quente_Conversao_descricao-yt_0800_1075_25jul_","","","27/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4490999063","",""
+"","a25a80e9-5194-451f-9e4d-7cc779ac169c","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a25a7c2b-d53e-49c4-9637-a32427237df3","","Maria Teresa Milanez","54842808772","teresamilanez@gmail.com","Quadra SQS 415 Bloco F","107","apt 107","Asa Sul","Brasília","DF","BR","70298060","55","61984293883","","","","","","","26/07/2026 16:58:55","26/07/2026 17:01:34","","25/08/2026 17:01:34","25/08/2026 17:01:34","WS | Celebração Os 4 Pilares do Yoga Clássico","Instagram","lancamento-WS_4_pilares-Quente","organic","youtube","Vida_veda_2026_lancamento_WS_4_pilares-Quente_Conversao_descricao-yt_0800_1075_25jul_","WS | Os 4 Pilares do Yoga Clássico","a256d518a67241c1af32a58eb8343379-a23ff07e322344639cedd64d945d740d","null|organic|lancamento-WS_4_pilares-Quente|youtube|Vida_veda_2026_lancamento_WS_4_pilares-Quente_Conversao_descricao-yt_0800_1075_25jul_","youtube","","lancamento-WS_4_pilares-Quente","organic","Vida_veda_2026_lancamento_WS_4_pilares-Quente_Conversao_descricao-yt_0800_1075_25jul_","","","27/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4491005576","",""
+"","a25ab02b-3fab-4c47-8a92-cf488f97b1cb","Stone","","Aprovada","Produtor","Cartão de Crédito","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","","","","","a25ab073-b942-4dee-9660-650dd3b587cf","","Patricia De Carvalho Vitalino","3421624976","patricia.vitalino@yahoo.com","Avenida Rangel Pestana","24","","Centro","Queiroz","SP","BR","17590021","55","11983900722","","","","","","","26/07/2026 19:11:03","26/07/2026 19:16:17","","25/08/2026 19:16:17","25/08/2026 19:16:17","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","null|manychat|lancamento-WS_4_pilares-misto|instagram|Yogalaya_2026_lancamento_WS_4_pilares-misto_Venda_Text-Ad_automacao_ig_17jul_","instagram","","lancamento-WS_4_pilares-misto","manychat","Yogalaya_2026_lancamento_WS_4_pilares-misto_Venda_Text-Ad_automacao_ig_17jul_","","","","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","pagarme","4491185588","",""
+"","a25b6b22-029c-43c7-8ec4-9de1b114d12c","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a25b6b64-b90b-4be1-92ec-e9bcbf46501f","","Matheus Pinho","9527731470","matheuspinhofisio@gmail.com","Avenida Manoel Borba","694","1210","Soledade","Recife","PE","BR","50070045","55","81999041505","","","","","","","27/07/2026 03:53:51","27/07/2026 03:56:09","","26/08/2026 03:56:09","26/08/2026 03:56:09","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","META_ADS|120249823866120573|120249823866150573|120249823866120573|120249823866090573","120249823866120573","META_ADS","120249823866150573","120249823866120573","120249823866090573","","","28/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4491548230","",""
+"","a25ba860-8a16-4157-811f-cf86e54bdf1d","Stone","","Aprovada","Produtor","Cartão de Crédito","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","","","","","9e7ed391-d9d0-4b10-b563-3b95f8b76409","","Silvia Lopes De Faria","18678961848","silvia.lmfaria@gmail.com","Rua Padre Reus","92","Att: Fabiano/Lisandra","Padre Reus","São Leopoldo","RS","BR","93020070","55","11987208897","","","","","","","27/07/2026 06:45:06","27/07/2026 06:46:24","","26/08/2026 06:46:24","26/08/2026 06:46:24","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","null|banner|lancamento-WS_4_pilares-misto|cativa|Yogalaya_2026_lancamento_WS_4_pilares-misto_Venda_Banner_banner_univedas_13jul_","cativa","","lancamento-WS_4_pilares-misto","banner","Yogalaya_2026_lancamento_WS_4_pilares-misto_Venda_Banner_banner_univedas_13jul_","","","","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","pagarme","4491615827","",""
+"","a25bae9f-8e67-4c1b-a3e5-39b8e1a2bd6e","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a25bb0d4-82c3-4516-a61e-bf1525426e09","","Aline Almeida Eriksson","97347922020","almeidaerikssonaline@gmail.com","Rua Marquês do Herval","1027","de 87/88 a 1649/1650","Centro","Santo Ângelo","RS","BR","98801640","46","761952738","","","","","","","27/07/2026 07:02:34","27/07/2026 07:10:04","","26/08/2026 07:10:04","26/08/2026 07:10:04","WS | Celebração Os 4 Pilares do Yoga Clássico","Instagram","lancamento-WS_4_pilares-Quente","organic","youtube","Vida_veda_2026_lancamento_WS_4_pilares-Quente_Conversao_descricao-yt_0800_1075_25jul_","WS | Os 4 Pilares do Yoga Clássico","a256d518a67241c1af32a58eb8343379-a23ff07e322344639cedd64d945d740d","null|organic|lancamento-WS_4_pilares-Quente|youtube|Vida_veda_2026_lancamento_WS_4_pilares-Quente_Conversao_descricao-yt_0800_1075_25jul_","youtube","","lancamento-WS_4_pilares-Quente","organic","Vida_veda_2026_lancamento_WS_4_pilares-Quente_Conversao_descricao-yt_0800_1075_25jul_","","","28/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4491630303","",""
+"","a25be0ac-8500-4d8b-a5f4-5b8960cb9a34","Stone","","Aprovada","Produtor","PIX","1","BRL","59","0","0","0","59","59","0","0","59","1783543121","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","1","0","","","","a25be0da-4a72-4f37-84d3-6133175f45f9","","Erica Fukuyama","14831429813","erinafukuyama.mn@gmail.com","Rua dos Tapes","57","AP 93","Cambuci","São Paulo","SP","BR","1527050","55","11947265212","","","","","","","27/07/2026 09:22:31","27/07/2026 09:24:11","","26/08/2026 09:24:11","26/08/2026 09:24:11","","","","","","","WS | Os 4 Pilares do Yoga Clássico","a23ff07e322344639cedd64d945d740d-a23ff07e322344639cedd64d945d740d","null|banner|lancamento-WS_4_pilares-misto|cativa|Yogalaya_2026_lancamento_WS_4_pilares-misto_Venda_Banner_banner_univedas_13jul_","cativa","","lancamento-WS_4_pilares-misto","banner","Yogalaya_2026_lancamento_WS_4_pilares-misto_Venda_Banner_banner_univedas_13jul_","","","28/07/2026","Workshop | Os 4 Pilares do Yoga Clássico (UniVedas)","","Standard","","","0","","","","","0","none","4491758766","",""
+</script>
+
+<script>
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║           CONFIGURAÇÃO DO CLIENTE — EDITE APENAS AQUI           ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+const CONFIG = {
+  // ── Identificação ─────────────────────────────────────────────────
+  CLIENTE:          'Yogalaya · UniVedas',
+  PRODUTO:          'Workshop 4 Pilares do Yoga Clássico',
+  ANO:              '2026',
+
+  // ── Planilha ──────────────────────────────────────────────────────
+  SHEET_ID:         '1Y3MlYhHGskshqvHmWYDI_Gbyxl1hzlOKlX5VBrmWRO8',
+  GERENCIADOR_SHEET:'Vendas',            // aba do gerenciador Meta Ads
+  WEBHOOK_SHEET:    'Resumo de vendas',  // aba de vendas (Guru) = webhook
+  DATA_MINIMA:      '2026-07-01',
+
+  // ── Identificação do produto principal ────────────────────────────
+  PRODUTO_NOME:         'workshop',   // contém, case-insensitive
+  PRODUTO_PRECO_MINIMO: 10,           // exclui linhas de teste (R$ 5)
+
+  // ── Agrupamento de order bumps ────────────────────────────────────
+  // Guru: 1 transação por linha, sem OB agrupado
+  USA_TX_ROOT: false,
+
+  // ── Valores em centavos? ──────────────────────────────────────────
+  VALORES_EM_CENTAVOS: false,
+
+  // ── Colunas do Webhook / Resumo de vendas (0-based) ───────────────
+  W: {
+    origemManual: 0,   // "Orgânico ou Pago?" — se preenchido, sobrepõe o UTM
+    txRoot:       1,   // id transação
+    status:       4,
+    pagamento:    6,
+    fatTotal:     9,   // valor venda
+    fatLiquido:  13,   // valor líquido
+    produto:     19,   // nome produto
+    cliente:     28,   // nome contato
+    email:       30,
+    cidade:      35,
+    uf:          36,
+    data:        47,   // data pedido (dd/mm/aaaa hh:mm:ss)
+    dataAprov:   48,   // data aprovação
+    fatOB:     null,   // plataforma não separa order bump
+    fatPrincipal: 9,
+    utmSource:   62,
+    utmCampaign: 63,
+    utmMedium:   64,   // público/conjunto
+    utmContent:  65,   // criativo/anúncio
+    origem2:     60,   // string completa de origem (fallback)
+    origem3:     61,
+  },
+
+  // ── Colunas do Gerenciador / aba Vendas (0-based) ─────────────────
+  // ATENÇÃO: esta exportação NÃO tem coluna de Impressões.
+  // CTR e CPM são calculados sobre ALCANCE.
+  G: {
+    date:            0,
+    campaign:        1,
+    adset:           2,
+    ad:              3,
+    link:            4,
+    inv:             5,
+    reach:           6,
+    imp:          null,   // não existe nesta exportação
+    cliques:         7,
+    pv:              8,
+    ck:              9,
+    purch:          10,   // Action Omni Purchase (compras pelo pixel)
+    statusCampaign: 11,
+    statusAdset:    12,
+    statusAd:       13,
+  },
+
+  // ── Status de aprovação da plataforma ─────────────────────────────
+  STATUS_APROVADO: ['APROVADA','APPROVED','COMPLETE','CONFIRMED','PAGO','PAID'],
+
+  // ── De-para de UTM numérico → nome do anúncio/conjunto ─────────────
+  // O Meta está enviando IDs dinâmicos ({{ad.id}}, {{adset.id}}) nas UTMs.
+  // Preencha aqui para casar as vendas com os criativos/públicos:
+  //   '120249823700750573': 'ADV01'
+  MAP_ADS:    {},
+  MAP_ADSETS: {},
+
+  // ── Identificação da PÁGINA a partir do nome da campanha ──────────
+  // Ex.: "[JGT][VENDAS][WORKSHOP][PG1] LL0108" → PG1
+  // O grupo 1 da regex é usado como nome da página.
+  PAGINA_REGEX:    /\[(PG\s*\d+)\]/i,
+  PAGINA_FALLBACK: 'Sem PG',
+  MAP_CAMPAIGNS:   {},
+};
+
+const SHEET_ID          = CONFIG.SHEET_ID;
+const GERENCIADOR_SHEET = CONFIG.GERENCIADOR_SHEET;
+const WEBHOOK_SHEET     = CONFIG.WEBHOOK_SHEET;
+const DATA_MINIMA       = CONFIG.DATA_MINIMA;
+const G                 = CONFIG.G;
+const W                 = CONFIG.W;
+const SNAPSHOT_DATA     = '27/07/2026';
+
+document.addEventListener('DOMContentLoaded',()=>{
+  document.title = CONFIG.PRODUTO+' · '+CONFIG.CLIENTE+' — Jamelli GT';
+  const b=document.getElementById('brand-title');
+  if(b) b.textContent='📦 '+CONFIG.PRODUTO+' · '+CONFIG.CLIENTE;
+  const s=document.getElementById('brand-subtitle');
+  if(s) s.textContent='Dashboard de Performance — Perpétuo · Jamelli GT · '+CONFIG.ANO;
+});
+
+// ══════════════════ ESTADO GLOBAL ══════════════════
+let GROWS=[], SALES=[], DIAS=[], CHARTS={};
+let CRI_FILTER='todos', CRI_SORT='inv', PUB_FILTER='todos', PUB_SORT='inv';
+
+// ══════════════════ UTILITÁRIOS ══════════════════
+function parseCSV(text){
+  const rows=[]; let row=[], cur='', q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){
+      if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; }
+      else cur+=c;
+    }else{
+      if(c==='"') q=true;
+      else if(c===','){ row.push(cur); cur=''; }
+      else if(c==='\n'){ row.push(cur); rows.push(row); row=[]; cur=''; }
+      else if(c!=='\r') cur+=c;
+    }
+  }
+  if(cur!=='' || row.length){ row.push(cur); rows.push(row); }
+  return rows;
+}
+
+function num(v){
+  if(v===null||v===undefined) return 0;
+  let s=String(v).replace(/[^\d,.\-]/g,'').trim();
+  if(!s) return 0;
+  const hasC=s.indexOf(',')>=0, hasD=s.indexOf('.')>=0;
+  if(hasC&&hasD) s=s.replace(/\./g,'').replace(',','.');
+  else if(hasC) s=s.replace(',','.');
+  else if(hasD && /^-?\d{1,3}(\.\d{3})+$/.test(s)) s=s.replace(/\./g,'');
+  const n=parseFloat(s);
+  return isNaN(n)?0:n;
+}
+
+function toISO(v){
+  if(!v) return '';
+  const s=String(v).trim();
+  let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return m[1]+'-'+m[2]+'-'+m[3];
+  m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if(m) return m[3]+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[1]).padStart(2,'0');
+  m=s.match(/^Date\((\d+),(\d+),(\d+)/);
+  if(m) return m[1]+'-'+String(+m[2]+1).padStart(2,'0')+'-'+String(m[3]).padStart(2,'0');
+  return '';
+}
+
+const norm = s => String(s==null?'':s).toLowerCase().replace(/[\s_\-.]/g,'');
+const fmtBRL = v => (!v||!isFinite(v))?'—':'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtNum = v => (!v||!isFinite(v))?'—':Number(v).toLocaleString('pt-BR');
+const fmtPct = v => (!v||!isFinite(v))?'—':Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%';
+const fmtX   = v => (!v||!isFinite(v))?'—':Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'x';
+const fmtDia = d => d? d.slice(8,10)+'/'+d.slice(5,7) : '—';
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// ══════════════════ FETCH ══════════════════
+function withTimeout(promise,ms,label){
+  let timer;
+  const t=new Promise((_,rej)=>{ timer=setTimeout(()=>rej(new Error('Timeout ao carregar "'+label+'".')),ms); });
+  return Promise.race([promise,t]).finally(()=>clearTimeout(timer));
+}
+
+async function fetchSheetCSV(sheetName){
+  const url='https://docs.google.com/spreadsheets/d/'+SHEET_ID+
+            '/gviz/tq?tqx=out:csv&sheet='+encodeURIComponent(sheetName);
+  const resp=await withTimeout(fetch(url),25000,sheetName);
+  if(!resp.ok) throw new Error('Planilha "'+sheetName+'": HTTP '+resp.status+'. Verifique se está pública.');
+  const text=await withTimeout(resp.text(),25000,sheetName);
+  if(text.indexOf('Signin')>=0 || text.indexOf('accounts.google')>=0)
+    throw new Error('Planilha "'+sheetName+'" requer login. Defina como pública.');
+  return text;
+}
+
+// ══════════════════ PROCESSAMENTO ══════════════════
+function isTrafego(s){
+  const m=(s.origemManual||'').toLowerCase();
+  if(m.indexOf('pag')>=0 || m.indexOf('paid')>=0) return true;
+  if(m.indexOf('org')>=0) return false;
+  if(norm(s.utmSource)==='metaads') return true;
+  return norm(s.origem2).indexOf('metaads')===0;
+}
+
+function processSales(rows){
+  const groups={};
+  rows.forEach(r=>{
+    const data=toISO(r[W.data]) || toISO(r[W.dataAprov]);
+    if(!data || data<DATA_MINIMA) return;
+    const st=String(r[W.status]||'').trim().toUpperCase();
+    if(CONFIG.STATUS_APROVADO.indexOf(st)<0) return;
+    const prod=String(r[W.produto]||'').toLowerCase();
+    if(CONFIG.PRODUTO_NOME && prod.indexOf(CONFIG.PRODUTO_NOME)<0) return;
+    let tot=num(r[W.fatTotal]);
+    if(CONFIG.VALORES_EM_CENTAVOS) tot/=100;
+    if(tot<CONFIG.PRODUTO_PRECO_MINIMO) return;
+    let ob = (W.fatOB===null||W.fatOB===undefined) ? 0 : num(r[W.fatOB]);
+    if(CONFIG.VALORES_EM_CENTAVOS) ob/=100;
+    const key = CONFIG.USA_TX_ROOT ? (r[W.txRoot]||(r[W.email]+data)) : ('L'+Object.keys(groups).length);
+    if(!groups[key]){
+      groups[key]={
+        data:data,
+        nome:String(r[W.cliente]||'').trim(),
+        email:String(r[W.email]||'').trim(),
+        uf:String(r[W.uf]||'').trim(),
+        pagamento:String(r[W.pagamento]||'').trim(),
+        liquido:num(r[W.fatLiquido]),
+        fatTotal:0, fatPrincipal:0, fatOB:0,
+        origemManual:String(r[W.origemManual]||'').trim(),
+        utmSource:String(r[W.utmSource]||'').trim(),
+        utmMedium:String(r[W.utmMedium]||'').trim(),
+        utmCampaign:String(r[W.utmCampaign]||'').trim(),
+        utmContent:String(r[W.utmContent]||'').trim(),
+        origem2:String(r[W.origem2]||'').trim(),
+        origem3:String(r[W.origem3]||'').trim(),
+      };
+    }
+    groups[key].fatTotal      += tot;
+    groups[key].fatPrincipal  += (tot-ob);
+    groups[key].fatOB         += ob;
+  });
+  return Object.keys(groups).map(k=>groups[k]);
+}
+
+function buildDias(rows){
+  const map={};
+  rows.forEach(r=>{
+    const d=toISO(r[G.date]); if(!d) return;
+    if(!map[d]) map[d]={data:d,inv:0,reach:0,cliques:0,pv:0,ck:0,purch:0};
+    map[d].inv     += num(r[G.inv]);
+    map[d].reach   += num(r[G.reach]);
+    map[d].cliques += num(r[G.cliques]);
+    map[d].pv      += num(r[G.pv]);
+    map[d].ck      += num(r[G.ck]);
+    map[d].purch   += num(r[G.purch]);
+  });
+  return Object.keys(map).sort().map(k=>map[k]);
+}
+
+function isActiveRow(r){
+  const a=String(r[G.statusAd]||'').toUpperCase();
+  const b=String(r[G.statusAdset]||'').toUpperCase();
+  const c=String(r[G.statusCampaign]||'').toUpperCase();
+  const paused=s=>s.indexOf('PAUSED')>=0;
+  return !paused(a)&&!paused(b)&&!paused(c)&&(a!==''||b!==''||c!=='');
+}
+
+function inRange(d,from,to){ return (!from||d>=from)&&(!to||d<=to); }
+
+// ══════════════════ AGREGAÇÕES ══════════════════
+function aggGer(from,to){
+  const a={inv:0,reach:0,cliques:0,pv:0,ck:0,purch:0};
+  DIAS.forEach(d=>{ if(inRange(d.data,from,to)){
+    a.inv+=d.inv;a.reach+=d.reach;a.cliques+=d.cliques;a.pv+=d.pv;a.ck+=d.ck;a.purch+=d.purch;
+  }});
+  return a;
+}
+
+function aggSales(from,to){
+  const t={n:0,fat:0,ob:0}, o={n:0,fat:0,ob:0};
+  SALES.forEach(s=>{ if(!inRange(s.data,from,to)) return;
+    const b=isTrafego(s)?t:o;
+    b.n++; b.fat+=s.fatTotal; b.ob+=s.fatOB;
+  });
+  return {traf:t,org:o};
+}
+
+// ══════════════════ CRIATIVOS E PÚBLICOS ══════════════════
+function resolveAd(v){ const raw=String(v||'').trim(); return CONFIG.MAP_ADS[raw]||raw; }
+function resolveAdset(v){ const raw=String(v||'').trim(); return CONFIG.MAP_ADSETS[raw]||raw; }
+
+function buildCriPubMaps(from,to){
+  const cri={}, pub={}, camp={};
+  GROWS.forEach(r=>{
+    const d=toISO(r[G.date]); if(!inRange(d,from,to)) return;
+    const adN=String(r[G.ad]||'(sem nome)').trim();
+    const asN=String(r[G.adset]||'(sem nome)').trim();
+    const cpN=String(r[G.campaign]||'(sem nome)').trim();
+    const add=(map,key,name)=>{
+      if(!map[key]) map[key]={nome:name,inv:0,reach:0,cliques:0,pv:0,ck:0,purch:0,ativo:false,link:'',vendas:0,fat:0};
+      const m=map[key];
+      m.inv+=num(r[G.inv]); m.reach+=num(r[G.reach]); m.cliques+=num(r[G.cliques]);
+      m.pv+=num(r[G.pv]); m.ck+=num(r[G.ck]); m.purch+=num(r[G.purch]);
+      if(isActiveRow(r)) m.ativo=true;
+      if(!m.link && r[G.link]) m.link=String(r[G.link]).trim();
+      return m;
+    };
+    add(cri,norm(adN),adN);
+    add(pub,norm(asN),asN);
+    add(camp,norm(cpN),cpN);
+  });
+
+  let semAtribuicao={n:0,fat:0};
+  SALES.forEach(s=>{
+    if(!inRange(s.data,from,to)) return;
+    if(!isTrafego(s)) return;
+    const kc=norm(resolveAd(s.utmContent));
+    const km=norm(resolveAdset(s.utmMedium));
+    let hit=false;
+    if(cri[kc]){ cri[kc].vendas++; cri[kc].fat+=s.fatTotal; hit=true; }
+    if(pub[km]){ pub[km].vendas++; pub[km].fat+=s.fatTotal; hit=true; }
+    if(!hit){ semAtribuicao.n++; semAtribuicao.fat+=s.fatTotal; }
+  });
+
+  const finish=o=>Object.keys(o).map(k=>{
+    const m=o[k];
+    m.ctr  = m.reach? (m.cliques/m.reach*100):0;
+    m.cpc  = m.cliques? (m.inv/m.cliques):0;
+    m.cpm  = m.reach? (m.inv/m.reach*1000):0;
+    m.roas = m.inv? (m.fat/m.inv):0;
+    m.cpa  = m.vendas? (m.inv/m.vendas):0;
+    m.cpaPixel = m.purch? (m.inv/m.purch):0;
+    return m;
+  }).filter(m=>m.inv>0||m.cliques>0||m.vendas>0);
+
+  return {cri:finish(cri), pub:finish(pub), camp:finish(camp), semAtribuicao:semAtribuicao};
+}
+
+// ══════════════════ RENDER: TRÁFEGO ══════════════════
+function renderTrafego(from,to){
+  const g=aggGer(from,to), s=aggSales(from,to);
+  const t=s.traf, o=s.org;
+  const roas = g.inv? t.fat/g.inv : 0;
+  const cac  = t.n? g.inv/t.n : 0;
+  const tkt  = (t.n+o.n)? (t.fat+o.fat)/(t.n+o.n) : 0;
+  const cpc  = g.cliques? g.inv/g.cliques : 0;
+  const cpm  = g.reach? g.inv/g.reach*1000 : 0;
+  const ctr  = g.reach? g.cliques/g.reach*100 : 0;
+
+  const kpi=(l,v,cls,sub)=>'<div class="kpi-card"><div class="kpi-label">'+l+'</div><div class="kpi-value '+(cls||'')+'">'+v+'</div>'+(sub?'<div class="kpi-sub">'+sub+'</div>':'')+'</div>';
+  document.getElementById('kpi-trafego').innerHTML=
+    kpi('Investimento',fmtBRL(g.inv),'orange')+
+    kpi('Fat. Tráfego',fmtBRL(t.fat),'green')+
+    kpi('Fat. Orgânico',fmtBRL(o.fat),'yellow')+
+    kpi('ROAS Tráfego',fmtX(roas),roas>=1?'green':'red')+
+    kpi('Vendas Tráfego',fmtNum(t.n),'green')+
+    kpi('Vendas Orgânico',fmtNum(o.n),'yellow')+
+    kpi('CAC',fmtBRL(cac),cac&&tkt&&cac>tkt?'red':'')+
+    kpi('Ticket Médio',fmtBRL(tkt))+
+    kpi('Cliques',fmtNum(g.cliques))+
+    kpi('Alcance',fmtNum(g.reach),'','sem coluna de impressões')+
+    kpi('CPC',fmtBRL(cpc))+
+    kpi('CPM (alcance)',fmtBRL(cpm))+
+    kpi('CTR (alcance)',fmtPct(ctr))+
+    kpi('Compras (pixel)',fmtNum(g.purch),'','atribuição Meta');
+
+  const etapas=[['Cliques',g.cliques],['Page Views',g.pv],['Checkouts',g.ck],['Compras (webhook)',t.n]];
+  const max=Math.max.apply(null,etapas.map(e=>e[1]).concat([1]));
+  document.getElementById('funil-bars').innerHTML=etapas.map(e=>
+    '<div class="funil-bar-wrap"><div class="funil-label"><span>'+e[0]+'</span><span>'+fmtNum(e[1])+'</span></div>'+
+    '<div class="funil-bar-bg"><div class="funil-bar-fill" style="width:'+(e[1]/max*100)+'%"></div></div></div>').join('');
+
+  const taxa=(l,v)=>'<div class="taxa-item"><span>'+l+'</span><span class="taxa-val">'+v+'</span></div>';
+  document.getElementById('funil-taxas').innerHTML=
+    taxa('CTR (cliques / alcance)',fmtPct(ctr))+
+    taxa('Cliques → Page View',fmtPct(g.cliques?g.pv/g.cliques*100:0))+
+    taxa('Page View → Checkout',fmtPct(g.pv?g.ck/g.pv*100:0))+
+    taxa('Checkout → Compra',fmtPct(g.ck?t.n/g.ck*100:0))+
+    taxa('Cliques → Compra',fmtPct(g.cliques?t.n/g.cliques*100:0))+
+    taxa('Custo por Checkout',fmtBRL(g.ck?g.inv/g.ck:0));
+
+  const list=SALES.filter(x=>inRange(x.data,from,to)).sort((a,b)=>b.data.localeCompare(a.data));
+  document.getElementById('sales-cards').innerHTML = list.length? list.map(x=>{
+    const paid=isTrafego(x);
+    const criativo = paid? resolveAd(x.utmContent) : (x.utmContent||x.origem3||'');
+    const publico  = paid? resolveAdset(x.utmMedium) : (x.utmMedium||'');
+    return '<div class="sale-card'+(paid?' traf':'')+'">'+
+      '<div class="sale-top"><div class="sale-nome">'+(paid?'✅ ':'⭐ ')+esc(x.nome||'—')+'</div>'+
+      '<div class="sale-val">'+fmtBRL(x.fatTotal)+'</div></div>'+
+      '<div class="sale-meta">'+fmtDia(x.data)+' · '+esc(x.pagamento||'—')+(x.uf?' · '+esc(x.uf):'')+'</div>'+
+      (x.fatOB>0?'<div class="sale-meta">🛒 OB: '+fmtBRL(x.fatOB)+'</div>':'')+
+      '<div class="sale-meta">'+esc(x.email||'')+'</div>'+
+      '<div class="sale-tag'+(paid?' paid':'')+'">'+esc(paid?'META ADS':(x.origem3||x.utmMedium||'orgânico'))+'</div>'+
+      (criativo?'<div class="sale-tag">🎬 '+esc(String(criativo).slice(0,42))+'</div>':'')+
+      (publico?'<div class="sale-tag">👥 '+esc(String(publico).slice(0,42))+'</div>':'')+
+      '</div>';
+  }).join('') : '<div class="empty">Nenhuma venda no período.</div>';
+
+  const nSemUtm=list.filter(x=>isTrafego(x)&&!x.utmContent).length;
+  document.getElementById('info-trafego').innerHTML=
+    '<b>Como ler:</b> faturamento vem sempre da aba <b>Resumo de vendas</b> (status aprovado, produto principal, valor ≥ R$ '+CONFIG.PRODUTO_PRECO_MINIMO+'). '+
+    'Investimento e funil vêm da aba <b>Vendas</b> (gerenciador Meta). '+
+    '<b>Tráfego</b> = <code>utm_source = META_ADS</code>; qualquer outra origem entra como orgânico. '+
+    'A coluna <i>"Orgânico ou Pago?"</i> da planilha, se preenchida, tem prioridade sobre o UTM.<br>'+
+    '⚠️ Esta exportação do gerenciador <b>não traz Impressões</b> — CTR e CPM estão calculados sobre <b>Alcance</b>. '+
+    '<b>Compras (pixel)</b> é a atribuição do próprio Meta e naturalmente diverge das vendas do webhook.';
+}
+
+// ══════════════════ RENDER: VISÃO GERAL ══════════════════
+function renderVisao(from,to){
+  const g=aggGer(from,to), s=aggSales(from,to);
+  const fat=s.traf.fat+s.org.fat, n=s.traf.n+s.org.n;
+  const kpi=(l,v,cls)=>'<div class="kpi-card"><div class="kpi-label">'+l+'</div><div class="kpi-value '+(cls||'')+'">'+v+'</div></div>';
+  document.getElementById('kpi-visao').innerHTML=
+    kpi('Investimento',fmtBRL(g.inv),'orange')+
+    kpi('Fat. Total',fmtBRL(fat),'green')+
+    kpi('ROAS Total',fmtX(g.inv?fat/g.inv:0),(g.inv&&fat/g.inv>=1)?'green':'red')+
+    kpi('Vendas Total',fmtNum(n))+
+    kpi('Tráfego',fmtNum(s.traf.n),'green')+
+    kpi('Orgânicas',fmtNum(s.org.n),'yellow')+
+    kpi('Ticket Médio',fmtBRL(n?fat/n:0))+
+    kpi('CAC Total',fmtBRL(n?g.inv/n:0));
+
+  const dias={};
+  DIAS.forEach(d=>{ if(inRange(d.data,from,to)) dias[d.data]={data:d.data,inv:d.inv,cliques:d.cliques,pv:d.pv,ck:d.ck,fat:0,nt:0,no:0}; });
+  SALES.forEach(x=>{ if(!inRange(x.data,from,to)) return;
+    if(!dias[x.data]) dias[x.data]={data:x.data,inv:0,cliques:0,pv:0,ck:0,fat:0,nt:0,no:0};
+    dias[x.data].fat+=x.fatTotal;
+    if(isTrafego(x)) dias[x.data].nt++; else dias[x.data].no++;
+  });
+  const arr=Object.keys(dias).sort().map(k=>dias[k]);
+
+  let tot={inv:0,fat:0,nt:0,no:0};
+  const body=arr.map(d=>{
+    tot.inv+=d.inv; tot.fat+=d.fat; tot.nt+=d.nt; tot.no+=d.no;
+    const nn=d.nt+d.no;
+    return '<tr><td>'+fmtDia(d.data)+'</td><td>'+fmtBRL(d.inv)+'</td><td>'+fmtBRL(d.fat)+
+      '</td><td class="'+(d.inv&&d.fat/d.inv>=1?'green':'')+'">'+fmtX(d.inv?d.fat/d.inv:0)+
+      '</td><td>'+fmtNum(nn)+'</td><td>'+fmtNum(d.nt)+'</td><td>'+fmtNum(d.no)+
+      '</td><td>'+fmtBRL(nn?d.fat/nn:0)+'</td><td>'+fmtBRL(d.nt?d.inv/d.nt:0)+'</td></tr>';
+  }).join('');
+  const totN=tot.nt+tot.no;
+  document.getElementById('tbl-visao').innerHTML=
+    '<thead><tr><th>Data</th><th>Invest.</th><th>Fat. Total</th><th>ROAS</th><th>Compras</th><th>Tráfego</th><th>Orgânicas</th><th>Ticket Médio</th><th>CAC</th></tr></thead>'+
+    '<tbody>'+(body||'<tr><td colspan="9" style="text-align:center">Sem dados</td></tr>')+'</tbody>'+
+    '<tfoot><tr><td>TOTAL</td><td>'+fmtBRL(tot.inv)+'</td><td>'+fmtBRL(tot.fat)+'</td><td>'+fmtX(tot.inv?tot.fat/tot.inv:0)+
+    '</td><td>'+fmtNum(totN)+'</td><td>'+fmtNum(tot.nt)+'</td><td>'+fmtNum(tot.no)+'</td><td>'+fmtBRL(totN?tot.fat/totN:0)+
+    '</td><td>'+fmtBRL(tot.nt?tot.inv/tot.nt:0)+'</td></tr></tfoot>';
+
+  const lb=arr.map(d=>fmtDia(d.data));
+  mkChart('ch-invfat','bar',lb,[
+    {label:'Investimento',data:arr.map(d=>d.inv),backgroundColor:'rgba(255,107,43,0.85)'},
+    {label:'Faturamento',data:arr.map(d=>d.fat),backgroundColor:'rgba(255,183,55,0.85)'}]);
+  mkChart('ch-vendas','bar',lb,[
+    {label:'Tráfego',data:arr.map(d=>d.nt),backgroundColor:'rgba(255,107,43,0.85)'},
+    {label:'Orgânico',data:arr.map(d=>d.no),backgroundColor:'rgba(255,183,55,0.85)'}],true);
+  mkChart('ch-roas','line',lb,[
+    {label:'ROAS',data:arr.map(d=>d.inv?+(d.fat/d.inv).toFixed(2):0),borderColor:'rgba(255,107,43,0.95)',backgroundColor:'rgba(255,107,43,0.15)',fill:true,tension:.3}]);
+  mkChart('ch-cliques','line',lb,[
+    {label:'Cliques',data:arr.map(d=>d.cliques),borderColor:'rgba(255,107,43,0.95)',tension:.3},
+    {label:'Page Views',data:arr.map(d=>d.pv),borderColor:'rgba(255,183,55,0.95)',tension:.3}]);
+}
+
+function mkChart(id,type,labels,datasets,stacked){
+  const el=document.getElementById(id); if(!el) return;
+  if(CHARTS[id]) CHARTS[id].destroy();
+  CHARTS[id]=new Chart(el,{type:type,data:{labels:labels,datasets:datasets},options:{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:'rgba(255,255,255,.5)',font:{size:10},boxWidth:10}}},
+    scales:{
+      x:{stacked:!!stacked,ticks:{color:'rgba(255,255,255,.35)',font:{size:9}},grid:{color:'rgba(255,255,255,.04)'}},
+      y:{stacked:!!stacked,beginAtZero:true,ticks:{color:'rgba(255,255,255,.35)',font:{size:9}},grid:{color:'rgba(255,255,255,.04)'}}
+    }}});
+}
+
+// ══════════════════ RENDER: CRIATIVOS ══════════════════
+function sortItems(arr,key){
+  const f={inv:m=>m.inv,ctr:m=>m.ctr,cpc:m=>-(m.cpc||1e9),roas:m=>m.roas,vendas:m=>m.vendas}[key]||(m=>m.inv);
+  return arr.slice().sort((a,b)=>f(b)-f(a));
+}
+function filterItems(arr,f){
+  if(f==='ativos') return arr.filter(m=>m.ativo);
+  if(f==='inativos') return arr.filter(m=>!m.ativo);
+  return arr;
+}
+
+function renderCriativos(from,to){
+  const maps=buildCriPubMaps(from,to);
+  const arr=sortItems(filterItems(maps.cri,CRI_FILTER),CRI_SORT);
+
+  document.getElementById('info-criativos').innerHTML=
+    '⚠️ <b>Atribuição de vendas por criativo:</b> o Meta está enviando <b>IDs dinâmicos</b> no <code>utm_content</code> '+
+    '(ex.: <code>120249823700750573</code>) em vez do nome do anúncio, então a maior parte das vendas pagas não casa automaticamente com os cards. '+
+    'Enquanto o UTM não for corrigido no gerenciador, preencha o de-para em <code>CONFIG.MAP_ADS</code> no topo do arquivo. '+
+    '<b>Compras (pixel)</b> é a atribuição do próprio Meta e funciona independentemente disso. '+
+    (maps.semAtribuicao.n? '<br>🔎 <b>'+maps.semAtribuicao.n+' venda(s) paga(s)</b> ('+fmtBRL(maps.semAtribuicao.fat)+') no período sem match de criativo/público.' : '');
+
+  document.getElementById('cri-cards').innerHTML = arr.length? arr.map(m=>
+    '<div class="cri-card'+(m.ativo?' ativo':'')+'">'+
+    '<div class="cri-card-header"><div class="cri-name">'+esc(m.nome)+'</div>'+
+    '<div class="cri-badge '+(m.ativo?'ativo':'inativo')+'">'+(m.ativo?'ATIVO':'INATIVO')+'</div></div>'+
+    '<div class="cri-metrics">'+
+    met('Invest.',fmtBRL(m.inv),true)+met('ROAS',fmtX(m.roas),true)+
+    met('Cliques',fmtNum(m.cliques))+met('CTR',fmtPct(m.ctr))+
+    met('CPC',fmtBRL(m.cpc))+met('CPM',fmtBRL(m.cpm))+
+    met('Page Views',fmtNum(m.pv))+met('Checkouts',fmtNum(m.ck))+
+    met('Vendas UTM',fmtNum(m.vendas))+met('Compras pixel',fmtNum(m.purch))+
+    '</div>'+
+    (m.link?'<a class="cri-link" href="'+esc(m.link)+'" target="_blank">🔗 ver anúncio</a>':'')+
+    '</div>').join('') : '<div class="empty">Nenhum criativo no período.</div>';
+
+  let t={inv:0,cliques:0,pv:0,ck:0,purch:0,vendas:0,fat:0,reach:0};
+  const body=arr.map(m=>{
+    t.inv+=m.inv;t.cliques+=m.cliques;t.pv+=m.pv;t.ck+=m.ck;t.purch+=m.purch;t.vendas+=m.vendas;t.fat+=m.fat;t.reach+=m.reach;
+    return '<tr><td>'+esc(m.nome)+(m.ativo?' <span style="color:#2ecc71">●</span>':'')+'</td><td>'+fmtBRL(m.inv)+
+      '</td><td>'+fmtNum(m.reach)+'</td><td>'+fmtNum(m.cliques)+'</td><td>'+fmtPct(m.ctr)+'</td><td>'+fmtBRL(m.cpc)+
+      '</td><td>'+fmtNum(m.pv)+'</td><td>'+fmtNum(m.ck)+'</td><td>'+fmtNum(m.purch)+'</td><td>'+fmtNum(m.vendas)+
+      '</td><td>'+fmtBRL(m.fat)+'</td><td class="'+(m.roas>=1?'green':'')+'">'+fmtX(m.roas)+'</td></tr>';
+  }).join('');
+  document.getElementById('tbl-criativos').innerHTML=
+    '<thead><tr><th>Criativo</th><th>Invest.</th><th>Alcance</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Page Views</th><th>Checkouts</th><th>Compras pixel</th><th>Vendas UTM</th><th>Fat.</th><th>ROAS</th></tr></thead>'+
+    '<tbody>'+(body||'<tr><td colspan="12" style="text-align:center">Sem dados</td></tr>')+'</tbody>'+
+    '<tfoot><tr><td>TOTAL</td><td>'+fmtBRL(t.inv)+'</td><td>'+fmtNum(t.reach)+'</td><td>'+fmtNum(t.cliques)+
+    '</td><td>'+fmtPct(t.reach?t.cliques/t.reach*100:0)+'</td><td>'+fmtBRL(t.cliques?t.inv/t.cliques:0)+
+    '</td><td>'+fmtNum(t.pv)+'</td><td>'+fmtNum(t.ck)+'</td><td>'+fmtNum(t.purch)+'</td><td>'+fmtNum(t.vendas)+
+    '</td><td>'+fmtBRL(t.fat)+'</td><td>'+fmtX(t.inv?t.fat/t.inv:0)+'</td></tr></tfoot>';
+}
+function met(l,v,hl){
+  return '<div class="cri-metric"><div class="cri-metric-label">'+l+'</div><div class="cri-metric-val'+(hl?' hl':'')+'">'+v+'</div></div>';
+}
+
+// ══════════════════ RENDER: PÚBLICOS ══════════════════
+function renderPublicos(from,to){
+  const maps=buildCriPubMaps(from,to);
+  const arr=sortItems(filterItems(maps.pub,PUB_FILTER),PUB_SORT);
+
+  document.getElementById('info-publicos').innerHTML=
+    'Público = <b>conjunto de anúncios</b> do gerenciador. As vendas pagas casam pelo <code>utm_medium</code>, '+
+    'que hoje vem como ID numérico do conjunto — use <code>CONFIG.MAP_ADSETS</code> para o de-para até o UTM ser corrigido.'+
+    (maps.semAtribuicao.n? ' 🔎 <b>'+maps.semAtribuicao.n+' venda(s) paga(s)</b> sem match no período.' : '');
+
+  document.getElementById('pub-cards').innerHTML = arr.length? arr.map(m=>
+    '<div class="pub-card'+(m.ativo?' ativo':'')+'">'+
+    '<div class="pub-card-header"><div class="pub-name">'+esc(m.nome)+'</div>'+
+    '<div class="cri-badge '+(m.ativo?'ativo':'inativo')+'">'+(m.ativo?'ATIVO':'INATIVO')+'</div></div>'+
+    '<div class="pub-metrics">'+
+    pm(fmtBRL(m.inv),'Investimento')+pm(fmtX(m.roas),'ROAS')+pm(fmtNum(m.vendas),'Vendas UTM')+
+    pm(fmtNum(m.cliques),'Cliques',1)+pm(fmtPct(m.ctr),'CTR',1)+pm(fmtBRL(m.cpc),'CPC',1)+
+    pm(fmtNum(m.pv),'Page Views',1)+pm(fmtNum(m.ck),'Checkouts',1)+pm(fmtNum(m.purch),'Compras pixel',1)+
+    '</div></div>').join('') : '<div class="empty">Nenhum público no período.</div>';
+
+  const camps=sortItems(maps.camp,'inv');
+  let t={inv:0,cliques:0,pv:0,ck:0,purch:0,vendas:0,fat:0,reach:0};
+  const body=camps.map(m=>{
+    t.inv+=m.inv;t.cliques+=m.cliques;t.pv+=m.pv;t.ck+=m.ck;t.purch+=m.purch;t.vendas+=m.vendas;t.fat+=m.fat;t.reach+=m.reach;
+    return '<tr><td>'+esc(m.nome)+(m.ativo?' <span style="color:#2ecc71">●</span>':'')+'</td><td>'+fmtBRL(m.inv)+
+      '</td><td>'+fmtNum(m.reach)+'</td><td>'+fmtNum(m.cliques)+'</td><td>'+fmtPct(m.ctr)+'</td><td>'+fmtBRL(m.cpc)+
+      '</td><td>'+fmtNum(m.pv)+'</td><td>'+fmtNum(m.ck)+'</td><td>'+fmtNum(m.purch)+'</td></tr>';
+  }).join('');
+  document.getElementById('tbl-campanhas').innerHTML=
+    '<thead><tr><th>Campanha</th><th>Invest.</th><th>Alcance</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Page Views</th><th>Checkouts</th><th>Compras pixel</th></tr></thead>'+
+    '<tbody>'+(body||'<tr><td colspan="9" style="text-align:center">Sem dados</td></tr>')+'</tbody>'+
+    '<tfoot><tr><td>TOTAL</td><td>'+fmtBRL(t.inv)+'</td><td>'+fmtNum(t.reach)+'</td><td>'+fmtNum(t.cliques)+
+    '</td><td>'+fmtPct(t.reach?t.cliques/t.reach*100:0)+'</td><td>'+fmtBRL(t.cliques?t.inv/t.cliques:0)+
+    '</td><td>'+fmtNum(t.pv)+'</td><td>'+fmtNum(t.ck)+'</td><td>'+fmtNum(t.purch)+'</td></tr></tfoot>';
+}
+function pm(v,l,neutral){
+  return '<div class="pub-metric"><div class="pub-metric-val'+(neutral?' neutral':'')+'">'+v+'</div><div class="pub-metric-lbl">'+l+'</div></div>';
+}
+
+// ══════════════════ RENDER: PÁGINAS ══════════════════
+function resolveCampaign(v){ const raw=String(v||'').trim(); return CONFIG.MAP_CAMPAIGNS[raw]||raw; }
+function pagKey(nomeCampanha){
+  const m=String(nomeCampanha||'').match(CONFIG.PAGINA_REGEX);
+  return m? m[1].toUpperCase().replace(/\s+/g,'') : CONFIG.PAGINA_FALLBACK;
+}
+
+function buildPaginas(from,to){
+  const pag={};
+  const ensure=k=>{
+    if(!pag[k]) pag[k]={nome:k,inv:0,reach:0,cliques:0,pv:0,ck:0,purch:0,vendas:0,fat:0,
+                        ativo:false,campanhas:{},criativos:{}};
+    return pag[k];
+  };
+  GROWS.forEach(r=>{
+    const d=toISO(r[G.date]); if(!inRange(d,from,to)) return;
+    const cp=String(r[G.campaign]||'').trim();
+    const m=ensure(pagKey(cp));
+    m.inv+=num(r[G.inv]); m.reach+=num(r[G.reach]); m.cliques+=num(r[G.cliques]);
+    m.pv+=num(r[G.pv]); m.ck+=num(r[G.ck]); m.purch+=num(r[G.purch]);
+    if(isActiveRow(r)) m.ativo=true;
+    if(cp){
+      if(!m.campanhas[cp]) m.campanhas[cp]={nome:cp,inv:0,reach:0,cliques:0,pv:0,ck:0,purch:0,ativo:false};
+      const c=m.campanhas[cp];
+      c.inv+=num(r[G.inv]); c.reach+=num(r[G.reach]); c.cliques+=num(r[G.cliques]);
+      c.pv+=num(r[G.pv]); c.ck+=num(r[G.ck]); c.purch+=num(r[G.purch]);
+      if(isActiveRow(r)) c.ativo=true;
+    }
+    const ad=String(r[G.ad]||'').trim();
+    if(ad) m.criativos[ad]=true;
+  });
+
+  let sem={n:0,fat:0};
+  SALES.forEach(s=>{
+    if(!inRange(s.data,from,to) || !isTrafego(s)) return;
+    const k=pagKey(resolveCampaign(s.utmCampaign));
+    if(pag[k] && k!==CONFIG.PAGINA_FALLBACK){ pag[k].vendas++; pag[k].fat+=s.fatTotal; }
+    else { sem.n++; sem.fat+=s.fatTotal; }
+  });
+
+  const arr=Object.keys(pag).sort().map(k=>{
+    const m=pag[k];
+    m.ctr    = m.reach? m.cliques/m.reach*100 : 0;
+    m.cpc    = m.cliques? m.inv/m.cliques : 0;
+    m.cpm    = m.reach? m.inv/m.reach*1000 : 0;
+    m.txPV   = m.cliques? m.pv/m.cliques*100 : 0;
+    m.txCK   = m.pv? m.ck/m.pv*100 : 0;
+    m.txCompra = m.ck? m.purch/m.ck*100 : 0;
+    m.cpPV   = m.pv? m.inv/m.pv : 0;
+    m.cpCK   = m.ck? m.inv/m.ck : 0;
+    m.roas   = m.inv? m.fat/m.inv : 0;
+    m.nCamp  = Object.keys(m.campanhas).length;
+    m.nCri   = Object.keys(m.criativos).length;
+    return m;
+  }).filter(m=>m.inv>0||m.cliques>0);
+
+  return {pag:arr, semAtribuicao:sem};
+}
+
+function renderPaginas(from,to){
+  const r=buildPaginas(from,to);
+  const arr=r.pag.slice().sort((a,b)=>b.inv-a.inv);
+
+  const best=(f,fmt,inverso)=>{
+    const val=arr.filter(m=>m.cliques>0);
+    if(!val.length) return '—';
+    const w=val.slice().sort((a,b)=>inverso? f(a)-f(b) : f(b)-f(a))[0];
+    return w.nome+' · '+fmt(f(w));
+  };
+  const kpi=(l,v,cls,sub)=>'<div class="kpi-card"><div class="kpi-label">'+l+'</div><div class="kpi-value '+(cls||'')+'">'+v+'</div>'+(sub?'<div class="kpi-sub">'+sub+'</div>':'')+'</div>';
+  const totInv=arr.reduce((a,m)=>a+m.inv,0);
+  document.getElementById('kpi-paginas').innerHTML=
+    kpi('Páginas ativas no período',fmtNum(arr.length),'orange')+
+    kpi('Investimento total',fmtBRL(totInv))+
+    kpi('Melhor CTR',best(m=>m.ctr,fmtPct),'green')+
+    kpi('Melhor Clique→PV',best(m=>m.txPV,fmtPct),'green')+
+    kpi('Melhor PV→Checkout',best(m=>m.txCK,fmtPct),'green')+
+    kpi('Menor CPC',best(m=>m.cpc,fmtBRL,true),'green')+
+    kpi('Menor custo/checkout',best(m=>m.cpCK||1e9,fmtBRL,true),'green');
+
+  document.getElementById('info-paginas').innerHTML=
+    'Página extraída da tag <code>[PGx]</code> no nome da campanha — ajuste em <code>CONFIG.PAGINA_REGEX</code> se a nomenclatura mudar. '+
+    'Campanhas sem a tag caem em <b>'+esc(CONFIG.PAGINA_FALLBACK)+'</b>.<br>'+
+    'A leitura mais confiável aqui é o <b>funil</b>: Clique→Page View mede se a página carrega e prende, '+
+    'PV→Checkout mede se a página convence. Faturamento e ROAS por página dependem do <code>utm_campaign</code>, '+
+    'que hoje vem como ID numérico do Meta — use <code>CONFIG.MAP_CAMPAIGNS</code> para o de-para.'+
+    (r.semAtribuicao.n? '<br>🔎 <b>'+r.semAtribuicao.n+' venda(s) paga(s)</b> ('+fmtBRL(r.semAtribuicao.fat)+') sem página identificada no período.' : '');
+
+  document.getElementById('pag-cards').innerHTML = arr.length? arr.map(m=>
+    '<div class="pub-card'+(m.ativo?' ativo':'')+'">'+
+    '<div class="pub-card-header"><div class="pub-name">📄 '+esc(m.nome)+
+    '<div style="font-size:10px;color:rgba(255,255,255,.35);font-weight:400;margin-top:3px">'+
+    m.nCamp+' campanha(s) · '+m.nCri+' criativo(s)</div></div>'+
+    '<div class="cri-badge '+(m.ativo?'ativo':'inativo')+'">'+(m.ativo?'ATIVO':'INATIVO')+'</div></div>'+
+    '<div class="pub-metrics">'+
+    pm(fmtBRL(m.inv),'Investimento')+pm(fmtPct(m.txPV),'Clique→PV')+pm(fmtPct(m.txCK),'PV→Checkout')+
+    pm(fmtNum(m.cliques),'Cliques',1)+pm(fmtNum(m.pv),'Page Views',1)+pm(fmtNum(m.ck),'Checkouts',1)+
+    pm(fmtPct(m.ctr),'CTR',1)+pm(fmtBRL(m.cpc),'CPC',1)+pm(fmtBRL(m.cpCK),'Custo/CK',1)+
+    pm(fmtNum(m.purch),'Compras pixel',1)+pm(fmtNum(m.vendas),'Vendas UTM',1)+pm(fmtX(m.roas),'ROAS',1)+
+    '</div></div>').join('') : '<div class="empty">Nenhuma página no período.</div>';
+
+  let t={inv:0,reach:0,cliques:0,pv:0,ck:0,purch:0,vendas:0,fat:0};
+  const body=arr.map(m=>{
+    t.inv+=m.inv;t.reach+=m.reach;t.cliques+=m.cliques;t.pv+=m.pv;t.ck+=m.ck;t.purch+=m.purch;t.vendas+=m.vendas;t.fat+=m.fat;
+    return '<tr><td>'+esc(m.nome)+(m.ativo?' <span style="color:#2ecc71">●</span>':'')+'</td><td>'+fmtBRL(m.inv)+
+      '</td><td>'+fmtNum(m.reach)+'</td><td>'+fmtNum(m.cliques)+'</td><td>'+fmtPct(m.ctr)+'</td><td>'+fmtBRL(m.cpc)+
+      '</td><td>'+fmtNum(m.pv)+'</td><td>'+fmtPct(m.txPV)+'</td><td>'+fmtBRL(m.cpPV)+
+      '</td><td>'+fmtNum(m.ck)+'</td><td>'+fmtPct(m.txCK)+'</td><td>'+fmtBRL(m.cpCK)+
+      '</td><td>'+fmtNum(m.purch)+'</td><td>'+fmtNum(m.vendas)+'</td><td class="'+(m.roas>=1?'green':'')+'">'+fmtX(m.roas)+'</td></tr>';
+  }).join('');
+  document.getElementById('tbl-paginas').innerHTML=
+    '<thead><tr><th>Página</th><th>Invest.</th><th>Alcance</th><th>Cliques</th><th>CTR</th><th>CPC</th>'+
+    '<th>Page Views</th><th>Clique→PV</th><th>Custo/PV</th><th>Checkouts</th><th>PV→CK</th><th>Custo/CK</th>'+
+    '<th>Compras pixel</th><th>Vendas UTM</th><th>ROAS</th></tr></thead>'+
+    '<tbody>'+(body||'<tr><td colspan="15" style="text-align:center">Sem dados</td></tr>')+'</tbody>'+
+    '<tfoot><tr><td>TOTAL</td><td>'+fmtBRL(t.inv)+'</td><td>'+fmtNum(t.reach)+'</td><td>'+fmtNum(t.cliques)+
+    '</td><td>'+fmtPct(t.reach?t.cliques/t.reach*100:0)+'</td><td>'+fmtBRL(t.cliques?t.inv/t.cliques:0)+
+    '</td><td>'+fmtNum(t.pv)+'</td><td>'+fmtPct(t.cliques?t.pv/t.cliques*100:0)+'</td><td>'+fmtBRL(t.pv?t.inv/t.pv:0)+
+    '</td><td>'+fmtNum(t.ck)+'</td><td>'+fmtPct(t.pv?t.ck/t.pv*100:0)+'</td><td>'+fmtBRL(t.ck?t.inv/t.ck:0)+
+    '</td><td>'+fmtNum(t.purch)+'</td><td>'+fmtNum(t.vendas)+'</td><td>'+fmtX(t.inv?t.fat/t.inv:0)+'</td></tr></tfoot>';
+
+  let rowsC='';
+  arr.forEach(m=>{
+    Object.keys(m.campanhas).sort((a,b)=>m.campanhas[b].inv-m.campanhas[a].inv).forEach(k=>{
+      const c=m.campanhas[k];
+      rowsC+='<tr><td>'+esc(c.nome)+(c.ativo?' <span style="color:#2ecc71">●</span>':'')+'</td><td style="text-align:left">'+esc(m.nome)+
+        '</td><td>'+fmtBRL(c.inv)+'</td><td>'+fmtNum(c.cliques)+'</td><td>'+fmtPct(c.reach?c.cliques/c.reach*100:0)+
+        '</td><td>'+fmtBRL(c.cliques?c.inv/c.cliques:0)+'</td><td>'+fmtNum(c.pv)+
+        '</td><td>'+fmtPct(c.cliques?c.pv/c.cliques*100:0)+'</td><td>'+fmtNum(c.ck)+'</td><td>'+fmtNum(c.purch)+'</td></tr>';
+    });
+  });
+  document.getElementById('tbl-pag-camp').innerHTML=
+    '<thead><tr><th>Campanha</th><th style="text-align:left">Página</th><th>Invest.</th><th>Cliques</th><th>CTR</th>'+
+    '<th>CPC</th><th>Page Views</th><th>Clique→PV</th><th>Checkouts</th><th>Compras pixel</th></tr></thead>'+
+    '<tbody>'+(rowsC||'<tr><td colspan="10" style="text-align:center">Sem dados</td></tr>')+'</tbody>';
+
+  const lb=arr.map(m=>m.nome);
+  mkChart('ch-pag-inv','bar',lb,[
+    {label:'Investimento (R$)',data:arr.map(m=>+m.inv.toFixed(2)),backgroundColor:'rgba(255,107,43,0.85)'},
+    {label:'Cliques',data:arr.map(m=>m.cliques),backgroundColor:'rgba(255,183,55,0.85)'}]);
+  mkChart('ch-pag-taxas','bar',lb,[
+    {label:'Clique→PV',data:arr.map(m=>+m.txPV.toFixed(2)),backgroundColor:'rgba(255,107,43,0.85)'},
+    {label:'PV→Checkout',data:arr.map(m=>+m.txCK.toFixed(2)),backgroundColor:'rgba(255,183,55,0.85)'}]);
+}
+
+// ══════════════════ RENDER: SEMANAL / MENSAL ══════════════════
+function weekKey(iso){
+  const d=new Date(iso+'T12:00:00');
+  const dow=(d.getDay()+6)%7;
+  d.setDate(d.getDate()-dow);
+  return d.toISOString().slice(0,10);
+}
+function monthKey(iso){ return iso.slice(0,7); }
+
+function buildPeriodos(from,to,keyFn){
+  const map={};
+  const ensure=k=>{ if(!map[k]) map[k]={k:k,inv:0,reach:0,cliques:0,pv:0,ck:0,purch:0,fat:0,nt:0,no:0}; return map[k]; };
+  DIAS.forEach(d=>{ if(!inRange(d.data,from,to)) return;
+    const m=ensure(keyFn(d.data));
+    m.inv+=d.inv;m.reach+=d.reach;m.cliques+=d.cliques;m.pv+=d.pv;m.ck+=d.ck;m.purch+=d.purch;
+  });
+  SALES.forEach(s=>{ if(!inRange(s.data,from,to)) return;
+    const m=ensure(keyFn(s.data));
+    m.fat+=s.fatTotal; if(isTrafego(s)) m.nt++; else m.no++;
+  });
+  return Object.keys(map).sort().map(k=>map[k]);
+}
+
+function renderPeriodo(arr,tblId,chInv,chCtr,labelFn,colLabel){
+  let t={inv:0,reach:0,cliques:0,pv:0,ck:0,fat:0,nt:0,no:0};
+  const body=arr.map(m=>{
+    t.inv+=m.inv;t.reach+=m.reach;t.cliques+=m.cliques;t.pv+=m.pv;t.ck+=m.ck;t.fat+=m.fat;t.nt+=m.nt;t.no+=m.no;
+    const nn=m.nt+m.no;
+    return '<tr><td>'+labelFn(m.k)+'</td><td>'+fmtBRL(m.inv)+'</td><td>'+fmtNum(m.cliques)+
+      '</td><td>'+fmtPct(m.reach?m.cliques/m.reach*100:0)+'</td><td>'+fmtBRL(m.cliques?m.inv/m.cliques:0)+
+      '</td><td>'+fmtNum(m.pv)+'</td><td>'+fmtNum(m.ck)+'</td><td>'+fmtBRL(m.fat)+
+      '</td><td>'+fmtNum(nn)+'</td><td>'+fmtNum(m.nt)+'</td><td>'+fmtNum(m.no)+
+      '</td><td class="'+(m.inv&&m.fat/m.inv>=1?'green':'')+'">'+fmtX(m.inv?m.fat/m.inv:0)+
+      '</td><td>'+fmtBRL(m.nt?m.inv/m.nt:0)+'</td></tr>';
+  }).join('');
+  const totN=t.nt+t.no;
+  document.getElementById(tblId).innerHTML=
+    '<thead><tr><th>'+colLabel+'</th><th>Invest.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Page Views</th><th>Checkouts</th><th>Fat.</th><th>Compras</th><th>Tráfego</th><th>Orgânicas</th><th>ROAS</th><th>CAC</th></tr></thead>'+
+    '<tbody>'+(body||'<tr><td colspan="13" style="text-align:center">Sem dados</td></tr>')+'</tbody>'+
+    '<tfoot><tr><td>TOTAL</td><td>'+fmtBRL(t.inv)+'</td><td>'+fmtNum(t.cliques)+'</td><td>'+fmtPct(t.reach?t.cliques/t.reach*100:0)+
+    '</td><td>'+fmtBRL(t.cliques?t.inv/t.cliques:0)+'</td><td>'+fmtNum(t.pv)+'</td><td>'+fmtNum(t.ck)+'</td><td>'+fmtBRL(t.fat)+
+    '</td><td>'+fmtNum(totN)+'</td><td>'+fmtNum(t.nt)+'</td><td>'+fmtNum(t.no)+'</td><td>'+fmtX(t.inv?t.fat/t.inv:0)+
+    '</td><td>'+fmtBRL(t.nt?t.inv/t.nt:0)+'</td></tr></tfoot>';
+
+  const lb=arr.map(m=>labelFn(m.k));
+  mkChart(chInv,'bar',lb,[{label:'Investimento',data:arr.map(m=>m.inv),backgroundColor:'rgba(255,107,43,0.85)'},
+                          {label:'Faturamento',data:arr.map(m=>m.fat),backgroundColor:'rgba(255,183,55,0.85)'}]);
+  mkChart(chCtr,'line',lb,[{label:'CTR (%)',data:arr.map(m=>m.reach?+(m.cliques/m.reach*100).toFixed(2):0),
+    borderColor:'rgba(255,107,43,0.95)',backgroundColor:'rgba(255,107,43,0.15)',fill:true,tension:.3}]);
+}
+
+const MESES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+function renderSemanal(from,to){
+  renderPeriodo(buildPeriodos(from,to,weekKey),'tbl-semanal','ch-sem-inv','ch-sem-ctr',
+    k=>'sem. de '+fmtDia(k),'Semana');
+}
+function renderMensal(from,to){
+  renderPeriodo(buildPeriodos(from,to,monthKey),'tbl-mensal','ch-men-inv','ch-men-ctr',
+    k=>MESES[parseInt(k.slice(5,7),10)-1]+'/'+k.slice(0,4),'Mês');
+}
+
+// ══════════════════ FILTROS / NAVEGAÇÃO ══════════════════
+function showTab(id,el){
+  document.querySelectorAll('.content').forEach(c=>c.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  el.classList.add('active');
+  setTimeout(()=>{Object.keys(CHARTS).forEach(k=>{try{CHARTS[k].resize();}catch(e){}});},60);
+}
+function setCriFilter(f,el){ CRI_FILTER=f; document.querySelectorAll('.cri-status-btn').forEach(b=>b.classList.remove('active')); el.classList.add('active'); renderAll(); }
+function setCriSort(s,el){ CRI_SORT=s; document.querySelectorAll('.cri-sort-btn').forEach(b=>b.classList.remove('active')); el.classList.add('active'); renderAll(); }
+function setPubFilter(f,el){ PUB_FILTER=f; document.querySelectorAll('.pub-filter-btn').forEach(b=>b.classList.remove('active')); el.classList.add('active'); renderAll(); }
+function setPubSort(s,el){ PUB_SORT=s; document.querySelectorAll('.pub-sort-btn').forEach(b=>b.classList.remove('active')); el.classList.add('active'); renderAll(); }
+
+function allDates(){
+  return DIAS.map(d=>d.data).concat(SALES.map(s=>s.data)).filter(Boolean).sort();
+}
+function setPreset(days,btn){
+  const a=allDates(); if(!a.length) return;
+  const first=a[0], last=a[a.length-1];
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  if(days==='all'){
+    document.getElementById('dateFrom').value=first;
+    document.getElementById('dateTo').value=last;
+  }else{
+    const d=new Date(last+'T12:00:00'); d.setDate(d.getDate()-(days-1));
+    let from=d.toISOString().slice(0,10); if(from<first) from=first;
+    document.getElementById('dateFrom').value=from;
+    document.getElementById('dateTo').value=last;
+  }
+  renderAll();
+}
+function onDateChange(){
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+  renderAll();
+}
+
+function renderAll(){
+  const from=document.getElementById('dateFrom').value||'';
+  const to=document.getElementById('dateTo').value||'';
+  document.getElementById('range-info').textContent =
+    (from&&to)? fmtDia(from)+' → '+fmtDia(to)+' · '+
+      (Math.round((new Date(to)-new Date(from))/864e5)+1)+' dias' : '';
+  renderTrafego(from,to);
+  renderVisao(from,to);
+  renderCriativos(from,to);
+  renderPublicos(from,to);
+  renderPaginas(from,to);
+  renderSemanal(from,to);
+  renderMensal(from,to);
+}
+
+// ══════════════════ LOAD ══════════════════
+function bootstrap(gTxt,wTxt){
+  GROWS=parseCSV(gTxt).slice(1).filter(r=>r.length>3&&toISO(r[G.date]));
+  SALES=processSales(parseCSV(wTxt).slice(1).filter(r=>r.length>3))
+          .sort((a,b)=>b.data.localeCompare(a.data));
+  DIAS=buildDias(GROWS);
+  if(!GROWS.length && !SALES.length) throw new Error('Nenhum dado encontrado nas abas.');
+
+  const a=allDates();
+  document.getElementById('dateFrom').value=a[0]||'';
+  document.getElementById('dateTo').value=a[a.length-1]||'';
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('btn-all').classList.add('active');
+  renderAll();
+  document.getElementById('loading-overlay').style.display='none';
+}
+
+function showError(msg){
+  const ov=document.getElementById('loading-overlay');
+  ov.style.display='flex';
+  ov.innerHTML=
+   '<div class="err-box" style="max-width:640px">'+
+   '<b>Não foi possível buscar a planilha automaticamente</b><br>'+
+   '<span style="color:rgba(255,255,255,.55)">'+esc(msg)+'</span>'+
+   '<div style="height:12px"></div>'+
+   '<div style="color:rgba(255,255,255,.55);font-size:12px;line-height:1.7">'+
+   'Isso quase sempre acontece quando o arquivo está aberto <b>dentro de um preview/iframe</b>, que bloqueia requisições externas. '+
+   'Duas saídas:<br>'+
+   '<b>1.</b> Baixe este arquivo <code>.html</code> e abra direto no navegador — aí o carregamento automático funciona.<br>'+
+   '<b>2.</b> Ou use o modo manual abaixo: no Google Sheets, <i>Arquivo → Fazer download → CSV</i> em cada aba e selecione os arquivos aqui.'+
+   '</div>'+
+   '<div class="manual-box">'+
+   '<div class="manual-row"><label>Aba <b>'+esc(GERENCIADOR_SHEET)+'</b> (gerenciador)</label><input type="file" id="f-ger" accept=".csv,text/csv"></div>'+
+   '<div class="manual-row"><label>Aba <b>'+esc(WEBHOOK_SHEET)+'</b> (vendas)</label><input type="file" id="f-web" accept=".csv,text/csv"></div>'+
+   '<div style="display:flex;gap:8px;margin-top:12px">'+
+   '<button class="preset-btn" onclick="loadFromFiles()">📂 Carregar CSVs</button>'+
+   '<button class="preset-btn" onclick="loadData()">🔄 Tentar de novo</button>'+
+   '</div><div id="manual-msg" style="font-size:11px;color:rgba(255,255,255,.4);margin-top:8px"></div>'+
+   '</div></div>';
+}
+
+function readFile(input){
+  return new Promise((res,rej)=>{
+    const f=input&&input.files&&input.files[0];
+    if(!f){ rej(new Error('Selecione os dois arquivos CSV.')); return; }
+    const r=new FileReader();
+    r.onload=()=>res(String(r.result));
+    r.onerror=()=>rej(new Error('Falha ao ler '+f.name));
+    r.readAsText(f,'utf-8');
+  });
+}
+
+async function loadFromFiles(){
+  const m=document.getElementById('manual-msg');
+  try{
+    m.textContent='Lendo arquivos...';
+    const gTxt=await readFile(document.getElementById('f-ger'));
+    const wTxt=await readFile(document.getElementById('f-web'));
+    bootstrap(gTxt,wTxt);
+  }catch(e){
+    m.textContent='⚠️ '+e.message;
+  }
+}
+
+function snapText(id){
+  const el=document.getElementById(id);
+  return el? el.textContent.trim() : '';
+}
+
+function showSnapshotBadge(motivo){
+  const b=document.getElementById('snap-banner');
+  if(!b) return;
+  b.style.display='block';
+  b.innerHTML='<div style="background:rgba(241,196,15,.09);border-bottom:1px solid rgba(241,196,15,.25);'+
+    'padding:8px 28px;font-size:11px;color:rgba(255,255,255,.55);line-height:1.5">'+
+    '📌 Exibindo o <b style="color:#f1c40f">snapshot embutido</b> da planilha ('+esc(SNAPSHOT_DATA)+'). '+
+    'A busca ao vivo falhou: <i>'+esc(motivo)+'</i> — normal dentro de preview/iframe. '+
+    'Abrindo o arquivo direto no navegador, os dados passam a vir da planilha em tempo real.</div>';
+  const s=document.getElementById('brand-subtitle');
+  if(s) s.textContent='Snapshot '+SNAPSHOT_DATA+' · Jamelli GT · '+CONFIG.ANO;
+}
+
+async function loadData(){
+  const ov=document.getElementById('loading-overlay');
+  ov.style.display='flex';
+  ov.innerHTML='<div style="width:40px;height:40px;border:3px solid rgba(255,107,43,.2);border-top-color:#ff6b2b;border-radius:50%;animation:spin 1s linear infinite"></div>'+
+               '<div style="color:rgba(255,255,255,.5);font-size:13px;margin-top:16px" id="loading-msg">Conectando com a planilha...</div>';
+  const msg=document.getElementById('loading-msg');
+  try{
+    msg.textContent='Carregando aba "'+GERENCIADOR_SHEET+'"...';
+    const gTxt=await fetchSheetCSV(GERENCIADOR_SHEET);
+    msg.textContent='Carregando aba "'+WEBHOOK_SHEET+'"...';
+    const wTxt=await fetchSheetCSV(WEBHOOK_SHEET);
+    msg.textContent='Processando...';
+    bootstrap(gTxt,wTxt);
+    const b=document.getElementById('snap-banner');
+    if(b){ b.style.display='none'; b.innerHTML=''; }
+    const s=document.getElementById('brand-subtitle');
+    if(s) s.textContent='Dashboard de Performance — Perpétuo · Jamelli GT · '+CONFIG.ANO;
+  }catch(e){
+    const g=snapText('snap-ger'), w=snapText('snap-web');
+    if(g&&w){
+      try{ bootstrap(g,w); showSnapshotBadge(e.message); return; }
+      catch(e2){ showError(e2.message); return; }
+    }
+    showError(e.message);
+  }
+}
+
+loadData();
+</script>
+</body>
+</html>
