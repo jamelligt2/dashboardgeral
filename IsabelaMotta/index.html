@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard Captação — Dr. Isabella Mota</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%231a1a2e'/%3E%3Ctext x='32' y='40' font-family='Arial' font-weight='bold' font-size='20' fill='%23ff6b35' text-anchor='middle'%3EJGT%3C/text%3E%3C/svg%3E">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0f0f1a; --card:#1e1e35; --border:#262640;
+    --orange:#ff6b35; --green:#00c853; --red:#ff1744; --yellow:#ffd600; --blue:#42a5f5;
+    --text:#ffffff; --dim:#9a9ab0; --faded:#777777;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',Arial,sans-serif;}
+  .header{display:flex;align-items:center;gap:18px;background:#16213e;border-bottom:2px solid var(--orange);padding:18px 32px;}
+  .logo-badge{background:linear-gradient(135deg,#ff6b35,#e04e1c);border-radius:10px;width:52px;height:52px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;color:#fff;flex-shrink:0;}
+  .header-divider{width:2px;height:40px;background:var(--border);}
+  .header-text h1{font-size:19px;letter-spacing:.5px;}
+  .header-text p{color:var(--dim);font-size:13px;margin-top:4px;}
+  .live-badge{margin-left:auto;background:rgba(0,200,83,.12);border:1px solid var(--green);color:var(--green);font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;letter-spacing:.4px;}
+  .container{max-width:1280px;margin:0 auto;padding:28px 32px 60px;}
+
+  /* Budget bar */
+  .budget-section{background:var(--card);border:2px solid var(--orange);border-radius:14px;padding:22px 26px;margin-bottom:28px;}
+  .budget-top{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:10px;margin-bottom:16px;}
+  .budget-top h2{font-size:15px;letter-spacing:.5px;color:var(--orange);text-transform:uppercase;}
+  .budget-days{background:#2a1608;border:1px solid var(--orange);border-radius:8px;padding:6px 14px;font-size:13px;color:#ffb28a;font-weight:600;}
+  .budget-days b{color:var(--orange);font-size:16px;}
+  .budget-track{width:100%;height:22px;background:#0a0a14;border-radius:11px;overflow:hidden;border:1px solid var(--border);position:relative;}
+  .budget-fill{height:100%;background:linear-gradient(90deg,#ff6b35,#ff9558);border-radius:11px 0 0 11px;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;font-size:11px;font-weight:700;color:#1a0a00;transition:width 1s ease;}
+  .budget-stats{display:flex;gap:24px;margin-top:16px;flex-wrap:wrap;}
+  .budget-stat{flex:1;min-width:150px;}
+  .budget-stat .lbl{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;}
+  .budget-stat .val{font-size:22px;font-weight:700;margin-top:4px;}
+  .budget-stat.spent .val{color:var(--orange);}
+  .budget-stat.left .val{color:var(--green);}
+  .budget-stat.total .val{color:#fff;}
+
+  /* KPIs */
+  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px;}
+  .kpi-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px 20px;}
+  .kpi-card .lbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;}
+  .kpi-card .val{font-size:28px;font-weight:800;margin-top:8px;color:var(--orange);}
+  .kpi-card .sub{font-size:12px;color:var(--faded);margin-top:4px;}
+
+  h3.section-title{font-size:14px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);margin:32px 0 14px;}
+
+  /* Segments */
+  .temp-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px;}
+  .temp-card{border-radius:12px;padding:18px 20px;}
+  .temp-card.hot{border:2px solid var(--red);background:#2a0a0a;}
+  .temp-card.cold{border:2px solid var(--blue);background:#061428;}
+  .temp-card.win{border:2px solid var(--green);background:#062a12;}
+  .temp-card h4{font-size:13px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;}
+  .temp-card.hot h4{color:var(--red);}
+  .temp-card.cold h4{color:var(--blue);}
+  .temp-card.win h4{color:var(--green);}
+  .temp-row{display:flex;justify-content:space-between;font-size:14px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06);}
+  .temp-row span:last-child{font-weight:700;}
+  .temp-detail{font-size:12px;color:var(--faded);margin-top:10px;line-height:1.5;}
+  .compare-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 20px;display:flex;justify-content:space-around;gap:20px;flex-wrap:wrap;margin-bottom:16px;}
+  .compare-card .stat{text-align:center;}
+  .compare-card .big{font-size:22px;font-weight:800;color:var(--yellow);}
+  .compare-card .lbl{font-size:11px;color:var(--dim);text-transform:uppercase;}
+
+  /* Funnel */
+  .funnel-row{display:flex;gap:20px;align-items:stretch;margin-bottom:10px;}
+  .funnel-svg-wrap{flex:0 0 56%;max-width:56%;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px;}
+  .funnel-metrics-row{flex:1;display:flex;flex-direction:column;gap:12px;}
+  .fm-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;flex:1;display:flex;flex-direction:column;justify-content:center;position:relative;overflow:hidden;}
+  .fm-card .lbl{font-size:12px;color:var(--dim);text-transform:uppercase;}
+  .fm-card .val{font-size:30px;font-weight:800;margin-top:6px;}
+  .fm-card .sub{font-size:11px;color:var(--faded);margin-top:4px;}
+  .fm-card .bar{position:absolute;bottom:0;left:0;right:0;height:3px;border-radius:0 0 12px 12px;}
+  .fm-card.cpc .val{color:#ff6b35;} .fm-card.cpc .bar{background:#ff6b35;}
+  .fm-card.entrada .val{color:#ffd600;} .fm-card.entrada .bar{background:#ffd600;}
+  .fm-card.cadastro .val{color:#00c853;} .fm-card.cadastro .bar{background:#00c853;}
+  .funnel-note{font-size:11px;color:var(--faded);margin:10px 0 24px;}
+
+  /* Tabs */
+  .tabs{display:flex;gap:4px;background:#16213e;border-radius:10px;padding:4px;margin-bottom:24px;width:fit-content;}
+  .tab-btn{background:none;border:none;color:var(--dim);padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;border-radius:8px;border-bottom:3px solid transparent;letter-spacing:.3px;}
+  .tab-btn.active{color:var(--orange);border-bottom:3px solid var(--orange);}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+
+  table{width:100%;border-collapse:collapse;background:var(--card);border-radius:12px;overflow:hidden;border:1px solid var(--border);}
+  thead th{background:#16213e;color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.4px;padding:12px 10px;text-align:left;}
+  tbody td{padding:12px 10px;font-size:13px;border-top:1px solid var(--border);}
+  tbody tr.total{background:#2a1608;font-weight:700;}
+  tbody tr:hover{background:#22223c;}
+  .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;}
+  .badge.escalar{background:rgba(0,200,83,.15);color:var(--green);border:1px solid var(--green);}
+  .badge.manter{background:rgba(255,107,53,.15);color:var(--orange);border:1px solid var(--orange);}
+  .badge.avaliar{background:rgba(255,214,0,.15);color:var(--yellow);border:1px solid var(--yellow);}
+  .badge.pausar{background:rgba(255,23,68,.15);color:var(--red);border:1px solid var(--red);}
+  a.linkcell{color:var(--blue);text-decoration:none;}
+  a.linkcell:hover{text-decoration:underline;}
+
+  .chart-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;margin-top:20px;height:300px;}
+  .info-box{background:var(--card);border:1px solid var(--border);border-left:3px solid var(--blue);border-radius:8px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:var(--dim);line-height:1.6;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo-badge">JGT</div>
+  <div class="header-divider"></div>
+  <div class="header-text">
+    <h1>DASHBOARD CAPTAÇÃO — DR. ISABELLA MOTA</h1>
+    <p>Evento Presencial SP · Agosto 2026 · Dados ao vivo via Meta Ads · Atualizado em 28/07/2026</p>
+  </div>
+  <div class="live-badge">● AO VIVO — META ADS</div>
+</div>
+
+<div class="container">
+
+  <!-- BARRA DE ORÇAMENTO -->
+  <div class="budget-section">
+    <div class="budget-top">
+      <h2>Orçamento do Evento</h2>
+      <div class="budget-days">Faltam <b>24 dias</b> para o evento (21–22/08/2026)</div>
+    </div>
+    <div class="budget-track">
+      <div class="budget-fill" style="width:28.4%">28,4%</div>
+    </div>
+    <div class="budget-stats">
+      <div class="budget-stat total">
+        <div class="lbl">Orçamento Total</div>
+        <div class="val">R$ 3.000,00</div>
+      </div>
+      <div class="budget-stat spent">
+        <div class="lbl">Investido até agora</div>
+        <div class="val">R$ 852,49</div>
+      </div>
+      <div class="budget-stat left">
+        <div class="lbl">Falta Investir</div>
+        <div class="val">R$ 2.147,51</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="lbl">Investimento Total</div>
+      <div class="val">R$ 852,49</div>
+      <div class="sub">4 campanhas AGO26 · dados ao vivo (Meta Ads)</div>
+    </div>
+    <div class="kpi-card">
+      <div class="lbl">CTR Médio</div>
+      <div class="val">1,22%</div>
+      <div class="sub">223 cliques no link / 18.290 impressões</div>
+    </div>
+    <div class="kpi-card">
+      <div class="lbl">CPM Médio</div>
+      <div class="val">R$ 46,61</div>
+      <div class="sub">custo por mil impressões</div>
+    </div>
+    <div class="kpi-card">
+      <div class="lbl">CPL Médio</div>
+      <div class="val">R$ 28,42</div>
+      <div class="sub">30 leads no total</div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="geral">Visão Geral</button>
+    <button class="tab-btn" data-tab="campanhas">Campanhas</button>
+    <button class="tab-btn" data-tab="criativos">Criativos</button>
+    <button class="tab-btn" data-tab="publicos">Públicos</button>
+    <button class="tab-btn" data-tab="detalhe">Detalhamento</button>
+  </div>
+
+  <!-- ABA VISÃO GERAL -->
+  <div class="tab-panel active" id="geral">
+
+    <h3 class="section-title">SP vs Fora do Estado vs Quente (novo)</h3>
+    <div class="temp-grid">
+      <div class="temp-card win">
+        <h4>SP — Capital/Região</h4>
+        <div class="temp-row"><span>Investimento</span><span>R$ 617,59</span></div>
+        <div class="temp-row"><span>CPL</span><span>R$ 22,87</span></div>
+        <div class="temp-row"><span>Leads</span><span>27</span></div>
+        <div class="temp-detail">Campanha original pausada em 23/07 (R$ 370,27 · 10 leads · CPL R$ 37,03) + nova campanha ativa desde 23/07 (R$ 247,32 · 17 leads · CPL R$ 14,55). A otimização reduziu bastante o CPL.</div>
+      </div>
+      <div class="temp-card cold">
+        <h4>Fora do Estado — Pausada</h4>
+        <div class="temp-row"><span>Investimento</span><span>R$ 172,34</span></div>
+        <div class="temp-row"><span>CPL</span><span>—</span></div>
+        <div class="temp-row"><span>Leads</span><span>0</span></div>
+        <div class="temp-detail">Segue em 0 leads. Já foi pausada — recomendação da análise anterior foi aplicada. Considerar realocar essa verba para SP ou para a campanha Quente.</div>
+      </div>
+      <div class="temp-card hot">
+        <h4>Quente — Engajamento (nova!)</h4>
+        <div class="temp-row"><span>Investimento</span><span>R$ 62,56</span></div>
+        <div class="temp-row"><span>CPL</span><span>R$ 20,85</span></div>
+        <div class="temp-row"><span>Leads</span><span>3</span></div>
+        <div class="temp-detail">Ativada em 27/07 (ontem) — a camada de público quente que recomendamos finalmente entrou no ar. Com só 1 dia de veiculação já compete de igual para igual com o frio.</div>
+      </div>
+    </div>
+    <div class="compare-card">
+      <div class="stat"><div class="lbl">% dos leads por segmento</div><div class="big">SP 90% · Quente 10% · Fora 0%</div></div>
+      <div class="stat"><div class="lbl">CPL quente vs frio (SP)</div><div class="big">R$ 20,85 vs R$ 22,87</div></div>
+    </div>
+    <div class="info-box">Boa notícia: a campanha de público quente (engajamento) que recomendamos foi ativada ontem (27/07) e já entrega CPL melhor que o frio. A campanha "Fora do Estado" segue pausada sem leads — vale decidir entre reativar com criativo novo ou realocar de vez a verba.</div>
+
+    <h3 class="section-title">Funil de Conversão (campanhas AGO26 · dados ao vivo)</h3>
+    <div class="funnel-row">
+      <div class="funnel-svg-wrap">
+        <svg viewBox="0 0 1200 540" width="100%">
+          <defs>
+            <linearGradient id="g1" x1="0" x2="1"><stop offset="0%" stop-color="#0d3b66"/><stop offset="50%" stop-color="#1e6fc9"/><stop offset="100%" stop-color="#0d3b66"/></linearGradient>
+            <linearGradient id="g2" x1="0" x2="1"><stop offset="0%" stop-color="#0a2e4a"/><stop offset="50%" stop-color="#2f8fe8"/><stop offset="100%" stop-color="#0a2e4a"/></linearGradient>
+            <linearGradient id="g3" x1="0" x2="1"><stop offset="0%" stop-color="#5a2600"/><stop offset="50%" stop-color="#ff8a3d"/><stop offset="100%" stop-color="#5a2600"/></linearGradient>
+            <linearGradient id="g4" x1="0" x2="1"><stop offset="0%" stop-color="#003d1f"/><stop offset="50%" stop-color="#00c853"/><stop offset="100%" stop-color="#003d1f"/></linearGradient>
+            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="10" result="b"/>
+              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+
+          <polygon points="100,20 1100,20 980,140 220,140" fill="url(#g1)"/>
+          <text x="600" y="90" text-anchor="middle" font-size="56" font-weight="800" fill="#fff">18.290</text>
+          <text x="600" y="118" text-anchor="middle" font-size="15" fill="#cfe3ff">IMPRESSÕES</text>
+
+          <text x="600" y="165" text-anchor="middle" font-size="14" fill="#42a5f5" font-weight="700">CTR 1,22%</text>
+
+          <polygon points="220,180 980,180 890,290 310,290" fill="url(#g2)"/>
+          <text x="600" y="245" text-anchor="middle" font-size="56" font-weight="800" fill="#fff">223</text>
+          <text x="600" y="272" text-anchor="middle" font-size="15" fill="#cfe3ff">CLIQUES (LINK)</text>
+
+          <text x="600" y="315" text-anchor="middle" font-size="14" fill="#ffd600" font-weight="700">TX ENTRADA 89,2%</text>
+
+          <polygon points="310,330 890,330 820,420 380,420" fill="url(#g3)"/>
+          <text x="600" y="385" text-anchor="middle" font-size="56" font-weight="800" fill="#fff">199</text>
+          <text x="600" y="410" text-anchor="middle" font-size="15" fill="#ffe3cf">PAGE VIEWS</text>
+
+          <text x="600" y="445" text-anchor="middle" font-size="14" fill="#00c853" font-weight="700">TX CADASTRO 15,1%</text>
+
+          <polygon points="380,460 820,460 770,530 430,530" fill="url(#g4)" filter="url(#glow)"/>
+          <text x="600" y="500" text-anchor="middle" font-size="68" font-weight="900" fill="#fff">30</text>
+          <text x="600" y="524" text-anchor="middle" font-size="15" fill="#c9ffdf">LEADS</text>
+        </svg>
+      </div>
+      <div class="funnel-metrics-row">
+        <div class="fm-card cpc">
+          <div class="lbl">CPC — Custo por Clique</div>
+          <div class="val">R$ 3,82</div>
+          <div class="sub">Investimento / Cliques no link</div>
+          <div class="bar"></div>
+        </div>
+        <div class="fm-card entrada">
+          <div class="lbl">TX Entrada</div>
+          <div class="val">89,2%</div>
+          <div class="sub">Page Views / Cliques</div>
+          <div class="bar"></div>
+        </div>
+        <div class="fm-card cadastro">
+          <div class="lbl">TX Cadastro</div>
+          <div class="val">15,1%</div>
+          <div class="sub">Leads / Page Views</div>
+          <div class="bar"></div>
+        </div>
+      </div>
+    </div>
+    <div class="funnel-note">Funil com as 4 campanhas ativas/pausadas que contêm "AGO26" no nome, puxado direto da API do Meta Ads (não depende mais da planilha do Google Sheets).</div>
+
+    <h3 class="section-title">Resumo por Campanha (01/07 – 28/07) — dados ao vivo</h3>
+    <table>
+      <thead><tr><th>Campanha</th><th>Status</th><th>Invest.</th><th>Impressões</th><th>Cliques (link)</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th></tr></thead>
+      <tbody>
+        <tr><td>SP AGO26 (original)</td><td>Pausada</td><td>R$ 370,27</td><td>6.797</td><td>91</td><td>80</td><td>10</td><td>1,34%</td><td>R$ 4,07</td><td>R$ 37,03</td></tr>
+        <tr><td>SP AGO26 (nova - 230726)</td><td>Ativa</td><td>R$ 247,32</td><td>6.616</td><td>92</td><td>85</td><td>17</td><td>1,39%</td><td>R$ 2,69</td><td>R$ 14,55</td></tr>
+        <tr><td>Fora do Estado</td><td>Pausada</td><td>R$ 172,34</td><td>3.400</td><td>22</td><td>19</td><td>0</td><td>0,65%</td><td>R$ 7,83</td><td>—</td></tr>
+        <tr><td>Quente (270726)</td><td>Ativa</td><td>R$ 62,56</td><td>1.477</td><td>18</td><td>15</td><td>3</td><td>1,22%</td><td>R$ 3,48</td><td>R$ 20,85</td></tr>
+        <tr class="total"><td>Total</td><td>—</td><td>R$ 852,49</td><td>18.290</td><td>223</td><td>199</td><td>30</td><td>1,22%</td><td>R$ 3,82</td><td>R$ 28,42</td></tr>
+      </tbody>
+    </table>
+    <div class="funnel-note">CTR/CPC consideram cliques no link. Dados puxados direto da API do Meta Ads (Marketing API), atualizados em tempo real a cada consulta.</div>
+
+    <div class="chart-wrap"><canvas id="chartLeads"></canvas></div>
+  </div>
+
+  <!-- ABA CAMPANHAS -->
+  <div class="tab-panel" id="campanhas">
+    <table>
+      <thead><tr><th>#</th><th>Campanha</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th><th>TX Entrada</th><th>TX Cadastro</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>[AC-JGT] [Leads] CURSO PRESENCIAL SP AGO26 - 230726</td><td>R$ 247,32</td><td>6.616</td><td>92</td><td>85</td><td>17</td><td>1,39%</td><td>R$ 2,69</td><td>R$ 14,55</td><td>92,4%</td><td>20,0%</td><td><span class="badge escalar">ESCALAR</span></td></tr>
+        <tr><td>2</td><td>[CO-JGT] [Leads] CURSO PRESENCIAL SP AGO26 - 270726 QUENTE</td><td>R$ 62,56</td><td>1.477</td><td>18</td><td>15</td><td>3</td><td>1,22%</td><td>R$ 3,48</td><td>R$ 20,85</td><td>83,3%</td><td>20,0%</td><td><span class="badge avaliar">AVALIAR (1 dia no ar)</span></td></tr>
+        <tr><td>3</td><td>[CO-JGT] [Leads] CURSO PRESENCIAL SP AGO26</td><td>R$ 370,27</td><td>6.797</td><td>91</td><td>80</td><td>10</td><td>1,34%</td><td>R$ 4,07</td><td>R$ 37,03</td><td>87,9%</td><td>12,5%</td><td><span class="badge pausar">PAUSADA</span></td></tr>
+        <tr><td>4</td><td>[CO-JGT] [Leads] CURSO PRESENCIAL SP AGO26 Fora do Estado 160726</td><td>R$ 172,34</td><td>3.400</td><td>22</td><td>19</td><td>0</td><td>0,65%</td><td>R$ 7,83</td><td>—</td><td>86,4%</td><td>0%</td><td><span class="badge pausar">PAUSADA</span></td></tr>
+      </tbody>
+    </table>
+    <div class="info-box">Filtro: campanhas com "AGO26" no nome. Dados puxados ao vivo via Meta Ads Marketing API (28/07/2026).</div>
+  </div>
+
+  <!-- ABA CRIATIVOS -->
+  <div class="tab-panel" id="criativos">
+
+    <h3 class="section-title">Vídeo vs Estático</h3>
+    <div class="temp-grid" style="grid-template-columns:1fr 1fr;">
+      <div class="temp-card win">
+        <h4>Vídeo (ADV01/02/03)</h4>
+        <div class="temp-row"><span>Investimento</span><span>R$ 80,06</span></div>
+        <div class="temp-row"><span>CPL</span><span>R$ 10,01</span></div>
+        <div class="temp-row"><span>Leads</span><span>8</span></div>
+        <div class="temp-detail">CTR 2,83% · CPM R$ 44,48 · 1.800 impressões · 51 cliques. De longe o formato com melhor CPL — vale escalar verba pra cá.</div>
+      </div>
+      <div class="temp-card cold">
+        <h4>Estático (Carrossel + Imagem única)</h4>
+        <div class="temp-row"><span>Investimento</span><span>R$ 770,50</span></div>
+        <div class="temp-row"><span>CPL</span><span>R$ 35,03</span></div>
+        <div class="temp-row"><span>Leads</span><span>22</span></div>
+        <div class="temp-detail">Carrossel (CAR01) sozinho tem CPL R$ 19,16 e puxa a média pra baixo — as imagens únicas (ADE01/04/05) é que estão caras (CPL R$ 36 a R$ 166).</div>
+      </div>
+    </div>
+    <div class="info-box">Vídeo entrega CPL ~3,5x menor que estático puro. Dentro do estático, o carrossel (CAR01) performa bem melhor que as imagens únicas — recomendação: pedir mais variações de vídeo e de carrossel, pausar/repaginar as imagens únicas de CPL alto.</div>
+
+    <h3 class="section-title">Desempenho por Criativo (agregado entre conjuntos)</h3>
+    <table>
+      <thead><tr><th>#</th><th>Criativo</th><th>Formato</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPL</th><th>Status</th><th>Ver</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>ADE02 - Doutora de harmonização</td><td>Estático (imagem)</td><td>R$ 5,55</td><td>275</td><td>7</td><td>2</td><td>1</td><td>2,55%</td><td>R$ 5,55</td><td><span class="badge avaliar">AVALIAR (amostra pequena)</span></td><td><a class="linkcell" href="https://business.facebook.com/ads/api/preview_iframe.php?d=AQLuTc2vKBooO9JsIqFUELcoThErOgVSLDPdXhKQI-zqIbevQErxW5tCQCi1NT7TKL7w072MPLshVw-yVH9RQfUERV24rXK4bM_-lF3zo43APfgLq10run-J9OSZdcqtpfLdLYU0G3t4AoizNzjFPnF7y1a5-t3IKnftqwu7ft-YJOfKj_dMU-44lOdBRRNsQl5GoLm4QrIUidJjCyS8ico8UDezZQ5Ve__62AC2li1GXA&amp;t=AQKO6sIwXfHquk--0vA" target="_blank" rel="noopener">Abrir ▸</a></td></tr>
+        <tr><td>2</td><td>ADV03-CPSP-AGO26</td><td>Vídeo</td><td>R$ 8,42</td><td>211</td><td>4</td><td>3</td><td>1</td><td>1,90%</td><td>R$ 8,42</td><td><span class="badge avaliar">AVALIAR (amostra pequena)</span></td><td><a class="linkcell" href="https://business.facebook.com/ads/api/preview_iframe.php?d=AQL4d7az3JZsywKmQ9E_dNM36CchVQU6AZuXiMyaeKyURpXgUfLJShLY6foJSMF4j2luBtoXFxC8bsXZNyXYksWzhaxu3jEGq8H6jfhpnJPQwPkRY_NUqUMftdIi5tpd1pBYs98fZ6ErlTwLwDIDbk7NMbl3rjO0XvqZe0p5YB3DWbhZUHrE0c_TzpRQTbgJnzdRTCWT_bmNxCyTn1Zbj1tZQVxzuRHAY8GyvvHuWJEDuA&amp;t=AQLj2nigc4xhDxtPtJU" target="_blank" rel="noopener">Abrir ▸</a></td></tr>
+        <tr><td>3</td><td>ADV02-CPSP-AGO26</td><td>Vídeo</td><td>R$ 39,71</td><td>850</td><td>27</td><td>12</td><td>4</td><td>3,18%</td><td>R$ 9,93</td><td><span class="badge escalar">ESCALAR</span></td><td><a class="linkcell" href="https://business.facebook.com/ads/api/preview_iframe.php?d=AQJBEcicXO0hyrfl817c1Zb-ATN5ZxCAijqJcjTQPOfx8r75ktC_QY3pRKP91w0X4yS0DprHWNm49KrIeNSOEWbDyCD6uz2_hY5cwGape_E--xugCMUHl_midpRjpEIr46N24S1RtyhjLDaJ7O4AQ7cDd-wLYVzgzj3JC4rQ8Zx9qGTO2chuwbksCYCKFkeR1hlAuY8eYwQQQgFd7HFfv-IJCFxPb6jvUO6H4mAxt_D-lw&amp;t=AQJbPM9rjDOHGxQ4iZc" target="_blank" rel="noopener">Abrir ▸</a></td></tr>
+        <tr><td>4</td><td>ADV01-CPSP-AGO26</td><td>Vídeo</td><td>R$ 31,93</td><td>739</td><td>20</td><td>9</td><td>3</td><td>2,71%</td><td>R$ 10,64</td><td><span class="badge escalar">ESCALAR</span></td><td><a class="linkcell" href="https://business.facebook.com/ads/api/preview_iframe.php?d=AQL1_xeAEcd769ZTPmjEU7ZJSJSL2m3cvZaXZ7UqLn4I2AIK0VEej6A6vS_8QIw9lid0OMRoWwx8wg5yem6faRoBHFNpUHE5TKZ_Wfypl-bT4LXc3fquO4CUNjrYwzjr-_OWix7TpXqTjANhOLvXFiLrv9b6OpLuQEjaeDO9w4Y5ihl9XEwwLPl2njZxqVOCXrRkd8NATWu4dv_kSoKPH5a2uCxQtyua18DXi46gPGd1aA&amp;t=AQI3Qwtatk69fKqRCQc" target="_blank" rel="noopener">Abrir ▸</a></td></tr>
+        <tr><td>5</td><td>CAR01-CPSP-AGO26</td><td>Carrossel</td><td>R$ 229,87</td><td>6.300</td><td>189</td><td>77</td><td>12</td><td>3,00%</td><td>R$ 19,16</td><td><span class="badge escalar">ESCALAR</span></td><td><a class="linkcell" href="https://business.facebook.com/ads/api/preview_iframe.php?d=AQL0epvTYQNHsbOfNOQXH3f9B_NJcqWa3CqFR6xSS1YqW-o-K1X5viQpfD0AGNkWYOse7UGGE9d_B0zLgTl7SuoD_bIdSK8JPE57XPYVOW4q6vXkIg32aYc-RwsZWrfWr0ytJaEB5OQPdYai3rbqSw1qEHbC7f8PmS4Am9MuedQu5C1z2pvnM4gQlPb53BGJQLvHYbOKrT7iWLvtFnjos5-sT3XFTNLZ2-bM7DdWtXy2Dg&amp;t=AQIMn03-N5o-WvH_2S8" target="_blank" rel="noopener">Abrir ▸</a></td></tr>
+        <tr><td>6</td><td>ADE04 - Saber injetar</td><td>Estático (imagem)</td><td>R$ 253,67</td><td>4.651</td><td>103</td><td>51</td><td>7</td><td>2,21%</td><td>R$ 36,24</td><td><span class="badge manter">MANTER</span></td><td><a class="linkcell" href="https://business.facebook.com/ads/api/preview_iframe.php?d=AQItM-tdQsGaidcvxBaIgtA5E1LrxPsD5BmBBXXDxAC4ZnUUwBWn633RXJL0ZWJ28dnZY-WnXtYpdmFFoei9_LXVDeUAU6YNv91r-pdeHdIEcQPoy9OFoJfkb-kWruor7ALsJHur5U7Dc8f4P-5YZg12yRq3m5fskxKj6OheDYhx5MdV6_Wvy-LNURTr0hKKK-9-o03_lmQPPOoL89Se3zXfWHaHbHCSAC5rVad6_gRPbA&amp;t=AQLQZdL9ao1V2rozc9s" target="_blank" rel="noopener">Abrir ▸</a></td></tr>
+        <tr><td>7</td><td>ADE01 - Produto 3 doutoras</td><td>Estático (imagem)</td><td>R$ 113,77</td><td>2.422</td><td>50</td><td>24</td><td>1</td><td>2,06%</td><td>R$ 113,77</td><td><span class="badge pausar">PAUSAR</span></td><td><a class="linkcell" href="https://business.facebook.com/ads/api/preview_iframe.php?d=AQL-QBnIaCT03h-NUVlPM2GQcWOBsJ_-G95XkGh3ec6jE91xuCCyZ7VsMR9eC1eZqFhDJdGf7amlrzZ__TRaTq5yoDNB3tP9ATsgSmXcwJmWICeVAqGXEsSEImR-JLmYMwvNjtwXVWwQMyqFyKZB6rB8-DxRxrF-lB7Tb_nVLNwDC13iaZ6MJvde54FB4cPdltrrWEZgkGMxytminbCosQpauDraTh7kOJFPxXHL8KdDXw&amp;t=AQIuKwMEtjX1Hl3wDtE" target="_blank" rel="noopener">Abrir ▸</a></td></tr>
+        <tr><td>8</td><td>ADE05 - 2 dias</td><td>Estático (imagem)</td><td>R$ 165,96</td><td>2.616</td><td>47</td><td>21</td><td>1</td><td>1,80%</td><td>R$ 165,96</td><td><span class="badge pausar">PAUSAR</span></td><td><a class="linkcell" href="https://business.facebook.com/ads/api/preview_iframe.php?d=AQJRwjl4USTQaD5TrHNHcop-wAWtfmD9PNroiv4ghIxm7jy9ErC-brMCn1IKiYDH5GTt1mEA7oJ8Bd27r0G6NtFQ1uy9Azq93B2i-dcW33UZT12g1VuxGoPo56S8D6jw52a96V9T0mwfbOBQdZk0SViatzCdfhZEDwE1B9LQMv-CdS9G6HCtqDDsAd2olSsB8IN8CakDewYXFrSy4g60ist-bMRaG_YXyN8n6CiGJ3iOFQ&amp;t=AQLKrX4CbJzefg3iXTc" target="_blank" rel="noopener">Abrir ▸</a></td></tr>
+        <tr><td>9</td><td>ADE03 - Quiz Rápido</td><td>Estático (imagem)</td><td>R$ 1,68</td><td>233</td><td>1</td><td>1</td><td>0</td><td>0,43%</td><td>—</td><td><span class="badge pausar">PAUSAR</span></td><td><a class="linkcell" href="https://business.facebook.com/ads/api/preview_iframe.php?d=AQLJObdP4gbUoLrsurfAN4EwgD-vvcZ-S0kkaiQC5lANeCphD-H5aBOLZZ85i2czFEZDa8dlyHfMIV1WD3TBjSPbKBMbuvLpaFCOpu26hg06vzU_LGGiGI1i1UqLbpPAR0YVX2wO0dI0jFFv5EAeIChimV7-7pGLiAljnq4RfcjHDxKbPylHuJy7cdX5wYmjGnD22QwMKQqOq8MqZ2q3oYeNY6U7iQUo5-dSUhXV_JmYjg&amp;t=AQLn4TPWM5jZacM0EW0" target="_blank" rel="noopener">Abrir ▸</a></td></tr>
+      </tbody>
+    </table>
+    <div class="info-box">Tabela agrega o mesmo criativo quando repetido em mais de um conjunto/campanha (ex.: ADV02 aparece na campanha nova e na Quente). Nomenclatura: ADV = anúncio em vídeo, CAR = carrossel, ADE = anúncio estático (imagem única). Os links abrem o preview oficial do Meta Ads (requer acesso ao Business Manager da conta).</div>
+  </div>
+
+  <!-- ABA PÚBLICOS -->
+  <div class="tab-panel" id="publicos">
+    <table>
+      <thead><tr><th>#</th><th>Segmento</th><th>Tipo</th><th>Invest.</th><th>Leads</th><th>CPL</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>SP — Capital/Região (2 campanhas)</td><td>Frio</td><td>R$ 617,59</td><td>27</td><td>R$ 22,87</td><td><span class="badge escalar">ESCALAR</span></td></tr>
+        <tr><td>2</td><td>Quente — Engajamento (nova)</td><td>Quente</td><td>R$ 62,56</td><td>3</td><td>R$ 20,85</td><td><span class="badge avaliar">AVALIAR (1 dia no ar)</span></td></tr>
+        <tr><td>3</td><td>Fora do Estado</td><td>Frio</td><td>R$ 172,34</td><td>0</td><td>—</td><td><span class="badge pausar">PAUSADA</span></td></tr>
+      </tbody>
+    </table>
+    <div class="info-box">A camada quente (engajamento) que recomendamos ativar já está no ar desde 27/07, com CPL melhor que o público frio de SP nos primeiros resultados.</div>
+  </div>
+
+  <!-- ABA DETALHAMENTO -->
+  <div class="tab-panel" id="detalhe">
+    <div class="info-box">Dados por campanha, puxados ao vivo da API do Meta Ads (Marketing API) em 28/07/2026 — período 01/07 a 28/07/2026.</div>
+    <table>
+      <thead><tr><th>Campanha</th><th>Status</th><th>Alcance</th><th>Freq.</th><th>Orçamento diário</th><th>Início</th><th>Valor usado</th><th>Impressões</th><th>CPM</th><th>Cliques (link)</th><th>CPC (link)</th><th>CTR (link)</th><th>PV</th></tr></thead>
+      <tbody>
+        <tr><td>SP AGO26 (nova - 230726)</td><td>Ativa</td><td>3.139</td><td>2,11</td><td>R$ 47,00</td><td>23/07</td><td>R$ 247,32</td><td>6.616</td><td>R$ 37,38</td><td>92</td><td>R$ 2,69</td><td>1,39%</td><td>85</td></tr>
+        <tr><td>Quente (270726)</td><td>Ativa</td><td>832</td><td>1,78</td><td>R$ 47,00</td><td>27/07</td><td>R$ 62,56</td><td>1.477</td><td>R$ 42,36</td><td>18</td><td>R$ 3,48</td><td>1,22%</td><td>15</td></tr>
+        <tr><td>SP AGO26 (original)</td><td>Pausada</td><td>3.338</td><td>2,04</td><td>R$ 47,00</td><td>14/07</td><td>R$ 370,27</td><td>6.797</td><td>R$ 54,48</td><td>91</td><td>R$ 4,07</td><td>1,34%</td><td>80</td></tr>
+        <tr><td>Fora do Estado</td><td>Pausada</td><td>1.899</td><td>1,79</td><td>R$ 37,00</td><td>16/07</td><td>R$ 172,34</td><td>3.400</td><td>R$ 50,69</td><td>22</td><td>R$ 7,83</td><td>0,65%</td><td>19</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+  document.querySelectorAll('.tab-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  const ctx = document.getElementById('chartLeads').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['SP (original)','SP (nova)','Fora do Estado','Quente (novo)'],
+      datasets: [
+        { label:'Investimento (R$)', data:[370.27,247.32,172.34,62.56], backgroundColor:'#ff6b35', yAxisID:'y' },
+        { label:'Leads', data:[10,17,0,3], type:'line', borderColor:'#00c853', backgroundColor:'#00c853', yAxisID:'y1', tension:.3, pointRadius:6 }
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      scales:{
+        y:{ position:'left', ticks:{color:'#9a9ab0'}, grid:{color:'#262640'} },
+        y1:{ position:'right', ticks:{color:'#9a9ab0'}, grid:{drawOnChartArea:false} },
+        x:{ ticks:{color:'#9a9ab0'}, grid:{display:false} }
+      },
+      plugins:{ legend:{ labels:{ color:'#fff' } } }
+    }
+  });
+</script>
+
+</body>
+</html>
