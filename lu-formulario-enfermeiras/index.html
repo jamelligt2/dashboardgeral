@@ -63,6 +63,11 @@
   .chart-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;margin-top:20px;}
   .note{color:var(--dim);font-size:12px;margin:6px 0 18px;}
   .table-wrap{overflow-x:auto;}
+  .leads-summary-bar{background:#16213e;color:var(--dim);font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:16px 18px;border-radius:10px;margin-bottom:22px;border:1px solid var(--border);}
+  .leads-day-group{margin-bottom:26px;}
+  .leads-day-header{display:flex;align-items:baseline;gap:10px;padding:6px 2px 10px;}
+  .leads-day-header .day-date{color:var(--orange);font-weight:800;font-size:16px;}
+  .leads-day-header .day-count{color:var(--dim);font-size:13px;}
 </style>
 </head>
 <body>
@@ -109,7 +114,7 @@
   <!-- CRIATIVOS -->
   <div class="tab-pane" id="tab-criativos">
     <h2 class="section-title">Criativos — ranqueados por Custo por Lead (CPL)</h2>
-    <p class="note">Leads = coluna "Action Leads" do Meta Ads. Criativos com investimento baixo (&lt; R$15) entram como AVALIAR por volume insuficiente para conclusão. Os criativos da campanha "[JGT] [FORMULÁRIO] FORM001" aparecem como PAUSADO — pausados manualmente pelo gestor, independente da performance.</p>
+    <p class="note">Leads = coluna "Action Leads" do Meta Ads.</p>
     <div class="table-wrap"><table id="creativeTable"></table></div>
   </div>
 
@@ -127,10 +132,8 @@
 
   <!-- LEADS -->
   <div class="tab-pane" id="tab-leads">
-    <div class="kpi-row" style="grid-template-columns:repeat(2,1fr);" id="leadsKpiRow"></div>
-    <h2 class="section-title">Leads captados — nome e data de cadastro</h2>
-    <p class="note">Lista de nomes vem da aba "Leads" da planilha (cadastro real, com WhatsApp). O total de "Leads reportados no Meta Ads" acima vem da coluna "Action Leads" da aba Meta_Ads e bate exatamente com os cadastros aqui (65 = 65, inclusive dia a dia).</p>
-    <div class="table-wrap"><table id="leadsTable"></table></div>
+    <div class="leads-summary-bar" id="leadsSummaryBar"></div>
+    <div id="leadsGrouped"></div>
   </div>
 
 </div>
@@ -512,26 +515,10 @@ const creativeArr = Object.values(creativeMap).map(v=>({
   return a.cpl-b.cpl;
 });
 
-// Campanhas pausadas manualmente pelo gestor (independente de performance)
-const pausedCampaigns = ['[JGT] [FORMULÁRIO] FORM001'];
-
-function statusForCPL(v, arr){
-  if(v.campaign && pausedCampaigns.includes(v.campaign)) return {label:'PAUSADO', cls:'pausar'};
-  const withCPL = arr.filter(x=>x.cpl!==null);
-  const cpls = withCPL.map(x=>x.cpl).sort((a,b)=>a-b);
-  const median = cpls[Math.floor(cpls.length/2)];
-  if(v.cpl===null) return {label:'PAUSAR', cls:'pausar'};
-  if(v.spend < 15) return {label:'AVALIAR', cls:'avaliar'};
-  if(v.cpl <= median*0.85) return {label:'ESCALAR', cls:'escalar'};
-  if(v.cpl <= median*1.15) return {label:'MANTER', cls:'manter'};
-  return {label:'PAUSAR', cls:'pausar'};
-}
-
-let creativeHTML = `<thead><tr><th>#</th><th>Criativo</th><th>Campanha</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Leads</th><th>CPL</th><th>Link</th><th>Status</th></tr></thead><tbody>`;
+let creativeHTML = `<thead><tr><th>#</th><th>Criativo</th><th>Campanha</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Leads</th><th>CPL</th><th>Link</th></tr></thead><tbody>`;
 creativeArr.forEach((v,i)=>{
-  const st = statusForCPL(v, creativeArr);
   const shortLink = v.link.split('/p/')[1] || v.link;
-  creativeHTML += `<tr><td>${i+1}</td><td>${v.ad}</td><td>${v.campaign.length>34?v.campaign.slice(0,34)+'…':v.campaign}</td><td>${fmtBRL(v.spend)}</td><td>${fmtInt(v.impr)}</td><td>${fmtInt(v.clicks)}</td><td>${fmtPct(v.ctr)}</td><td>${fmtBRL(v.cpc)}</td><td>${v.leads}</td><td>${v.cpl?fmtBRL(v.cpl):'—'}</td><td><a class="ad-link" href="${v.link}" target="_blank">${shortLink}</a></td><td><span class="badge ${st.cls}">${st.label}</span></td></tr>`;
+  creativeHTML += `<tr><td>${i+1}</td><td>${v.ad}</td><td>${v.campaign.length>34?v.campaign.slice(0,34)+'…':v.campaign}</td><td>${fmtBRL(v.spend)}</td><td>${fmtInt(v.impr)}</td><td>${fmtInt(v.clicks)}</td><td>${fmtPct(v.ctr)}</td><td>${fmtBRL(v.cpc)}</td><td>${v.leads}</td><td>${v.cpl?fmtBRL(v.cpl):'—'}</td><td><a class="ad-link" href="${v.link}" target="_blank">${shortLink}</a></td></tr>`;
 });
 creativeHTML += `</tbody>`;
 document.getElementById('creativeTable').innerHTML = creativeHTML;
@@ -553,12 +540,9 @@ const adsetArr = Object.entries(adsetMap).map(([name,v])=>({
   return a.cpl-b.cpl;
 });
 
-let audHTML = `<thead><tr><th>#</th><th>Conjunto</th><th>Temperatura</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Leads</th><th>CPL</th><th>Status</th></tr></thead><tbody>`;
+let audHTML = `<thead><tr><th>#</th><th>Conjunto</th><th>Temperatura</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Leads</th><th>CPL</th></tr></thead><tbody>`;
 adsetArr.forEach((v,i)=>{
-  let st;
-  if(v.clicks===0) st = {label:'SEM DADOS', cls:'pausar'};
-  else st = statusForCPL(v, adsetArr.filter(x=>x.clicks>0));
-  audHTML += `<tr><td>${i+1}</td><td>${v.name.replace('00 - ','')}</td><td>${v.temp}</td><td>${fmtBRL(v.spend)}</td><td>${fmtInt(v.impr)}</td><td>${fmtInt(v.clicks)}</td><td>${fmtPct(v.ctr)}</td><td>${fmtBRL(v.cpc)}</td><td>${v.leads}</td><td>${v.cpl?fmtBRL(v.cpl):'—'}</td><td><span class="badge ${st.cls}">${st.label}</span></td></tr>`;
+  audHTML += `<tr><td>${i+1}</td><td>${v.name.replace('00 - ','')}</td><td>${v.temp}</td><td>${fmtBRL(v.spend)}</td><td>${fmtInt(v.impr)}</td><td>${fmtInt(v.clicks)}</td><td>${fmtPct(v.ctr)}</td><td>${fmtBRL(v.cpc)}</td><td>${v.leads}</td><td>${v.cpl?fmtBRL(v.cpl):'—'}</td></tr>`;
 });
 audHTML += `</tbody>`;
 document.getElementById('audienceTable').innerHTML = audHTML;
@@ -573,20 +557,53 @@ detailHTML += `</tbody>`;
 document.getElementById('detailTable').innerHTML = detailHTML;
 
 // ================= LEADS =================
-document.getElementById('leadsKpiRow').innerHTML = `
-  <div class="kpi-card"><div class="label">Cadastros na aba Leads</div><div class="value">${totalLeadsCRM}</div><div class="sub">13/07 a 30/07/2026 · nomes reais</div></div>
-  <div class="kpi-card"><div class="label">Leads reportados no Meta Ads</div><div class="value">${totalLeadsMeta}</div><div class="sub">CPL: ${fmtBRL(cplAvg)} (Invest. total ÷ leads Meta)</div></div>
-`;
-let leadsHTML = `<thead><tr><th>#</th><th>Data de Cadastro</th><th>Nome do Lead</th><th>WhatsApp</th></tr></thead><tbody>`;
-[...leadsRows].sort((a,b)=>{
+function formatPhoneBR(raw){
+  const digits = String(raw).replace(/\D/g,'');
+  let country, rest;
+  if(digits.startsWith('55') && (digits.length===12 || digits.length===13)){
+    country = '55'; rest = digits.slice(2);
+  } else if(digits.length===10 || digits.length===11){
+    country = '55'; rest = digits;
+  } else {
+    return '+'+digits;
+  }
+  const area = rest.slice(0,2);
+  const local = rest.slice(2);
+  let localFmt = local;
+  if(local.length===9) localFmt = local.slice(0,5)+'-'+local.slice(5);
+  else if(local.length===8) localFmt = local.slice(0,4)+'-'+local.slice(4);
+  return `+${country} ${area} ${localFmt}`;
+}
+
+const leadsSorted = [...leadsRows].sort((a,b)=>{
   const da = a[0].split(' ')[0].split('/').reverse().join('')+a[0].split(' ')[1];
   const db = b[0].split(' ')[0].split('/').reverse().join('')+b[0].split(' ')[1];
   return da.localeCompare(db);
-}).forEach((r,i)=>{
-  leadsHTML += `<tr><td>${i+1}</td><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`;
 });
-leadsHTML += `</tbody>`;
-document.getElementById('leadsTable').innerHTML = leadsHTML;
+
+document.getElementById('leadsSummaryBar').textContent =
+  `Resumo de leads cadastrados (${totalLeadsCRM} leads · horário de Brasília)`;
+
+const leadsByDayGroup = {};
+leadsSorted.forEach(r=>{
+  const day = r[0].split(' ')[0];
+  leadsByDayGroup[day] = leadsByDayGroup[day] || [];
+  leadsByDayGroup[day].push(r);
+});
+const leadDays = Object.keys(leadsByDayGroup).sort((a,b)=>dateToKey(a).localeCompare(dateToKey(b)));
+
+let groupedHTML = '';
+leadDays.forEach(day=>{
+  const rows = leadsByDayGroup[day];
+  groupedHTML += `<div class="leads-day-group">
+    <div class="leads-day-header"><span class="day-date">${day}</span><span class="day-count">${rows.length} lead${rows.length>1?'s':''}</span></div>
+    <div class="table-wrap"><table><thead><tr><th>Data de Cadastro</th><th>Nome do Lead</th><th>Telefone / WhatsApp</th></tr></thead><tbody>`;
+  rows.forEach(r=>{
+    groupedHTML += `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${formatPhoneBR(r[2])}</td></tr>`;
+  });
+  groupedHTML += `</tbody></table></div></div>`;
+});
+document.getElementById('leadsGrouped').innerHTML = groupedHTML;
 
 // ================= TABS =================
 document.querySelectorAll('.tab-btn').forEach(btn=>{
