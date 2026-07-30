@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard Captação — Luciana Enfermeiras</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%231a1a2e'/%3E%3Ctext x='50' y='62' font-size='34' font-family='Arial' font-weight='bold' fill='%23ff6b35' text-anchor='middle'%3EJGT%3C/text%3E%3C/svg%3E">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0f0f1a; --card:#1e1e35; --border:#262640;
+    --orange:#ff6b35; --green:#00c853; --red:#ff1744; --yellow:#ffd600; --blue:#42a5f5;
+    --text:#ffffff; --dim:#9a9ab0;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Segoe UI',Arial,sans-serif;}
+  .header{display:flex;align-items:center;gap:18px;background:#16213e;border-bottom:2px solid var(--orange);padding:16px 28px;}
+  .logo-badge{background:linear-gradient(135deg,#ff6b35,#e04e1c);border-radius:10px;width:52px;height:52px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;letter-spacing:1px;}
+  .header-divider{width:1px;height:40px;background:var(--border);}
+  .header-text h1{margin:0;font-size:19px;letter-spacing:.5px;}
+  .header-text p{margin:2px 0 0;color:var(--dim);font-size:13px;}
+  .tabs{display:flex;gap:4px;background:#16213e;padding:0 24px;border-bottom:1px solid var(--border);overflow-x:auto;}
+  .tab-btn{background:none;border:none;color:var(--dim);padding:14px 18px;font-size:14px;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;}
+  .tab-btn.active{color:var(--orange);border-bottom:3px solid var(--orange);}
+  .content{padding:24px 28px 60px;max-width:1400px;margin:0 auto;}
+  .tab-pane{display:none;}
+  .tab-pane.active{display:block;}
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:26px;}
+  .kpi-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px 20px;}
+  .kpi-card .label{color:var(--dim);font-size:12.5px;text-transform:uppercase;letter-spacing:.5px;}
+  .kpi-card .value{font-size:28px;font-weight:800;margin-top:6px;color:var(--orange);}
+  .kpi-card .sub{color:var(--dim);font-size:12px;margin-top:4px;}
+  h2.section-title{font-size:16px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);margin:32px 0 14px;border-left:3px solid var(--orange);padding-left:10px;}
+  .temp-row{display:grid;grid-template-columns:1fr 1fr 0.85fr;gap:16px;margin-bottom:10px;}
+  .temp-card{border-radius:12px;padding:18px 20px;border:1.5px solid;}
+  .temp-card.quente{border-color:var(--red);background:#2a0a0a;}
+  .temp-card.frio{border-color:var(--blue);background:#061428;}
+  .temp-card h3{margin:0 0 12px;font-size:15px;}
+  .temp-card .metrics{display:flex;gap:22px;margin-bottom:10px;}
+  .temp-card .metrics div .m-label{color:var(--dim);font-size:11.5px;text-transform:uppercase;}
+  .temp-card .metrics div .m-value{font-size:20px;font-weight:800;}
+  .temp-card .detail{font-size:12.5px;color:var(--dim);border-top:1px solid rgba(255,255,255,.08);padding-top:8px;}
+  .compare-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px 20px;display:flex;flex-direction:column;justify-content:center;gap:14px;}
+  .compare-card .c-label{color:var(--dim);font-size:11.5px;text-transform:uppercase;}
+  .compare-card .c-value{font-size:22px;font-weight:800;}
+  .funnel-flex{display:flex;gap:20px;align-items:stretch;}
+  .funnel-svg-wrap{flex:0 0 52%;max-width:52%;}
+  .funnel-metrics-row{flex:1;display:flex;flex-direction:column;gap:12px;}
+  .metric-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;flex:1;display:flex;flex-direction:column;justify-content:center;position:relative;overflow:hidden;}
+  .metric-card .m-label{color:var(--dim);font-size:12px;text-transform:uppercase;}
+  .metric-card .m-value{font-size:26px;font-weight:800;margin-top:6px;}
+  .metric-card .bar{position:absolute;left:0;right:0;bottom:0;height:3px;border-radius:0 0 12px 12px;}
+  table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:13px;}
+  thead th{background:#16213e;color:var(--dim);text-transform:uppercase;font-size:11px;padding:10px 12px;text-align:left;letter-spacing:.4px;}
+  tbody td{padding:10px 12px;border-top:1px solid var(--border);}
+  tbody tr.total-row{background:#2a1a0e;font-weight:700;}
+  .badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;display:inline-block;}
+  .badge.escalar{background:rgba(0,200,83,.18);color:var(--green);}
+  .badge.manter{background:rgba(255,107,53,.18);color:var(--orange);}
+  .badge.avaliar{background:rgba(255,214,0,.18);color:var(--yellow);}
+  .badge.pausar{background:rgba(255,23,68,.18);color:var(--red);}
+  a.ad-link{color:var(--blue);text-decoration:none;}
+  a.ad-link:hover{text-decoration:underline;}
+  .chart-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;margin-top:20px;}
+  .note{color:var(--dim);font-size:12px;margin:6px 0 18px;}
+  .table-wrap{overflow-x:auto;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo-badge">JGT</div>
+  <div class="header-divider"></div>
+  <div class="header-text">
+    <h1>DASHBOARD CAPTAÇÃO — FORMULARIO ENFERMEIRAS · PERFIL LUCIANA</h1>
+    <p id="headerSubtitle">D49 · Luciana Pessoal Qualitty</p>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="geral">Visão Geral</button>
+  <button class="tab-btn" data-tab="criativos">Criativos</button>
+  <button class="tab-btn" data-tab="publicos">Públicos</button>
+  <button class="tab-btn" data-tab="diaria">Análise Diária</button>
+  <button class="tab-btn" data-tab="leads">Leads</button>
+</div>
+
+<div class="content">
+
+  <!-- VISÃO GERAL -->
+  <div class="tab-pane active" id="tab-geral">
+    <div class="kpi-row" id="kpiRow"></div>
+
+    <h2 class="section-title">Público Quente vs Público Frio</h2>
+    <div class="temp-row" id="tempRow"></div>
+    <p class="note">CPL calculado com a coluna "Action Leads" do Meta Ads (atribuída por linha/criativo). O total bate exatamente com os cadastros da aba Leads (65 = 65) e também dia a dia.</p>
+
+    <h2 class="section-title">Funil de Conversão</h2>
+    <div class="funnel-flex">
+      <div class="funnel-svg-wrap" id="funnelWrap"></div>
+      <div class="funnel-metrics-row" id="funnelMetrics"></div>
+    </div>
+    <p class="note">A planilha ainda não preenche a coluna "Action Landing Page View" — o funil mostra Impressões → Cliques → Leads (Meta Ads). A coluna "Action Leads" é a mesma usada no cálculo de CPL por criativo/conjunto.</p>
+
+    <h2 class="section-title">Evolução Diária</h2>
+    <div class="table-wrap"><table id="dailyTable"></table></div>
+    <div class="chart-wrap"><canvas id="dailyChart" height="90"></canvas></div>
+  </div>
+
+  <!-- CRIATIVOS -->
+  <div class="tab-pane" id="tab-criativos">
+    <h2 class="section-title">Criativos — ranqueados por Custo por Lead (CPL)</h2>
+    <p class="note">Leads = coluna "Action Leads" do Meta Ads. Criativos com investimento baixo (&lt; R$15) entram como AVALIAR por volume insuficiente para conclusão. Os criativos da campanha "[JGT] [FORMULÁRIO] FORM001" aparecem como PAUSADO — pausados manualmente pelo gestor, independente da performance.</p>
+    <div class="table-wrap"><table id="creativeTable"></table></div>
+  </div>
+
+  <!-- PÚBLICOS -->
+  <div class="tab-pane" id="tab-publicos">
+    <h2 class="section-title">Públicos / Conjuntos — ranqueados por CPL</h2>
+    <div class="table-wrap"><table id="audienceTable"></table></div>
+  </div>
+
+  <!-- ANÁLISE DIÁRIA -->
+  <div class="tab-pane" id="tab-diaria">
+    <h2 class="section-title">Detalhe por Dia e Conjunto</h2>
+    <div class="table-wrap"><table id="detailTable"></table></div>
+  </div>
+
+  <!-- LEADS -->
+  <div class="tab-pane" id="tab-leads">
+    <div class="kpi-row" style="grid-template-columns:repeat(2,1fr);" id="leadsKpiRow"></div>
+    <h2 class="section-title">Leads captados — nome e data de cadastro</h2>
+    <p class="note">Lista de nomes vem da aba "Leads" da planilha (cadastro real, com WhatsApp). O total de "Leads reportados no Meta Ads" acima vem da coluna "Action Leads" da aba Meta_Ads e bate exatamente com os cadastros aqui (65 = 65, inclusive dia a dia).</p>
+    <div class="table-wrap"><table id="leadsTable"></table></div>
+  </div>
+
+</div>
+
+<script>
+// ================= RAW DATA =================
+// Meta Ads — todas as linhas reais do período com dados (13/07 a 30/07/2026)
+// cols: [date, campaign, adset, ad, link, spend, clicks, reach, impressions, leadsMeta]
+const metaRows = [
+["13/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Engajamento 365D","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,48",0,31,33,0],
+["13/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Engajamento 365D","FORMS-ADV02","https://www.instagram.com/p/DavUnYSgD96/","R$ 2,54",1,110,115,1],
+["13/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Nurse","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 1,86",1,106,107,0],
+["13/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Nurse","FORMS-ADV02","https://www.instagram.com/p/DavUmY_gmvC/","R$ 1,32",2,60,62,2],
+["13/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Profissionais de saude","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 2,02",0,81,82,0],
+["13/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Profissionais de saude","FORMS-ADV02","https://www.instagram.com/p/DavUl05gA4h/","R$ 1,34",0,47,47,0],
+["13/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Profissões","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,92",0,36,37,0],
+["13/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Profissões","FORMS-ADV02","https://www.instagram.com/p/DavUmY_gmvC/","R$ 0,38",0,9,9,0],
+["14/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Engajamento 365D","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,47",0,15,15,0],
+["14/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Engajamento 365D","FORMS-ADV02","https://www.instagram.com/p/DavUnYSgD96/","R$ 5,18",1,248,253,0],
+["14/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Nurse","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,76",1,37,37,0],
+["14/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Nurse","FORMS-ADV02","https://www.instagram.com/p/DavUmY_gmvC/","R$ 5,56",4,233,239,0],
+["14/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Profissionais de saude","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,50",1,25,25,0],
+["14/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Profissionais de saude","FORMS-ADV02","https://www.instagram.com/p/DavUl05gA4h/","R$ 5,57",0,248,255,0],
+["15/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Engajamento 365D","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,38",1,9,9,0],
+["15/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Engajamento 365D","FORMS-ADV02","https://www.instagram.com/p/DavUnYSgD96/","R$ 5,26",1,232,237,0],
+["15/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Nurse","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,26",0,10,11,0],
+["15/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Nurse","FORMS-ADV02","https://www.instagram.com/p/DavUmY_gmvC/","R$ 5,50",5,276,278,0],
+["15/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Profissionais de saude","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,10",0,4,4,0],
+["15/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Profissionais de saude","FORMS-ADV02","https://www.instagram.com/p/DavUl05gA4h/","R$ 6,08",4,213,217,3],
+["16/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Engajamento 365D","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,01",0,2,2,0],
+["16/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Engajamento 365D","FORMS-ADV02","https://www.instagram.com/p/DavUnYSgD96/","R$ 6,26",3,235,243,2],
+["16/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Nurse","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,68",0,21,21,0],
+["16/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Nurse","FORMS-ADV02","https://www.instagram.com/p/DavUmY_gmvC/","R$ 5,88",5,272,274,1],
+["16/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Profissionais de saude","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,32",0,8,8,0],
+["16/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Profissionais de saude","FORMS-ADV02","https://www.instagram.com/p/DavUl05gA4h/","R$ 6,83",7,286,286,1],
+["17/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Engajamento 365D","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,15",0,4,4,0],
+["17/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Engajamento 365D","FORMS-ADV02","https://www.instagram.com/p/DavUnYSgD96/","R$ 6,19",4,214,218,0],
+["17/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Nurse","FORMS-ADV02","https://www.instagram.com/p/DavUmY_gmvC/","R$ 7,10",7,322,342,2],
+["17/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Profissionais de saude","FORMS-ADV02","https://www.instagram.com/p/DavUl05gA4h/","R$ 7,27",4,277,282,2],
+["18/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Engajamento 365D","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,02",0,3,3,0],
+["18/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Engajamento 365D","FORMS-ADV02","https://www.instagram.com/p/DavUnYSgD96/","R$ 6,03",1,216,229,0],
+["18/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Nurse","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,10",0,4,4,0],
+["18/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Nurse","FORMS-ADV02","https://www.instagram.com/p/DavUmY_gmvC/","R$ 11,74",5,509,526,2],
+["18/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Profissionais de saude","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,01",0,2,2,0],
+["18/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Profissionais de saude","FORMS-ADV02","https://www.instagram.com/p/DavUl05gA4h/","R$ 8,22",7,299,306,1],
+["19/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Engajamento 365D","FORMS-ADV02","https://www.instagram.com/p/DavUnYSgD96/","R$ 6,68",3,233,244,0],
+["19/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Nurse","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,85",0,26,26,0],
+["19/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Nurse","FORMS-ADV02","https://www.instagram.com/p/DavUmY_gmvC/","R$ 7,05",13,269,279,1],
+["19/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Profissionais de saude","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,18",0,4,4,0],
+["19/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Profissionais de saude","FORMS-ADV02","https://www.instagram.com/p/DavUl05gA4h/","R$ 6,09",1,224,229,0],
+["20/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Engajamento 365D","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,57",0,15,15,0],
+["20/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Engajamento 365D","FORMS-ADV02","https://www.instagram.com/p/DavUnYSgD96/","R$ 6,50",6,180,188,2],
+["20/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Nurse","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,00",0,1,1,0],
+["20/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Nurse","FORMS-ADV02","https://www.instagram.com/p/DavUmY_gmvC/","R$ 8,56",5,340,354,1],
+["20/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Profissionais de saude","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,23",0,13,13,0],
+["20/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Profissionais de saude","FORMS-ADV02","https://www.instagram.com/p/DavUl05gA4h/","R$ 7,90",3,280,285,1],
+["21/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Engajamento 365D","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,19",0,6,6,0],
+["21/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Engajamento 365D","FORMS-ADV02","https://www.instagram.com/p/DavUnYSgD96/","R$ 6,66",1,213,220,0],
+["21/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Nurse","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,04",0,1,1,0],
+["21/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Nurse","FORMS-ADV02","https://www.instagram.com/p/DavUmY_gmvC/","R$ 8,31",5,322,335,2],
+["21/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Profissionais de saude","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,50",0,22,23,0],
+["21/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Profissionais de saude","FORMS-ADV02","https://www.instagram.com/p/DavUl05gA4h/","R$ 6,72",5,231,233,4],
+["22/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Engajamento 365D","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,30",0,18,18,0],
+["22/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Engajamento 365D","FORMS-ADV02","https://www.instagram.com/p/DavUnYSgD96/","R$ 6,25",2,215,220,1],
+["22/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Nurse","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,14",0,6,6,0],
+["22/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Nurse","FORMS-ADV02","https://www.instagram.com/p/DavUmY_gmvC/","R$ 7,56",4,271,282,1],
+["22/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Profissionais de saude","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,44",0,15,15,0],
+["22/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Profissionais de saude","FORMS-ADV02","https://www.instagram.com/p/DavUl05gA4h/","R$ 6,74",4,300,306,0],
+["23/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Engajamento 365D","FORMS-ADV02","https://www.instagram.com/p/DavUnYSgD96/","R$ 6,10",4,212,222,1],
+["23/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Nurse","FORMS-ADV02","https://www.instagram.com/p/DavUmY_gmvC/","R$ 7,78",6,316,333,2],
+["23/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Profissionais de saude","FORMS-ADV02","https://www.instagram.com/p/DavUl05gA4h/","R$ 6,66",6,257,263,0],
+["24/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Engajamento 365D","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 1,29",2,37,40,1],
+["24/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Engajamento 365D","FORMS-ADV02","https://www.instagram.com/p/DbL78kyALcK/","R$ 1,86",0,53,54,0],
+["24/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Nurse","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 1,20",0,38,38,0],
+["24/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Nurse","FORMS-ADV02","https://www.instagram.com/p/DbL78kyALcK/","R$ 1,91",1,56,57,0],
+["24/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Profissionais de saude","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 1,65",0,49,50,0],
+["24/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Profissionais de saude","FORMS-ADV02","https://www.instagram.com/p/DbL78kyALcK/","R$ 2,06",2,60,61,1],
+["24/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Engajamento 365D","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,24",0,5,5,0],
+["24/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Engajamento 365D","FORMS-ADV02","https://www.instagram.com/p/DavUnYSgD96/","R$ 2,59",2,85,87,1],
+["24/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Nurse","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,22",0,9,9,0],
+["24/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Nurse","FORMS-ADV02","https://www.instagram.com/p/DavUmY_gmvC/","R$ 2,89",0,81,81,0],
+["24/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Profissionais de saude","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 1,03",0,16,16,0],
+["24/07/2026","[JGT] [FORMULÁRIO] FORM001","00 - Profissionais de saude","FORMS-ADV02","https://www.instagram.com/p/DavUl05gA4h/","R$ 2,96",3,100,100,0],
+["25/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Engajamento 365D","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,72",0,16,17,0],
+["25/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Engajamento 365D","FORMS-ADV02","https://www.instagram.com/p/DbL78kyALcK/","R$ 5,43",8,158,162,2],
+["25/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Nurse","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,16",0,7,7,0],
+["25/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Nurse","FORMS-ADV02","https://www.instagram.com/p/DbL78kyALcK/","R$ 6,01",6,192,201,3],
+["25/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Profissionais de saude","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,10",0,9,10,0],
+["25/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Profissionais de saude","FORMS-ADV02","https://www.instagram.com/p/DbL78kyALcK/","R$ 5,41",0,210,219,0],
+["26/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Engajamento 365D","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,07",0,3,3,0],
+["26/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Engajamento 365D","FORMS-ADV02","https://www.instagram.com/p/DbL78kyALcK/","R$ 10,81",5,309,325,1],
+["26/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Nurse","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,08",0,2,2,0],
+["26/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Nurse","FORMS-ADV02","https://www.instagram.com/p/DbL78kyALcK/","R$ 10,49",8,335,345,2],
+["26/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Profissionais de saude","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,12",0,6,7,0],
+["26/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Profissionais de saude","FORMS-ADV02","https://www.instagram.com/p/DbL78kyALcK/","R$ 10,26",5,308,314,1],
+["27/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Engajamento 365D","FORMS-ADV02","https://www.instagram.com/p/DbL78kyALcK/","R$ 8,20",9,326,333,2],
+["27/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Nurse","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,00",0,1,1,0],
+["27/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Nurse","FORMS-ADV02","https://www.instagram.com/p/DbL78kyALcK/","R$ 8,89",9,344,360,2],
+["27/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Profissionais de saude","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,02",0,1,1,0],
+["27/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Profissionais de saude","FORMS-ADV02","https://www.instagram.com/p/DbL78kyALcK/","R$ 7,88",5,335,335,2],
+["28/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Engajamento 365D","FORMS-ADV02","https://www.instagram.com/p/DbL78kyALcK/","R$ 5,78",7,180,184,2],
+["28/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Nurse","FORMS-ADV02","https://www.instagram.com/p/DbL78kyALcK/","R$ 6,29",8,277,285,0],
+["28/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Profissionais de saude","FORMS-ADV02","https://www.instagram.com/p/DbL78kyALcK/","R$ 6,23",7,233,241,1],
+["29/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Engajamento 365D","FORMS-ADV01","https://www.instagram.com/p/DavUnRighcR/","R$ 0,66",0,1,1,0],
+["29/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Engajamento 365D","FORMS-ADV02","https://www.instagram.com/p/DbL78kyALcK/","R$ 7,03",9,245,251,2],
+["29/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Nurse","FORMS-ADV02","https://www.instagram.com/p/DbL78kyALcK/","R$ 7,27",6,305,306,2],
+["29/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Profissionais de saude","FORMS-ADV02","https://www.instagram.com/p/DbL78kyALcK/","R$ 6,79",11,253,253,2],
+["30/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Engajamento 365D","FORMS-ADV02","https://www.instagram.com/p/DbL78kyALcK/","R$ 2,91",5,73,75,3],
+["30/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Nurse","FORMS-ADV02","https://www.instagram.com/p/DbL78kyALcK/","R$ 2,42",3,88,90,2],
+["30/07/2026","[AC-JGT] [FORMULÁRIO] [LEAD]  FORM001 Formulário enfermeira","00 - Profissionais de saude","FORMS-ADV02","https://www.instagram.com/p/DbL78kyALcK/","R$ 3,57",1,105,107,0]
+];
+
+// Leads (aba Leads) — Data/hora (BRT), Nome, Telefone — atualizado: 65 cadastros (13/07 a 30/07/2026)
+const leadsRows = [
+["13/07/2026 18:47","Debora Cristina","5531982879073"],
+["13/07/2026 21:56","Michele Paes","5521977394560"],
+["13/07/2026 22:45","Natália Sena","553391988353"],
+["15/07/2026 00:37","Patricia de Barros","5571999814761"],
+["15/07/2026 09:36","Renata Gisfrede","5519998221015"],
+["15/07/2026 14:11","Josilene Dutra","553399363743"],
+["16/07/2026 10:27","Daniele Rodrigues Mendes Costa","5521993843440"],
+["16/07/2026 13:12","Pamela Cadelca","5534992121184"],
+["16/07/2026 20:47","Eni de Fátima Barbosa","553298545090"],
+["16/07/2026 21:48","Mery Silva","5583999221939"],
+["17/07/2026 14:41","Luciana Conceição Marinho Vieira","5522974050283"],
+["17/07/2026 19:54","Ivania Oliveira","554599115376"],
+["17/07/2026 20:34","Francisca Lima","554391821420"],
+["17/07/2026 23:42","Milena Pinheiro","5516997048681"],
+["18/07/2026 02:04","Elisandra duarte dos Santos","3198358293"],
+["18/07/2026 08:04","Katia Mena Barreto","5543999736081"],
+["18/07/2026 19:59","Fabiana Garcia Dos Santos","5541995903897"],
+["19/07/2026 11:31","Joselia Maria Lopes da Silva","5511948580503"],
+["20/07/2026 08:34","Cleide Marques","5585987409066"],
+["20/07/2026 10:05","Enf Marcia Maria","5511963997136"],
+["20/07/2026 12:21","Teresinha Fernandes","553598471448"],
+["20/07/2026 22:11","Soraya de Fátima Alves Andrade","5561992008712"],
+["21/07/2026 08:17","Kelle Cristina","553399699080"],
+["21/07/2026 08:58","Cleide Cristiane Romualdo Massocatto","5519992221061"],
+["21/07/2026 11:33","Priscila Trajano","5581998596331"],
+["21/07/2026 15:15","Iranete","5561998022905"],
+["21/07/2026 18:31","Ilione Lassen","555567931580"],
+["21/07/2026 22:01","Priscila Ranielle","5584996101109"],
+["22/07/2026 00:49","Luzilene Costa Pereira","5598986082641"],
+["22/07/2026 23:40","Débora Regina Garcia","5511939066569"],
+["23/07/2026 19:48","Ana Lígia Machado Ramos","5555997133795"],
+["23/07/2026 21:16","Marlene Ciliato","5544991268300"],
+["23/07/2026 21:51","Jéssica Falcão","5521988481243"],
+["24/07/2026 00:29","Adernes Gonçalves","5531988645952"],
+["24/07/2026 21:15","Maristela Berlitz","5521998694630"],
+["24/07/2026 21:18","Sheila Eugenia","5531989040539"],
+["25/07/2026 12:07","Dériga Alves","554191310130"],
+["25/07/2026 14:44","Ana Carolina Primolan","43991082800"],
+["25/07/2026 14:46","Fabiana Rodrigues","5511974944754"],
+["25/07/2026 16:04","Juliana da Silva Marins","5521991207370"],
+["25/07/2026 23:32","Jaina Braga","5538999638350"],
+["26/07/2026 00:45","Maria Alves","5537991145686"],
+["26/07/2026 01:15","Rejane Ceres Michielin","5555997214241"],
+["26/07/2026 15:20","Arianne Carolina","5531999787961"],
+["26/07/2026 22:00","Nívea Higino","5579996510865"],
+["27/07/2026 08:13","Jennefer Rafaela/ Enfermeira","5542998291232"],
+["27/07/2026 09:43","Edianny Passos Medeiros","556299141921"],
+["27/07/2026 12:59","Kátia Santos","5521974575278"],
+["27/07/2026 13:37","Maria Joaquina","5583998322225"],
+["27/07/2026 15:08","Nathalia Alves","558591270025"],
+["27/07/2026 20:37","Soraia de Araújo Amaral","5537999863700"],
+["28/07/2026 11:09","Fabrícia Maia","5574981017705"],
+["28/07/2026 20:22","Gisele da Silva Duarte","5531994702733"],
+["28/07/2026 21:22","Carla Rodrigues de Resende","32984270489"],
+["29/07/2026 08:50","Priscila Peres Castro","555599157973"],
+["29/07/2026 10:20","Patricia Zeferino Siqueira","5527996126492"],
+["29/07/2026 14:34","Enf. Alice Jordanea","5516996483602"],
+["29/07/2026 18:05","Thifane Maria Lima","5524988482445"],
+["29/07/2026 19:02","Cassia Costa","5521981634795"],
+["29/07/2026 21:32","Andrea Cristina Magalhães pessoa","5596981423180"],
+["30/07/2026 03:45","Elisangela Soares","5522988412596"],
+["30/07/2026 08:17","Lauren Rodrigues","5543991471148"],
+["30/07/2026 08:56","Adriana Gimenez Garcia","5547997244653"],
+["30/07/2026 13:25","Rita Moreira","5585986276128"],
+["30/07/2026 13:37","Juquintino Sarmento","5538991463823"]
+];
+
+// ================= HELPERS =================
+function parseBR(str){
+  return parseFloat(String(str).replace('R$','').trim().replace(/\./g,'').replace(',', '.')) || 0;
+}
+function fmtBRL(n){
+  return 'R$ ' + n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function fmtPct(n){ return n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%'; }
+function fmtInt(n){ return n.toLocaleString('pt-BR'); }
+function dateToKey(d){ // dd/mm/yyyy -> sortable
+  const [dd,mm,yyyy] = d.split('/'); return yyyy+mm+dd;
+}
+
+const data = metaRows.map(r => ({
+  date:r[0], campaign:r[1], adset:r[2], ad:r[3], link:r[4],
+  spend:parseBR(r[5]), clicks:r[6], reach:r[7], impr:r[8], leads:r[9]
+}));
+
+// ================= TOTALS =================
+const totalSpend = data.reduce((a,r)=>a+r.spend,0);
+const totalClicks = data.reduce((a,r)=>a+r.clicks,0);
+const totalImpr = data.reduce((a,r)=>a+r.impr,0);
+const totalReach = data.reduce((a,r)=>a+r.reach,0);
+const totalLeadsMeta = data.reduce((a,r)=>a+r.leads,0); // "Action Leads" reportado pelo Meta por anúncio
+const totalLeadsCRM = leadsRows.length; // nomes cadastrados na aba Leads
+const ctrAvg = totalClicks/totalImpr*100;
+const cpmAvg = totalSpend/totalImpr*1000;
+const cplAvg = totalSpend/totalLeadsMeta;
+const cpcAvg = totalSpend/totalClicks;
+
+document.getElementById('headerSubtitle').textContent =
+  'D49 · Luciana Pessoal Qualitty · Período com investimento: 13/07 – 30/07/2026';
+
+// KPI cards
+document.getElementById('kpiRow').innerHTML = `
+  <div class="kpi-card"><div class="label">Investimento Total</div><div class="value">${fmtBRL(totalSpend)}</div></div>
+  <div class="kpi-card"><div class="label">CTR Médio</div><div class="value">${fmtPct(ctrAvg)}</div></div>
+  <div class="kpi-card"><div class="label">CPM Médio</div><div class="value">${fmtBRL(cpmAvg)}</div></div>
+  <div class="kpi-card"><div class="label">CPL Médio</div><div class="value">${fmtBRL(cplAvg)}</div><div class="sub">${totalLeadsMeta} leads (Meta Ads) — bate com os ${totalLeadsCRM} cadastros da aba Leads</div></div>
+`;
+
+// ================= QUENTE VS FRIO =================
+function bucketOf(row){ return row.adset === '00 - Engajamento 365D' ? 'quente' : 'frio'; }
+const quente = data.filter(r=>bucketOf(r)==='quente');
+const frio = data.filter(r=>bucketOf(r)==='frio');
+function sumField(arr,f){ return arr.reduce((a,r)=>a+r[f],0); }
+const qSpend=sumField(quente,'spend'), qClicks=sumField(quente,'clicks'), qImpr=sumField(quente,'impr'), qLeads=sumField(quente,'leads');
+const fSpend=sumField(frio,'spend'), fClicks=sumField(frio,'clicks'), fImpr=sumField(frio,'impr'), fLeads=sumField(frio,'leads');
+const qCPC = qSpend/qClicks, fCPC = fSpend/fClicks;
+const qCPL = qLeads? qSpend/qLeads : null, fCPL = fLeads? fSpend/fLeads : null;
+
+// detail by creative link within each bucket
+function creativeBreak(arr){
+  const m = {};
+  arr.forEach(r=>{
+    m[r.link] = m[r.link] || {spend:0,clicks:0,leads:0};
+    m[r.link].spend += r.spend; m[r.link].clicks += r.clicks; m[r.link].leads += r.leads;
+  });
+  return Object.entries(m).sort((a,b)=>b[1].spend-a[1].spend);
+}
+const qDetail = creativeBreak(quente).map(([link,v])=>`${link.split('/p/')[1]}: ${fmtBRL(v.spend)} (${v.leads} leads)`).join(' · ');
+const fDetail = creativeBreak(frio).map(([link,v])=>`${link.split('/p/')[1]}: ${fmtBRL(v.spend)} (${v.leads} leads)`).join(' · ');
+
+document.getElementById('tempRow').innerHTML = `
+  <div class="temp-card quente">
+    <h3>🔥 Público Quente — 00 Engajamento 365D</h3>
+    <div class="metrics">
+      <div><div class="m-label">Investimento</div><div class="m-value">${fmtBRL(qSpend)}</div></div>
+      <div><div class="m-label">CPL</div><div class="m-value">${qCPL?fmtBRL(qCPL):'N/A'}</div></div>
+      <div><div class="m-label">Leads</div><div class="m-value">${fmtInt(qLeads)}</div></div>
+    </div>
+    <div class="detail">Por criativo: ${qDetail}</div>
+  </div>
+  <div class="temp-card frio">
+    <h3>❄️ Público Frio — Nurse / Profissionais de saúde / Profissões</h3>
+    <div class="metrics">
+      <div><div class="m-label">Investimento</div><div class="m-value">${fmtBRL(fSpend)}</div></div>
+      <div><div class="m-label">CPL</div><div class="m-value">${fCPL?fmtBRL(fCPL):'N/A'}</div></div>
+      <div><div class="m-label">Leads</div><div class="m-value">${fmtInt(fLeads)}</div></div>
+    </div>
+    <div class="detail">Por criativo: ${fDetail}</div>
+  </div>
+  <div class="compare-card">
+    <div><div class="c-label">% dos leads</div><div class="c-value" style="color:var(--red)">Quente ${(qLeads/(qLeads+fLeads)*100).toFixed(1)}%</div><div class="c-value" style="color:var(--blue)">Frio ${(fLeads/(qLeads+fLeads)*100).toFixed(1)}%</div></div>
+    <div><div class="c-label">Diferença de CPL</div><div class="c-value">${(qCPL&&fCPL)? (fCPL<qCPL? 'Frio é '+(((qCPL-fCPL)/fCPL)*100).toFixed(0)+'% mais barato' : 'Quente é '+(((fCPL-qCPL)/qCPL)*100).toFixed(0)+'% mais barato') : 'N/A'}</div></div>
+  </div>
+`;
+
+// ================= FUNIL (Impressões -> Cliques -> Leads) =================
+const funnelSVG = `
+<svg viewBox="0 0 1200 540" width="100%" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gradImp" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#123a63"/><stop offset="50%" stop-color="#2f6fb5"/><stop offset="100%" stop-color="#123a63"/>
+    </linearGradient>
+    <linearGradient id="gradClk" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#1a4d80"/><stop offset="50%" stop-color="#3f8fd9"/><stop offset="100%" stop-color="#1a4d80"/>
+    </linearGradient>
+    <linearGradient id="gradLead" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#0b5c2e"/><stop offset="50%" stop-color="#00c853"/><stop offset="100%" stop-color="#0b5c2e"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <polygon points="80,20 1120,20 980,180 220,180" fill="url(#gradImp)" stroke="#1a1a2e"/>
+  <text x="600" y="90" text-anchor="middle" font-size="22" fill="#cfe6ff" font-family="Arial">IMPRESSÕES</text>
+  <text x="600" y="150" text-anchor="middle" font-size="56" font-weight="800" fill="#ffffff" font-family="Arial">${fmtInt(totalImpr)}</text>
+
+  <text x="600" y="215" text-anchor="middle" font-size="18" fill="#ffd600" font-family="Arial" font-weight="700">CTR ${fmtPct(ctrAvg)}</text>
+
+  <polygon points="220,235 980,235 860,360 340,360" fill="url(#gradClk)" stroke="#1a1a2e"/>
+  <text x="600" y="290" text-anchor="middle" font-size="20" fill="#cfe6ff" font-family="Arial">CLIQUES</text>
+  <text x="600" y="340" text-anchor="middle" font-size="48" font-weight="800" fill="#ffffff" font-family="Arial">${fmtInt(totalClicks)}</text>
+
+  <text x="600" y="400" text-anchor="middle" font-size="18" fill="#ffd600" font-family="Arial" font-weight="700">${(totalLeadsMeta/totalClicks*100).toFixed(1)}% cliques → leads</text>
+
+  <g filter="url(#glow)">
+    <polygon points="340,420 860,420 800,520 400,520" fill="url(#gradLead)" stroke="#0b5c2e"/>
+  </g>
+  <text x="600" y="465" text-anchor="middle" font-size="20" fill="#d8ffe6" font-family="Arial">LEADS (META ADS)</text>
+  <text x="600" y="508" text-anchor="middle" font-size="52" font-weight="800" fill="#ffffff" font-family="Arial">${fmtInt(totalLeadsMeta)}</text>
+</svg>`;
+document.getElementById('funnelWrap').innerHTML = funnelSVG;
+
+document.getElementById('funnelMetrics').innerHTML = `
+  <div class="metric-card"><div class="m-label">CPC — Custo por Clique</div><div class="m-value" style="color:#ff6b35">${fmtBRL(cpcAvg)}</div><div class="bar" style="background:#ff6b35"></div></div>
+  <div class="metric-card"><div class="m-label">CPM — Custo por Mil Impressões</div><div class="m-value" style="color:#ffd600">${fmtBRL(cpmAvg)}</div><div class="bar" style="background:#ffd600"></div></div>
+  <div class="metric-card"><div class="m-label">CPL — Custo por Lead</div><div class="m-value" style="color:#00c853">${fmtBRL(cplAvg)}</div><div class="bar" style="background:#00c853"></div></div>
+`;
+
+// ================= EVOLUÇÃO DIÁRIA =================
+const crmLeadsByDay = {};
+leadsRows.forEach(([dt])=>{
+  const d = dt.split(' ')[0];
+  crmLeadsByDay[d] = (crmLeadsByDay[d]||0)+1;
+});
+
+const byDay = {};
+data.forEach(r=>{
+  byDay[r.date] = byDay[r.date] || {spend:0,clicks:0,impr:0,reach:0,leads:0};
+  byDay[r.date].spend += r.spend; byDay[r.date].clicks += r.clicks;
+  byDay[r.date].impr += r.impr; byDay[r.date].reach += r.reach; byDay[r.date].leads += r.leads;
+});
+const days = Object.keys(byDay).sort((a,b)=>dateToKey(a).localeCompare(dateToKey(b)));
+
+let dailyHTML = `<thead><tr><th>Dia</th><th>Investimento</th><th>Impressões</th><th>Cliques</th><th>Alcance</th><th>CTR</th><th>CPC</th><th>CPL</th><th>Leads (Meta)</th><th>Cadastros (aba Leads)</th></tr></thead><tbody>`;
+days.forEach(d=>{
+  const v = byDay[d];
+  const ctr = v.clicks/v.impr*100, cpc = v.clicks? v.spend/v.clicks:0, cpl = v.leads? v.spend/v.leads : null;
+  dailyHTML += `<tr><td>${d}</td><td>${fmtBRL(v.spend)}</td><td>${fmtInt(v.impr)}</td><td>${fmtInt(v.clicks)}</td><td>${fmtInt(v.reach)}</td><td>${fmtPct(ctr)}</td><td>${fmtBRL(cpc)}</td><td>${cpl?fmtBRL(cpl):'—'}</td><td>${v.leads}</td><td>${crmLeadsByDay[d]||0}</td></tr>`;
+});
+dailyHTML += `<tr class="total-row"><td>TOTAL</td><td>${fmtBRL(totalSpend)}</td><td>${fmtInt(totalImpr)}</td><td>${fmtInt(totalClicks)}</td><td>${fmtInt(totalReach)}</td><td>${fmtPct(ctrAvg)}</td><td>${fmtBRL(cpcAvg)}</td><td>${fmtBRL(cplAvg)}</td><td>${totalLeadsMeta}</td><td>${totalLeadsCRM}</td></tr>`;
+dailyHTML += `</tbody>`;
+document.getElementById('dailyTable').innerHTML = dailyHTML;
+const noteEl = document.createElement('p');
+noteEl.className='note';
+noteEl.textContent='"Leads (Meta)" = coluna "Action Leads" do Meta Ads, atribuída por anúncio/dia. "Cadastros (aba Leads)" = nomes reais na planilha de Leads. As duas contagens batem dia a dia neste período (65 = 65 no total).';
+document.getElementById('dailyTable').closest('.table-wrap').after(noteEl);
+
+new Chart(document.getElementById('dailyChart'), {
+  type:'bar',
+  data:{
+    labels:days,
+    datasets:[
+      {type:'bar', label:'Investimento (R$)', data:days.map(d=>byDay[d].spend.toFixed(2)), backgroundColor:'#ff6b35', yAxisID:'y'},
+      {type:'line', label:'Leads (Meta Ads)', data:days.map(d=>byDay[d].leads), borderColor:'#00c853', backgroundColor:'#00c853', yAxisID:'y1', tension:.3},
+      {type:'line', label:'Cadastros (aba Leads)', data:days.map(d=>crmLeadsByDay[d]||0), borderColor:'#42a5f5', backgroundColor:'#42a5f5', yAxisID:'y1', tension:.3, borderDash:[5,4]}
+    ]
+  },
+  options:{
+    responsive:true,
+    interaction:{mode:'index',intersect:false},
+    scales:{
+      y:{position:'left', ticks:{color:'#9a9ab0'}, grid:{color:'#262640'}},
+      y1:{position:'right', ticks:{color:'#9a9ab0'}, grid:{display:false}},
+      x:{ticks:{color:'#9a9ab0'}, grid:{color:'#262640'}}
+    },
+    plugins:{legend:{labels:{color:'#ffffff'}}}
+  }
+});
+
+// ================= CRIATIVOS =================
+function keyCreative(r){ return r.campaign+'||'+r.ad+'||'+r.link; }
+const creativeMap = {};
+data.forEach(r=>{
+  const k = keyCreative(r);
+  creativeMap[k] = creativeMap[k] || {campaign:r.campaign, ad:r.ad, link:r.link, spend:0, clicks:0, impr:0, reach:0, leads:0};
+  creativeMap[k].spend += r.spend; creativeMap[k].clicks += r.clicks; creativeMap[k].impr += r.impr; creativeMap[k].reach += r.reach; creativeMap[k].leads += r.leads;
+});
+const creativeArr = Object.values(creativeMap).map(v=>({
+  ...v, ctr: v.impr? v.clicks/v.impr*100:0, cpc: v.clicks? v.spend/v.clicks:0, cpm: v.impr? v.spend/v.impr*1000:0,
+  cpl: v.leads? v.spend/v.leads : null
+})).sort((a,b)=>{
+  if(a.cpl===null) return 1; if(b.cpl===null) return -1;
+  return a.cpl-b.cpl;
+});
+
+// Campanhas pausadas manualmente pelo gestor (independente de performance)
+const pausedCampaigns = ['[JGT] [FORMULÁRIO] FORM001'];
+
+function statusForCPL(v, arr){
+  if(v.campaign && pausedCampaigns.includes(v.campaign)) return {label:'PAUSADO', cls:'pausar'};
+  const withCPL = arr.filter(x=>x.cpl!==null);
+  const cpls = withCPL.map(x=>x.cpl).sort((a,b)=>a-b);
+  const median = cpls[Math.floor(cpls.length/2)];
+  if(v.cpl===null) return {label:'PAUSAR', cls:'pausar'};
+  if(v.spend < 15) return {label:'AVALIAR', cls:'avaliar'};
+  if(v.cpl <= median*0.85) return {label:'ESCALAR', cls:'escalar'};
+  if(v.cpl <= median*1.15) return {label:'MANTER', cls:'manter'};
+  return {label:'PAUSAR', cls:'pausar'};
+}
+
+let creativeHTML = `<thead><tr><th>#</th><th>Criativo</th><th>Campanha</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Leads</th><th>CPL</th><th>Link</th><th>Status</th></tr></thead><tbody>`;
+creativeArr.forEach((v,i)=>{
+  const st = statusForCPL(v, creativeArr);
+  const shortLink = v.link.split('/p/')[1] || v.link;
+  creativeHTML += `<tr><td>${i+1}</td><td>${v.ad}</td><td>${v.campaign.length>34?v.campaign.slice(0,34)+'…':v.campaign}</td><td>${fmtBRL(v.spend)}</td><td>${fmtInt(v.impr)}</td><td>${fmtInt(v.clicks)}</td><td>${fmtPct(v.ctr)}</td><td>${fmtBRL(v.cpc)}</td><td>${v.leads}</td><td>${v.cpl?fmtBRL(v.cpl):'—'}</td><td><a class="ad-link" href="${v.link}" target="_blank">${shortLink}</a></td><td><span class="badge ${st.cls}">${st.label}</span></td></tr>`;
+});
+creativeHTML += `</tbody>`;
+document.getElementById('creativeTable').innerHTML = creativeHTML;
+
+// ================= PÚBLICOS (adsets) =================
+const adsetNamesAll = ['00 - Engajamento 365D','00 - Nurse','00 - Profissionais de saude','00 - Profissões'];
+const adsetMap = {};
+adsetNamesAll.forEach(n=>adsetMap[n]={spend:0,clicks:0,impr:0,reach:0,leads:0});
+data.forEach(r=>{
+  adsetMap[r.adset].spend += r.spend; adsetMap[r.adset].clicks += r.clicks;
+  adsetMap[r.adset].impr += r.impr; adsetMap[r.adset].reach += r.reach; adsetMap[r.adset].leads += r.leads;
+});
+const adsetArr = Object.entries(adsetMap).map(([name,v])=>({
+  name, ...v, ctr: v.impr? v.clicks/v.impr*100:0, cpc: v.clicks? v.spend/v.clicks:0, cpm: v.impr? v.spend/v.impr*1000:0,
+  cpl: v.leads? v.spend/v.leads : null,
+  temp: name==='00 - Engajamento 365D' ? 'Quente' : 'Frio'
+})).sort((a,b)=>{
+  if(a.cpl===null) return 1; if(b.cpl===null) return -1;
+  return a.cpl-b.cpl;
+});
+
+let audHTML = `<thead><tr><th>#</th><th>Conjunto</th><th>Temperatura</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Leads</th><th>CPL</th><th>Status</th></tr></thead><tbody>`;
+adsetArr.forEach((v,i)=>{
+  let st;
+  if(v.clicks===0) st = {label:'SEM DADOS', cls:'pausar'};
+  else st = statusForCPL(v, adsetArr.filter(x=>x.clicks>0));
+  audHTML += `<tr><td>${i+1}</td><td>${v.name.replace('00 - ','')}</td><td>${v.temp}</td><td>${fmtBRL(v.spend)}</td><td>${fmtInt(v.impr)}</td><td>${fmtInt(v.clicks)}</td><td>${fmtPct(v.ctr)}</td><td>${fmtBRL(v.cpc)}</td><td>${v.leads}</td><td>${v.cpl?fmtBRL(v.cpl):'—'}</td><td><span class="badge ${st.cls}">${st.label}</span></td></tr>`;
+});
+audHTML += `</tbody>`;
+document.getElementById('audienceTable').innerHTML = audHTML;
+
+// ================= ANÁLISE DIÁRIA (detalhe por dia+conjunto) =================
+let detailHTML = `<thead><tr><th>Dia</th><th>Campanha</th><th>Conjunto</th><th>Criativo</th><th>Invest.</th><th>Cliques</th><th>Impr.</th><th>CTR</th><th>CPC</th><th>Leads</th></tr></thead><tbody>`;
+[...data].sort((a,b)=>dateToKey(a.date).localeCompare(dateToKey(b.date))).forEach(r=>{
+  const ctr = r.impr? r.clicks/r.impr*100:0, cpc = r.clicks? r.spend/r.clicks : 0;
+  detailHTML += `<tr><td>${r.date}</td><td>${r.campaign.length>30?r.campaign.slice(0,30)+'…':r.campaign}</td><td>${r.adset.replace('00 - ','')}</td><td>${r.ad}</td><td>${fmtBRL(r.spend)}</td><td>${fmtInt(r.clicks)}</td><td>${fmtInt(r.impr)}</td><td>${fmtPct(ctr)}</td><td>${fmtBRL(cpc)}</td><td>${r.leads}</td></tr>`;
+});
+detailHTML += `</tbody>`;
+document.getElementById('detailTable').innerHTML = detailHTML;
+
+// ================= LEADS =================
+document.getElementById('leadsKpiRow').innerHTML = `
+  <div class="kpi-card"><div class="label">Cadastros na aba Leads</div><div class="value">${totalLeadsCRM}</div><div class="sub">13/07 a 30/07/2026 · nomes reais</div></div>
+  <div class="kpi-card"><div class="label">Leads reportados no Meta Ads</div><div class="value">${totalLeadsMeta}</div><div class="sub">CPL: ${fmtBRL(cplAvg)} (Invest. total ÷ leads Meta)</div></div>
+`;
+let leadsHTML = `<thead><tr><th>#</th><th>Data de Cadastro</th><th>Nome do Lead</th><th>WhatsApp</th></tr></thead><tbody>`;
+[...leadsRows].sort((a,b)=>{
+  const da = a[0].split(' ')[0].split('/').reverse().join('')+a[0].split(' ')[1];
+  const db = b[0].split(' ')[0].split('/').reverse().join('')+b[0].split(' ')[1];
+  return da.localeCompare(db);
+}).forEach((r,i)=>{
+  leadsHTML += `<tr><td>${i+1}</td><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`;
+});
+leadsHTML += `</tbody>`;
+document.getElementById('leadsTable').innerHTML = leadsHTML;
+
+// ================= TABS =================
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+  });
+});
+</script>
+</body>
+</html>
