@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Captação — Formulário Cuidadores - Perfil Qualitty</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%231a1a2e'/%3E%3Ctext x='32' y='40' font-family='Arial' font-weight='bold' font-size='20' fill='%23ff6b35' text-anchor='middle'%3EJGT%3C/text%3E%3C/svg%3E">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --fundo:#0f0f1a; --card:#1e1e35; --borda:#262640;
+    --laranja:#ff6b35; --verde:#00c853; --vermelho:#ff1744;
+    --amarelo:#ffd600; --azul:#42a5f5; --texto:#ffffff; --apagado:#777777;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{background:var(--fundo); color:var(--texto); font-family:'Segoe UI', Arial, sans-serif; padding-bottom:60px;}
+  .header{background:#16213e; border-bottom:2px solid var(--laranja); display:flex; align-items:center; padding:18px 32px; gap:18px;}
+  .logo-badge{background:linear-gradient(135deg,#ff6b35,#e04e1c); border-radius:10px; width:52px; height:52px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:16px; letter-spacing:1px;}
+  .header-divider{width:2px; height:40px; background:var(--borda);}
+  .header-text h1{font-size:18px; letter-spacing:.5px;}
+  .header-text p{color:var(--apagado); font-size:13px; margin-top:4px;}
+  .tabs{display:flex; background:#16213e; border-bottom:1px solid var(--borda); padding:0 32px; overflow-x:auto;}
+  .tab-btn{background:none; border:none; color:var(--apagado); font-size:14px; font-weight:600; padding:16px 20px; cursor:pointer; border-bottom:3px solid transparent; white-space:nowrap;}
+  .tab-btn.active{color:var(--laranja); border-bottom:3px solid var(--laranja);}
+  .tab-content{display:none; padding:28px 32px;}
+  .tab-content.active{display:block;}
+  .section-title{font-size:15px; text-transform:uppercase; letter-spacing:1px; color:var(--apagado); margin:32px 0 14px;}
+  .section-title:first-child{margin-top:0;}
+  .kpi-row{display:grid; grid-template-columns:repeat(4,1fr); gap:16px;}
+  .kpi-card{background:var(--card); border:1px solid var(--borda); border-radius:12px; padding:18px 20px;}
+  .kpi-card .label{color:var(--apagado); font-size:12px; text-transform:uppercase; letter-spacing:.5px;}
+  .kpi-card .value{font-size:28px; font-weight:800; margin-top:6px;}
+  .kpi-card .sub{color:var(--apagado); font-size:12px; margin-top:4px;}
+  .publico-grid{display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:16px;}
+  .pub-card{border-radius:12px; padding:18px 20px; border:2px solid var(--borda); background:var(--card);}
+  .pub-card.best{border-color:var(--verde); background:#08251a;}
+  .pub-card h3{font-size:13px; text-transform:uppercase; letter-spacing:.5px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;}
+  .pub-card .tag{font-size:10px; background:var(--verde); color:#06180f; padding:3px 8px; border-radius:20px; font-weight:800;}
+  .pub-metric{display:flex; justify-content:space-between; font-size:13px; padding:5px 0; border-bottom:1px solid var(--borda);}
+  .pub-metric:last-child{border-bottom:none;}
+  .pub-metric span:last-child{font-weight:700;}
+  .comp-card{background:var(--card); border:1px solid var(--borda); border-radius:12px; padding:18px 20px; display:flex; flex-direction:column; justify-content:center; gap:14px;}
+  .comp-card .big{font-size:22px; font-weight:800; color:var(--laranja);}
+  .comp-card .desc{font-size:12px; color:var(--apagado);}
+  .funnel-wrap{display:flex; gap:20px; align-items:stretch;}
+  .funnel-svg-wrap{flex:0 0 52%; max-width:52%;}
+  .funnel-metrics-row{flex:1; display:flex; flex-direction:column; gap:12px;}
+  .fmetric-card{background:var(--card); border:1px solid var(--borda); border-radius:12px; flex:1; display:flex; flex-direction:column; justify-content:center; padding:16px 20px; position:relative; overflow:hidden;}
+  .fmetric-card .bar{position:absolute; bottom:0; left:0; right:0; height:3px; border-radius:0 0 12px 12px;}
+  .fmetric-card .label{color:var(--apagado); font-size:12px; text-transform:uppercase;}
+  .fmetric-card .value{font-size:26px; font-weight:800; margin-top:6px;}
+  table{width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--borda); border-radius:10px; overflow:hidden;}
+  th{background:#16213e; color:var(--laranja); text-transform:uppercase; font-size:11px; letter-spacing:.5px; padding:12px 10px; text-align:left;}
+  td{padding:10px 10px; font-size:13px; border-top:1px solid var(--borda);}
+  tr.total-row td{background:#2a1608; color:var(--laranja); font-weight:800;}
+  tr:hover td{background:#23233d;}
+  .badge{padding:4px 10px; border-radius:20px; font-size:11px; font-weight:800; display:inline-block;}
+  .badge.escalar{background:var(--verde); color:#06180f;}
+  .badge.manter{background:var(--laranja); color:#2a0f00;}
+  .badge.avaliar{background:var(--amarelo); color:#2a2400;}
+  .badge.pausar{background:var(--vermelho); color:#2a0006;}
+  a.link{color:var(--azul); text-decoration:none; font-size:12px;}
+  a.link:hover{text-decoration:underline;}
+  .chart-card{background:var(--card); border:1px solid var(--borda); border-radius:12px; padding:20px; margin-top:16px;}
+  .note{color:var(--apagado); font-size:12px; margin-top:10px; font-style:italic;}
+  .day-group-title{color:var(--laranja); font-size:13px; font-weight:800; text-transform:uppercase; margin:18px 0 8px;}
+  .day-group-title .count{color:var(--apagado); font-weight:600; text-transform:none; margin-left:6px;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo-badge">JGT</div>
+  <div class="header-divider"></div>
+  <div class="header-text">
+    <h1>DASHBOARD CAPTAÇÃO — FORMULARIO CUIDADORES - PERFIL QUALITTY</h1>
+    <p>FORMULÁRIO · Perfil Qualitty · 27/07 a 30/07/2026</p>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="showTab('geral', this)">Visão Geral</button>
+  <button class="tab-btn" onclick="showTab('criativos', this)">Criativos</button>
+  <button class="tab-btn" onclick="showTab('publicos', this)">Públicos</button>
+  <button class="tab-btn" onclick="showTab('diaria', this)">Análise Diária</button>
+  <button class="tab-btn" onclick="showTab('leads', this)">Leads</button>
+</div>
+
+<!-- ABA 1: VISÃO GERAL -->
+<div id="tab-geral" class="tab-content active">
+
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="label">Investimento Total</div>
+      <div class="value">R$ 104,02</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">CTR Médio</div>
+      <div class="value">1,34%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">CPM Médio</div>
+      <div class="value">R$ 22,55</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">CPL Médio</div>
+      <div class="value">R$ 3,85</div>
+      <div class="sub">27 leads no período</div>
+    </div>
+  </div>
+
+  <div class="section-title">Comparativo por Público-Alvo</div>
+  <div class="publico-grid">
+    <div class="pub-card">
+      <h3>Área Saúde</h3>
+      <div class="pub-metric"><span>Investimento</span><span>R$ 34,84</span></div>
+      <div class="pub-metric"><span>CPL</span><span>R$ 4,36</span></div>
+      <div class="pub-metric"><span>Leads</span><span>8</span></div>
+      <div class="pub-metric"><span>CTR</span><span>1,75%</span></div>
+    </div>
+    <div class="pub-card best">
+      <h3>Nurse <span class="tag">Melhor CPL</span></h3>
+      <div class="pub-metric"><span>Investimento</span><span>R$ 33,71</span></div>
+      <div class="pub-metric"><span>CPL</span><span>R$ 3,37</span></div>
+      <div class="pub-metric"><span>Leads</span><span>10</span></div>
+      <div class="pub-metric"><span>CTR</span><span>1,23%</span></div>
+    </div>
+    <div class="pub-card">
+      <h3>Profissionais</h3>
+      <div class="pub-metric"><span>Investimento</span><span>R$ 35,47</span></div>
+      <div class="pub-metric"><span>CPL</span><span>R$ 3,94</span></div>
+      <div class="pub-metric"><span>Leads</span><span>9</span></div>
+      <div class="pub-metric"><span>CTR</span><span>1,04%</span></div>
+    </div>
+    <div class="comp-card">
+      <div>
+        <div class="desc">Share de leads</div>
+        <div class="big">37% Nurse</div>
+        <div class="desc">29,6% Área Saúde · 33,3% Profissionais</div>
+      </div>
+      <div>
+        <div class="desc">Diferença de CPL</div>
+        <div class="big">+29%</div>
+        <div class="desc">Área Saúde vs. Nurse (público mais barato)</div>
+      </div>
+    </div>
+  </div>
+  <p class="note">Planilha não traz segmentação por temperatura de público (quente/frio); a campanha roda 3 públicos profissionais (Área Saúde, Nurse, Profissionais) sobre o mesmo criativo.</p>
+
+  <div class="section-title">Funil de Conversão</div>
+  <div class="funnel-wrap">
+    <div class="funnel-svg-wrap">
+      <svg viewBox="0 0 1200 540" width="100%" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="gradImp" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#0d47a1"/>
+            <stop offset="50%" stop-color="#1976d2"/>
+            <stop offset="100%" stop-color="#0d47a1"/>
+          </linearGradient>
+          <linearGradient id="gradClk" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#1565c0"/>
+            <stop offset="50%" stop-color="#42a5f5"/>
+            <stop offset="100%" stop-color="#1565c0"/>
+          </linearGradient>
+          <linearGradient id="gradLead" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#00701a"/>
+            <stop offset="50%" stop-color="#00c853"/>
+            <stop offset="100%" stop-color="#00701a"/>
+          </linearGradient>
+          <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="12" result="blur"/>
+            <feMerge>
+              <feMergeNode in="blur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+
+        <polygon points="150,10 1050,10 950,160 250,160" fill="url(#gradImp)"/>
+        <text x="600" y="70" text-anchor="middle" font-size="20" fill="#ffffffcc" letter-spacing="2">IMPRESSÕES</text>
+        <text x="600" y="130" text-anchor="middle" font-size="56" font-weight="800" fill="#fff">4.612</text>
+
+        <text x="600" y="195" text-anchor="middle" font-size="18" fill="#ffd600" font-weight="700">CTR: 1,34%</text>
+
+        <polygon points="250,220 950,220 800,370 400,370" fill="url(#gradClk)"/>
+        <text x="600" y="270" text-anchor="middle" font-size="18" fill="#ffffffcc" letter-spacing="2">CLIQUES</text>
+        <text x="600" y="335" text-anchor="middle" font-size="52" font-weight="800" fill="#fff">62</text>
+
+        <text x="600" y="405" text-anchor="middle" font-size="18" fill="#ffd600" font-weight="700">Conversão em Lead: 43,55%</text>
+
+        <polygon points="400,430 800,430 690,540 510,540" fill="url(#gradLead)" filter="url(#glow)"/>
+        <text x="600" y="465" text-anchor="middle" font-size="16" fill="#ffffffcc" letter-spacing="2">LEADS</text>
+        <text x="600" y="522" text-anchor="middle" font-size="52" font-weight="800" fill="#fff">27</text>
+      </svg>
+    </div>
+    <div class="funnel-metrics-row">
+      <div class="fmetric-card">
+        <div class="label">CPC — Custo por Clique</div>
+        <div class="value">R$ 1,68</div>
+        <div class="bar" style="background:#ff6b35;"></div>
+      </div>
+      <div class="fmetric-card">
+        <div class="label">Taxa de Conversão em Lead</div>
+        <div class="value">43,55%</div>
+        <div class="bar" style="background:#ffd600;"></div>
+      </div>
+      <div class="fmetric-card">
+        <div class="label">CPL — Custo por Lead</div>
+        <div class="value">R$ 3,85</div>
+        <div class="bar" style="background:#00c853;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">Evolução Diária</div>
+  <table>
+    <thead>
+      <tr><th>Dia</th><th>Investimento</th><th>Impressões</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Leads</th><th>CPL</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>27/07</td><td>R$ 14,72</td><td>617</td><td>9</td><td>1,46%</td><td>R$ 1,64</td><td>5</td><td>R$ 2,94</td></tr>
+      <tr><td>28/07</td><td>R$ 39,03</td><td>1.449</td><td>16</td><td>1,10%</td><td>R$ 2,44</td><td>10</td><td>R$ 3,90</td></tr>
+      <tr><td>29/07</td><td>R$ 35,24</td><td>1.722</td><td>30</td><td>1,74%</td><td>R$ 1,17</td><td>11</td><td>R$ 3,20</td></tr>
+      <tr><td>30/07</td><td>R$ 15,03</td><td>824</td><td>7</td><td>0,85%</td><td>R$ 2,15</td><td>1</td><td>R$ 15,03</td></tr>
+      <tr class="total-row"><td>TOTAL</td><td>R$ 104,02</td><td>4.612</td><td>62</td><td>1,34%</td><td>R$ 1,68</td><td>27</td><td>R$ 3,85</td></tr>
+    </tbody>
+  </table>
+
+  <div class="chart-card">
+    <canvas id="chartDiario" height="90"></canvas>
+  </div>
+</div>
+
+<!-- ABA 2: CRIATIVOS -->
+<div id="tab-criativos" class="tab-content">
+  <div class="section-title">Ranking de Criativos</div>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th><th>Criativo</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>Leads</th>
+        <th>CTR</th><th>CPC</th><th>CPL</th><th>TX Entrada</th><th>TX Cadastro</th><th>Hook Rate</th><th>Link</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1</td><td>25/06</td><td>R$ 104,02</td><td>4.612</td><td>62</td><td>27</td>
+        <td>1,34%</td><td>R$ 1,68</td><td>R$ 3,85</td><td>—</td><td>—</td><td>—</td>
+        <td><a class="link" href="https://www.instagram.com/p/DaER2GpsZz1/" target="_blank">ver post ↗</a></td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="note">Único criativo ativo no período (25/06), rodando sobre os 3 públicos. TX Entrada, TX Cadastro e Hook Rate não se aplicam: é um formulário nativo (lead ad), sem landing page e sem métricas de vídeo na planilha.</p>
+</div>
+
+<!-- ABA 3: PÚBLICOS -->
+<div id="tab-publicos" class="tab-content">
+  <div class="section-title">Ranking de Públicos (Adsets)</div>
+  <table>
+    <thead>
+      <tr><th>#</th><th>Público</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>1</td><td>00 - Nurse</td><td>R$ 33,71</td><td>1.383</td><td>17</td><td>10</td><td>1,23%</td><td>R$ 1,98</td><td>R$ 3,37</td></tr>
+      <tr><td>2</td><td>00 - Profissionais</td><td>R$ 35,47</td><td>1.629</td><td>17</td><td>9</td><td>1,04%</td><td>R$ 2,09</td><td>R$ 3,94</td></tr>
+      <tr><td>3</td><td>00 - Área Saúde</td><td>R$ 34,84</td><td>1.600</td><td>28</td><td>8</td><td>1,75%</td><td>R$ 1,24</td><td>R$ 4,36</td></tr>
+    </tbody>
+  </table>
+  <p class="note">Breakdown por placement (Feed vs. Stories) não está disponível na planilha atual — o Meta Ads exporta apenas o nível de adset.</p>
+</div>
+
+<!-- ABA 4: ANÁLISE DIÁRIA -->
+<div id="tab-diaria" class="tab-content">
+  <div class="section-title">Detalhamento por Dia e Público</div>
+  <table>
+    <thead>
+      <tr><th>Dia</th><th>Público</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Leads</th><th>CPL</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>27/07</td><td>Área Saúde</td><td>R$ 2,98</td><td>138</td><td>2</td><td>1,45%</td><td>R$ 1,49</td><td>1</td><td>R$ 2,98</td></tr>
+      <tr><td>27/07</td><td>Nurse</td><td>R$ 6,01</td><td>229</td><td>4</td><td>1,75%</td><td>R$ 1,50</td><td>2</td><td>R$ 3,01</td></tr>
+      <tr><td>27/07</td><td>Profissionais</td><td>R$ 5,73</td><td>250</td><td>3</td><td>1,20%</td><td>R$ 1,91</td><td>2</td><td>R$ 2,87</td></tr>
+      <tr><td>28/07</td><td>Área Saúde</td><td>R$ 13,83</td><td>494</td><td>7</td><td>1,42%</td><td>R$ 1,98</td><td>4</td><td>R$ 3,46</td></tr>
+      <tr><td>28/07</td><td>Nurse</td><td>R$ 13,18</td><td>487</td><td>7</td><td>1,44%</td><td>R$ 1,88</td><td>5</td><td>R$ 2,64</td></tr>
+      <tr><td>28/07</td><td>Profissionais</td><td>R$ 12,02</td><td>468</td><td>2</td><td>0,43%</td><td>R$ 6,01</td><td>1</td><td>R$ 12,02</td></tr>
+      <tr><td>29/07</td><td>Área Saúde</td><td>R$ 12,55</td><td>654</td><td>14</td><td>2,14%</td><td>R$ 0,90</td><td>3</td><td>R$ 4,18</td></tr>
+      <tr><td>29/07</td><td>Nurse</td><td>R$ 10,47</td><td>479</td><td>5</td><td>1,04%</td><td>R$ 2,09</td><td>2</td><td>R$ 5,24</td></tr>
+      <tr><td>29/07</td><td>Profissionais</td><td>R$ 12,22</td><td>589</td><td>11</td><td>1,87%</td><td>R$ 1,11</td><td>6</td><td>R$ 2,04</td></tr>
+      <tr><td>30/07</td><td>Área Saúde</td><td>R$ 5,48</td><td>314</td><td>5</td><td>1,59%</td><td>R$ 1,10</td><td>0</td><td>—</td></tr>
+      <tr><td>30/07</td><td>Nurse</td><td>R$ 4,05</td><td>188</td><td>1</td><td>0,53%</td><td>R$ 4,05</td><td>1</td><td>R$ 4,05</td></tr>
+      <tr><td>30/07</td><td>Profissionais</td><td>R$ 5,50</td><td>322</td><td>1</td><td>0,31%</td><td>R$ 5,50</td><td>0</td><td>—</td></tr>
+      <tr class="total-row"><td colspan="2">TOTAL</td><td>R$ 104,02</td><td>4.612</td><td>62</td><td>1,34%</td><td>R$ 1,68</td><td>27</td><td>R$ 3,85</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ABA 5: LEADS -->
+<div id="tab-leads" class="tab-content">
+  <div class="section-title">Resumo de Leads Cadastrados (27 leads · horário de Brasília)</div>
+
+  <div class="day-group-title">27/07/2026 <span class="count">5 leads</span></div>
+  <table>
+    <thead><tr><th>Data de Cadastro</th><th>Nome do Lead</th><th>Telefone / WhatsApp</th></tr></thead>
+    <tbody>
+      <tr><td>27/07/2026 20:01</td><td>Viviane de Carvalho Capetine da Silva</td><td>+55 21 97358-1164</td></tr>
+      <tr><td>27/07/2026 21:25</td><td>Patricia</td><td>+55 22 99783-5921</td></tr>
+      <tr><td>27/07/2026 22:41</td><td>Ml</td><td>+55 32 8408-1554</td></tr>
+      <tr><td>27/07/2026 23:03</td><td>Edilza</td><td>+55 81 98494-8206</td></tr>
+      <tr><td>27/07/2026 23:35</td><td>Sandra</td><td>+55 71 98786-8882</td></tr>
+    </tbody>
+  </table>
+
+  <div class="day-group-title">28/07/2026 <span class="count">10 leads</span></div>
+  <table>
+    <thead><tr><th>Data de Cadastro</th><th>Nome do Lead</th><th>Telefone / WhatsApp</th></tr></thead>
+    <tbody>
+      <tr><td>28/07/2026 05:41</td><td>Juliana</td><td>+55 31 9914-2022</td></tr>
+      <tr><td>28/07/2026 14:03</td><td>Monica De Morais</td><td>+55 54 8150-6136</td></tr>
+      <tr><td>28/07/2026 14:05</td><td>Tania Maria de Almeida Soares</td><td>+55 22 99798-7649</td></tr>
+      <tr><td>28/07/2026 17:50</td><td>Laiz</td><td>+55 21 97534-3781</td></tr>
+      <tr><td>28/07/2026 19:22</td><td>Thalita</td><td>+55 83 99901-6570</td></tr>
+      <tr><td>28/07/2026 21:28</td><td>Mary</td><td>+55 41 99204-4846</td></tr>
+      <tr><td>28/07/2026 22:18</td><td>Msgda</td><td>+55 54 98132-0660</td></tr>
+      <tr><td>28/07/2026 22:36</td><td>Aline</td><td>+55 17 99653-4678</td></tr>
+      <tr><td>28/07/2026 23:25</td><td>Cleide</td><td>+55 71 98723-0233</td></tr>
+      <tr><td>28/07/2026 23:55</td><td>Neiz</td><td>+55 84 99820-0075</td></tr>
+    </tbody>
+  </table>
+
+  <div class="day-group-title">29/07/2026 <span class="count">11 leads</span></div>
+  <table>
+    <thead><tr><th>Data de Cadastro</th><th>Nome do Lead</th><th>Telefone / WhatsApp</th></tr></thead>
+    <tbody>
+      <tr><td>29/07/2026 05:38</td><td>Elisangela</td><td>+55 11 98239-5953</td></tr>
+      <tr><td>29/07/2026 12:51</td><td>Rute</td><td>+55 19 99153-2544</td></tr>
+      <tr><td>29/07/2026 13:03</td><td>Lídia</td><td>+55 11 99547-8135</td></tr>
+      <tr><td>29/07/2026 15:51</td><td>Adriana Araujo</td><td>+55 21 97280-2557</td></tr>
+      <tr><td>29/07/2026 18:41</td><td>Cristine</td><td>+55 41 99642-8032</td></tr>
+      <tr><td>29/07/2026 19:41</td><td>Leonice</td><td>+55 85 98462-5340</td></tr>
+      <tr><td>29/07/2026 21:53</td><td>Elisandra</td><td>+55 51 99195-8578</td></tr>
+      <tr><td>29/07/2026 21:56</td><td>Maria Cecilia M</td><td>+55 42 99874-8227</td></tr>
+      <tr><td>29/07/2026 22:41</td><td>Karina</td><td>+55 11 91509-0375</td></tr>
+      <tr><td>29/07/2026 23:15</td><td>Gildete</td><td>+55 19 99738-2712</td></tr>
+      <tr><td>29/07/2026 23:35</td><td>Alessandra</td><td>+55 12 99673-0468</td></tr>
+    </tbody>
+  </table>
+
+  <div class="day-group-title">30/07/2026 <span class="count">1 lead</span></div>
+  <table>
+    <thead><tr><th>Data de Cadastro</th><th>Nome do Lead</th><th>Telefone / WhatsApp</th></tr></thead>
+    <tbody>
+      <tr><td>30/07/2026 11:28</td><td>Ariene Alves Dalla</td><td>+55 32 98825-3556</td></tr>
+    </tbody>
+  </table>
+
+  <p class="note">Contagem de leads por dia bate exatamente com a coluna "Action Leads" da aba Meta_Ads (5 / 10 / 11 / 1) — confirma consistência entre as duas abas.</p>
+</div>
+
+<script>
+function showTab(name, btn){
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+
+const ctx = document.getElementById('chartDiario').getContext('2d');
+new Chart(ctx, {
+  data: {
+    labels: ['27/07', '28/07', '29/07', '30/07'],
+    datasets: [
+      {
+        type: 'bar',
+        label: 'Leads',
+        data: [5, 10, 11, 1],
+        backgroundColor: '#00c853',
+        yAxisID: 'y',
+        borderRadius: 6,
+        order: 2
+      },
+      {
+        type: 'line',
+        label: 'CPL (R$)',
+        data: [2.94, 3.90, 3.20, 15.03],
+        borderColor: '#ff6b35',
+        backgroundColor: '#ff6b35',
+        yAxisID: 'y1',
+        tension: 0.3,
+        pointRadius: 5,
+        pointBackgroundColor: '#ff6b35',
+        order: 1
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { labels: { color: '#fff' } },
+      title: { display: true, text: 'Leads e CPL por Dia', color: '#fff', font: { size: 14 } }
+    },
+    scales: {
+      x: { ticks: { color: '#aaa' }, grid: { color: '#262640' } },
+      y: { position: 'left', ticks: { color: '#00c853' }, grid: { color: '#262640' }, title: { display: true, text: 'Leads', color: '#00c853' } },
+      y1: { position: 'right', ticks: { color: '#ff6b35' }, grid: { display: false }, title: { display: true, text: 'CPL (R$)', color: '#ff6b35' } }
+    }
+  }
+});
+</script>
+
+</body>
+</html>
