@@ -143,6 +143,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
   <div class="tab" onclick="showTab('visao',this)">🌐 Visão Geral</div>
   <div class="tab" onclick="showTab('criativos',this)">Criativos</div>
   <div class="tab" onclick="showTab('publicos',this)">Públicos</div>
+  <div class="tab" onclick="showTab('paginas',this)">📄 Páginas</div>
   <div class="tab" onclick="showTab('formulario',this)">📋 Formulário</div>
   <div class="tab" onclick="showTab('semanal',this)">Semana a Semana</div>
   <div class="tab" onclick="showTab('mensal',this)">Mês a Mês</div>
@@ -154,6 +155,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
 <div class="content" id="tab-visao"></div>
 <div class="content" id="tab-criativos"></div>
 <div class="content" id="tab-publicos"></div>
+<div class="content" id="tab-paginas"></div>
 <div class="content" id="tab-formulario"></div>
 <div class="content" id="tab-semanal"></div>
 <div class="content" id="tab-mensal"></div>
@@ -479,6 +481,7 @@ function renderAll(){
   renderVisao(from,to);
   renderCriativos(from,to);
   renderPublicos(from,to);
+  renderPaginas(from,to);
   renderFormulario(from,to);
   renderSemanal(from,to);
   renderMensal(from,to);
@@ -527,6 +530,8 @@ function renderTrafego(from,to){
   h += kpi('Fat. OB Orgânico', fatOBOrg>0?fmtBRL(fatOBOrg):'—', '');
   h += kpi('CAC', isFinite(cac)?fmtBRL(cac):'—', 'orange');
   h += kpi('Ticket Médio', isFinite(ticket)?fmtBRL(ticket):'—', '');
+  const obCount = obTraf.length + obOrg.length;
+  h += kpi('% Compras c/ Order Bump', sales.length>0?fmtPct(obCount/sales.length*100):'—', 'yellow', obCount>0?(obCount+' de '+sales.length+' compras'):'');
   h += kpi('Cliques', fmtInt(cliques), '');
   h += kpi('Impressões', fmtInt(imp), '');
   h += kpi('CPC', isFinite(cpc)?fmtBRL(cpc):'—', '');
@@ -544,10 +549,10 @@ function renderTrafego(from,to){
   h += '<div class="taxa-item"><span>Cliques → PV</span><span class="taxa-val">'+fmtPct(cliques>0?pv/cliques*100:NaN)+'</span></div>';
   h += '<div class="taxa-item"><span>PV → Checkout</span><span class="taxa-val">'+fmtPct(pv>0?ck/pv*100:NaN)+'</span></div>';
   h += '<div class="taxa-item"><span>Checkout → Compra</span><span class="taxa-val">'+fmtPct(ck>0?comprasPixel/ck*100:NaN)+'</span></div>';
-  h += '<div class="taxa-item"><span>Cliques → Compra</span><span class="taxa-val">'+fmtPct(cliques>0?comprasPixel/cliques*100:NaN)+'</span></div>';
+  h += '<div class="taxa-item"><span>Page View → Compra</span><span class="taxa-val">'+fmtPct(pv>0?comprasPixel/pv*100:NaN)+'</span></div>';
   h += '</div></div>';
 
-  h += '<div class="chart-grid-2x2"><div class="chart-card"><h4>Investimento por dia</h4><canvas id="ch-inv-dia"></canvas></div><div class="chart-card"><h4>Vendas por dia (planilha)</h4><canvas id="ch-vendas-dia"></canvas></div></div>';
+  h += '<div class="chart-grid-2x2"><div class="chart-card"><h4>Investimento por dia</h4><canvas id="ch-inv-dia"></canvas></div><div class="chart-card"><h4>Vendas por dia (planilha)</h4><canvas id="ch-vendas-dia"></canvas></div><div class="chart-card"><h4>ROAS dia a dia (fat. total ÷ invest.)</h4><canvas id="ch-roas-dia"></canvas></div></div>';
 
   h += '<div class="sec-title">Vendas (' + sales.length + ') — ✅ tráfego · ⭐ orgânico</div><div class="sales-scroll">';
   for(const s of sales){
@@ -558,11 +563,24 @@ function renderTrafego(from,to){
   document.getElementById('tab-trafego').innerHTML = h;
 
   const dias = DIAS.filter(d=>inRange(d.data,from,to));
-  mkChart('ch-inv-dia', { type:'bar', data:{ labels:dias.map(d=>dBR(d.data)), datasets:[{ label:'Investimento', data:dias.map(d=>+d.inv.toFixed(2)), backgroundColor:WARM1, borderRadius:4 }] }, options:{ responsive:true, plugins:{legend:{display:false}}, scales:scalesDark() } });
-  const vMap = {};
-  for(const s of sales){ vMap[s.data]=(vMap[s.data]||0)+1; }
+  const dlab = fmt => ({ display:true, anchor:'end', align:'top', color:'rgba(255,255,255,.85)', font:{size:10,weight:'700',family:'DM Mono'}, formatter:fmt, clamp:true });
+  const scHead = (vals,intY) => ({
+    x:{ ticks:{color:'rgba(255,255,255,.4)',font:{size:10}}, grid:{color:'rgba(255,255,255,.04)'} },
+    y:{ ticks:{color:'rgba(255,255,255,.4)',font:{size:10}, precision:intY?0:undefined}, grid:{color:'rgba(255,255,255,.06)'}, beginAtZero:true, suggestedMax: Math.max(...vals,0)*1.28 }
+  });
+  const invVals = dias.map(d=>+d.inv.toFixed(2));
+  mkChart('ch-inv-dia', { type:'bar', data:{ labels:dias.map(d=>dBR(d.data)), datasets:[{ label:'Investimento', data:invVals, backgroundColor:WARM1, borderRadius:4 }] }, options:{ responsive:true, plugins:{legend:{display:false}, datalabels:dlab(v=>'R$'+Math.round(v))}, scales:scHead(invVals) } });
+  const vMap = {}, fMap = {};
+  for(const s of sales){ vMap[s.data]=(vMap[s.data]||0)+1; fMap[s.data]=(fMap[s.data]||0)+s.fatTotal; }
   const vDays = Object.keys(vMap).sort();
-  mkChart('ch-vendas-dia', { type:'bar', data:{ labels:vDays.map(dBR), datasets:[{ label:'Vendas', data:vDays.map(d=>vMap[d]), backgroundColor:WARM2, borderRadius:4 }] }, options:{ responsive:true, plugins:{legend:{display:false}}, scales:scalesDark(true) } });
+  const vVals = vDays.map(d=>vMap[d]);
+  mkChart('ch-vendas-dia', { type:'bar', data:{ labels:vDays.map(dBR), datasets:[{ label:'Vendas', data:vVals, backgroundColor:WARM2, borderRadius:4 }] }, options:{ responsive:true, plugins:{legend:{display:false}, datalabels:dlab(v=>v)}, scales:scHead(vVals,true) } });
+  const rDays = dias.filter(d=>d.inv>0).map(d=>d.data);
+  const rVals = rDays.map(d=>{
+    const dia = dias.find(x=>x.data===d);
+    return +(((fMap[d]||0)/dia.inv)).toFixed(2);
+  });
+  mkChart('ch-roas-dia', { type:'bar', data:{ labels:rDays.map(dBR), datasets:[{ label:'ROAS', data:rVals, backgroundColor:rVals.map(v=>v>=1?WARM1:'rgba(231,76,60,0.75)'), borderRadius:4 }] }, options:{ responsive:true, plugins:{legend:{display:false}, datalabels:dlab(v=>v.toLocaleString('pt-BR',{minimumFractionDigits:2})+'x')}, scales:scHead(rVals) } });
 }
 
 function scalesDark(intY){
@@ -673,30 +691,72 @@ function renderCriativos(from,to){
   }
   h += '</div><div class="ob-info">💡 "Ativo" = criativo com investimento na última data do período selecionado. Vendas e faturamento vêm da planilha de Vendas (cruzamento por UTM Content).</div>';
 
-  h += '<div class="cri-grid">';
+  h += '<div class="tbl-wrap"><table><thead><tr><th>Criativo</th><th>Status</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>PV</th><th>Checkout</th><th>Vendas</th><th>Fat.</th><th>ROAS</th><th>Anúncio</th></tr></thead><tbody>';
   for(const c of items){
-    const ctr = c.imp>0?c.cliques/c.imp*100:NaN;
-    const cpc = c.cliques>0?c.inv/c.cliques:NaN;
     const roas = c.inv>0?c.fat/c.inv:NaN;
-    h += '<div class="cri-card'+(c.ativo?' ativo':'')+'"><div class="cri-card-header"><div class="cri-name">'+esc(c.nome)+'</div><span class="cri-badge '+(c.ativo?'ativo':'inativo')+'">'+(c.ativo?'ATIVO':'INATIVO')+'</span></div><div class="cri-metrics">';
-    h += '<div class="cri-metric"><span class="cri-metric-label">Invest.</span><span class="cri-metric-val">'+fmtBRL(c.inv)+'</span></div>';
-    h += '<div class="cri-metric"><span class="cri-metric-label">Vendas</span><span class="cri-metric-val hl">'+fmtInt(c.vendas)+'</span></div>';
-    h += '<div class="cri-metric"><span class="cri-metric-label">Faturamento</span><span class="cri-metric-val">'+(c.fat>0?fmtBRL(c.fat):'—')+'</span></div>';
-    h += '<div class="cri-metric"><span class="cri-metric-label">ROAS</span><span class="cri-metric-val'+(isFinite(roas)&&roas>=1?' hl':'')+'">'+fmtX(roas)+'</span></div>';
-    h += '<div class="cri-metric"><span class="cri-metric-label">CTR</span><span class="cri-metric-val">'+fmtPct(ctr)+'</span></div>';
-    h += '<div class="cri-metric"><span class="cri-metric-label">CPC</span><span class="cri-metric-val">'+(isFinite(cpc)?fmtBRL(cpc):'—')+'</span></div>';
-    h += '<div class="cri-metric"><span class="cri-metric-label">Impressões</span><span class="cri-metric-val">'+fmtInt(c.imp)+'</span></div>';
-    h += '<div class="cri-metric"><span class="cri-metric-label">Checkouts</span><span class="cri-metric-val">'+fmtInt(c.ck)+'</span></div>';
-    h += '</div>'+(c.link?'<a class="cri-link" href="'+esc(c.link)+'" target="_blank">🔗 Ver anúncio</a>':'')+'</div>';
-  }
-  h += '</div>';
-
-  h += '<div class="sec-title">Tabela completa</div><div class="tbl-wrap"><table><thead><tr><th>Criativo</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>PV</th><th>Checkout</th><th>Vendas</th><th>Fat.</th><th>ROAS</th></tr></thead><tbody>';
-  for(const c of items){
-    h += '<tr><td>'+esc(c.nome)+'</td><td>'+fmtBRL(c.inv)+'</td><td>'+fmtInt(c.imp)+'</td><td>'+fmtInt(c.cliques)+'</td><td>'+fmtPct(c.imp>0?c.cliques/c.imp*100:NaN)+'</td><td>'+(c.cliques>0?fmtBRL(c.inv/c.cliques):'—')+'</td><td>'+fmtInt(c.pv)+'</td><td>'+fmtInt(c.ck)+'</td><td>'+fmtInt(c.vendas)+'</td><td>'+(c.fat>0?fmtBRL(c.fat):'—')+'</td><td>'+fmtX(c.inv>0?c.fat/c.inv:NaN)+'</td></tr>';
+    h += '<tr><td>'+esc(c.nome)+'</td><td>'+(c.ativo?'<span class="cri-badge ativo">ATIVO</span>':'<span class="cri-badge inativo">INATIVO</span>')+'</td><td>'+fmtBRL(c.inv)+'</td><td>'+fmtInt(c.imp)+'</td><td>'+fmtInt(c.cliques)+'</td><td>'+fmtPct(c.imp>0?c.cliques/c.imp*100:NaN)+'</td><td>'+(c.cliques>0?fmtBRL(c.inv/c.cliques):'—')+'</td><td>'+fmtInt(c.pv)+'</td><td>'+fmtInt(c.ck)+'</td><td>'+fmtInt(c.vendas)+'</td><td>'+(c.fat>0?fmtBRL(c.fat):'—')+'</td><td style="color:'+(isFinite(roas)&&roas>=1?'#2ecc71':'#e74c3c')+'">'+fmtX(roas)+'</td><td>'+(c.link?'<a href="'+esc(c.link)+'" target="_blank" style="color:#ff6b2b;text-decoration:none">🔗 Ver</a>':'—')+'</td></tr>';
   }
   h += '</tbody></table></div>';
   document.getElementById('tab-criativos').innerHTML = h;
+}
+
+// ═══════════════ ABA COMPARATIVO DE PÁGINAS ═══════════════
+function pageOf(name){
+  const n = (name||'').toLowerCase();
+  if(/pag\s*[-–—]?\s*l/.test(n)) return 'Página L';
+  if(/pag\s*[-–—]?\s*b/.test(n)) return 'Página B';
+  return 'Outra / sem identificação';
+}
+function renderPaginas(from,to){
+  const g = GROWS.filter(r=>inRange(r.data,from,to));
+  const traf = SALES.filter(s=>inRange(s.data,from,to) && isTrafego(s));
+  const m = {};
+  const get = k => m[k] || (m[k] = { nome:k, inv:0, imp:0, cliques:0, pv:0, ck:0, comprasPixel:0, vendas:0, fat:0, ob:0 });
+  for(const r of g){
+    const o = get(pageOf(r.campaign));
+    o.inv+=r.inv; o.imp+=r.imp; o.cliques+=r.cliques; o.pv+=r.pv; o.ck+=r.ck; o.comprasPixel+=r.compras;
+  }
+  for(const s of traf){
+    const o = get(pageOf(s.utmCampaign || s.utmMedium));
+    o.vendas++; o.fat+=s.fatTotal; if(s.fatOB>0) o.ob++;
+  }
+  const order = ['Página L','Página B','Outra / sem identificação'];
+  const items = order.map(k=>m[k]).filter(Boolean).filter(o=>o.inv>0||o.vendas>0);
+
+  let h = '<div class="ob-info">💡 Página identificada pelo nome da campanha ("Pag B" / "Pag L") no Gerenciador e nas UTMs das vendas de tráfego. Vendas orgânicas ficam de fora (não têm página rastreada).</div>';
+
+  h += '<div class="pub-grid">';
+  for(const o of items){
+    const roas = o.inv>0?o.fat/o.inv:NaN;
+    const cpa = o.vendas>0&&o.inv>0?o.inv/o.vendas:NaN;
+    const convPV = o.pv>0?o.vendas/o.pv*100:NaN;
+    h += '<div class="pub-card ativo"><div class="pub-card-header"><div class="pub-name">📄 '+esc(o.nome)+'</div></div><div class="pub-metrics">';
+    h += '<div class="pub-metric"><div class="pub-metric-val neutral">'+fmtBRL(o.inv)+'</div><div class="pub-metric-lbl">Invest.</div></div>';
+    h += '<div class="pub-metric"><div class="pub-metric-val">'+fmtInt(o.vendas)+'</div><div class="pub-metric-lbl">Vendas</div></div>';
+    h += '<div class="pub-metric"><div class="pub-metric-val'+(isFinite(roas)&&roas<1?' neutral':'')+'">'+fmtX(roas)+'</div><div class="pub-metric-lbl">ROAS</div></div>';
+    h += '<div class="pub-metric"><div class="pub-metric-val neutral">'+(isFinite(cpa)?fmtBRL(cpa):'—')+'</div><div class="pub-metric-lbl">CPA</div></div>';
+    h += '<div class="pub-metric"><div class="pub-metric-val neutral">'+fmtPct(convPV)+'</div><div class="pub-metric-lbl">PV → Compra</div></div>';
+    h += '<div class="pub-metric"><div class="pub-metric-val neutral">'+(o.vendas>0?fmtPct(o.ob/o.vendas*100):'—')+'</div><div class="pub-metric-lbl">% c/ OB</div></div>';
+    h += '</div></div>';
+  }
+  h += '</div>';
+
+  h += '<div class="chart-grid-2x2"><div class="chart-card"><h4>ROAS por página</h4><canvas id="ch-pag-roas"></canvas></div><div class="chart-card"><h4>CPA por página</h4><canvas id="ch-pag-cpa"></canvas></div></div>';
+
+  h += '<div class="sec-title">Tabela comparativa</div><div class="tbl-wrap"><table><thead><tr><th>Página</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>CTR</th><th>PV</th><th>Checkout</th><th>Vendas</th><th>Fat.</th><th>ROAS</th><th>CPA</th><th>PV → Compra</th><th>% c/ OB</th></tr></thead><tbody>';
+  for(const o of items){
+    const roas = o.inv>0?o.fat/o.inv:NaN;
+    h += '<tr><td>'+esc(o.nome)+'</td><td>'+fmtBRL(o.inv)+'</td><td>'+fmtInt(o.imp)+'</td><td>'+fmtInt(o.cliques)+'</td><td>'+fmtPct(o.imp>0?o.cliques/o.imp*100:NaN)+'</td><td>'+fmtInt(o.pv)+'</td><td>'+fmtInt(o.ck)+'</td><td>'+fmtInt(o.vendas)+'</td><td>'+(o.fat>0?fmtBRL(o.fat):'—')+'</td><td style="color:'+(isFinite(roas)&&roas>=1?'#2ecc71':'#e74c3c')+'">'+fmtX(roas)+'</td><td>'+(o.vendas>0&&o.inv>0?fmtBRL(o.inv/o.vendas):'—')+'</td><td>'+fmtPct(o.pv>0?o.vendas/o.pv*100:NaN)+'</td><td>'+(o.vendas>0?fmtPct(o.ob/o.vendas*100):'—')+'</td></tr>';
+  }
+  h += '</tbody></table></div>';
+  document.getElementById('tab-paginas').innerHTML = h;
+
+  const dlabP = fmt => ({ display:true, anchor:'end', align:'top', color:'rgba(255,255,255,.85)', font:{size:11,weight:'700',family:'DM Mono'}, formatter:fmt, clamp:true });
+  const roasVals = items.map(o=>o.inv>0?+(o.fat/o.inv).toFixed(2):0);
+  const cpaVals = items.map(o=>o.vendas>0&&o.inv>0?+(o.inv/o.vendas).toFixed(2):0);
+  const scP = vals => ({ x:{ ticks:{color:'rgba(255,255,255,.55)',font:{size:11}}, grid:{display:false} }, y:{ ticks:{color:'rgba(255,255,255,.4)',font:{size:10}}, grid:{color:'rgba(255,255,255,.06)'}, beginAtZero:true, suggestedMax:Math.max(...vals,0)*1.3 } });
+  mkChart('ch-pag-roas', { type:'bar', data:{ labels:items.map(o=>o.nome), datasets:[{ data:roasVals, backgroundColor:roasVals.map(v=>v>=1?WARM1:'rgba(231,76,60,0.75)'), borderRadius:6 }] }, options:{ responsive:true, plugins:{legend:{display:false}, datalabels:dlabP(v=>v.toLocaleString('pt-BR',{minimumFractionDigits:2})+'x')}, scales:scP(roasVals) } });
+  mkChart('ch-pag-cpa', { type:'bar', data:{ labels:items.map(o=>o.nome), datasets:[{ data:cpaVals, backgroundColor:WARM2, borderRadius:6 }] }, options:{ responsive:true, plugins:{legend:{display:false}, datalabels:dlabP(v=>'R$ '+v.toLocaleString('pt-BR',{minimumFractionDigits:2}))}, scales:scP(cpaVals) } });
 }
 
 function renderPublicos(from,to){
@@ -730,25 +790,63 @@ function renderPublicos(from,to){
 }
 
 // ═══════════════ ABA FORMULÁRIO ═══════════════
+// O formulário fica na PÁGINA DE OBRIGADO: só comprador responde.
+// Métrica correta: de quem COMPROU, quantos RESPONDERAM (taxa de resposta).
+function normEmail(e){
+  let t = String(e||'').trim().toLowerCase().replace(/\s+/g,'');
+  const fix = { 'hotmai.com':'hotmail.com','hotmal.com':'hotmail.com','hotmial.com':'hotmail.com','gmial.com':'gmail.com','gamil.com':'gmail.com','gmail.co':'gmail.com','gmai.com':'gmail.com','outlok.com':'outlook.com' };
+  const at = t.lastIndexOf('@');
+  if(at>0){ const dom = t.slice(at+1); if(fix[dom]) t = t.slice(0,at+1)+fix[dom]; }
+  return t;
+}
 function renderFormulario(from,to){
   const forms = FORMS.filter(f=>!f.data || inRange(f.data,from,to));
-  // cruzamento por e-mail contra TODAS as vendas pagas (independe do filtro de data)
-  const paidEmails = new Set(SALES.map(s=>s.email).filter(Boolean));
-  const compraram = forms.filter(f=>paidEmails.has(f.email));
-  const soResp = forms.length - compraram.length;
-  const taxa = forms.length>0 ? compraram.length/forms.length*100 : NaN;
+
+  // compradores únicos (todas as datas), por e-mail normalizado
+  const buyerByEmail = {}, buyerByLocal = {};
+  for(const s of SALES){
+    const e = normEmail(s.email);
+    if(!e) continue;
+    if(!buyerByEmail[e]) buyerByEmail[e] = s;
+    const local = e.split('@')[0];
+    if(!buyerByLocal[local]) buyerByLocal[local] = new Set();
+    buyerByLocal[local].add(e);
+  }
+  const buyers = Object.keys(buyerByEmail);
+
+  // match: e-mail exato (com correção de typo) OU prefixo do e-mail único
+  const matchBuyer = fEmail => {
+    const e = normEmail(fEmail);
+    if(buyerByEmail[e]) return e;
+    const local = e.split('@')[0];
+    if(buyerByLocal[local] && buyerByLocal[local].size===1) return [...buyerByLocal[local]][0];
+    return null;
+  };
+
+  const respondedBuyers = new Set();
+  const unmatchedForms = [];
+  for(const f of forms){
+    const m = matchBuyer(f.email);
+    f._matched = m;
+    if(m) respondedBuyers.add(m);
+    else unmatchedForms.push(f.email);
+  }
+  const compraramResp = respondedBuyers.size;
+  const compraramNaoResp = Math.max(buyers.length - compraramResp, 0);
+  const taxaResp = buyers.length>0 ? compraramResp/buyers.length*100 : NaN;
 
   let h = '<div class="kpi-grid">';
-  h += kpi('Respostas do Formulário', fmtInt(forms.length), 'orange');
-  h += kpi('Responderam e Compraram', fmtInt(compraram.length), 'green');
-  h += kpi('Só Responderam', fmtInt(soResp), 'yellow');
-  h += kpi('Taxa de Conversão', fmtPct(taxa), isFinite(taxa)&&taxa>=20?'green':'');
+  h += kpi('Compradores Únicos', fmtInt(buyers.length), 'orange');
+  h += kpi('Compraram e Responderam', fmtInt(compraramResp), 'green');
+  h += kpi('Compraram e NÃO Responderam', fmtInt(compraramNaoResp), 'yellow');
+  h += kpi('Taxa de Resposta', fmtPct(taxaResp), isFinite(taxaResp)&&taxaResp>=50?'green':'');
+  h += kpi('Respostas do Formulário', fmtInt(forms.length), '', unmatchedForms.length?('⚠️ '+unmatchedForms.length+' com e-mail divergente'):'');
   h += '</div>';
 
-  h += '<div class="ob-info">💡 Cruzamento feito por e-mail entre as respostas do formulário e as vendas pagas da aba Vendas (todas as datas). Respostas duplicadas de mesmo e-mail contam uma vez.</div>';
+  h += '<div class="ob-info">💡 O formulário fica na <strong>página de obrigado</strong> — só comprador responde. A pizza mostra, do total de compradores únicos, quantos responderam. Cruzamento por e-mail com correção de typos (ex.: hotmai.com → hotmail.com) e match por prefixo. '+(unmatchedForms.length?('<br>⚠️ Respostas cujo e-mail não bate com nenhuma compra (pessoa usou outro e-mail no checkout): <strong>'+unmatchedForms.map(esc).join(', ')+'</strong> — essas contam como resposta, mas o comprador correspondente pode estar em "não responderam".'):'')+'</div>';
 
   h += '<div class="chart-grid-2x2">';
-  h += '<div class="chart-card tall"><h4>Compraram × Responderam</h4><canvas id="ch-form-pizza"></canvas></div>';
+  h += '<div class="chart-card tall"><h4>Compradores: responderam × não responderam</h4><canvas id="ch-form-pizza"></canvas></div>';
   h += '<div class="chart-card tall"><h4>Faixa etária</h4><canvas id="ch-form-idade"></canvas></div>';
   h += '<div class="chart-card tall"><h4>Renda mensal</h4><canvas id="ch-form-renda"></canvas></div>';
   h += '<div class="chart-card tall"><h4>Perfil (o que busca)</h4><canvas id="ch-form-perfil"></canvas></div>';
@@ -756,10 +854,9 @@ function renderFormulario(from,to){
   h += '<div class="chart-card tall"><h4>Experiência com pêndulo</h4><canvas id="ch-form-pendulo"></canvas></div>';
   h += '</div>';
 
-  h += '<div class="sec-title">Respostas ('+forms.length+')</div><div class="tbl-wrap"><table><thead><tr><th>E-mail</th><th>Comprou?</th><th>Idade</th><th>Renda</th><th>Perfil</th><th>Situação</th><th>Estado</th><th>Pêndulo</th><th>Data</th></tr></thead><tbody>';
+  h += '<div class="sec-title">Respostas ('+forms.length+')</div><div class="tbl-wrap"><table><thead><tr><th>E-mail</th><th>Venda localizada?</th><th>Idade</th><th>Renda</th><th>Perfil</th><th>Situação</th><th>Estado</th><th>Pêndulo</th><th>Data</th></tr></thead><tbody>';
   for(const f of forms){
-    const c = paidEmails.has(f.email);
-    h += '<tr><td>'+esc(f.email)+'</td><td>'+(c?'<span style="color:#2ecc71">✅ Sim</span>':'<span style="color:rgba(255,255,255,.35)">—</span>')+'</td><td>'+esc(f.idade)+'</td><td>'+esc(f.renda)+'</td><td>'+esc(f.perfil)+'</td><td>'+esc(f.situacao)+'</td><td>'+esc(f.estado)+'</td><td>'+esc(f.pendulo)+'</td><td>'+dBR(f.data)+'</td></tr>';
+    h += '<tr><td>'+esc(f.email)+'</td><td>'+(f._matched?'<span style="color:#2ecc71">✅ Sim</span>':'<span style="color:#f1c40f">⚠️ e-mail divergente</span>')+'</td><td>'+esc(f.idade)+'</td><td>'+esc(f.renda)+'</td><td>'+esc(f.perfil)+'</td><td>'+esc(f.situacao)+'</td><td>'+esc(f.estado)+'</td><td>'+esc(f.pendulo)+'</td><td>'+dBR(f.data)+'</td></tr>';
   }
   h += '</tbody></table></div>';
   document.getElementById('tab-formulario').innerHTML = h;
@@ -768,8 +865,8 @@ function renderFormulario(from,to){
   mkChart('ch-form-pizza', {
     type:'pie',
     data:{
-      labels:['Responderam e compraram','Só responderam'],
-      datasets:[{ data:[compraram.length, soResp], backgroundColor:[WARM1, WARM2], borderColor:'#12121f', borderWidth:2 }]
+      labels:['Compraram e responderam','Compraram e não responderam'],
+      datasets:[{ data:[compraramResp, compraramNaoResp], backgroundColor:[WARM1, WARM2], borderColor:'#12121f', borderWidth:2 }]
     },
     options:{
       responsive:true,
