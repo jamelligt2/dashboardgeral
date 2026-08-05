@@ -259,6 +259,7 @@ const CONFIG = {
     utmMedium:    8,
     utmCampaign:  9,
     utmContent:   10,
+    utmTerm:      11,   // traz o código do anúncio (ex: "ADV11") — é o que bate com a coluna "Anúncio" do Gerenciador
   },
 
   // ── Colunas do Gerenciador (0-based) — planilha PueriGuide ──
@@ -374,6 +375,7 @@ async function loadData(){
         utmMedium:(r[W.utmMedium]||'').trim(),
         utmCampaign:(r[W.utmCampaign]||'').trim(),
         utmContent:(r[W.utmContent]||'').trim(),
+        utmTerm:(r[W.utmTerm]||'').trim(),
       };
       if(CONFIG.USA_TX_ROOT && W.txRoot>=0){
         const key=(r[W.txRoot]||'').trim()||('NOKEY_'+sales.length+Math.random());
@@ -402,12 +404,12 @@ async function loadData(){
   const fatPrincipal=g.filter(x=>x.isPrinc).reduce((a,x)=>a+x.val,0);
         const obRows=g.filter(x=>!x.isPrinc);const fatOB=obRows.reduce((a,x)=>a+x.val,0);const fatOBTrf=obRows.filter(isTrafego).reduce((a,x)=>a+x.val,0);const fatOBOrg=fatOB-fatOBTrf;
         const obCountTrf=obRows.filter(isTrafego).length, obCountOrg=obRows.length-obCountTrf;
-        finalSales.push({data:principal.data,nome:principal.nome,email:principal.email,fatTotal:fatPrincipal+fatOB,fatPrincipal,fatOB,fatOBTrf,fatOBOrg,obCountTrf,obCountOrg,utmSource:principal.utmSource,utmMedium:principal.utmMedium,utmCampaign:principal.utmCampaign,utmContent:principal.utmContent});
+        finalSales.push({data:principal.data,nome:principal.nome,email:principal.email,fatTotal:fatPrincipal+fatOB,fatPrincipal,fatOB,fatOBTrf,fatOBOrg,obCountTrf,obCountOrg,utmSource:principal.utmSource,utmMedium:principal.utmMedium,utmCampaign:principal.utmCampaign,utmContent:principal.utmContent,utmTerm:principal.utmTerm});
       }
     } else {
       for(const rec of sales){
         if(!(rec.prod.includes(CONFIG.PRODUTO_NOME)&&rec.val>=CONFIG.PRODUTO_PRECO_MINIMO))continue;
-        finalSales.push({data:rec.data,nome:rec.nome,email:rec.email,fatTotal:rec.val,fatPrincipal:rec.val,fatOB:0,fatOBTrf:0,fatOBOrg:0,utmSource:rec.utmSource,utmMedium:rec.utmMedium,utmCampaign:rec.utmCampaign,utmContent:rec.utmContent});
+        finalSales.push({data:rec.data,nome:rec.nome,email:rec.email,fatTotal:rec.val,fatPrincipal:rec.val,fatOB:0,fatOBTrf:0,fatOBOrg:0,utmSource:rec.utmSource,utmMedium:rec.utmMedium,utmCampaign:rec.utmCampaign,utmContent:rec.utmContent,utmTerm:rec.utmTerm});
       }
     }
     SALES=finalSales.sort((a,b)=>b.data.localeCompare(a.data));
@@ -578,10 +580,22 @@ function buildCriPubMaps(from,to){
     po.inv+=parseBR(r[G.inv]); po.imp+=parseBR(r[G.imp]); po.reach+=parseBR(r[G.reach]); po.cliques+=parseBR(r[G.cliques]); po.pv+=parseBR(r[G.pv]); po.ck+=parseBR(r[G.ck]);
     if(rowActive(r))po.active=true;
   }
-  // distribuir vendas (apenas tráfego pago tem utmContent/utmMedium)
+  // distribuir vendas (apenas tráfego pago tem utm)
+  // O UTM Content do Webhook traz o ID numérico do anúncio (não bate com nada do Gerenciador).
+  // Quem bate com a coluna "Anúncio" do Gerenciador é o UTM Term (ex: "ADV11").
+  // Para o Público, em vez de tentar casar o UTM Medium (formato inconsistente ao longo do tempo),
+  // usamos o Conjunto já vinculado àquele anúncio dentro do próprio Gerenciador — fonte única da verdade.
   for(const s of sl){
-    if(s.utmContent&&cri[s.utmContent]){ cri[s.utmContent].vendas++; cri[s.utmContent].fat+=s.fatTotal; }
-    if(s.utmMedium&&pub[s.utmMedium]){ pub[s.utmMedium].vendas++; pub[s.utmMedium].fat+=s.fatTotal; }
+    const adKey=(s.utmTerm||'').trim();
+    const matched=adKey&&cri[adKey];
+    if(matched){
+      cri[adKey].vendas++; cri[adKey].fat+=s.fatTotal;
+      const adsetName=cri[adKey].adset;
+      if(adsetName&&pub[adsetName]){ pub[adsetName].vendas++; pub[adsetName].fat+=s.fatTotal; }
+    } else if(s.utmMedium&&pub[s.utmMedium]){
+      // fallback para vendas antigas sem UTM Term preenchido
+      pub[s.utmMedium].vendas++; pub[s.utmMedium].fat+=s.fatTotal;
+    }
   }
   const finish=o=>{ o.ctr=o.imp>0?o.cliques/o.imp*100:0; o.cpc=o.cliques>0?o.inv/o.cliques:0; o.cpm=o.imp>0?o.inv/o.imp*1000:0; o.roas=o.inv>0?o.fat/o.inv:0; o.temp=o.quente?'Quente':'Frio'; return o; };
   return {cri:Object.values(cri).map(finish),pub:Object.values(pub).map(finish)};
