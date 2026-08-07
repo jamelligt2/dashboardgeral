@@ -36,7 +36,8 @@ body{background:#1a1a2e;color:#e8e6f0;font-family:'DM Sans',sans-serif;min-heigh
 .kpi-card{background:#12121f;border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:16px 18px}
 .kpi-label{font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
 .kpi-value{font-size:20px;font-weight:700;font-family:'DM Mono',monospace}
-.orange{color:#ff6b2b}.green{color:#2ecc71}.red{color:#e74c3c}.yellow{color:#f1c40f}
+.kpi-sub{font-size:10px;color:rgba(255,255,255,.4);margin-top:5px;font-family:'DM Mono',monospace}
+.orange{color:#ff6b2b}.green{color:#2ecc71}.red{color:#e74c3c}.yellow{color:#f1c40f}.gray{color:rgba(255,255,255,.55)}
 table{width:100%;border-collapse:collapse;font-size:12px}
 th{background:#12121f;color:rgba(255,255,255,.45);padding:8px 10px;text-align:right;font-weight:500;border-bottom:1px solid rgba(255,255,255,.07);white-space:nowrap}
 th:first-child{text-align:left}
@@ -216,7 +217,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
   <div class="sec-title">Dia a Dia — Visão Geral</div>
   <div class="ob-info">ℹ️ <strong>Hotmart:</strong> Todas as vendas contadas (orgânico + pago) a partir de 14/01/2026. Faturamento inclui produto principal + order bumps vinculados via <strong>transaction_root</strong>. Investimento = Meta Ads (Gerenciador).</div>
   <div class="tbl-wrap"><table><thead><tr>
-    <th>Data</th><th>Invest.</th><th>Fat. Total</th><th>ROAS</th><th>Compras Total</th><th>Tráfego</th><th>Orgânicas</th><th>Ticket Médio</th><th>CAC</th>
+    <th>Data</th><th>Invest.</th><th>Fat. Total</th><th>ROAS</th><th>Compras Total</th><th>Tráfego</th><th>Orgânicas</th><th>Sem UTM</th><th>Ticket Médio</th><th>CAC</th>
   </tr></thead><tbody id="tbody-geral"></tbody></table></div>
 </div>
 
@@ -406,6 +407,13 @@ function statusBadge(inv,fat){
   if(r>=1)return'<span class="badge otimizar">Otimizar</span>';
   return'<span class="badge corrigir">Corrigir</span>';
 }
+
+// ============ CLASSIFICAÇÃO DE VENDA POR UTM ============
+// Tráfego = utm_source == meta_ads | Sem UTM = utm_source vazio | Orgânico = tem utm_source mas não é meta_ads
+function utmSourceNorm(s){return (s.utmSource||'').toLowerCase().replace(/[\s_-]/g,'');}
+function isTrafego(s){return utmSourceNorm(s)==='metaads';}
+function isSemUTM(s){return !utmSourceNorm(s);}
+function isOrganico(s){return !isTrafego(s)&&!isSemUTM(s);}
 
 // ============ PROCESS DATA ============
 async function loadData(){
@@ -713,42 +721,41 @@ function filteredSales(){
 // ============ TRÁFEGO KPIs ============
 function renderKpiTrafego(dias,fSales){
   const inv=dias.reduce((s,d)=>s+d.inv,0);
-  const fat=dias.reduce((s,d)=>s+d.fat,0);
   const cliques=dias.reduce((s,d)=>s+d.cliques,0);
   const imp=dias.reduce((s,d)=>s+d.imp,0);
-  const pv=dias.reduce((s,d)=>s+d.pv,0);
-  const ck=dias.reduce((s,d)=>s+d.ck,0);
   const cpc=cliques>0?inv/cliques:0;
   const cpm=imp>0?inv/imp*1000:0;
 
-  // Separar tráfego vs orgânico
-  const isTraf=s=>(s.utmSource||'').toLowerCase().replace(/[\s_-]/g,'')==='metaads';
-  const vendTraf=fSales.filter(isTraf);
-  const vendOrg=fSales.filter(s=>!isTraf(s));
+  // Separar tráfego / orgânico / sem UTM
+  const vendTraf=fSales.filter(isTrafego);
+  const vendOrg=fSales.filter(isOrganico);
+  const vendSemUTM=fSales.filter(isSemUTM);
 
   const fatTraf=vendTraf.reduce((s,v)=>s+v.fatTotal,0);
   const fatOrg=vendOrg.reduce((s,v)=>s+v.fatTotal,0);
+  const fatSemUTM=vendSemUTM.reduce((s,v)=>s+v.fatTotal,0);
 
   // OBs: vendas que têm fatOB > 0
   const obTraf=vendTraf.filter(v=>v.fatOB>0);
   const obOrg=vendOrg.filter(v=>v.fatOB>0);
+  const obSemUTM=vendSemUTM.filter(v=>v.fatOB>0);
   const fatObTraf=obTraf.reduce((s,v)=>s+v.fatOB,0);
   const fatObOrg=obOrg.reduce((s,v)=>s+v.fatOB,0);
+  const fatObSemUTM=obSemUTM.reduce((s,v)=>s+v.fatOB,0);
 
   const roas=inv>0?fatTraf/inv:0;
   const cac=vendTraf.length>0?inv/vendTraf.length:0;
   const ticket=vendTraf.length>0?fatTraf/vendTraf.length:0;
-  const lucroTraf=fatTraf-inv;
 
   document.getElementById('kpi-trafego').innerHTML=
     '<div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">'+brl(inv)+'</div></div>'
-   +'<div class="kpi-card"><div class="kpi-label">Fat. Tráfego</div><div class="kpi-value orange">'+brl(fatTraf)+'</div></div>'
-   +'<div class="kpi-card"><div class="kpi-label">Fat. Orgânico</div><div class="kpi-value yellow">'+brl(fatOrg)+'</div></div>'
+   +'<div class="kpi-card"><div class="kpi-label">Fat. Tráfego</div><div class="kpi-value orange">'+brl(fatTraf)+'</div>'+(fatObTraf>0?'<div class="kpi-sub">+'+brl(fatObTraf)+' OB</div>':'')+'</div>'
+   +'<div class="kpi-card"><div class="kpi-label">Fat. Orgânico</div><div class="kpi-value yellow">'+brl(fatOrg)+'</div>'+(fatObOrg>0?'<div class="kpi-sub">+'+brl(fatObOrg)+' OB</div>':'')+'</div>'
+   +'<div class="kpi-card"><div class="kpi-label">Fat. Sem UTM</div><div class="kpi-value gray">'+brl(fatSemUTM)+'</div>'+(fatObSemUTM>0?'<div class="kpi-sub">+'+brl(fatObSemUTM)+' OB</div>':'')+'</div>'
    +'<div class="kpi-card"><div class="kpi-label">ROAS Tráfego</div><div class="kpi-value '+(roas>=1?'green':'red')+'">'+br(roas,2)+'x</div></div>'
    +'<div class="kpi-card"><div class="kpi-label">Vendas Tráfego</div><div class="kpi-value orange">'+vendTraf.length+'<span style="font-size:11px;color:rgba(255,255,255,.4);margin-left:6px">+'+obTraf.length+' OB</span></div></div>'
    +'<div class="kpi-card"><div class="kpi-label">Vendas Orgânico</div><div class="kpi-value yellow">'+vendOrg.length+'<span style="font-size:11px;color:rgba(255,255,255,.4);margin-left:6px">+'+obOrg.length+' OB</span></div></div>'
-   +'<div class="kpi-card"><div class="kpi-label">Fat. OB Tráfego</div><div class="kpi-value">'+brl(fatObTraf)+'</div></div>'
-   +'<div class="kpi-card"><div class="kpi-label">Fat. OB Orgânico</div><div class="kpi-value">'+brl(fatObOrg)+'</div></div>'
+   +'<div class="kpi-card"><div class="kpi-label">Vendas Sem UTM</div><div class="kpi-value gray">'+vendSemUTM.length+'<span style="font-size:11px;color:rgba(255,255,255,.4);margin-left:6px">+'+obSemUTM.length+' OB</span></div></div>'
    +'<div class="kpi-card"><div class="kpi-label">CAC</div><div class="kpi-value">'+brl(cac)+'</div></div>'
    +'<div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value">'+brl(ticket)+'</div></div>'
    +'<div class="kpi-card"><div class="kpi-label">Cliques</div><div class="kpi-value">'+br(cliques,0)+'</div></div>'
@@ -762,24 +769,29 @@ function renderSalesPanel(fSales){
   const panel=document.getElementById('sales-panel');
   if(!panel)return;
   const totalFat=fSales.reduce((s,v)=>s+v.fatTotal,0);
-  const isTrafego=s=>(s.utmSource||'').toLowerCase().replace(/[\s_-]/g,'')==='metaads';
   const tracked=fSales.filter(isTrafego);
-  const organic=fSales.filter(s=>!isTrafego(s));
+  const organic=fSales.filter(isOrganico);
+  const semUtm=fSales.filter(isSemUTM);
   const cards=fSales.map(s=>{
-    const isTracked=(s.utmSource||'').toLowerCase().replace(/[\s_-]/g,'')==='metaads';
-    const color=isTracked?'rgba(46,204,113,.12)':'rgba(241,196,15,.08)';
-    const border=isTracked?'rgba(46,204,113,.35)':'rgba(241,196,15,.25)';
-    const icon=isTracked?'✅':'⭐';
-    const srcLabel=isTracked?'meta_ads':'orgânico';
+    const traf=isTrafego(s), org=isOrganico(s);
+    let color,border,icon,srcLabel;
+    if(traf){color='rgba(46,204,113,.12)';border='rgba(46,204,113,.35)';icon='✅';srcLabel='meta_ads';}
+    else if(org){color='rgba(241,196,15,.08)';border='rgba(241,196,15,.25)';icon='⭐';srcLabel='orgânico';}
+    else{color='rgba(255,255,255,.05)';border='rgba(255,255,255,.15)';icon='❔';srcLabel='sem UTM';}
     const utmMedShort=s.utmMedium?(s.utmMedium.length>28?s.utmMedium.slice(0,28)+'…':s.utmMedium):'—';
     const obTag=s.fatOB>0
       ?'<div style="font-size:10px;color:#f39c12;margin-bottom:3px">🛒 OB: '+brl(s.fatOB)+'</div>'
       :'';
-    const trackedHtml=isTracked
-      ?'<div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:2px">🎨 <span style="color:#2ecc71">'+( s.utmContent||'—')+'</span></div>'
+    let trackedHtml;
+    if(traf){
+      trackedHtml='<div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:2px">🎨 <span style="color:#2ecc71">'+( s.utmContent||'—')+'</span></div>'
        +'<div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:2px">👥 <span style="color:#2ecc71">'+utmMedShort+'</span></div>'
-       +'<div style="font-size:10px;color:rgba(255,255,255,.45)">📣 <span style="color:#e8e6f0">'+srcLabel+'</span></div>'
-      :'<div style="font-size:10px;color:rgba(241,196,15,.7);margin-top:4px">⭐ Venda orgânica</div>';
+       +'<div style="font-size:10px;color:rgba(255,255,255,.45)">📣 <span style="color:#e8e6f0">'+srcLabel+'</span></div>';
+    }else if(org){
+      trackedHtml='<div style="font-size:10px;color:rgba(241,196,15,.7);margin-top:4px">⭐ Venda orgânica</div>';
+    }else{
+      trackedHtml='<div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:4px">❔ Venda sem UTM</div>';
+    }
     return '<div style="flex-shrink:0;width:210px;background:'+color+';border:1px solid '+border+';border-radius:8px;padding:10px 12px">'
       +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">'
       +'<div style="font-size:11px;font-weight:600;color:#e8e6f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px">'+icon+' '+(s.nome||'Sem nome')+'</div>'
@@ -795,7 +807,7 @@ function renderSalesPanel(fSales){
     +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">'
     +'<span style="font-size:18px">💸</span>'
     +'<div><div style="font-size:13px;font-weight:600;color:#ff9a3c">Vendas no Período ('+fSales.length+')</div>'
-    +'<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px">'+SALES.length+' total · '+brl(totalFat)+' faturamento · ✅ '+tracked.length+' rastreadas · ⭐ '+organic.length+' orgânicas · ← arraste para ver mais</div>'
+    +'<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px">'+SALES.length+' total · '+brl(totalFat)+' faturamento · ✅ '+tracked.length+' rastreadas · ⭐ '+organic.length+' orgânicas · ❔ '+semUtm.length+' sem UTM · ← arraste para ver mais</div>'
     +'</div></div>'
     +'<div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:6px">'+cards+emptyMsg+'</div>'
     +'</div>';
@@ -805,10 +817,10 @@ function renderSalesPanel(fSales){
 function renderKpiVisao(dias,fSales){
   const inv=dias.reduce((s,d)=>s+d.inv,0);
   const fatTotal=fSales.reduce((s,v)=>s+v.fatTotal,0);
-  const isTraf=s=>(s.utmSource||'').toLowerCase().replace(/[\s_-]/g,'')==='metaads';
   const comprasTotal=fSales.length;
-  const comprasRastr=fSales.filter(isTraf).length;
-  const comprasOrg=fSales.filter(s=>!isTraf(s)).length;
+  const comprasRastr=fSales.filter(isTrafego).length;
+  const comprasOrg=fSales.filter(isOrganico).length;
+  const comprasSemUTM=fSales.filter(isSemUTM).length;
   const ticket=comprasTotal>0?fatTotal/comprasTotal:0;
   const cac=comprasTotal>0?inv/comprasTotal:0;
   const roas=inv>0?fatTotal/inv:0;
@@ -819,7 +831,8 @@ function renderKpiVisao(dias,fSales){
     <div class="kpi-card"><div class="kpi-label">ROAS Total</div><div class="kpi-value ${roas>=1?'green':'red'}">${br(roas,2)}x</div></div>
     <div class="kpi-card"><div class="kpi-label">Vendas Total</div><div class="kpi-value orange">${br(comprasTotal,0)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Tráfego</div><div class="kpi-value green">${br(comprasRastr,0)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Orgânicas</div><div class="kpi-value yellow">${br(comprasOrg>=0?comprasOrg:0,0)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Orgânicas</div><div class="kpi-value yellow">${br(comprasOrg,0)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Sem UTM</div><div class="kpi-value gray">${br(comprasSemUTM,0)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value">${brl(ticket)}</div></div>
     <div class="kpi-card"><div class="kpi-label">CAC Total</div><div class="kpi-value">${brl(cac)}</div></div>
   `;
@@ -829,23 +842,22 @@ function renderKpiVisao(dias,fSales){
 function renderTbodyGeral(dias,fSales){
   const el=document.getElementById('tbody-geral');
   if(!el)return;
-  // Agrupa vendas por data
-  const isTrafG=s=>(s.utmSource||'').toLowerCase().replace(/[\s_-]/g,'')==='metaads';
+  // Agrupa vendas por data (tráfego / orgânico / sem UTM)
   const salesByDate={};
   fSales.forEach(s=>{
-    if(!salesByDate[s.data])salesByDate[s.data]={total:0,fat:0,traf:0};
-    salesByDate[s.data].total+=1;
-    salesByDate[s.data].fat+=s.fatTotal;
-    if(isTrafG(s))salesByDate[s.data].traf+=1;
+    if(!salesByDate[s.data])salesByDate[s.data]={total:0,fat:0,traf:0,org:0,semUtm:0};
+    const sd=salesByDate[s.data];
+    sd.total+=1;
+    sd.fat+=s.fatTotal;
+    if(isTrafego(s))sd.traf+=1;
+    else if(isOrganico(s))sd.org+=1;
+    else sd.semUtm+=1;
   });
   el.innerHTML=dias.slice().reverse().map(d=>{
     const inv=d.inv;
-    const sd=salesByDate[d.data]||{total:0,fat:0};
+    const sd=salesByDate[d.data]||{total:0,fat:0,traf:0,org:0,semUtm:0};
     const fatTotal=sd.fat;
     const comprasTotal=sd.total;
-    const isTrafD=s=>(s.utmSource||'').toLowerCase().replace(/[\s_-]/g,'')==='metaads';
-    const comprasRastr=(salesByDate[d.data]||{traf:0}).traf;
-    const comprasOrg=Math.max(0,comprasTotal-comprasRastr);
     const ticket=comprasTotal>0?fatTotal/comprasTotal:0;
     const cac=comprasTotal>0&&inv>0?inv/comprasTotal:0;
     const roas=inv>0&&fatTotal>0?fatTotal/inv:0;
@@ -855,8 +867,9 @@ function renderTbodyGeral(dias,fSales){
       +'<td>'+(fatTotal>0?brl(fatTotal):'—')+'</td>'
       +'<td>'+(fatTotal>0&&inv>0?br(roas,2)+'x':'—')+'</td>'
       +'<td>'+(comprasTotal>0?br(comprasTotal,0):'—')+'</td>'
-      +'<td style="color:#2ecc71">'+(comprasRastr>0?br(comprasRastr,0):'—')+'</td>'
-      +'<td style="color:#f1c40f">'+(comprasOrg>0?br(comprasOrg,0):'—')+'</td>'
+      +'<td style="color:#2ecc71">'+(sd.traf>0?br(sd.traf,0):'—')+'</td>'
+      +'<td style="color:#f1c40f">'+(sd.org>0?br(sd.org,0):'—')+'</td>'
+      +'<td style="color:rgba(255,255,255,.5)">'+(sd.semUtm>0?br(sd.semUtm,0):'—')+'</td>'
       +'<td>'+(ticket>0?brl(ticket):'—')+'</td>'
       +'<td>'+(cac>0?brl(cac):'—')+'</td>'
       +'</tr>';
