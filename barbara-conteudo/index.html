@@ -535,12 +535,21 @@ async function loadData(){
       byTx[key].push(r);
     });
     const norm = s => String(s||'').toLowerCase().replace(/[\s_-]/g,'');
+    const statusFinal = new Set(['COMPLETED','COMPLETE']);
     const webhookSales = [];
     Object.values(byTx).forEach(group=>{
       const approved = group.filter(g=>statusSet.has(g.status));
       if (!approved.length) return;
-      approved.sort((a,b)=>a.dataISO.localeCompare(b.dataISO));
-      const first = approved[0];
+      const finals = approved.filter(g=>statusFinal.has(g.status));
+      let chosen;
+      if (finals.length){
+        finals.sort((a,b)=>a.dataISO.localeCompare(b.dataISO));
+        chosen = finals[finals.length-1];
+      } else {
+        approved.sort((a,b)=>a.dataISO.localeCompare(b.dataISO));
+        chosen = approved[0];
+      }
+      const first = chosen;
       const isTrafego = CONFIG.TRAFEGO_PREFIXES.some(p => norm(first.utmSource).startsWith(p));
       webhookSales.push({
         data: first.dataISO,
