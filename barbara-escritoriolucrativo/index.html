@@ -330,6 +330,15 @@ const CONFIG = {
   // Webhook é a fonte de faturamento/vendas a partir desta data (inclusive)
   WEBHOOK_DESDE: '2026-07-13',
   PRODUTO_NOME: 'escritorio lucrativo',
+  // Preço fixo do produto — usado como fallback quando o Valor do Webhook
+  // vem em branco/zerado (bug de origem visto em alguns registros).
+  PRODUTO_VALOR_PADRAO: 247,
+  // Exceções manuais: transações onde o cliente confirmou a origem real,
+  // mesmo quando a UTM do Webhook não reflete isso (ex: UTM em branco/direct
+  // mas a venda veio de anúncio pago). Chave = ID da transação (txId).
+  OVERRIDE_TRAFEGO: {
+    'HP1633771352': true, // Aline Pessoa — confirmado como tráfego pago
+  },
   STATUS_APROVADO: ['APPROVED','COMPLETED','COMPLETE','CONFIRMED','PAGO'],
   // Colunas do Gerenciador (0-based) — esta planilha não tem colunas de status
   G: { date:0, campaign:1, adset:2, ad:3, inv:4, imp:5, alc:6, clk:7, pv:8, ck:9 },
@@ -549,18 +558,37 @@ async function loadData(){
       byTx[key].push(r);
     });
     const norm = s => String(s||'').toLowerCase().replace(/[\s_-]/g,'');
+    const statusFinal = new Set(['COMPLETED','COMPLETE']);
     const webhookSales = [];
     Object.values(byTx).forEach(group=>{
       const approved = group.filter(g=>statusSet.has(g.status));
       if (!approved.length) return;
-      approved.sort((a,b)=>a.dataISO.localeCompare(b.dataISO));
-      const first = approved[0];
-      const isTrafego = norm(first.utmSource).startsWith('metaads');
+      // a venda é contabilizada na data do fechamento final (COMPLETED), quando
+      // existir — é quando o pagamento realmente está confirmado/liquidado.
+      // Se ainda não fechou, usa a data da primeira aprovação.
+      const finals = approved.filter(g=>statusFinal.has(g.status));
+      let chosen;
+      if (finals.length){
+        finals.sort((a,b)=>a.dataISO.localeCompare(b.dataISO));
+        chosen = finals[finals.length-1];
+      } else {
+        approved.sort((a,b)=>a.dataISO.localeCompare(b.dataISO));
+        chosen = approved[0];
+      }
+      const first = chosen;
+      const txIdChosen = chosen.txId;
+      const isTrafego = CONFIG.OVERRIDE_TRAFEGO.hasOwnProperty(txIdChosen)
+        ? CONFIG.OVERRIDE_TRAFEGO[txIdChosen]
+        : norm(first.utmSource).startsWith('metaads');
+      // fallback: se o Valor veio em branco/zero no webhook (bug de origem),
+      // usa o preço fixo do produto em vez de contabilizar R$ 0,00 na venda
+      const valorEncontrado = Math.max(0, ...group.map(g=>g.valor||0));
+      const valorFinal = valorEncontrado > 0 ? valorEncontrado : CONFIG.PRODUTO_VALOR_PADRAO;
       webhookSales.push({
         data: first.dataISO,
         nome: first.nome,
         email: first.email,
-        valor: first.valor,
+        valor: valorFinal,
         isTrafego,
         utmSource: first.utmSource,
         fonte: 'webhook'
