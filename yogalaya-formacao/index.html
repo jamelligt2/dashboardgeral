@@ -146,6 +146,7 @@ tfoot td{font-weight:700;color:#ff6b2b;border-top:1px solid rgba(255,107,43,.3)}
   <div>
     <div class="brand" id="brand-title">📦 Formação 300H · Yogalaya</div>
     <div class="subtitle" id="brand-subtitle">Dashboard de Lançamento · Jamelli GT · 2026</div>
+    <div class="subtitle" id="build-stamp" style="color:rgba(255,107,43,.6);font-family:'DM Mono',monospace">carregando...</div>
   </div>
 </div>
 
@@ -255,6 +256,7 @@ const CONFIG = {
   CLIENTE: 'Yogalaya',
   PRODUTO: 'Formação 300H',
   ANO: '2026',
+  BUILD: 'v3 · 14/08/2026',
 
   SHEET_ID: '1N4NmSwlMXg7PAp-_HjVBS1HlGQntHeBDHcn0ALoPst4',
   ABA_GERENCIADOR: 'Gerenciador',
@@ -329,11 +331,11 @@ function parseCSV(text){
 
 async function fetchSheetCSV(sheetName){
   const url = 'https://docs.google.com/spreadsheets/d/' + CONFIG.SHEET_ID +
-              '/gviz/tq?tqx=out:csv&sheet=' + encodeURIComponent(sheetName);
+              '/gviz/tq?tqx=out:csv&sheet=' + encodeURIComponent(sheetName) + '&_cb=' + Date.now();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20000);
   try {
-    const resp = await fetch(url, { signal: controller.signal });
+    const resp = await fetch(url, { signal: controller.signal, cache: 'no-store' });
     clearTimeout(timeout);
     if (!resp.ok) throw new Error('Planilha "' + sheetName + '": HTTP ' + resp.status + '. Verifique se está pública.');
     const text = await resp.text();
@@ -377,16 +379,21 @@ function fetchSheetJSONP(sheetName){
     };
     sc.onerror = () => { if (!done) { cleanup(); reject(new Error('Não foi possível acessar a aba "' + sheetName + '". Confirme que a planilha está pública.')); } };
     sc.src = 'https://docs.google.com/spreadsheets/d/' + CONFIG.SHEET_ID +
-             '/gviz/tq?tqx=out:json;responseHandler:' + cb + '&sheet=' + encodeURIComponent(sheetName);
+             '/gviz/tq?tqx=out:json;responseHandler:' + cb + '&sheet=' + encodeURIComponent(sheetName) +
+             '&_cb=' + Date.now();
     document.head.appendChild(sc);
   });
 }
 
 // Tenta fetch (CSV) e, se o navegador bloquear, cai para JSONP automaticamente.
+let LOAD_ROUTE = '';
 async function loadSheet(sheetName){
   try {
-    return await fetchSheetCSV(sheetName);
+    const r = await fetchSheetCSV(sheetName);
+    LOAD_ROUTE = 'fetch';
+    return r;
   } catch(e){
+    LOAD_ROUTE = 'jsonp';
     return await fetchSheetJSONP(sheetName);
   }
 }
@@ -435,6 +442,10 @@ async function loadData(){
     processFormacao(form, comercial);
     initDates();
     render();
+    const now = new Date();
+    const stamp = document.getElementById('build-stamp');
+    if (stamp) stamp.textContent = 'build ' + CONFIG.BUILD + ' · dados de ' +
+      now.toLocaleTimeString('pt-BR') + ' · ' + GROWS.length + ' linhas · ' + SALES.length + ' vendas · via ' + LOAD_ROUTE;
     ov.style.display = 'none';
   } catch(e){
     ov.style.display = 'none';
