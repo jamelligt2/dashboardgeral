@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dashboard de Performance — Jamelli GT</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#1a1a2e;color:#e8e6f0;font-family:'DM Sans',sans-serif;min-height:100vh}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:#12121f}::-webkit-scrollbar-thumb{background:#ff6b2b55;border-radius:3px}
+.topbar{background:#12121f;padding:12px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.07);position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:10px}
+.brand{font-size:17px;font-weight:700;color:#ff6b2b}
+.subtitle{font-size:11px;color:rgba(255,255,255,0.4);margin-top:2px}
+.logo-jgt{display:flex;align-items:center;gap:10px}
+.logo-jgt svg{width:36px;height:36px;flex-shrink:0}
+.logo-text{display:flex;flex-direction:column}
+.logo-text strong{font-size:13px;font-weight:700;color:#ff6b2b;letter-spacing:.3px}
+.logo-text span{font-size:10px;color:rgba(255,255,255,.35);margin-top:1px}
+.period-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.period-bar label{font-size:11px;color:rgba(255,255,255,.45);white-space:nowrap}
+.date-input{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:#e8e6f0;padding:5px 10px;border-radius:6px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;outline:none;min-width:118px}
+.date-input:focus{border-color:#ff6b2b}
+.date-input::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;cursor:pointer}
+.period-sep{color:rgba(255,255,255,.2);font-size:13px;padding:0 2px}
+.preset-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;transition:all .2s;white-space:nowrap}
+.preset-btn:hover,.preset-btn.active{background:rgba(255,107,43,.2);border-color:#ff6b2b;color:#ff6b2b;font-weight:600}
+.range-info{font-size:11px;color:rgba(255,107,43,.75);font-family:'DM Mono',monospace;white-space:nowrap;padding-left:4px}
+.tabs{display:flex;border-bottom:1px solid rgba(255,255,255,0.07);background:#12121f;padding:0 28px;overflow-x:auto}
+.tab{padding:12px 20px;cursor:pointer;font-size:13px;color:rgba(255,255,255,0.5);border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
+.tab:hover{color:#e8e6f0}.tab.active{color:#ff6b2b;border-bottom-color:#ff6b2b;font-weight:600}
+.content{padding:24px 28px;display:none}.content.active{display:block}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:20px}
+.kpi-card{background:#12121f;border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:16px 18px}
+.kpi-label{font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.kpi-value{font-size:20px;font-weight:700;font-family:'DM Mono',monospace}
+.kpi-sub{font-size:10px;color:rgba(255,255,255,.35);margin-top:4px;font-family:'DM Mono',monospace}
+.orange{color:#ff6b2b}.green{color:#2ecc71}.red{color:#e74c3c}.yellow{color:#f1c40f}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#12121f;color:rgba(255,255,255,.45);padding:8px 10px;text-align:right;font-weight:500;border-bottom:1px solid rgba(255,255,255,.07);white-space:nowrap}
+th:first-child{text-align:left}
+td{padding:7px 10px;text-align:right;border-bottom:1px solid rgba(255,255,255,.04);font-family:'DM Mono',monospace;font-size:11px;color:#e8e6f0}
+td:first-child{text-align:left;font-family:'DM Sans',sans-serif;font-size:12px}
+tr:hover td{background:rgba(255,255,255,.025)}
+tfoot td{font-weight:700;color:#ff6b2b;border-top:1px solid rgba(255,107,43,.3)}
+.funil-section{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:16px 0}
+.funil-bar-wrap{margin-bottom:12px}
+.funil-label{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;color:rgba(255,255,255,.7)}
+.funil-bar-bg{background:rgba(255,255,255,.05);border-radius:4px;height:14px;overflow:hidden}
+.funil-bar-fill{background:linear-gradient(90deg,#ff6b2b,#ff9a3c);height:100%;border-radius:4px;transition:width .4s}
+.taxa-grid{display:grid;gap:8px}
+.taxa-item{background:rgba(255,255,255,.04);border-radius:8px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;font-size:12px;color:rgba(255,255,255,.7)}
+.taxa-val{font-family:'DM Mono',monospace;font-size:15px;font-weight:600;color:#ff6b2b}
+.chart-grid-2x2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0}
+.chart-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:16px}
+.chart-card h4{font-size:11px;color:rgba(255,255,255,.45);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
+.chart-card canvas{max-height:190px}
+.sec-title{font-size:13px;font-weight:600;color:rgba(255,255,255,.65);margin:20px 0 10px;border-left:3px solid #ff6b2b;padding-left:10px}
+.cri-filterbar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.cri-filter-btn,.cri-status-btn,.cri-sort-btn,.pub-filter-btn,.pub-sort-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 12px;border-radius:5px;cursor:pointer;font-size:12px;transition:all .2s;font-family:'DM Sans',sans-serif}
+.cri-filter-btn.active,.cri-status-btn.active,.cri-sort-btn.active,.pub-filter-btn.active,.pub-sort-btn.active{background:rgba(255,107,43,.2);border-color:#ff6b2b;color:#ff6b2b}
+.cri-sort-label{font-size:11px;color:rgba(255,255,255,.4);white-space:nowrap}
+.cri-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
+.cri-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:14px}
+.cri-card.ativo{border-color:rgba(46,204,113,.25)}
+.cri-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.cri-name{font-size:11px;font-weight:600;word-break:break-all;flex:1;margin-right:6px;color:#e8e6f0}
+.cri-badge{font-size:10px;padding:2px 6px;border-radius:4px;white-space:nowrap}
+.cri-badge.ativo{background:rgba(46,204,113,.15);color:#2ecc71}
+.cri-badge.inativo{background:rgba(255,255,255,.08);color:rgba(255,255,255,.4)}
+.cri-metrics{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.cri-metric{display:flex;flex-direction:column}
+.cri-metric-label{color:rgba(255,255,255,.4);font-size:9px;margin-bottom:2px;text-transform:uppercase}
+.cri-metric-val{font-family:'DM Mono',monospace;font-size:12px;font-weight:600;color:#e8e6f0}
+.cri-metric-val.hl{color:#ff6b2b;font-size:14px}
+.cri-link{display:block;margin-top:8px;font-size:10px;color:rgba(255,107,43,.7);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tbl-wrap{overflow-x:auto;border-radius:8px;border:1px solid rgba(255,255,255,.07)}
+.pub-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-bottom:24px}
+.pub-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:16px}
+.pub-card.ativo{border-color:rgba(46,204,113,.2)}
+.pub-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+.pub-name{font-size:12px;font-weight:600;flex:1;margin-right:8px;color:#e8e6f0;line-height:1.4}
+.pub-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.pub-metric{text-align:center;padding:8px 6px;background:rgba(255,255,255,.03);border-radius:6px}
+.pub-metric-val{font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:#ff6b2b}
+.pub-metric-val.neutral{color:#e8e6f0}
+.pub-metric-lbl{font-size:9px;color:rgba(255,255,255,.35);margin-top:2px;text-transform:uppercase;letter-spacing:.4px}
+.ob-info{background:rgba(255,107,43,.07);border:1px solid rgba(255,107,43,.2);border-radius:8px;padding:10px 14px;font-size:11px;color:rgba(255,255,255,.55);margin-bottom:16px;line-height:1.5}
+.sales-scroll{display:flex;gap:12px;overflow-x:auto;padding-bottom:10px;margin-bottom:8px}
+.sale-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:14px;min-width:250px;flex-shrink:0}
+.sale-card.traf{border-left:3px solid #2ecc71}
+.sale-card.org{border-left:3px solid #f1c40f}
+.sale-name{font-size:12px;font-weight:600;color:#e8e6f0;margin-bottom:2px}
+.sale-val{font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:#ff6b2b;margin:6px 0 2px}
+.sale-meta{font-size:10px;color:rgba(255,255,255,.4);margin-top:3px;word-break:break-word;line-height:1.4}
+.empty{padding:24px;text-align:center;color:rgba(255,255,255,.3);font-size:12px}
+.err-box{background:rgba(231,76,60,.1);border:1px solid rgba(231,76,60,.35);color:#e74c3c;padding:14px 18px;border-radius:8px;font-size:12px;margin:20px 28px;line-height:1.6}
+@media(max-width:900px){.cri-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.cri-grid{grid-template-columns:1fr}.chart-grid-2x2{grid-template-columns:1fr}.funil-section{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div id="loading-overlay" style="position:fixed;inset:0;background:#1a1a2e;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px">
+  <div style="width:40px;height:40px;border:3px solid rgba(255,107,43,.2);border-top-color:#ff6b2b;border-radius:50%;animation:spin 1s linear infinite"></div>
+  <div style="color:rgba(255,255,255,.5);font-size:13px" id="loading-msg">Conectando com a planilha...</div>
+  <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+</div>
+
+<div class="topbar">
+  <div class="logo-jgt">
+    <svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+      <rect width="36" height="36" rx="8" fill="#ff6b2b" fill-opacity="0.9"/>
+      <text x="18" y="25" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="13" fill="white">JGT</text>
+    </svg>
+    <div class="logo-text">
+      <strong>Jamelli GT</strong>
+      <span>Tráfego Pago</span>
+    </div>
+  </div>
+  <div class="period-bar">
+    <label>De</label>
+    <input type="date" id="dateFrom" class="date-input" onchange="onDateChange()">
+    <span class="period-sep">→</span>
+    <input type="date" id="dateTo" class="date-input" onchange="onDateChange()">
+    <button class="preset-btn" onclick="setPreset(7,this)">7d</button>
+    <button class="preset-btn" onclick="setPreset(14,this)">14d</button>
+    <button class="preset-btn" onclick="setPreset(30,this)">30d</button>
+    <button class="preset-btn active" id="btn-all" onclick="setPreset('all',this)">Tudo</button>
+    <span class="range-info" id="range-info"></span>
+    <button class="preset-btn" onclick="loadData()" style="margin-left:4px">🔄 Atualizar</button>
+  </div>
+  <div>
+    <div class="brand" id="brand-title">📦 Dashboard</div>
+    <div class="subtitle" id="brand-subtitle">Dashboard de Performance — Perpétuo · Jamelli GT</div>
+    <div class="subtitle"><span id="src-tag" style="font-family:'DM Mono',monospace;font-size:10px"></span></div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('trafego',this)">📊 Tráfego</div>
+  <div class="tab" onclick="showTab('visao',this)">🌐 Visão Geral</div>
+  <div class="tab" onclick="showTab('criativos',this)">Criativos</div>
+  <div class="tab" onclick="showTab('publicos',this)">Públicos</div>
+  <div class="tab" onclick="showTab('semanal',this)">Semana a Semana</div>
+  <div class="tab" onclick="showTab('mensal',this)">Mês a Mês</div>
+</div>
+
+<div id="err-slot"></div>
+
+<!-- ══════════ TRÁFEGO ══════════ -->
+<div class="content active" id="tab-trafego">
+  <div class="kpi-grid" id="kpi-trafego"></div>
+  <div id="utm-warn"></div>
+  <div class="sec-title">Funil de Conversão</div>
+  <div class="funil-section">
+    <div id="funil-bars"></div>
+    <div class="taxa-grid" id="funil-taxas"></div>
+  </div>
+  <div class="sec-title">Evolução Diária</div>
+  <div class="chart-grid-2x2">
+    <div class="chart-card"><h4>Investimento por dia</h4><canvas id="ch-inv-dia"></canvas></div>
+    <div class="chart-card"><h4>Cliques × Page Views por dia</h4><canvas id="ch-clk-dia"></canvas></div>
+  </div>
+  <div class="sec-title">Painel de Vendas</div>
+  <div class="ob-info">✅ = venda de tráfego pago (meta_ads) &nbsp;·&nbsp; ⭐ = venda orgânica &nbsp;·&nbsp; 🛒 = order bump na mesma transação. Faturamento sempre vindo da aba de webhook.</div>
+  <div class="sales-scroll" id="sales-cards"></div>
+</div>
+
+<!-- ══════════ VISÃO GERAL ══════════ -->
+<div class="content" id="tab-visao">
+  <div class="kpi-grid" id="kpi-visao"></div>
+  <div class="sec-title">Dia a Dia</div>
+  <div class="tbl-wrap"><table id="tbl-dias"></table></div>
+</div>
+
+<!-- ══════════ CRIATIVOS ══════════ -->
+<div class="content" id="tab-criativos">
+  <div class="cri-filterbar">
+    <button class="cri-status-btn active" onclick="setCriStatus('todos',this)">Todos</button>
+    <button class="cri-status-btn" onclick="setCriStatus('ativos',this)">Ativos</button>
+    <button class="cri-status-btn" onclick="setCriStatus('inativos',this)">Inativos</button>
+    <span class="cri-sort-label" style="margin-left:10px">Ordenar por:</span>
+    <button class="cri-sort-btn active" onclick="setCriSort('inv',this)">Investimento</button>
+    <button class="cri-sort-btn" onclick="setCriSort('ctr',this)">CTR</button>
+    <button class="cri-sort-btn" onclick="setCriSort('cpc',this)">CPC</button>
+    <button class="cri-sort-btn" onclick="setCriSort('roas',this)">ROAS</button>
+    <button class="cri-sort-btn" onclick="setCriSort('vendas',this)">Vendas</button>
+  </div>
+  <div class="cri-grid" id="cri-cards"></div>
+  <div class="tbl-wrap"><table id="tbl-cri"></table></div>
+</div>
+
+<!-- ══════════ PÚBLICOS ══════════ -->
+<div class="content" id="tab-publicos">
+  <div class="cri-filterbar">
+    <button class="pub-filter-btn active" onclick="setPubStatus('todos',this)">Todos</button>
+    <button class="pub-filter-btn" onclick="setPubStatus('ativos',this)">Ativos</button>
+    <button class="pub-filter-btn" onclick="setPubStatus('inativos',this)">Inativos</button>
+    <span class="cri-sort-label" style="margin-left:10px">Ordenar por:</span>
+    <button class="pub-sort-btn active" onclick="setPubSort('inv',this)">Investimento</button>
+    <button class="pub-sort-btn" onclick="setPubSort('ctr',this)">CTR</button>
+    <button class="pub-sort-btn" onclick="setPubSort('cpc',this)">CPC</button>
+    <button class="pub-sort-btn" onclick="setPubSort('roas',this)">ROAS</button>
+    <button class="pub-sort-btn" onclick="setPubSort('vendas',this)">Vendas</button>
+  </div>
+  <div class="pub-grid" id="pub-cards"></div>
+  <div class="tbl-wrap"><table id="tbl-pub"></table></div>
+</div>
+
+<!-- ══════════ SEMANAL ══════════ -->
+<div class="content" id="tab-semanal">
+  <div class="chart-grid-2x2">
+    <div class="chart-card"><h4>Investimento por semana</h4><canvas id="ch-sem-inv"></canvas></div>
+    <div class="chart-card"><h4>CTR por semana (%)</h4><canvas id="ch-sem-ctr"></canvas></div>
+  </div>
+  <div class="tbl-wrap"><table id="tbl-sem"></table></div>
+</div>
+
+<!-- ══════════ MENSAL ══════════ -->
+<div class="content" id="tab-mensal">
+  <div class="chart-grid-2x2">
+    <div class="chart-card"><h4>Investimento por mês</h4><canvas id="ch-mes-inv"></canvas></div>
+    <div class="chart-card"><h4>CTR por mês (%)</h4><canvas id="ch-mes-ctr"></canvas></div>
+  </div>
+  <div class="tbl-wrap"><table id="tbl-mes"></table></div>
+</div>
+
+<script>
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║           CONFIGURAÇÃO DO CLIENTE — EDITE APENAS AQUI           ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+const CONFIG = {
+  // ── Identificação ─────────────────────────────────────────────────
+  // Deixe vazio ('') para o dashboard usar o nome da campanha automaticamente.
+  CLIENTE:          '',
+  PRODUTO:          'Desafio Perfil que Vende',
+  ANO:              '2026',
+
+  // ── Planilha ──────────────────────────────────────────────────────
+  SHEET_ID:         '1yPEXUAkFWmT4PXrqZI7aeLgApEtWkFn5Ch3VFOVNAIY',
+  GERENCIADOR_SHEET:'Gerenciador conta 2',
+  WEBHOOK_SHEET:    'WebhooK',
+  DATA_MINIMA:      '2026-08-12',
+
+  // ── Identificação do produto principal ────────────────────────────
+  // '' (vazio) = aceita qualquer produto que não seja order bump
+  PRODUTO_NOME:         '',
+  PRODUTO_PRECO_MINIMO: 0,
+
+  // ── transaction_root (agrupamento de OBs) ─────────────────────────
+  USA_TX_ROOT: true,
+
+  // ── Valores em centavos? (Hotmart = false) ────────────────────────
+  VALORES_EM_CENTAVOS: false,
+
+  // ── Ignorar linhas de teste/sandbox da plataforma ─────────────────
+  IGNORAR_TESTE: true,
+  PADROES_TESTE: ['produto test postback','teste comprador','@example.com','postman'],
+
+  // ── Colunas do Webhook (0-based, fallback) ────────────────────────
+  // Resolvidas automaticamente pelo NOME do cabeçalho (ver W_HEADERS).
+  W: {
+    data: 41, produto: 2, status: 58, cliente: 79, email: 84,
+    fatTotal: 51, fatPrincipal: 51, fatOB: null, txRoot: 34,
+    isOB: 35, transacao: 57,
+    utmSource: 44, utmMedium: null, utmCampaign: 43, utmContent: 42,
+  },
+
+  // Nomes de cabeçalho aceitos por campo (na ordem de prioridade)
+  W_HEADERS: {
+    data:        ['data.purchase.approved_date','data.purchase.order_date','creation_date','date','data'],
+    produto:     ['data.product.name','product_name','produto'],
+    status:      ['data.purchase.status','status'],
+    cliente:     ['data.buyer.name','buyer_name','nome','cliente'],
+    email:       ['data.buyer.email','buyer_email','email'],
+    fatTotal:    ['data.purchase.price.value','data.purchase.full_price.value','valor','price'],
+    fatPrincipal:['data.purchase.price.value','valor_principal'],
+    fatOB:       ['valor_order_bump','order_bump_value'],
+    txRoot:      ['data.purchase.order_bump.parent_purchase_transaction','transaction_root','tx_root'],
+    transacao:   ['data.purchase.transaction','transaction'],
+    isOB:        ['data.purchase.order_bump.is_order_bump','is_order_bump'],
+    utmSource:   ['data.purchase.origin.utm_source','data.purchase.tracking.source','data.purchase.origin.source','utm_source','src','data.purchase.offer.metadata.source'],
+    utmMedium:   ['data.purchase.origin.utm_medium','data.purchase.tracking.medium','utm_medium','sck'],
+    utmCampaign: ['data.purchase.origin.utm_campaign','data.purchase.tracking.campaign','utm_campaign','data.purchase.offer.metadata.campaign'],
+    utmContent:  ['data.purchase.origin.utm_content','data.purchase.tracking.content','utm_content','data.purchase.offer.metadata.variant'],
+  },
+
+  // ── Colunas do Gerenciador (0-based) ──────────────────────────────
+  G: {
+    date:0, campaign:1, adset:2, ad:3, link:4, inv:5, reach:6, imp:7,
+    cliques:8, pv:9, ck:10, purchases:11,
+    statusCampaign:12, statusAdset:13, statusAd:14,
+  },
+  G_HEADERS: {
+    date:['date','data'], campaign:['campaign name','campanha'], adset:['adset name','conjunto de anúncios','conjunto'],
+    ad:['ad name','anúncio','anuncio'], link:['instagram permalink url','link do anúncio','link'],
+    inv:['spend (cost, amount spent)','spend','investimento'], reach:['reach (estimated)','reach','alcance'],
+    imp:['impressions','impressões'], cliques:['action link clicks','clicks','cliques'],
+    pv:['action landing page view','page view','landing page view'],
+    ck:['action omni initiated checkout','checkout'], purchases:['action omni purchase','purchase','compras'],
+    statusCampaign:['campaign status','status_campanha'], statusAdset:['adset status','status_conjunto'],
+    statusAd:['ad status','status_anúncio','status_anuncio'],
+  },
+
+  // ── Status de aprovação da plataforma ─────────────────────────────
+  STATUS_APROVADO: ['APPROVED','COMPLETE','COMPLETED','CONFIRMED','PAGO','APROVADO'],
+};
+
+const SHEET_ID          = CONFIG.SHEET_ID;
+const GERENCIADOR_SHEET = CONFIG.GERENCIADOR_SHEET;
+const WEBHOOK_SHEET     = CONFIG.WEBHOOK_SHEET;
+const DATA_MINIMA       = CONFIG.DATA_MINIMA;
+const G                 = CONFIG.G;
+const W                 = CONFIG.W;
+
+function updateBrand(){
+  let label = [CONFIG.PRODUTO, CONFIG.CLIENTE].filter(Boolean).join(' · ');
+  if(!label){
+    const map={};
+    GROWS.forEach(r=>{ if(r.campanha) map[r.campanha]=(map[r.campanha]||0)+r.inv; });
+    const top=Object.keys(map).sort((a,b)=>map[b]-map[a])[0];
+    label = top || 'Dashboard de Performance';
+  }
+  document.title = label + ' — Jamelli GT';
+  const b = document.getElementById('brand-title');
+  if(b) b.textContent = '📦 ' + label;
+  const s = document.getElementById('brand-subtitle');
+  if(s) s.textContent = 'Dashboard de Performance — Perpétuo · Jamelli GT · ' + CONFIG.ANO;
+}
+document.addEventListener('DOMContentLoaded', updateBrand);
+
+// ══════════════════════════════════════════════════════════════════
+// ESTADO GLOBAL
+// ══════════════════════════════════════════════════════════════════
+let GROWS = [];   // linhas brutas do Gerenciador (objetos)
+let SALES = [];   // vendas processadas do Webhook
+let DIAS  = [];   // agregado por dia (Gerenciador)
+let HAS_UTM = false;
+let CHARTS = {};
+let criStatus='todos', criSort='inv', pubStatus='todos', pubSort='inv';
+
+// ══════════════════════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════════════════════
+function parseCSV(text){
+  const rows=[]; let row=[], cur='', q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){
+      if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; }
+      else cur+=c;
+    } else {
+      if(c==='"') q=true;
+      else if(c===','){ row.push(cur); cur=''; }
+      else if(c==='\n'){ row.push(cur); rows.push(row); row=[]; cur=''; }
+      else if(c!=='\r') cur+=c;
+    }
+  }
+  if(cur!=='' || row.length){ row.push(cur); rows.push(row); }
+  return rows.filter(r=>r.length>1 || (r[0]||'').trim()!=='');
+}
+
+function num(v){
+  if(v===null||v===undefined) return 0;
+  let s=String(v).trim().replace(/R\$/gi,'').replace(/\s|\u00a0/g,'');
+  if(!s) return 0;
+  if(s.indexOf(',')>-1) s=s.replace(/\./g,'').replace(',','.');
+  else if(/^-?\d{1,3}(\.\d{3})+$/.test(s)) s=s.replace(/\./g,'');
+  const n=parseFloat(s);
+  return isNaN(n)?0:n;
+}
+
+function toISO(v){
+  if(v===null||v===undefined) return '';
+  const s=String(v).trim();
+  if(!s) return '';
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  if(/^\d{2}\/\d{2}\/\d{4}/.test(s)){ const p=s.slice(0,10).split('/'); return p[2]+'-'+p[1]+'-'+p[0]; }
+  const d0=s.replace(/[^\d]/g,'');
+  if(/^\d{10,13}$/.test(d0)){
+    let n=parseInt(d0,10);
+    if(d0.length<=10) n*=1000;
+    const d=new Date(n);
+    if(!isNaN(d.getTime())) return d.toISOString().slice(0,10);
+  }
+  const d=new Date(s);
+  if(!isNaN(d.getTime())) return d.toISOString().slice(0,10);
+  return '';
+}
+
+const nf0 = new Intl.NumberFormat('pt-BR',{maximumFractionDigits:0});
+const nf2 = new Intl.NumberFormat('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+function brl(v){ if(!v) return '—'; return 'R$ '+nf2.format(v); }
+function int(v){ if(!v) return '—'; return nf0.format(v); }
+function pct(v){ if(!v||!isFinite(v)) return '—'; return nf2.format(v)+'%'; }
+function dec(v,d){ if(!v||!isFinite(v)) return '—'; return new Intl.NumberFormat('pt-BR',{minimumFractionDigits:d||2,maximumFractionDigits:d||2}).format(v); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function normKey(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9à-ÿ]/gi,''); }
+
+function resolveCols(header, headerMap, fallback){
+  const H = header.map(h=>String(h||'').trim().toLowerCase());
+  const out = Object.assign({}, fallback);
+  Object.keys(headerMap).forEach(key=>{
+    for(const cand of headerMap[key]){
+      const i = H.indexOf(cand.toLowerCase());
+      if(i>-1){ out[key]=i; return; }
+    }
+  });
+  return out;
+}
+
+const isTrafego = s => (s.utmSource||'').toLowerCase().replace(/[\s_-]/g,'') === 'metaads';
+
+// ══════════════════════════════════════════════════════════════════
+// FETCH
+// ══════════════════════════════════════════════════════════════════
+async function fetchSheetCSV(sheetName){
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+  // Timeout sem AbortSignal: alguns visualizadores em iframe nao conseguem clonar o signal via postMessage
+  let th;
+  const timeoutP = new Promise((_,rej)=>{ th = setTimeout(()=>rej(new Error(`Timeout ao carregar "${sheetName}".`)),20000); });
+  timeoutP.catch(()=>{}); // evita rejeicao nao tratada quando o fetch vence a corrida
+  let resp;
+  try{ resp = await Promise.race([fetch(url), timeoutP]); }
+  finally{ clearTimeout(th); }
+  if(!resp.ok) throw new Error(`Planilha "${sheetName}": HTTP ${resp.status}. Verifique se esta publica.`);
+  const text = await resp.text();
+  if(text.includes('Signin') || text.includes('accounts.google'))
+    throw new Error(`Planilha "${sheetName}" requer login. Defina como publica.`);
+  return text;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// LOAD
+// ══════════════════════════════════════════════════════════════════
+const EMBED_GEN = "14/08/2026";
+const EMBED_GERENCIADOR = "\"Date\",\"Campaign Name\",\"Adset Name\",\"Ad Name\",\"Instagram Permalink URL\",\" Spend (Cost, Amount Spent) \",\"Reach (Estimated)\",\"Impressions\",\"Action Link Clicks\",\"Action Landing Page View\",\"Action Omni Initiated Checkout\",\"Action Omni Purchase\",\"Campaign Status\",\"Adset Status\",\"Ad Status\",\"Campaign ID\",\"Adset ID\",\"Ad ID\"\n\"2026-08-12\",\"[JGT][VENDAS][DESAFIO] LL240826\",\"00 - ADV\",\"ADV-07 dias e seu perfil transformado\",\"https://www.instagram.com/p/Db9KK9vgJ2Z/\",\"0,07\",\"4\",\"4\",\"0\",\"0\",\"0\",\"0\",\"ACTIVE\",\"ACTIVE\",\"ACTIVE\",\"120249915563940459\",\"120249915563950459\",\"120249915808950459\"\n\"2026-08-12\",\"[JGT][VENDAS][DESAFIO] LL240826\",\"00 - ADV\",\"ADV-Ningu\u00e9m quer falar isso para a psic\u00f3loga\",\"https://www.instagram.com/p/Db9KKuygKzG/\",\"2,99\",\"47\",\"49\",\"0\",\"0\",\"0\",\"0\",\"ACTIVE\",\"ACTIVE\",\"ACTIVE\",\"120249915563940459\",\"120249915563950459\",\"120249915672880459\"\n\"2026-08-12\",\"[JGT][VENDAS][DESAFIO] LL240826\",\"00 - ADV\",\"ADV-O QUE ME INCOMODA VER NO PERFIL DA PSIC\u00d3LOGA\",\"https://www.instagram.com/p/Db9KLFGgtz3/\",\"1,31\",\"9\",\"9\",\"0\",\"0\",\"0\",\"0\",\"ACTIVE\",\"ACTIVE\",\"ACTIVE\",\"120249915563940459\",\"120249915563950459\",\"120249915563960459\"\n\"2026-08-12\",\"[JGT][VENDAS][DESAFIO] LL240826\",\"00 - ADV\",\"ADV-Oferta Direta\",\"https://www.instagram.com/p/Db9KJ_fA-aS/\",\"59,91\",\"534\",\"622\",\"11\",\"10\",\"0\",\"0\",\"ACTIVE\",\"ACTIVE\",\"ACTIVE\",\"120249915563940459\",\"120249915563950459\",\"120249915896240459\"\n\"2026-08-12\",\"[JGT][VENDAS][DESAFIO] LL240826\",\"00 - ADV\",\"ADV-Oferta Direta 2\",\"https://www.instagram.com/p/Db9KJ0Lgcs-/\",\"0,34\",\"10\",\"10\",\"0\",\"0\",\"0\",\"0\",\"ACTIVE\",\"ACTIVE\",\"ACTIVE\",\"120249915563940459\",\"120249915563950459\",\"120249915914270459\"\n\"2026-08-12\",\"[JGT][VENDAS][DESAFIO] LL240826\",\"00 - ADV\",\"ADV-Que loucura\",\"https://www.instagram.com/p/Db9KK_cA7Vt/\",\"0,01\",\"2\",\"2\",\"0\",\"0\",\"0\",\"0\",\"ACTIVE\",\"ACTIVE\",\"ACTIVE\",\"120249915563940459\",\"120249915563950459\",\"120249915880370459\"\n\"2026-08-12\",\"[JGT][VENDAS][DESAFIO] LL240826\",\"00 - ADV\",\"ADV-prova social\",\"https://www.instagram.com/p/Db9KLDHg8s5/\",\"6,43\",\"45\",\"46\",\"2\",\"2\",\"0\",\"0\",\"ACTIVE\",\"ACTIVE\",\"ACTIVE\",\"120249915563940459\",\"120249915563950459\",\"120249915724560459\"\n\"2026-08-13\",\"[JGT][VENDAS][DESAFIO] LL240826\",\"00 - ADV\",\"ADV-07 dias e seu perfil transformado\",\"https://www.instagram.com/p/Db9KK9vgJ2Z/\",\"2,55\",\"23\",\"25\",\"1\",\"1\",\"0\",\"0\",\"ACTIVE\",\"ACTIVE\",\"ACTIVE\",\"120249915563940459\",\"120249915563950459\",\"120249915808950459\"\n\"2026-08-13\",\"[JGT][VENDAS][DESAFIO] LL240826\",\"00 - ADV\",\"ADV-Ningu\u00e9m quer falar isso para a psic\u00f3loga\",\"https://www.instagram.com/p/Db9KKuygKzG/\",\"0,36\",\"6\",\"8\",\"0\",\"0\",\"0\",\"0\",\"ACTIVE\",\"ACTIVE\",\"ACTIVE\",\"120249915563940459\",\"120249915563950459\",\"120249915672880459\"\n\"2026-08-13\",\"[JGT][VENDAS][DESAFIO] LL240826\",\"00 - ADV\",\"ADV-O QUE ME INCOMODA VER NO PERFIL DA PSIC\u00d3LOGA\",\"https://www.instagram.com/p/Db9KLFGgtz3/\",\"2,88\",\"30\",\"31\",\"1\",\"0\",\"0\",\"0\",\"ACTIVE\",\"ACTIVE\",\"ACTIVE\",\"120249915563940459\",\"120249915563950459\",\"120249915563960459\"\n\"2026-08-13\",\"[JGT][VENDAS][DESAFIO] LL240826\",\"00 - ADV\",\"ADV-Oferta Direta\",\"https://www.instagram.com/p/Db9KJ_fA-aS/\",\"204,74\",\"59585\",\"60864\",\"238\",\"145\",\"0\",\"0\",\"ACTIVE\",\"ACTIVE\",\"ACTIVE\",\"120249915563940459\",\"120249915563950459\",\"120249915896240459\"\n\"2026-08-13\",\"[JGT][VENDAS][DESAFIO] LL240826\",\"00 - ADV\",\"ADV-Oferta Direta 2\",\"https://www.instagram.com/p/Db9KJ0Lgcs-/\",\"31,95\",\"267\",\"311\",\"3\",\"3\",\"0\",\"0\",\"ACTIVE\",\"ACTIVE\",\"ACTIVE\",\"120249915563940459\",\"120249915563950459\",\"120249915914270459\"\n\"2026-08-13\",\"[JGT][VENDAS][DESAFIO] LL240826\",\"00 - ADV\",\"ADV-Que loucura\",\"https://www.instagram.com/p/Db9KK_cA7Vt/\",\"3,44\",\"24\",\"24\",\"1\",\"1\",\"0\",\"0\",\"ACTIVE\",\"ACTIVE\",\"ACTIVE\",\"120249915563940459\",\"120249915563950459\",\"120249915880370459\"\n\"2026-08-13\",\"[JGT][VENDAS][DESAFIO] LL240826\",\"00 - ADV\",\"ADV-prova social\",\"https://www.instagram.com/p/Db9KLDHg8s5/\",\"17,19\",\"96\",\"105\",\"1\",\"1\",\"0\",\"0\",\"ACTIVE\",\"ACTIVE\",\"ACTIVE\",\"120249915563940459\",\"120249915563950459\",\"120249915724560459\"\n\"2026-08-14\",\"[JGT][VENDAS][DESAFIO] LL240826\",\"00 - ADV\",\"ADV-07 dias e seu perfil transformado\",\"https://www.instagram.com/p/Db9KK9vgJ2Z/\",\"12,17\",\"80\",\"92\",\"3\",\"1\",\"0\",\"0\",\"ACTIVE\",\"ACTIVE\",\"ACTIVE\",\"120249915563940459\",\"120249915563950459\",\"120249915808950459\"\n\"2026-08-14\",\"[JGT][VENDAS][DESAFIO] LL240826\",\"00 - ADV\",\"ADV-Ningu\u00e9m quer falar isso para a psic\u00f3loga\",\"https://www.instagram.com/p/Db9KKuygKzG/\",\"4,64\",\"121\",\"124\",\"2\",\"1\",\"0\",\"0\",\"ACTIVE\",\"ACTIVE\",\"ACTIVE\",\"120249915563940459\",\"120249915563950459\",\"120249915672880459\"\n\"2026-08-14\",\"[JGT][VENDAS][DESAFIO] LL240826\",\"00 - ADV\",\"ADV-O QUE ME INCOMODA VER NO PERFIL DA PSIC\u00d3LOGA\",\"https://www.instagram.com/p/Db9KLFGgtz3/\",\"9,79\",\"94\",\"102\",\"0\",\"0\",\"0\",\"0\",\"ACTIVE\",\"ACTIVE\",\"ACTIVE\",\"120249915563940459\",\"120249915563950459\",\"120249915563960459\"\n\"2026-08-14\",\"[JGT][VENDAS][DESAFIO] LL240826\",\"00 - ADV\",\"ADV-Oferta Direta\",\"https://www.instagram.com/p/Db9KJ_fA-aS/\",\"43,47\",\"108937\",\"109968\",\"416\",\"281\",\"1\",\"1\",\"ACTIVE\",\"ACTIVE\",\"ACTIVE\",\"120249915563940459\",\"120249915563950459\",\"120249915896240459\"\n\"2026-08-14\",\"[JGT][VENDAS][DESAFIO] LL240826\",\"00 - ADV\",\"ADV-Oferta Direta 2\",\"https://www.instagram.com/p/Db9KJ0Lgcs-/\",\"18,03\",\"298\",\"331\",\"2\",\"1\",\"0\",\"0\",\"ACTIVE\",\"ACTIVE\",\"ACTIVE\",\"120249915563940459\",\"120249915563950459\",\"120249915914270459\"\n\"2026-08-14\",\"[JGT][VENDAS][DESAFIO] LL240826\",\"00 - ADV\",\"ADV-Que loucura\",\"https://www.instagram.com/p/Db9KK_cA7Vt/\",\"2,62\",\"2032\",\"2032\",\"10\",\"10\",\"0\",\"0\",\"ACTIVE\",\"ACTIVE\",\"ACTIVE\",\"120249915563940459\",\"120249915563950459\",\"120249915880370459\"\n\"2026-08-14\",\"[JGT][VENDAS][DESAFIO] LL240826\",\"00 - ADV\",\"ADV-prova social\",\"https://www.instagram.com/p/Db9KLDHg8s5/\",\"7,86\",\"57\",\"65\",\"1\",\"1\",\"0\",\"0\",\"ACTIVE\",\"ACTIVE\",\"ACTIVE\",\"120249915563940459\",\"120249915563950459\",\"120249915724560459\"";
+const EMBED_WEBHOOK = "\"data.product.support_email\",\"data.product.has_co_production\",\"data.product.name\",\"data.product.warranty_date\",\"data.product.is_physical_product\",\"data.product.id\",\"data.product.ucode\",\"data.product.product_format_id\",\"data.product.content.has_physical_products\",\"data.product.content.products[0].name\",\"data.product.content.products[0].is_physical_product\",\"data.product.content.products[0].id\",\"data.product.content.products[0].ucode\",\"data.product.content.products[1].name\",\"data.product.content.products[1].is_physical_product\",\"data.product.content.products[1].id\",\"data.product.content.products[1].ucode\",\"data.shipping.carrier.service\",\"data.shipping.carrier.name\",\"data.shipping.cost.currency_value\",\"data.shipping.cost.value\",\"data.shipping.estimated_delivery_days\",\"data.shipping.fulfillment.service\",\"data.commissions[0].currency_value\",\"data.commissions[0].source\",\"data.commissions[0].value\",\"data.commissions[1].currency_value\",\"data.commissions[1].source\",\"data.commissions[1].value\",\"data.purchase.original_offer_price.currency_value\",\"data.purchase.original_offer_price.value\",\"data.purchase.checkout_country.iso\",\"data.purchase.checkout_country.name\",\"data.purchase.sckPaymentLink\",\"data.purchase.order_bump.parent_purchase_transaction\",\"data.purchase.order_bump.is_order_bump\",\"data.purchase.variants.attributes[0].name\",\"data.purchase.variants.attributes[0].value\",\"data.purchase.variants.attributes[1].name\",\"data.purchase.variants.attributes[1].value\",\"data.purchase.variants.sku\",\"data.purchase.approved_date\",\"data.purchase.offer.metadata.variant\",\"data.purchase.offer.metadata.campaign\",\"data.purchase.offer.metadata.source\",\"data.purchase.offer.code\",\"data.purchase.offer.coupon_code\",\"data.purchase.is_funnel\",\"data.purchase.event_tickets.amount\",\"data.purchase.order_date\",\"data.purchase.price.currency_value\",\"data.purchase.price.value\",\"data.purchase.payment.installments_number\",\"data.purchase.payment.type\",\"data.purchase.full_price.currency_value\",\"data.purchase.full_price.value\",\"data.purchase.business_model\",\"data.purchase.transaction\",\"data.purchase.status\",\"data.affiliates[0].affiliate_code\",\"data.affiliates[0].name\",\"data.producer.legal_nature\",\"data.producer.document\",\"data.producer.name\",\"data.subscription.subscriber.code\",\"data.subscription.plan.name\",\"data.subscription.plan.id\",\"data.subscription.status\",\"data.buyer.checkout_phone_code\",\"data.buyer.address.zipcode\",\"data.buyer.address.country\",\"data.buyer.address.number\",\"data.buyer.address.address\",\"data.buyer.address.city\",\"data.buyer.address.state\",\"data.buyer.address.neighborhood\",\"data.buyer.address.complement\",\"data.buyer.address.country_iso\",\"data.buyer.document\",\"data.buyer.name\",\"data.buyer.last_name\",\"data.buyer.checkout_phone\",\"data.buyer.ucode\",\"data.buyer.first_name\",\"data.buyer.email\",\"data.buyer.document_type\",\"id\",\"creation_date\",\"event\",\"version\"\n\"support@hotmart.com.br\",\"FALSE\",\"Produto test postback2\",\"2017-12-27T00:00:00Z\",\"FALSE\",\"0,00\",\"fb056612-bcc6-4217-9e6d-2a5d1110ac2f\",\"1\",\"TRUE\",\"How to Make Clear Ice\",\"FALSE\",\"4774438\",\"559fef42-3406-4d82-b775-d09bd33936b1\",\"Organizador de Poeira\",\"TRUE\",\"4999597\",\"099e7644-b7d1-43d6-82a9-ec6be0118a4b\",\"SEDEX\",\"CORREIOS\",\"BRL\",\"25,5\",\"7\",\"MANUAL\",\"BRL\",\"MARKETPLACE\",\"149,5\",\"BRL\",\"PRODUCER\",\"1350,5\",\"BRL\",\"1500\",\"BR\",\"Brasil\",\"sckPaymentLinkTest\",\"HP02316330308193\",\"TRUE\",\"Tamanho\",\"M\u00e9dio\",\"Cor\",\"Azul\",\"HTM_SANDBOX-01\",\"1511783346000\",\"premium\",\"summer_sale_2026\",\"landing_page\",\"test\",\"SHHUHA\",\"FALSE\",\"1786719831834\",\"1511783344000\",\"BRL\",\"1500\",\"12\",\"CREDIT_CARD\",\"BRL\",\"1500\",\"I\",\"HP16015479281022\",\"CANCELED\",\"Q58388177J\",\"Affiliate name\",\"Pessoa F\u00edsica\",\"12345678965\",\"Producer Test Name\",\"I9OT62C3\",\"plano de teste\",\"123\",\"ACTIVE\",\"999999999\",\"38400123\",\"Brasil\",\"10\",\"Avenida Francisco Galassi\",\"Uberl\u00e2ndia\",\"Minas Gerais\",\"Tubalina\",\"Perto do shopping\",\"BR\",\"69526128664\",\"Teste Comprador\",\"Comprador\",\"99999999900\",\"f6ebb124-863f-4a94-a843-5c57c0b1b607\",\"Teste\",\"testeComprador271101postman15@example.com\",\"CPF\",\"92710d74-b977-4ac5-90c8-34d46ea4c9a0\",\"1786719831840\",\"PURCHASE_CANCELED\",\"2.0.0\"\n\"support@hotmart.com.br\",\"FALSE\",\"Produto test postback2\",\"2017-12-27T00:00:00Z\",\"FALSE\",\"0,00\",\"fb056612-bcc6-4217-9e6d-2a5d1110ac2f\",\"1\",\"TRUE\",\"How to Make Clear Ice\",\"FALSE\",\"4774438\",\"559fef42-3406-4d82-b775-d09bd33936b1\",\"Organizador de Poeira\",\"TRUE\",\"4999597\",\"099e7644-b7d1-43d6-82a9-ec6be0118a4b\",\"SEDEX\",\"CORREIOS\",\"BRL\",\"25,5\",\"7\",\"MANUAL\",\"BRL\",\"MARKETPLACE\",\"149,5\",\"BRL\",\"PRODUCER\",\"1350,5\",\"BRL\",\"1500\",\"BR\",\"Brasil\",\"sckPaymentLinkTest\",\"HP02316330308193\",\"TRUE\",\"Tamanho\",\"M\u00e9dio\",\"Cor\",\"Azul\",\"HTM_SANDBOX-01\",\"1511783346000\",\"premium\",\"summer_sale_2026\",\"landing_page\",\"test\",\"SHHUHA\",\"FALSE\",\"1786719831927\",\"1511783344000\",\"BRL\",\"1500\",\"12\",\"CREDIT_CARD\",\"BRL\",\"1500\",\"I\",\"HP16015479281022\",\"REFUNDED\",\"Q58388177J\",\"Affiliate name\",\"Pessoa F\u00edsica\",\"12345678965\",\"Producer Test Name\",\"I9OT62C3\",\"plano de teste\",\"123\",\"ACTIVE\",\"999999999\",\"38400123\",\"Brasil\",\"10\",\"Avenida Francisco Galassi\",\"Uberl\u00e2ndia\",\"Minas Gerais\",\"Tubalina\",\"Perto do shopping\",\"BR\",\"69526128664\",\"Teste Comprador\",\"Comprador\",\"99999999900\",\"f6ebb124-863f-4a94-a843-5c57c0b1b607\",\"Teste\",\"testeComprador271101postman15@example.com\",\"CPF\",\"7c16fa89-3400-478b-936e-c9a741db95bf\",\"1786719831933\",\"PURCHASE_REFUNDED\",\"2.0.0\"\n\"support@hotmart.com.br\",\"FALSE\",\"Produto test postback2\",\"2017-12-27T00:00:00Z\",\"FALSE\",\"0,00\",\"fb056612-bcc6-4217-9e6d-2a5d1110ac2f\",\"1\",\"TRUE\",\"How to Make Clear Ice\",\"FALSE\",\"4774438\",\"559fef42-3406-4d82-b775-d09bd33936b1\",\"Organizador de Poeira\",\"TRUE\",\"4999597\",\"099e7644-b7d1-43d6-82a9-ec6be0118a4b\",\"SEDEX\",\"CORREIOS\",\"BRL\",\"25,5\",\"7\",\"MANUAL\",\"BRL\",\"MARKETPLACE\",\"149,5\",\"BRL\",\"PRODUCER\",\"1350,5\",\"BRL\",\"1500\",\"BR\",\"Brasil\",\"sckPaymentLinkTest\",\"HP02316330308193\",\"TRUE\",\"Tamanho\",\"M\u00e9dio\",\"Cor\",\"Azul\",\"HTM_SANDBOX-01\",\"1511783346000\",\"premium\",\"summer_sale_2026\",\"landing_page\",\"test\",\"SHHUHA\",\"FALSE\",\"1786719831886\",\"1511783344000\",\"BRL\",\"1500\",\"12\",\"CREDIT_CARD\",\"BRL\",\"1500\",\"I\",\"HP16015479281022\",\"DELAYED\",\"Q58388177J\",\"Affiliate name\",\"Pessoa F\u00edsica\",\"12345678965\",\"Producer Test Name\",\"I9OT62C3\",\"plano de teste\",\"123\",\"ACTIVE\",\"999999999\",\"38400123\",\"Brasil\",\"10\",\"Avenida Francisco Galassi\",\"Uberl\u00e2ndia\",\"Minas Gerais\",\"Tubalina\",\"Perto do shopping\",\"BR\",\"69526128664\",\"Teste Comprador\",\"Comprador\",\"99999999900\",\"f6ebb124-863f-4a94-a843-5c57c0b1b607\",\"Teste\",\"testeComprador271101postman15@example.com\",\"CPF\",\"91aa9e3b-81b2-4465-a466-86b1e8975a6d\",\"1786719831891\",\"PURCHASE_DELAYED\",\"2.0.0\"\n\"support@hotmart.com.br\",\"FALSE\",\"Produto test postback2\",\"2017-12-27T00:00:00Z\",\"FALSE\",\"0,00\",\"fb056612-bcc6-4217-9e6d-2a5d1110ac2f\",\"1\",\"TRUE\",\"How to Make Clear Ice\",\"FALSE\",\"4774438\",\"559fef42-3406-4d82-b775-d09bd33936b1\",\"Organizador de Poeira\",\"TRUE\",\"4999597\",\"099e7644-b7d1-43d6-82a9-ec6be0118a4b\",\"SEDEX\",\"CORREIOS\",\"BRL\",\"25,5\",\"7\",\"MANUAL\",\"BRL\",\"MARKETPLACE\",\"149,5\",\"BRL\",\"PRODUCER\",\"1350,5\",\"BRL\",\"1500\",\"BR\",\"Brasil\",\"sckPaymentLinkTest\",\"HP02316330308193\",\"TRUE\",\"Tamanho\",\"M\u00e9dio\",\"Cor\",\"Azul\",\"HTM_SANDBOX-01\",\"1511783346000\",\"premium\",\"summer_sale_2026\",\"landing_page\",\"test\",\"SHHUHA\",\"FALSE\",\"1786719831782\",\"1511783344000\",\"BRL\",\"1500\",\"12\",\"CREDIT_CARD\",\"BRL\",\"1500\",\"I\",\"HP16015479281022\",\"DISPUTE\",\"Q58388177J\",\"Affiliate name\",\"Pessoa F\u00edsica\",\"12345678965\",\"Producer Test Name\",\"I9OT62C3\",\"plano de teste\",\"123\",\"ACTIVE\",\"999999999\",\"38400123\",\"Brasil\",\"10\",\"Avenida Francisco Galassi\",\"Uberl\u00e2ndia\",\"Minas Gerais\",\"Tubalina\",\"Perto do shopping\",\"BR\",\"69526128664\",\"Teste Comprador\",\"Comprador\",\"99999999900\",\"f6ebb124-863f-4a94-a843-5c57c0b1b607\",\"Teste\",\"testeComprador271101postman15@example.com\",\"CPF\",\"421f2833-7afd-4c3e-837f-1cc404007497\",\"1786719831789\",\"PURCHASE_PROTEST\",\"2.0.0\"\n\"support@hotmart.com.br\",\"FALSE\",\"Produto test postback2\",\"2017-12-27T00:00:00Z\",\"FALSE\",\"0,00\",\"fb056612-bcc6-4217-9e6d-2a5d1110ac2f\",\"1\",\"TRUE\",\"How to Make Clear Ice\",\"FALSE\",\"4774438\",\"559fef42-3406-4d82-b775-d09bd33936b1\",\"Organizador de Poeira\",\"TRUE\",\"4999597\",\"099e7644-b7d1-43d6-82a9-ec6be0118a4b\",\"SEDEX\",\"CORREIOS\",\"BRL\",\"25,5\",\"7\",\"MANUAL\",\"BRL\",\"MARKETPLACE\",\"149,5\",\"BRL\",\"PRODUCER\",\"1350,5\",\"BRL\",\"1500\",\"BR\",\"Brasil\",\"sckPaymentLinkTest\",\"HP02316330308193\",\"TRUE\",\"Tamanho\",\"M\u00e9dio\",\"Cor\",\"Azul\",\"HTM_SANDBOX-01\",\"1511783346000\",\"premium\",\"summer_sale_2026\",\"landing_page\",\"test\",\"SHHUHA\",\"FALSE\",\"1786719832021\",\"1511783344000\",\"BRL\",\"1500\",\"12\",\"CREDIT_CARD\",\"BRL\",\"1500\",\"I\",\"HP16015479281022\",\"COMPLETED\",\"Q58388177J\",\"Affiliate name\",\"Pessoa F\u00edsica\",\"12345678965\",\"Producer Test Name\",\"I9OT62C3\",\"plano de teste\",\"123\",\"ACTIVE\",\"999999999\",\"38400123\",\"Brasil\",\"10\",\"Avenida Francisco Galassi\",\"Uberl\u00e2ndia\",\"Minas Gerais\",\"Tubalina\",\"Perto do shopping\",\"BR\",\"69526128664\",\"Teste Comprador\",\"Comprador\",\"99999999900\",\"f6ebb124-863f-4a94-a843-5c57c0b1b607\",\"Teste\",\"testeComprador271101postman15@example.com\",\"CPF\",\"7be20ca8-6dd6-4c0d-93e0-e0d775b2485c\",\"1786719832027\",\"PURCHASE_COMPLETE\",\"2.0.0\"\n\"support@hotmart.com.br\",\"FALSE\",\"Produto test postback2\",\"2017-12-27T00:00:00Z\",\"FALSE\",\"0,00\",\"fb056612-bcc6-4217-9e6d-2a5d1110ac2f\",\"1\",\"TRUE\",\"How to Make Clear Ice\",\"FALSE\",\"4774438\",\"559fef42-3406-4d82-b775-d09bd33936b1\",\"Organizador de Poeira\",\"TRUE\",\"4999597\",\"099e7644-b7d1-43d6-82a9-ec6be0118a4b\",\"SEDEX\",\"CORREIOS\",\"BRL\",\"25,5\",\"7\",\"MANUAL\",\"BRL\",\"MARKETPLACE\",\"149,5\",\"BRL\",\"PRODUCER\",\"1350,5\",\"BRL\",\"1500\",\"BR\",\"Brasil\",\"sckPaymentLinkTest\",\"HP02316330308193\",\"TRUE\",\"Tamanho\",\"M\u00e9dio\",\"Cor\",\"Azul\",\"HTM_SANDBOX-01\",\"1511783346000\",\"premium\",\"summer_sale_2026\",\"landing_page\",\"test\",\"SHHUHA\",\"FALSE\",\"1786719831649\",\"1511783344000\",\"BRL\",\"1500\",\"12\",\"CREDIT_CARD\",\"BRL\",\"1500\",\"I\",\"HP16015479281022\",\"APPROVED\",\"Q58388177J\",\"Affiliate name\",\"Pessoa F\u00edsica\",\"12345678965\",\"Producer Test Name\",\"I9OT62C3\",\"plano de teste\",\"123\",\"ACTIVE\",\"999999999\",\"38400123\",\"Brasil\",\"10\",\"Avenida Francisco Galassi\",\"Uberl\u00e2ndia\",\"Minas Gerais\",\"Tubalina\",\"Perto do shopping\",\"BR\",\"69526128664\",\"Teste Comprador\",\"Comprador\",\"99999999900\",\"f6ebb124-863f-4a94-a843-5c57c0b1b607\",\"Teste\",\"testeComprador271101postman15@example.com\",\"CPF\",\"3c5171d5-2d73-4087-9537-acd2f520212d\",\"1786719831664\",\"PURCHASE_APPROVED\",\"2.0.0\"\n\"support@hotmart.com.br\",\"FALSE\",\"Produto test postback2\",\"2017-12-27T00:00:00Z\",\"FALSE\",\"0,00\",\"fb056612-bcc6-4217-9e6d-2a5d1110ac2f\",\"1\",\"TRUE\",\"How to Make Clear Ice\",\"FALSE\",\"4774438\",\"559fef42-3406-4d82-b775-d09bd33936b1\",\"Organizador de Poeira\",\"TRUE\",\"4999597\",\"099e7644-b7d1-43d6-82a9-ec6be0118a4b\",\"SEDEX\",\"CORREIOS\",\"BRL\",\"25,5\",\"7\",\"MANUAL\",\"BRL\",\"MARKETPLACE\",\"149,5\",\"BRL\",\"PRODUCER\",\"1350,5\",\"BRL\",\"1500\",\"BR\",\"Brasil\",\"sckPaymentLinkTest\",\"HP02316330308193\",\"TRUE\",\"Tamanho\",\"M\u00e9dio\",\"Cor\",\"Azul\",\"HTM_SANDBOX-01\",\"1511783346000\",\"premium\",\"summer_sale_2026\",\"landing_page\",\"test\",\"SHHUHA\",\"FALSE\",\"1786719831733\",\"1511783344000\",\"BRL\",\"1500\",\"12\",\"CREDIT_CARD\",\"BRL\",\"1500\",\"I\",\"HP16015479281022\",\"EXPIRED\",\"Q58388177J\",\"Affiliate name\",\"Pessoa F\u00edsica\",\"12345678965\",\"Producer Test Name\",\"I9OT62C3\",\"plano de teste\",\"123\",\"ACTIVE\",\"999999999\",\"38400123\",\"Brasil\",\"10\",\"Avenida Francisco Galassi\",\"Uberl\u00e2ndia\",\"Minas Gerais\",\"Tubalina\",\"Perto do shopping\",\"BR\",\"69526128664\",\"Teste Comprador\",\"Comprador\",\"99999999900\",\"f6ebb124-863f-4a94-a843-5c57c0b1b607\",\"Teste\",\"testeComprador271101postman15@example.com\",\"CPF\",\"543c591e-f39d-4d01-a3db-20e0a40e37a1\",\"1786719831739\",\"PURCHASE_EXPIRED\",\"2.0.0\"\n\"support@hotmart.com.br\",\"FALSE\",\"Produto test postback2\",\"2017-12-27T00:00:00Z\",\"FALSE\",\"0,00\",\"fb056612-bcc6-4217-9e6d-2a5d1110ac2f\",\"1\",\"TRUE\",\"How to Make Clear Ice\",\"FALSE\",\"4774438\",\"559fef42-3406-4d82-b775-d09bd33936b1\",\"Organizador de Poeira\",\"TRUE\",\"4999597\",\"099e7644-b7d1-43d6-82a9-ec6be0118a4b\",\"SEDEX\",\"CORREIOS\",\"BRL\",\"25,5\",\"7\",\"MANUAL\",\"BRL\",\"MARKETPLACE\",\"149,5\",\"BRL\",\"PRODUCER\",\"1350,5\",\"BRL\",\"1500\",\"BR\",\"Brasil\",\"sckPaymentLinkTest\",\"HP02316330308193\",\"TRUE\",\"Tamanho\",\"M\u00e9dio\",\"Cor\",\"Azul\",\"HTM_SANDBOX-01\",\"1511783346000\",\"premium\",\"summer_sale_2026\",\"landing_page\",\"test\",\"SHHUHA\",\"FALSE\",\"1786719831968\",\"1511783344000\",\"BRL\",\"1500\",\"12\",\"CREDIT_CARD\",\"BRL\",\"1500\",\"I\",\"HP16015479281022\",\"CHARGEBACK\",\"Q58388177J\",\"Affiliate name\",\"Pessoa F\u00edsica\",\"12345678965\",\"Producer Test Name\",\"I9OT62C3\",\"plano de teste\",\"123\",\"ACTIVE\",\"999999999\",\"38400123\",\"Brasil\",\"10\",\"Avenida Francisco Galassi\",\"Uberl\u00e2ndia\",\"Minas Gerais\",\"Tubalina\",\"Perto do shopping\",\"BR\",\"69526128664\",\"Teste Comprador\",\"Comprador\",\"99999999900\",\"f6ebb124-863f-4a94-a843-5c57c0b1b607\",\"Teste\",\"testeComprador271101postman15@example.com\",\"CPF\",\"b94a787d-d48f-441e-8e2c-460e3f472215\",\"1786719831974\",\"PURCHASE_CHARGEBACK\",\"2.0.0\"\n\"support@hotmart.com.br\",\"FALSE\",\"Produto test postback2\",\"2017-12-27T00:00:00Z\",\"FALSE\",\"0,00\",\"fb056612-bcc6-4217-9e6d-2a5d1110ac2f\",\"1\",\"TRUE\",\"How to Make Clear Ice\",\"FALSE\",\"4774438\",\"559fef42-3406-4d82-b775-d09bd33936b1\",\"Organizador de Poeira\",\"TRUE\",\"4999597\",\"099e7644-b7d1-43d6-82a9-ec6be0118a4b\",\"SEDEX\",\"CORREIOS\",\"BRL\",\"25,5\",\"7\",\"MANUAL\",\"BRL\",\"MARKETPLACE\",\"149,5\",\"BRL\",\"PRODUCER\",\"1350,5\",\"BRL\",\"1500\",\"BR\",\"Brasil\",\"sckPaymentLinkTest\",\"HP02316330308193\",\"TRUE\",\"Tamanho\",\"M\u00e9dio\",\"Cor\",\"Azul\",\"HTM_SANDBOX-01\",\"1511783346000\",\"premium\",\"summer_sale_2026\",\"landing_page\",\"test\",\"SHHUHA\",\"FALSE\",\"1786719832069\",\"1511783344000\",\"BRL\",\"1500\",\"12\",\"CREDIT_CARD\",\"BRL\",\"1500\",\"I\",\"HP16015479281022\",\"BILLET_PRINTED\",\"Q58388177J\",\"Affiliate name\",\"Pessoa F\u00edsica\",\"12345678965\",\"Producer Test Name\",\"I9OT62C3\",\"plano de teste\",\"123\",\"ACTIVE\",\"999999999\",\"38400123\",\"Brasil\",\"10\",\"Avenida Francisco Galassi\",\"Uberl\u00e2ndia\",\"Minas Gerais\",\"Tubalina\",\"Perto do shopping\",\"BR\",\"69526128664\",\"Teste Comprador\",\"Comprador\",\"99999999900\",\"f6ebb124-863f-4a94-a843-5c57c0b1b607\",\"Teste\",\"testeComprador271101postman15@example.com\",\"CPF\",\"8788a48f-f8b1-4cc7-8227-2247ef68fed0\",\"1786719832074\",\"PURCHASE_BILLET_PRINTED\",\"2.0.0\"";
+let DATA_SOURCE = 'embed';
+
+function applyData(gTxt, wTxt, source){
+  processGerenciador(parseCSV(gTxt));
+  processWebhook(parseCSV(wTxt));
+  DATA_SOURCE = source;
+  initDateInputs();
+  render();
+  const tag = document.getElementById('src-tag');
+  if(tag){
+    if(source === 'live'){ tag.textContent = '\u25CF ao vivo'; tag.style.color = '#2ecc71'; }
+    else { tag.textContent = '\u25CF copia local (' + EMBED_GEN + ')'; tag.style.color = '#f1c40f'; }
+  }
+}
+
+async function loadData(){
+  const ov = document.getElementById('loading-overlay');
+  if(ov) ov.style.display = 'flex';
+  document.getElementById('err-slot').innerHTML = '';
+  try{
+    setMsg('Buscando dados ao vivo...');
+    const gTxt = await fetchSheetCSV(GERENCIADOR_SHEET);
+    const wTxt = await fetchSheetCSV(WEBHOOK_SHEET);
+    if(!gTxt || gTxt.trim().length < 20) throw new Error('Planilha retornou vazia.');
+    setMsg('Processando...');
+    applyData(gTxt, wTxt, 'live');
+  }catch(e){
+    console.warn('Busca ao vivo falhou, usando snapshot embutido:', e.message);
+    try{
+      applyData(EMBED_GERENCIADOR, EMBED_WEBHOOK, 'embed');
+    }catch(e2){
+      document.getElementById('err-slot').innerHTML =
+        '<div class="err-box" style="white-space:pre-wrap"><strong>Erro ao carregar os dados</strong>\n'+esc(e2.message)+'</div>';
+    }
+  }finally{
+    if(ov) ov.style.display = 'none';
+  }
+}
+function setMsg(m){ const el=document.getElementById('loading-msg'); if(el) el.textContent=m; }
+
+function processGerenciador(rows){
+  if(!rows.length){ GROWS=[]; return; }
+  const c = resolveCols(rows[0], CONFIG.G_HEADERS, G);
+  const isPaused = s => String(s||'').toUpperCase().includes('PAUSED');
+  GROWS = rows.slice(1).map(r=>{
+    const sC=r[c.statusCampaign]||'', sA=r[c.statusAdset]||'', sD=r[c.statusAd]||'';
+    return {
+      data: toISO(r[c.date]),
+      campanha: (r[c.campaign]||'').trim(),
+      publico: (r[c.adset]||'').trim(),
+      criativo: (r[c.ad]||'').trim(),
+      link: (r[c.link]||'').trim(),
+      inv: num(r[c.inv]), reach: num(r[c.reach]), imp: num(r[c.imp]),
+      cliques: num(r[c.cliques]), pv: num(r[c.pv]), ck: num(r[c.ck]),
+      compras: num(r[c.purchases]),
+      ativo: !isPaused(sC) && !isPaused(sA) && !isPaused(sD) && (sC!=='' || sA!=='' || sD!==''),
+    };
+  }).filter(x=>x.data && x.data>=DATA_MINIMA);
+}
+
+function processWebhook(rows){
+  SALES=[]; HAS_UTM=false;
+  if(rows.length<2) return;
+  const header = rows[0];
+  const c = resolveCols(header, CONFIG.W_HEADERS, W);
+  const H = header.map(h=>String(h||'').trim().toLowerCase());
+  HAS_UTM = H.some(h=>/utm_source|origin\.source|tracking\.source/.test(h));
+
+  const div = CONFIG.VALORES_EM_CENTAVOS ? 100 : 1;
+  const okStatus = new Set(CONFIG.STATUS_APROVADO.map(s=>s.toUpperCase()));
+  const groups = {};
+
+  rows.slice(1).forEach((r,idx)=>{
+    const get = k => (c[k]==null || c[k]<0) ? '' : (r[c[k]]||'');
+    const data = toISO(get('data')) || toISO(get('transacao'));
+    const status = String(get('status')).trim().toUpperCase();
+    const produto = String(get('produto')).trim();
+    const nome = String(get('cliente')).trim();
+    const email = String(get('email')).trim();
+
+    if(CONFIG.IGNORAR_TESTE){
+      const blob = (produto+' '+nome+' '+email).toLowerCase();
+      if(CONFIG.PADROES_TESTE.some(p=>blob.includes(p))) return;
+    }
+    if(!data || data < DATA_MINIMA) return;
+    if(!okStatus.has(status)) return;
+
+    const valor = num(get('fatTotal'))/div;
+    const isOB = String(get('isOB')).trim().toUpperCase()==='TRUE';
+    let key;
+    if(CONFIG.USA_TX_ROOT){
+      key = String(get('txRoot')).trim() || String(get('transacao')).trim() || (email+'|'+data) || ('r'+idx);
+    } else {
+      key = (email+'|'+data) || ('r'+idx);
+    }
+
+    if(!groups[key]) groups[key] = {
+      data, nome, email, fatPrincipal:0, fatOB:0, principal:false,
+      utmSource:String(get('utmSource')).trim(),
+      utmMedium:String(get('utmMedium')).trim(),
+      utmCampaign:String(get('utmCampaign')).trim(),
+      utmContent:String(get('utmContent')).trim(),
+    };
+    const g = groups[key];
+    if(data < g.data) g.data = data;
+    if(!g.nome && nome) g.nome = nome;
+    if(!g.email && email) g.email = email;
+    ['utmSource','utmMedium','utmCampaign','utmContent'].forEach(k=>{
+      if(!g[k]){ const v=String(get(k)).trim(); if(v) g[k]=v; }
+    });
+
+    const ehPrincipal = !isOB
+      && (!CONFIG.PRODUTO_NOME || produto.toLowerCase().includes(CONFIG.PRODUTO_NOME.toLowerCase()))
+      && valor >= CONFIG.PRODUTO_PRECO_MINIMO;
+
+    if(ehPrincipal){ g.principal=true; g.fatPrincipal += valor; }
+    else g.fatOB += valor;
+  });
+
+  SALES = Object.values(groups)
+    .filter(g=>g.principal)
+    .map(g=>({ data:g.data, nome:g.nome, email:g.email,
+      fatPrincipal:g.fatPrincipal, fatOB:g.fatOB, fatTotal:g.fatPrincipal+g.fatOB,
+      utmSource:g.utmSource, utmMedium:g.utmMedium, utmCampaign:g.utmCampaign, utmContent:g.utmContent }))
+    .sort((a,b)=>b.data.localeCompare(a.data));
+}
+
+// ══════════════════════════════════════════════════════════════════
+// AGREGAÇÕES
+// ══════════════════════════════════════════════════════════════════
+function agregaDias(from,to){
+  const map={};
+  GROWS.filter(r=>(!from||r.data>=from)&&(!to||r.data<=to)).forEach(r=>{
+    if(!map[r.data]) map[r.data]={data:r.data,inv:0,imp:0,reach:0,cliques:0,pv:0,ck:0,compras:0};
+    const d=map[r.data];
+    d.inv+=r.inv; d.imp+=r.imp; d.reach+=r.reach; d.cliques+=r.cliques;
+    d.pv+=r.pv; d.ck+=r.ck; d.compras+=r.compras;
+  });
+  return Object.values(map).sort((a,b)=>a.data.localeCompare(b.data));
+}
+function filtSales(from,to){
+  return SALES.filter(s=>(!from||s.data>=from)&&(!to||s.data<=to));
+}
+function totais(dias){
+  const t={inv:0,imp:0,reach:0,cliques:0,pv:0,ck:0,compras:0};
+  dias.forEach(d=>{ for(const k in t) t[k]+=d[k]||0; });
+  return t;
+}
+
+function buildCriPubMaps(from,to){
+  const rows = GROWS.filter(r=>(!from||r.data>=from)&&(!to||r.data<=to));
+  const cri={}, pub={};
+  rows.forEach(r=>{
+    [[cri,r.criativo],[pub,r.publico]].forEach(([m,name])=>{
+      if(!name) return;
+      if(!m[name]) m[name]={nome:name,inv:0,imp:0,cliques:0,pv:0,ck:0,compras:0,vendas:0,fat:0,ativo:false,link:''};
+      const o=m[name];
+      o.inv+=r.inv; o.imp+=r.imp; o.cliques+=r.cliques; o.pv+=r.pv; o.ck+=r.ck; o.compras+=r.compras;
+      if(r.ativo) o.ativo=true;
+      if(!o.link && r.link) o.link=r.link;
+    });
+  });
+  const fSales = filtSales(from,to).filter(isTrafego);
+  const attach=(m,val)=>{
+    if(!val) return null;
+    const nk=normKey(val);
+    const keys=Object.keys(m);
+    let hit=keys.find(k=>normKey(k)===nk);
+    if(!hit) hit=keys.find(k=>{const a=normKey(k);return a&&(a.includes(nk)||nk.includes(a));});
+    return hit?m[hit]:null;
+  };
+  fSales.forEach(s=>{
+    const a=attach(cri,s.utmContent); if(a){a.vendas++;a.fat+=s.fatTotal;}
+    const b=attach(pub,s.utmMedium);  if(b){b.vendas++;b.fat+=s.fatTotal;}
+  });
+  const fin=o=>{
+    o.ctr = o.imp? o.cliques/o.imp*100 : 0;
+    o.cpc = o.cliques? o.inv/o.cliques : 0;
+    o.cpm = o.imp? o.inv/o.imp*1000 : 0;
+    o.roas = o.inv? o.fat/o.inv : 0;
+    o.cac = o.vendas? o.inv/o.vendas : 0;
+    return o;
+  };
+  return { cri:Object.values(cri).map(fin), pub:Object.values(pub).map(fin) };
+}
+
+// ══════════════════════════════════════════════════════════════════
+// DATAS / FILTRO
+// ══════════════════════════════════════════════════════════════════
+function allDatesSorted(){
+  return [...GROWS.map(r=>r.data), ...SALES.map(s=>s.data)].filter(Boolean).sort();
+}
+function initDateInputs(){
+  const a=allDatesSorted();
+  if(!a.length) return;
+  document.getElementById('dateFrom').value=a[0];
+  document.getElementById('dateTo').value=a[a.length-1];
+}
+function getRange(){
+  return { from: document.getElementById('dateFrom').value || '', to: document.getElementById('dateTo').value || '' };
+}
+function onDateChange(){
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+  render();
+}
+function setPreset(days,btn){
+  const a=allDatesSorted();
+  if(!a.length) return;
+  const first=a[0], last=a[a.length-1];
+  let from=first;
+  if(days!=='all'){
+    const d=new Date(last+'T00:00:00');
+    d.setDate(d.getDate()-(days-1));
+    const iso=d.toISOString().slice(0,10);
+    from = iso>first ? iso : first;
+  }
+  document.getElementById('dateFrom').value=from;
+  document.getElementById('dateTo').value=last;
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  render();
+}
+
+// ══════════════════════════════════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════════════════════════════════
+function render(){
+  const {from,to}=getRange();
+  const dias=agregaDias(from,to);
+  const sales=filtSales(from,to);
+  const t=totais(dias);
+
+  updateBrand();
+  const ri=document.getElementById('range-info');
+  if(ri) ri.textContent = dias.length ? `${dias.length} dia(s)` : 'sem dados no período';
+
+  renderTrafego(t,dias,sales);
+  renderVisao(t,dias,sales);
+  const maps=buildCriPubMaps(from,to);
+  renderCriativos(maps.cri);
+  renderPublicos(maps.pub);
+  renderPeriodo(dias,sales,'sem');
+  renderPeriodo(dias,sales,'mes');
+}
+
+function kpi(label,value,cls,sub){
+  return `<div class="kpi-card"><div class="kpi-label">${label}</div>
+  <div class="kpi-value ${cls||''}">${value}</div>${sub?`<div class="kpi-sub">${sub}</div>`:''}</div>`;
+}
+
+function renderTrafego(t,dias,sales){
+  const traf=sales.filter(isTrafego), org=sales.filter(s=>!isTrafego(s));
+  const fatT=traf.reduce((a,s)=>a+s.fatTotal,0), fatO=org.reduce((a,s)=>a+s.fatTotal,0);
+  const obT=traf.reduce((a,s)=>a+s.fatOB,0), obO=org.reduce((a,s)=>a+s.fatOB,0);
+  const nObT=traf.filter(s=>s.fatOB>0).length, nObO=org.filter(s=>s.fatOB>0).length;
+  const roas=t.inv?fatT/t.inv:0, cac=traf.length?t.inv/traf.length:0;
+  const tm=traf.length?fatT/traf.length:0;
+
+  document.getElementById('kpi-trafego').innerHTML =
+    kpi('Investimento',brl(t.inv),'orange')+
+    kpi('Fat. Tráfego',brl(fatT),'green')+
+    kpi('Fat. Orgânico',brl(fatO),'yellow')+
+    kpi('ROAS Tráfego',roas?dec(roas,2)+'x':'—',roas>=1?'green':'red')+
+    kpi('Vendas Tráfego',int(traf.length),'green',nObT?`+${nObT} OB`:'')+
+    kpi('Vendas Orgânico',int(org.length),'yellow',nObO?`+${nObO} OB`:'')+
+    kpi('Fat. OB Tráfego',brl(obT),'orange')+
+    kpi('Fat. OB Orgânico',brl(obO),'orange')+
+    kpi('CAC',brl(cac),'orange')+
+    kpi('Ticket Médio',brl(tm),'orange')+
+    kpi('Cliques',int(t.cliques))+
+    kpi('Impressões',int(t.imp))+
+    kpi('CPC',brl(t.cliques?t.inv/t.cliques:0))+
+    kpi('CPM',brl(t.imp?t.inv/t.imp*1000:0))+
+    kpi('CTR',pct(t.imp?t.cliques/t.imp*100:0))+
+    kpi('Compras (pixel Meta)',int(t.compras),'',
+        'atribuição do Meta — referência');
+
+  const warn=document.getElementById('utm-warn');
+  if(warn){
+    if(!HAS_UTM){
+      warn.innerHTML='<div class="ob-info" style="border-color:rgba(241,196,15,.35);background:rgba(241,196,15,.07)">⚠️ A aba de webhook <strong>não possui colunas de UTM</strong> (utm_source / utm_medium / utm_content). Sem elas, nenhuma venda pode ser marcada como tráfego pago — tudo cai como orgânico, e Criativos/Públicos ficam sem vendas atribuídas. Assim que o webhook passar a gravar o parâmetro <code>src</code>/<code>sck</code> ou as colunas <code>data.purchase.origin.utm_*</code>, o dashboard reconhece automaticamente.</div>';
+    } else warn.innerHTML='';
+  }
+
+  const et=[['Cliques',t.cliques],['Page Views',t.pv],['Checkouts',t.ck],['Compras',sales.length]];
+  const max=Math.max(...et.map(e=>e[1]),1);
+  document.getElementById('funil-bars').innerHTML = et.map(([l,v])=>
+    `<div class="funil-bar-wrap"><div class="funil-label"><span>${l}</span><span>${int(v)}</span></div>
+    <div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${Math.max(v/max*100,v?2:0)}%"></div></div></div>`).join('');
+  const taxa=(a,b)=>b?a/b*100:0;
+  document.getElementById('funil-taxas').innerHTML =
+    [['Cliques → Page View',taxa(t.pv,t.cliques)],
+     ['Page View → Checkout',taxa(t.ck,t.pv)],
+     ['Checkout → Compra',taxa(sales.length,t.ck)],
+     ['Cliques → Compra',taxa(sales.length,t.cliques)]]
+    .map(([l,v])=>`<div class="taxa-item"><span>${l}</span><span class="taxa-val">${pct(v)}</span></div>`).join('');
+
+  drawChart('ch-inv-dia','bar',dias.map(d=>d.data.slice(5)),
+    [{label:'Investimento',data:dias.map(d=>d.inv),backgroundColor:'rgba(255,107,43,0.85)'}]);
+  drawChart('ch-clk-dia','line',dias.map(d=>d.data.slice(5)),
+    [{label:'Cliques',data:dias.map(d=>d.cliques),borderColor:'rgba(255,107,43,0.85)',backgroundColor:'rgba(255,107,43,0.15)',tension:.3,fill:true},
+     {label:'Page Views',data:dias.map(d=>d.pv),borderColor:'rgba(255,183,55,0.85)',backgroundColor:'rgba(255,183,55,0.12)',tension:.3,fill:true}]);
+
+  const sc=document.getElementById('sales-cards');
+  sc.innerHTML = sales.length ? sales.map(s=>{
+    const tr=isTrafego(s);
+    return `<div class="sale-card ${tr?'traf':'org'}">
+      <div class="sale-name">${tr?'✅':'⭐'} ${esc(s.nome||'—')}</div>
+      <div class="sale-val">${brl(s.fatTotal)}</div>
+      <div class="sale-meta">📅 ${s.data.split('-').reverse().join('/')}</div>
+      ${s.fatOB>0?`<div class="sale-meta">🛒 OB: ${brl(s.fatOB)}</div>`:''}
+      <div class="sale-meta">🎯 ${esc(s.utmContent||'—')}</div>
+      <div class="sale-meta">👥 ${esc(s.utmMedium||'—')}</div>
+      <div class="sale-meta">🌐 ${esc(s.utmSource||'orgânico')}</div>
+    </div>`;
+  }).join('') : '<div class="empty">Nenhuma venda aprovada no período.</div>';
+}
+
+function renderVisao(t,dias,sales){
+  const traf=sales.filter(isTrafego), org=sales.filter(s=>!isTrafego(s));
+  const fat=sales.reduce((a,s)=>a+s.fatTotal,0);
+  const roas=t.inv?fat/t.inv:0;
+  document.getElementById('kpi-visao').innerHTML =
+    kpi('Investimento',brl(t.inv),'orange')+
+    kpi('Fat. Total',brl(fat),'green')+
+    kpi('ROAS Total',roas?dec(roas,2)+'x':'—',roas>=1?'green':'red')+
+    kpi('Vendas Total',int(sales.length))+
+    kpi('Tráfego',int(traf.length),'green')+
+    kpi('Orgânicas',int(org.length),'yellow')+
+    kpi('Ticket Médio',brl(sales.length?fat/sales.length:0),'orange')+
+    kpi('CAC Total',brl(sales.length?t.inv/sales.length:0),'orange');
+
+  const byDay={};
+  sales.forEach(s=>{
+    if(!byDay[s.data]) byDay[s.data]={n:0,fat:0,tr:0,or:0};
+    const d=byDay[s.data]; d.n++; d.fat+=s.fatTotal; isTrafego(s)?d.tr++:d.or++;
+  });
+  const rows=dias.map(d=>{
+    const v=byDay[d.data]||{n:0,fat:0,tr:0,or:0};
+    const r=d.inv?v.fat/d.inv:0;
+    return `<tr><td>${d.data.split('-').reverse().join('/')}</td><td>${brl(d.inv)}</td><td>${brl(v.fat)}</td>
+    <td class="${r>=1?'green':''}">${r?dec(r,2)+'x':'—'}</td><td>${int(v.n)}</td><td>${int(v.tr)}</td><td>${int(v.or)}</td>
+    <td>${brl(v.n?v.fat/v.n:0)}</td><td>${brl(v.n?d.inv/v.n:0)}</td></tr>`;
+  }).join('');
+  document.getElementById('tbl-dias').innerHTML =
+    `<thead><tr><th>Data</th><th>Invest.</th><th>Fat. Total</th><th>ROAS</th><th>Compras</th><th>Tráfego</th><th>Orgânicas</th><th>Ticket Médio</th><th>CAC</th></tr></thead>
+     <tbody>${rows||'<tr><td colspan="9" style="text-align:center;color:rgba(255,255,255,.3)">Sem dados no período</td></tr>'}</tbody>
+     <tfoot><tr><td>TOTAL</td><td>${brl(t.inv)}</td><td>${brl(fat)}</td><td>${roas?dec(roas,2)+'x':'—'}</td>
+     <td>${int(sales.length)}</td><td>${int(traf.length)}</td><td>${int(org.length)}</td>
+     <td>${brl(sales.length?fat/sales.length:0)}</td><td>${brl(sales.length?t.inv/sales.length:0)}</td></tr></tfoot>`;
+}
+
+function sortList(list,key,status){
+  let l=list.slice();
+  if(status==='ativos') l=l.filter(o=>o.ativo);
+  if(status==='inativos') l=l.filter(o=>!o.ativo);
+  const dir = key==='cpc' ? 1 : -1;
+  return l.sort((a,b)=>{
+    const av=a[key]||0, bv=b[key]||0;
+    if(key==='cpc'){ if(!av) return 1; if(!bv) return -1; }
+    return (av-bv)*dir;
+  });
+}
+
+function setCriStatus(v,b){ criStatus=v; document.querySelectorAll('.cri-status-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); render(); }
+function setCriSort(v,b){ criSort=v; document.querySelectorAll('.cri-sort-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); render(); }
+function setPubStatus(v,b){ pubStatus=v; document.querySelectorAll('.pub-filter-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); render(); }
+function setPubSort(v,b){ pubSort=v; document.querySelectorAll('.pub-sort-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); render(); }
+
+function renderCriativos(list){
+  const l=sortList(list,criSort,criStatus);
+  document.getElementById('cri-cards').innerHTML = l.length ? l.map(o=>`
+    <div class="cri-card ${o.ativo?'ativo':''}">
+      <div class="cri-card-header">
+        <div class="cri-name">${esc(o.nome)}</div>
+        <span class="cri-badge ${o.ativo?'ativo':'inativo'}">${o.ativo?'ATIVO':'INATIVO'}</span>
+      </div>
+      <div class="cri-metrics">
+        <div class="cri-metric"><span class="cri-metric-label">Investimento</span><span class="cri-metric-val hl">${brl(o.inv)}</span></div>
+        <div class="cri-metric"><span class="cri-metric-label">ROAS</span><span class="cri-metric-val hl">${o.roas?dec(o.roas,2)+'x':'—'}</span></div>
+        <div class="cri-metric"><span class="cri-metric-label">Impressões</span><span class="cri-metric-val">${int(o.imp)}</span></div>
+        <div class="cri-metric"><span class="cri-metric-label">Cliques</span><span class="cri-metric-val">${int(o.cliques)}</span></div>
+        <div class="cri-metric"><span class="cri-metric-label">CTR</span><span class="cri-metric-val">${pct(o.ctr)}</span></div>
+        <div class="cri-metric"><span class="cri-metric-label">CPC</span><span class="cri-metric-val">${brl(o.cpc)}</span></div>
+        <div class="cri-metric"><span class="cri-metric-label">Page Views</span><span class="cri-metric-val">${int(o.pv)}</span></div>
+        <div class="cri-metric"><span class="cri-metric-label">Vendas</span><span class="cri-metric-val">${int(o.vendas)}</span></div>
+      </div>
+      ${o.link?`<a class="cri-link" href="${esc(o.link)}" target="_blank">🔗 ver criativo</a>`:''}
+    </div>`).join('') : '<div class="empty">Nenhum criativo no período.</div>';
+
+  const tot=l.reduce((a,o)=>({inv:a.inv+o.inv,imp:a.imp+o.imp,cliques:a.cliques+o.cliques,pv:a.pv+o.pv,ck:a.ck+o.ck,vendas:a.vendas+o.vendas,fat:a.fat+o.fat}),{inv:0,imp:0,cliques:0,pv:0,ck:0,vendas:0,fat:0});
+  document.getElementById('tbl-cri').innerHTML =
+    `<thead><tr><th>Criativo</th><th>Status</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>CPM</th><th>PV</th><th>Checkout</th><th>Vendas</th><th>Fat.</th><th>ROAS</th></tr></thead>
+    <tbody>${l.map(o=>`<tr><td>${esc(o.nome)}</td><td>${o.ativo?'<span class="green">ativo</span>':'<span style="color:rgba(255,255,255,.35)">inativo</span>'}</td>
+    <td>${brl(o.inv)}</td><td>${int(o.imp)}</td><td>${int(o.cliques)}</td><td>${pct(o.ctr)}</td><td>${brl(o.cpc)}</td><td>${brl(o.cpm)}</td>
+    <td>${int(o.pv)}</td><td>${int(o.ck)}</td><td>${int(o.vendas)}</td><td>${brl(o.fat)}</td><td>${o.roas?dec(o.roas,2)+'x':'—'}</td></tr>`).join('')
+    ||'<tr><td colspan="13" style="text-align:center;color:rgba(255,255,255,.3)">Sem dados</td></tr>'}</tbody>
+    <tfoot><tr><td>TOTAL</td><td></td><td>${brl(tot.inv)}</td><td>${int(tot.imp)}</td><td>${int(tot.cliques)}</td>
+    <td>${pct(tot.imp?tot.cliques/tot.imp*100:0)}</td><td>${brl(tot.cliques?tot.inv/tot.cliques:0)}</td><td>${brl(tot.imp?tot.inv/tot.imp*1000:0)}</td>
+    <td>${int(tot.pv)}</td><td>${int(tot.ck)}</td><td>${int(tot.vendas)}</td><td>${brl(tot.fat)}</td><td>${tot.inv&&tot.fat?dec(tot.fat/tot.inv,2)+'x':'—'}</td></tr></tfoot>`;
+}
+
+function renderPublicos(list){
+  const l=sortList(list,pubSort,pubStatus);
+  document.getElementById('pub-cards').innerHTML = l.length ? l.map(o=>`
+    <div class="pub-card ${o.ativo?'ativo':''}">
+      <div class="pub-card-header">
+        <div class="pub-name">${esc(o.nome)}</div>
+        <span class="cri-badge ${o.ativo?'ativo':'inativo'}">${o.ativo?'ATIVO':'INATIVO'}</span>
+      </div>
+      <div class="pub-metrics">
+        <div class="pub-metric"><div class="pub-metric-val">${brl(o.inv)}</div><div class="pub-metric-lbl">Investimento</div></div>
+        <div class="pub-metric"><div class="pub-metric-val">${o.roas?dec(o.roas,2)+'x':'—'}</div><div class="pub-metric-lbl">ROAS</div></div>
+        <div class="pub-metric"><div class="pub-metric-val">${int(o.vendas)}</div><div class="pub-metric-lbl">Vendas</div></div>
+        <div class="pub-metric"><div class="pub-metric-val neutral">${int(o.imp)}</div><div class="pub-metric-lbl">Impressões</div></div>
+        <div class="pub-metric"><div class="pub-metric-val neutral">${pct(o.ctr)}</div><div class="pub-metric-lbl">CTR</div></div>
+        <div class="pub-metric"><div class="pub-metric-val neutral">${brl(o.cpc)}</div><div class="pub-metric-lbl">CPC</div></div>
+      </div>
+    </div>`).join('') : '<div class="empty">Nenhum público no período.</div>';
+
+  document.getElementById('tbl-pub').innerHTML =
+    `<thead><tr><th>Público / Conjunto</th><th>Status</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>PV</th><th>Checkout</th><th>Vendas</th><th>Fat.</th><th>ROAS</th></tr></thead>
+    <tbody>${l.map(o=>`<tr><td>${esc(o.nome)}</td><td>${o.ativo?'<span class="green">ativo</span>':'<span style="color:rgba(255,255,255,.35)">inativo</span>'}</td>
+    <td>${brl(o.inv)}</td><td>${int(o.imp)}</td><td>${int(o.cliques)}</td><td>${pct(o.ctr)}</td><td>${brl(o.cpc)}</td>
+    <td>${int(o.pv)}</td><td>${int(o.ck)}</td><td>${int(o.vendas)}</td><td>${brl(o.fat)}</td><td>${o.roas?dec(o.roas,2)+'x':'—'}</td></tr>`).join('')
+    ||'<tr><td colspan="12" style="text-align:center;color:rgba(255,255,255,.3)">Sem dados</td></tr>'}</tbody>`;
+}
+
+function isoWeek(iso){
+  const d=new Date(iso+'T00:00:00');
+  const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  const day=t.getUTCDay()||7;
+  t.setUTCDate(t.getUTCDate()+4-day);
+  const y0=new Date(Date.UTC(t.getUTCFullYear(),0,1));
+  const wk=Math.ceil(((t-y0)/86400000+1)/7);
+  return t.getUTCFullYear()+'-S'+String(wk).padStart(2,'0');
+}
+function renderPeriodo(dias,sales,tipo){
+  const keyf = tipo==='sem' ? isoWeek : (iso=>iso.slice(0,7));
+  const map={};
+  dias.forEach(d=>{
+    const k=keyf(d.data);
+    if(!map[k]) map[k]={k,inv:0,imp:0,cliques:0,pv:0,ck:0,vendas:0,fat:0};
+    const o=map[k]; o.inv+=d.inv;o.imp+=d.imp;o.cliques+=d.cliques;o.pv+=d.pv;o.ck+=d.ck;
+  });
+  sales.forEach(s=>{
+    const k=keyf(s.data);
+    if(!map[k]) map[k]={k,inv:0,imp:0,cliques:0,pv:0,ck:0,vendas:0,fat:0};
+    map[k].vendas++; map[k].fat+=s.fatTotal;
+  });
+  const l=Object.values(map).sort((a,b)=>a.k.localeCompare(b.k));
+  const lbl = tipo==='sem'?'Semana':'Mês';
+  document.getElementById('tbl-'+tipo).innerHTML =
+    `<thead><tr><th>${lbl}</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>PV</th><th>Checkout</th><th>Vendas</th><th>Fat.</th><th>ROAS</th><th>CAC</th></tr></thead>
+    <tbody>${l.map(o=>`<tr><td>${o.k}</td><td>${brl(o.inv)}</td><td>${int(o.imp)}</td><td>${int(o.cliques)}</td>
+    <td>${pct(o.imp?o.cliques/o.imp*100:0)}</td><td>${brl(o.cliques?o.inv/o.cliques:0)}</td><td>${int(o.pv)}</td><td>${int(o.ck)}</td>
+    <td>${int(o.vendas)}</td><td>${brl(o.fat)}</td><td>${o.inv&&o.fat?dec(o.fat/o.inv,2)+'x':'—'}</td><td>${brl(o.vendas?o.inv/o.vendas:0)}</td></tr>`).join('')
+    ||'<tr><td colspan="12" style="text-align:center;color:rgba(255,255,255,.3)">Sem dados</td></tr>'}</tbody>`;
+  drawChart('ch-'+tipo+'-inv','bar',l.map(o=>o.k),
+    [{label:'Investimento',data:l.map(o=>o.inv),backgroundColor:'rgba(255,107,43,0.85)'}]);
+  drawChart('ch-'+tipo+'-ctr','bar',l.map(o=>o.k),
+    [{label:'CTR %',data:l.map(o=>o.imp?o.cliques/o.imp*100:0),backgroundColor:'rgba(255,183,55,0.85)'}]);
+}
+
+function drawChart(id,type,labels,datasets){
+  const el=document.getElementById(id);
+  if(!el||typeof Chart==='undefined') return;
+  if(CHARTS[id]) CHARTS[id].destroy();
+  CHARTS[id]=new Chart(el,{type,data:{labels,datasets},options:{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:'rgba(255,255,255,.5)',font:{size:10}}}},
+    scales:{
+      x:{ticks:{color:'rgba(255,255,255,.4)',font:{size:9}},grid:{color:'rgba(255,255,255,.04)'}},
+      y:{ticks:{color:'rgba(255,255,255,.4)',font:{size:9}},grid:{color:'rgba(255,255,255,.04)'},beginAtZero:true}
+    }}});
+}
+
+function showTab(id,el){
+  document.querySelectorAll('.content').forEach(c=>c.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  el.classList.add('active');
+}
+
+loadData();
+</script>
+</body>
+</html>
