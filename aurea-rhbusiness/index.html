@@ -152,11 +152,15 @@ tfoot td{font-weight:700;color:#ff6b2b;border-top:1px solid rgba(255,107,43,.3);
 <!-- ============ TRÁFEGO ============ -->
 <div class="content active" id="tab-trafego">
   <div id="wh-notice"></div>
-  <div class="sec-title">Vendas pelo pixel do Meta (atribuição da plataforma)</div>
-  <div class="kpi-grid" id="kpi-pixel"></div>
-  <div class="sec-title">Vendas pelo Webhook (venda real na Eduzz)</div>
+  <div class="sec-title">Resultado consolidado</div>
+  <div class="ob-info">As UTMs não estão chegando ao checkout da Eduzz, então o que é venda de tráfego
+    vem da <b>atribuição do pixel do Meta</b>, valorizada pelo <b>ticket médio real</b>.
+    Orgânico é o total menos o tráfego. Compras do pixel abaixo de R$ 100 são descartadas
+    por serem de outros produtos.</div>
   <div class="kpi-grid" id="kpi-trafego"></div>
   <div id="outros-notice"></div>
+  <div class="sec-title">Conferência — números crus do pixel</div>
+  <div class="kpi-grid" id="kpi-pixel"></div>
   <div class="sec-title">Funil de conversão</div>
   <div class="funil-section">
     <div id="funil-bars"></div>
@@ -265,6 +269,12 @@ const CONFIG = {
   // Eduzz envia em reais
   VALORES_EM_CENTAVOS: false,
 
+  // ── Filtro de compras do pixel ────────────────────────────────────
+  // O pixel dispara em TODOS os checkouts do domínio, inclusive de outros
+  // produtos. Compras com ticket abaixo deste valor são descartadas da
+  // estimativa de tráfego (ex.: Curso VendeRH a R$ 67).
+  PIXEL_VALOR_MINIMO: 100,
+
   // ── Base histórica (vendas anteriores à conexão do Webhook) ───────
   // O Webhook só começou a gravar em 07/08. As vendas anteriores não
   // existem nele e precisam entrar como base informada pelo cliente.
@@ -278,7 +288,7 @@ const CONFIG = {
   //   sozinha — o total nunca infla.
   BASE_HISTORICA: {
     VENDAS:      40,            // total de vendas já realizadas até ATE
-    FATURAMENTO: null,          // faturamento total dessas 40 (null = não informado)
+    FATURAMENTO: 18780,         // faturamento total dessas 40 vendas (R$)
     ATE:         '2026-08-14',  // data de corte da base
     LABEL:       'Vendas anteriores ao Webhook',
   },
@@ -603,7 +613,7 @@ function processWebhook(rows){
 }
 
 // ══════════════════ AGREGAÇÕES GERENCIADOR ══════════════════
-function blank(){ return {inv:0,imp:0,reach:0,cliques:0,pv:0,ck:0,pxComp:0,pxVal:0}; }
+function blank(){ return {inv:0,imp:0,reach:0,cliques:0,pv:0,ck:0,pxComp:0,pxVal:0,pxCompV:0,pxValV:0}; }
 function addRow(o,r){
   o.inv    += num(r[G.inv]);
   o.imp    += num(r[G.imp]);
@@ -611,8 +621,11 @@ function addRow(o,r){
   o.cliques+= num(r[G.cliques]);
   o.pv     += num(r[G.pv]);
   o.ck     += num(r[G.ck]);
-  o.pxComp += num(r[G.compras]);
-  o.pxVal  += num(r[G.valorCompras]);
+  const c=num(r[G.compras]), v=num(r[G.valorCompras]);
+  o.pxComp += c;
+  o.pxVal  += v;
+  // só conta como venda deste produto se o ticket bater com a faixa esperada
+  if(c>0 && (v/c) >= CONFIG.PIXEL_VALOR_MINIMO){ o.pxCompV += c; o.pxValV += v; }
 }
 function gFiltradas(from,to){
   return GROWS.filter(function(r){
@@ -812,52 +825,67 @@ function renderTrafego(g,s,from,to){
   let obCountT=traf.filter(x=>x.fatOB>0).length, obCountO=org.filter(x=>x.fatOB>0).length;
   if(USE_PIXEL){ nT=g.pxComp; fatT=g.pxVal; }
 
-  // ── Bloco PIXEL (Meta Ads) — sempre visível ──────────────────────
-  const pxRoas=g.inv?g.pxVal/g.inv:0;
-  const pxCac=g.pxComp?g.inv/g.pxComp:0;
-  document.getElementById('kpi-pixel').innerHTML=
-    kpi('Compras (Pixel)',fmtN(g.pxComp),'green','atribuição Meta')+
-    kpi('Fat. Pixel',fmtR(g.pxVal),'green')+
-    kpi('ROAS Pixel',fmtX(pxRoas),pxRoas>=1?'green':'red')+
-    kpi('CPA Pixel',fmtR(pxCac),'red')+
-    kpi('Ticket Médio Pixel',fmtR(g.pxComp?g.pxVal/g.pxComp:0),'orange');
-
-  const roas=g.inv?fatT/g.inv:0;
-  const cac=nT?g.inv/nT:0;
-  const ticket=nT?fatT/nT:0;
+  // ── Métricas de mídia ────────────────────────────────────────────
+  const pxRoas = g.inv ? g.pxValV/g.inv : 0;
+  const pxCpa  = g.pxCompV ? g.inv/g.pxCompV : 0;
+  const descartadas = g.pxComp - g.pxCompV;
   const cpc=g.cliques?g.inv/g.cliques:0;
   const cpm=g.imp?g.inv/g.imp*1000:0;
   const ctr=g.imp?g.cliques/g.imp*100:0;
 
+  document.getElementById('kpi-pixel').innerHTML=
+    kpi('Compras (pixel)',fmtN(g.pxCompV),'green',
+        descartadas?(fmtN(descartadas)+' descartada(s): outro produto'):'todas válidas')+
+    kpi('Valor reportado',fmtR(g.pxValV),'green','como o pixel registrou')+
+    kpi('ROAS pelo pixel',fmtX(pxRoas),pxRoas>=1?'green':'red','subvaloriza parcelamento')+
+    kpi('CPA',fmtR(pxCpa),'red')+
+    kpi('Checkouts',fmtN(g.ck),'orange')+
+    kpi('Page Views',fmtN(g.pv),'orange');
+
   const bp=baseNoPeriodo(from,to);
   const nTotal = nT + nO + bp.n;
   const fatTotalGeral = fatT + fatO + bp.fat;
-  const ticketBase = (nT+nO)?(fatT+fatO)/(nT+nO):0;
-  const fatEstimado = bp.fatConhecido ? false : (bp.n>0);
+  const ticketReal = (CONFIG.BASE_HISTORICA.FATURAMENTO && CONFIG.BASE_HISTORICA.VENDAS)
+    ? CONFIG.BASE_HISTORICA.FATURAMENTO/CONFIG.BASE_HISTORICA.VENDAS
+    : ((nT+nO)?(fatT+fatO)/(nT+nO):0);
 
-  document.getElementById('kpi-trafego').innerHTML=
+  // ── Tráfego: vem do pixel (as UTMs não chegam ao checkout) ────────
+  const nTraf   = g.pxCompV;
+  const fatTraf = nTraf*ticketReal;          // valorizado pelo ticket real
+  const roasTraf= g.inv?fatTraf/g.inv:0;
+  const cacTraf = nTraf?g.inv/nTraf:0;
+  // ── Orgânico: o que sobra do total ───────────────────────────────
+  const nOrg    = Math.max(0, nTotal-nTraf);
+  const fatOrg  = Math.max(0, fatTotalGeral-fatTraf);
+  const roasGer = g.inv?fatTotalGeral/g.inv:0;
+  const obTotal = obT+obO;
+
+  let cards=
     kpi('Vendas Totais',fmtN(nTotal),'green',
         bp.n?(fmtN(bp.n)+' base + '+fmtN(nT+nO)+' webhook'):'todas do webhook')+
-    kpi('Fat. Total',
-        fatEstimado?fmtR(fatTotalGeral)+'*':fmtR(fatTotalGeral),
-        'green', fatEstimado?'* só o rastreado':'')+
+    kpi('Fat. Total',fmtR(fatTotalGeral),'green')+
+    kpi('Ticket Médio',fmtR(ticketReal),'orange',fmtN(nTotal)+' vendas')+
     kpi('Investimento (Meta Ads)',fmtR(g.inv),'orange')+
-    kpi('Fat. Tráfego',fmtR(fatT),'green')+
-    kpi('Fat. Orgânico',fmtR(fatO),'yellow')+
-    kpi('ROAS Tráfego',fmtX(roas),roas>=1?'green':'red')+
-    kpi('Vendas Tráfego',fmtN(nT),'green',obCountT?('+'+obCountT+' OB'):'')+
-    kpi('Vendas Orgânico',fmtN(nO),'yellow',obCountO?('+'+obCountO+' OB'):'')+
-    kpi('Vendas Base',fmtN(bp.n),'yellow','sem origem rastreada')+
-    kpi('Fat. OB Tráfego',fmtR(obT),'orange')+
-    kpi('Fat. OB Orgânico',fmtR(obO),'orange')+
-    kpi('CAC',fmtR(cac),'red')+
-    kpi('Ticket Médio',fmtR(ticketBase),'orange','base rastreada')+
+    kpi('Vendas Tráfego',fmtN(nTraf),'green','atribuição do pixel')+
+    kpi('Fat. Tráfego',fmtR(fatTraf),'green','a '+fmtR(ticketReal)+'/venda')+
+    kpi('ROAS Tráfego',fmtX(roasTraf),roasTraf>=1?'green':'red')+
+    kpi('CAC Tráfego',fmtR(cacTraf),'red')+
+    kpi('Vendas Orgânico',fmtN(nOrg),'yellow','total − tráfego')+
+    kpi('Fat. Orgânico',fmtR(fatOrg),'yellow')+
+    kpi('ROAS Geral',fmtX(roasGer),'green','fat. total ÷ invest.')+
+    kpi('% Vendas do Tráfego',fmtP(nTotal?nTraf/nTotal*100:0),'yellow')+
     kpi('Cliques',fmtN(g.cliques))+
     kpi('Impressões',fmtN(g.imp))+
+    kpi('Alcance',fmtN(g.reach))+
     kpi('CTR',fmtP(ctr),'orange')+
     kpi('CPC',fmtR(cpc),'orange')+
-    kpi('CPM',fmtR(cpm),'orange')+
-    kpi('Alcance',fmtN(g.reach));
+    kpi('CPM',fmtR(cpm),'orange');
+  // cards de order bump só aparecem quando existe OB
+  if(obTotal>0){
+    cards+=kpi('Fat. OB Tráfego',fmtR(obT),'orange')+
+           kpi('Fat. OB Orgânico',fmtR(obO),'orange');
+  }
+  document.getElementById('kpi-trafego').innerHTML=cards;
 
   // funil
   const et=[['Cliques',g.cliques],['Page Views',g.pv],['Checkouts',g.ck],['Compras',nT]];
@@ -910,22 +938,25 @@ function renderVisao(g,s,from,to){
   const bp=baseNoPeriodo(from,to);
   const fatComBase=fat+bp.fat;
   const nComBase=nV+bp.n;
+  const tk = nComBase?fatComBase/nComBase:0;
+  const nTrafPx = g.pxCompV;
+  const fatTrafPx = nTrafPx*tk;
   const roas=g.inv?fatComBase/g.inv:0;
 
   document.getElementById('kpi-visao').innerHTML=
     kpi('Vendas Totais',fmtN(nComBase),'green',
         bp.n?(fmtN(bp.n)+' base + '+fmtN(nV)+' webhook'):'')+
+    kpi('Fat. Total',fmtR(fatComBase),'green')+
+    kpi('Ticket Médio',fmtR(tk),'orange')+
     kpi('Investimento',fmtR(g.inv),'orange')+
-    kpi('Fat. Total',fmtR(fatComBase),'green',bp.n&&!bp.fatConhecido?'só o rastreado':'')+
-    kpi('ROAS Total',fmtX(roas),roas>=1?'green':'red')+
-    kpi('Tráfego',fmtN(nT),'green')+
-    kpi('Orgânicas',fmtN(nO),'yellow')+
-    kpi('Base',fmtN(bp.n),'yellow')+
-    kpi('Ticket Médio',fmtR(nV?fat/nV:0),'orange','base rastreada')+
-    kpi('CAC Total',fmtR(nComBase?g.inv/nComBase:0),'red')+
-    kpi('Compras Pixel',fmtN(g.pxComp),'green')+
-    kpi('Fat. Pixel',fmtR(g.pxVal),'green')+
-    kpi('ROAS Pixel',fmtX(g.inv?g.pxVal/g.inv:0),(g.inv&&g.pxVal/g.inv>=1)?'green':'red');
+    kpi('ROAS Geral',fmtX(roas),roas>=1?'green':'red')+
+    kpi('Vendas Tráfego',fmtN(nTrafPx),'green','pixel')+
+    kpi('Fat. Tráfego',fmtR(fatTrafPx),'green')+
+    kpi('ROAS Tráfego',fmtX(g.inv?fatTrafPx/g.inv:0),'green')+
+    kpi('CAC Tráfego',fmtR(nTrafPx?g.inv/nTrafPx:0),'red')+
+    kpi('Vendas Orgânico',fmtN(Math.max(0,nComBase-nTrafPx)),'yellow')+
+    kpi('Fat. Orgânico',fmtR(Math.max(0,fatComBase-fatTrafPx)),'yellow')+
+    kpi('CAC sobre total',fmtR(nComBase?g.inv/nComBase:0),'red');
 
   const dias=DIAS.filter(d=>(!from||d.data>=from)&&(!to||d.data<=to));
   const salesDia={};
@@ -1017,6 +1048,10 @@ function buildCriPubMaps(from,to){
     o.ctr=o.imp?o.cliques/o.imp*100:0;
     o.cpc=o.cliques?o.inv/o.cliques:0;
     o.cpm=o.imp?o.inv/o.imp*1000:0;
+    // vendas rastreadas por UTM; se não houver nenhuma, usa o pixel
+    o.vendasPx=o.pxCompV; o.fatPx=o.pxValV;
+    o.roasPx=o.inv?o.pxValV/o.inv:0;
+    o.cpaPx=o.pxCompV?o.inv/o.pxCompV:0;
     o.roas=o.inv?o.fat/o.inv:0;
     o.cpa=o.vendas?o.inv/o.vendas:0;
     return o;
@@ -1029,9 +1064,11 @@ function buildCriPubMaps(from,to){
 }
 
 function sortBy(arr,k){
+  const map={roas:'roasPx', vendas:'vendasPx'};
+  const key=map[k]||k;
   return arr.slice().sort(function(a,b){
-    if(k==='cpc') return (a.cpc||1e9)-(b.cpc||1e9);
-    return (b[k]||0)-(a[k]||0);
+    if(key==='cpc') return (a.cpc||1e9)-(b.cpc||1e9);
+    return (b[key]||0)-(a[key]||0);
   });
 }
 function setCriStatus(v,b){ CRI_STATUS=v; document.querySelectorAll('.cri-status-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); renderCriativos(); }
@@ -1058,10 +1095,10 @@ function renderCriativos(){
       '<div class="cri-card-header"><div class="cri-name">'+esc(c.nome)+'</div>'+
       '<span class="cri-badge '+(c.ativo?'ativo':'inativo')+'">'+(c.ativo?'ATIVO':'INATIVO')+'</span></div>'+
       '<div class="cri-metrics">'+
-      m('Invest.',fmtR(c.inv),true)+m('ROAS',fmtX(c.roas))+
+      m('Invest.',fmtR(c.inv),true)+m('ROAS Pixel',fmtX(c.roasPx))+
       m('CTR',fmtP(c.ctr))+m('CPC',fmtR(c.cpc))+
-      m('Cliques',fmtN(c.cliques))+m('Impressões',fmtN(c.imp))+
-      m('Vendas',fmtN(c.vendas))+m('CPA',fmtR(c.cpa))+
+      m('Cliques',fmtN(c.cliques))+m('Checkouts',fmtN(c.ck))+
+      m('Compras Pixel',fmtN(c.vendasPx),true)+m('CPA Pixel',fmtR(c.cpaPx))+
       '</div>'+
       (c.link?'<a class="cri-link" href="'+esc(c.link)+'" target="_blank">'+esc(c.link)+'</a>':'')+
       '</div>';
@@ -1070,19 +1107,22 @@ function renderCriativos(){
   let body=list.map(function(c){
     return '<tr><td>'+esc(c.nome)+'</td><td>'+(c.ativo?'✅':'⏸')+'</td><td>'+fmtR(c.inv)+'</td>'+
       '<td>'+fmtN(c.imp)+'</td><td>'+fmtN(c.cliques)+'</td><td>'+fmtP(c.ctr)+'</td><td>'+fmtR(c.cpc)+'</td>'+
-      '<td>'+fmtR(c.cpm)+'</td><td>'+fmtN(c.pv)+'</td><td>'+fmtN(c.ck)+'</td><td>'+fmtN(c.vendas)+'</td>'+
-      '<td>'+fmtR(c.fat)+'</td><td>'+fmtX(c.roas)+'</td><td>'+fmtR(c.cpa)+'</td></tr>';
+      '<td>'+fmtN(c.pv)+'</td><td>'+fmtN(c.ck)+'</td>'+
+      '<td>'+fmtN(c.vendasPx)+'</td><td>'+fmtR(c.fatPx)+'</td><td>'+fmtX(c.roasPx)+'</td><td>'+fmtR(c.cpaPx)+'</td>'+
+      '<td>'+fmtN(c.vendas)+'</td></tr>';
   }).join('');
-  const T=list.reduce(function(a,c){a.inv+=c.inv;a.imp+=c.imp;a.cliques+=c.cliques;a.pv+=c.pv;a.ck+=c.ck;a.vendas+=c.vendas;a.fat+=c.fat;return a;},
-    {inv:0,imp:0,cliques:0,pv:0,ck:0,vendas:0,fat:0});
+  const T=list.reduce(function(a,c){a.inv+=c.inv;a.imp+=c.imp;a.cliques+=c.cliques;a.pv+=c.pv;a.ck+=c.ck;
+    a.vendas+=c.vendas;a.vendasPx+=c.vendasPx;a.fatPx+=c.fatPx;return a;},
+    {inv:0,imp:0,cliques:0,pv:0,ck:0,vendas:0,vendasPx:0,fatPx:0});
   document.getElementById('tbl-cri').innerHTML=
     '<thead><tr><th>Criativo</th><th>Status</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>CTR</th>'+
-    '<th>CPC</th><th>CPM</th><th>PV</th><th>Checkout</th><th>Vendas</th><th>Fat.</th><th>ROAS</th><th>CPA</th></tr></thead>'+
+    '<th>CPC</th><th>PV</th><th>Checkout</th><th>Compras Pixel</th><th>Fat. Pixel</th><th>ROAS Pixel</th>'+
+    '<th>CPA Pixel</th><th>Vendas UTM</th></tr></thead>'+
     '<tbody>'+(body||'<tr><td colspan="14">Sem dados</td></tr>')+'</tbody>'+
     '<tfoot><tr><td>Total</td><td>—</td><td>'+fmtR(T.inv)+'</td><td>'+fmtN(T.imp)+'</td><td>'+fmtN(T.cliques)+
     '</td><td>'+fmtP(T.imp?T.cliques/T.imp*100:0)+'</td><td>'+fmtR(T.cliques?T.inv/T.cliques:0)+'</td><td>'+
-    fmtR(T.imp?T.inv/T.imp*1000:0)+'</td><td>'+fmtN(T.pv)+'</td><td>'+fmtN(T.ck)+'</td><td>'+fmtN(T.vendas)+
-    '</td><td>'+fmtR(T.fat)+'</td><td>'+fmtX(T.inv?T.fat/T.inv:0)+'</td><td>'+fmtR(T.vendas?T.inv/T.vendas:0)+
+    fmtN(T.pv)+'</td><td>'+fmtN(T.ck)+'</td><td>'+fmtN(T.vendasPx)+'</td><td>'+fmtR(T.fatPx)+'</td><td>'+
+    fmtX(T.inv?T.fatPx/T.inv:0)+'</td><td>'+fmtR(T.vendasPx?T.inv/T.vendasPx:0)+'</td><td>'+fmtN(T.vendas)+
     '</td></tr></tfoot>';
 }
 function m(l,v,hl){
@@ -1103,21 +1143,22 @@ function renderPublicos(){
       '<div class="pub-card-header"><div class="pub-name">'+esc(p.nome)+'</div>'+
       '<span class="cri-badge '+(p.ativo?'ativo':'inativo')+'">'+(p.ativo?'ATIVO':'INATIVO')+'</span></div>'+
       '<div class="pub-metrics">'+
-      pm2(fmtR(p.inv),'Invest.')+pm2(fmtX(p.roas),'ROAS')+pm2(fmtP(p.ctr),'CTR')+
-      pm2(fmtR(p.cpc),'CPC',true)+pm2(fmtN(p.cliques),'Cliques',true)+pm2(fmtN(p.vendas),'Vendas',true)+
+      pm2(fmtR(p.inv),'Invest.')+pm2(fmtX(p.roasPx),'ROAS Pixel')+pm2(fmtN(p.vendasPx),'Compras')+
+      pm2(fmtP(p.ctr),'CTR',true)+pm2(fmtN(p.ck),'Checkouts',true)+pm2(fmtR(p.cpaPx),'CPA',true)+
       '</div></div>';
   }).join('') : '<div class="empty">Nenhum público no filtro atual.</div>';
 
   let body=list.map(function(p){
     return '<tr><td>'+esc(p.nome)+'</td><td>'+(p.ativo?'✅':'⏸')+'</td><td>'+fmtR(p.inv)+'</td>'+
       '<td>'+fmtN(p.imp)+'</td><td>'+fmtN(p.cliques)+'</td><td>'+fmtP(p.ctr)+'</td><td>'+fmtR(p.cpc)+'</td>'+
-      '<td>'+fmtN(p.pv)+'</td><td>'+fmtN(p.ck)+'</td><td>'+fmtN(p.vendas)+'</td><td>'+fmtR(p.fat)+'</td>'+
-      '<td>'+fmtX(p.roas)+'</td></tr>';
+      '<td>'+fmtN(p.pv)+'</td><td>'+fmtN(p.ck)+'</td>'+
+      '<td>'+fmtN(p.vendasPx)+'</td><td>'+fmtR(p.fatPx)+'</td><td>'+fmtX(p.roasPx)+'</td><td>'+fmtR(p.cpaPx)+'</td></tr>';
   }).join('');
   document.getElementById('tbl-pub').innerHTML=
     '<thead><tr><th>Público / Conjunto</th><th>Status</th><th>Invest.</th><th>Impr.</th><th>Cliques</th>'+
-    '<th>CTR</th><th>CPC</th><th>PV</th><th>Checkout</th><th>Vendas</th><th>Fat.</th><th>ROAS</th></tr></thead>'+
-    '<tbody>'+(body||'<tr><td colspan="12">Sem dados</td></tr>')+'</tbody>';
+    '<th>CTR</th><th>CPC</th><th>PV</th><th>Checkout</th><th>Compras Pixel</th><th>Fat. Pixel</th>'+
+    '<th>ROAS Pixel</th><th>CPA Pixel</th></tr></thead>'+
+    '<tbody>'+(body||'<tr><td colspan="13">Sem dados</td></tr>')+'</tbody>';
 }
 function pm2(v,l,neutral){
   return '<div class="pub-metric"><div class="pub-metric-val'+(neutral?' neutral':'')+'">'+v+'</div>'+
