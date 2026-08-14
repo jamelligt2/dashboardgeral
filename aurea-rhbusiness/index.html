@@ -152,7 +152,11 @@ tfoot td{font-weight:700;color:#ff6b2b;border-top:1px solid rgba(255,107,43,.3);
 <!-- ============ TRÁFEGO ============ -->
 <div class="content active" id="tab-trafego">
   <div id="wh-notice"></div>
+  <div class="sec-title">Vendas pelo pixel do Meta (atribuição da plataforma)</div>
+  <div class="kpi-grid" id="kpi-pixel"></div>
+  <div class="sec-title">Vendas pelo Webhook (venda real na Eduzz)</div>
   <div class="kpi-grid" id="kpi-trafego"></div>
+  <div id="outros-notice"></div>
   <div class="sec-title">Funil de conversão</div>
   <div class="funil-section">
     <div id="funil-bars"></div>
@@ -248,11 +252,9 @@ const CONFIG = {
   DATA_MINIMA:      '2026-07-30',
 
   // ── Identificação do produto principal ────────────────────────────
-  // Uma linha é do produto principal se:
-  //   col produto contiver PRODUTO_NOME (case-insensitive)
-  //   E col fatTotal >= PRODUTO_PRECO_MINIMO
-  // '' = aceita qualquer produto (recomendado enquanto o Webhook está vazio)
-  PRODUTO_NOME:         '',
+  // O Webhook recebe TODOS os produtos da conta Eduzz (Meraki, VendeRH...).
+  // Só entram no dashboard as linhas cujo product_name contém este texto.
+  PRODUTO_NOME:         'RH Business Experience',
   PRODUTO_PRECO_MINIMO: 0,
 
   // ── transaction_root (agrupamento de OBs) ─────────────────────────
@@ -263,9 +265,28 @@ const CONFIG = {
   // Eduzz envia em reais
   VALORES_EM_CENTAVOS: false,
 
-  // ── Fallback do pixel ─────────────────────────────────────────────
-  // Enquanto o Webhook não tiver linhas, usa compras/valor do pixel Meta
-  FALLBACK_PIXEL: true,
+  // ── Base histórica (vendas anteriores à conexão do Webhook) ───────
+  // O Webhook só começou a gravar em 07/08. As vendas anteriores não
+  // existem nele e precisam entrar como base informada pelo cliente.
+  //
+  // COMO FUNCIONA (à prova de contagem dupla):
+  //   TOTAL = VENDAS  (o total já conhecido na data ATE)
+  //   O painel conta quantas vendas o Webhook já tem até ATE e injeta
+  //   só a DIFERENÇA como "fora do Webhook". Hoje: 40 - 7 = 33.
+  //   Toda venda nova que cair no Webhook depois de ATE soma por cima.
+  //   Se o Webhook receber vendas antigas depois, a diferença encolhe
+  //   sozinha — o total nunca infla.
+  BASE_HISTORICA: {
+    VENDAS:      40,            // total de vendas já realizadas até ATE
+    FATURAMENTO: null,          // faturamento total dessas 40 (null = não informado)
+    ATE:         '2026-08-14',  // data de corte da base
+    LABEL:       'Vendas anteriores ao Webhook',
+  },
+  // ── Eventos que NÃO são venda nova ────────────────────────────────
+  // contract_up_to_date repete um invoice_paid já contado (contaria em dobro)
+  EVENTOS_IGNORAR: ['contract_up_to_date','contract_canceled','contract_delayed',
+                    'invoice_canceled','invoice_refunded','invoice_chargeback',
+                    'invoice_open','invoice_waiting_payment'],
 
   // ── Colunas do Webhook (0-based) — layout Eduzz ────────────────────
   // Resolvidas automaticamente pelo cabeçalho (W_HEAD). Índices = fallback.
@@ -337,7 +358,8 @@ let GROWS = [];      // linhas brutas do Gerenciador
 let SALES = [];      // vendas processadas do Webhook
 let DIAS  = [];      // agregado diário do Gerenciador
 let WEBHOOK_ROWS = 0;
-let USE_PIXEL = false;
+let OUTROS = {n:0, fat:0};   // vendas de outros produtos da conta
+let USE_PIXEL = false;       // true = Webhook vazio, KPIs de venda vêm do pixel
 let ACTIVE_ADS = new Set(), ACTIVE_ADSETS = new Set();
 let CRI_STATUS='todos', CRI_SORT='inv', PUB_STATUS='todos', PUB_SORT='inv';
 const CHARTS = {};
@@ -399,6 +421,18 @@ function fmtDia(iso){ if(!iso) return '—'; const p=iso.split('-'); return p[2]
 function esc(s){ return String(s===null||s===undefined?'':s).replace(/[&<>"']/g,function(c){
   return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 function norm(s){ return String(s||'').trim().toLowerCase(); }
+
+// A Eduzz repete o valor da UTM separado por vírgula ("meta_ads,meta_ads",
+// "ADE01,ADE01"). Pega o primeiro valor não vazio e descarta as repetições.
+function cleanUtm(v){
+  const parts=String(v===null||v===undefined?'':v).split(',')
+    .map(x=>x.trim()).filter(Boolean);
+  if(!parts.length) return '';
+  const uniq=[];
+  parts.forEach(p=>{ if(uniq.indexOf(p)===-1) uniq.push(p); });
+  return uniq[0];
+}
+
 const isTrafego = s => norm(s.utmSource).replace(/[\s_\-]/g,'') === 'metaads';
 
 function weekStart(iso){
@@ -516,17 +550,27 @@ function processWebhook(rows){
   if(!body.length) return [];
   const div = CONFIG.VALORES_EM_CENTAVOS ? 100 : 1;
 
-  const groups={};
+  const groups={}, outrosTx={};
+  OUTROS={n:0,fat:0};
   body.forEach(function(r){
     const data = normDate(cell(r,'data')) || normDate(cell(r,'dataAlt'));
     if(!data || data < DATA_MINIMA) return;
     if(!isAprovado(cell(r,'status'), cell(r,'evento'))) return;
-    if(CONFIG.IGNORAR_EMAILS.indexOf(norm(cell(r,'email')))>-1) return;
-    if(CONFIG.IGNORAR_TXROOT.indexOf(String(cell(r,'txRoot')).trim())>-1) return;
+    // evento que não é venda nova (contract_up_to_date repete um invoice_paid)
+    if(CONFIG.EVENTOS_IGNORAR.indexOf(norm(cell(r,'evento')))>-1) return;
 
     let val = num(cell(r,'fatTotal'));
     if(!val) val = num(cell(r,'fatTotalAlt'));
     val = val/div;
+
+    // produto fora do escopo (outros produtos da conta Eduzz)
+    const prod = norm(cell(r,'produto'));
+    if(CONFIG.PRODUTO_NOME && prod.indexOf(norm(CONFIG.PRODUTO_NOME))===-1){
+      const tk=String(cell(r,'txRoot')).trim()||(norm(cell(r,'email'))+data);
+      if(!outrosTx[tk]){ outrosTx[tk]=1; OUTROS.n++; }
+      OUTROS.fat+=val;
+      return;
+    }
 
     const key = CONFIG.USA_TX_ROOT && cell(r,'txRoot')
       ? 'tx:'+String(cell(r,'txRoot')).trim()
@@ -540,18 +584,16 @@ function processWebhook(rows){
     const g=groups[key];
     if(data < g.data) g.data=data;
 
-    const prod = norm(cell(r,'produto'));
-    const ehPrincipal = (!CONFIG.PRODUTO_NOME || prod.indexOf(norm(CONFIG.PRODUTO_NOME))>-1)
-                        && val >= CONFIG.PRODUTO_PRECO_MINIMO;
+    const ehPrincipal = val >= CONFIG.PRODUTO_PRECO_MINIMO;
 
     if(ehPrincipal && !g.temPrincipal){ g.temPrincipal=true; g.fatPrincipal+=val; }
     else g.fatOB+=val;
     g.fatTotal+=val;
 
-    if(!g.utmSource)   g.utmSource   = String(cell(r,'utmSource')||cell(r,'trkSource')||'').trim();
-    if(!g.utmMedium)   g.utmMedium   = String(cell(r,'utmMedium')||cell(r,'trkMedium')||'').trim();
-    if(!g.utmCampaign) g.utmCampaign = String(cell(r,'utmCampaign')||cell(r,'trkCampaign')||'').trim();
-    if(!g.utmContent)  g.utmContent  = String(cell(r,'utmContent')||cell(r,'trkContent')||'').trim();
+    if(!g.utmSource)   g.utmSource   = cleanUtm(cell(r,'utmSource')||cell(r,'trkSource'));
+    if(!g.utmMedium)   g.utmMedium   = cleanUtm(cell(r,'utmMedium')||cell(r,'trkMedium'));
+    if(!g.utmCampaign) g.utmCampaign = cleanUtm(cell(r,'utmCampaign')||cell(r,'trkCampaign'));
+    if(!g.utmContent)  g.utmContent  = cleanUtm(cell(r,'utmContent')||cell(r,'trkContent'));
   });
 
   return Object.keys(groups)
@@ -583,6 +625,32 @@ function sFiltradas(from,to){
   return SALES.filter(s=>(!from||s.data>=from)&&(!to||s.data<=to));
 }
 
+// ══════════════════ BASE HISTÓRICA ══════════════════
+// Retorna as vendas da base que ainda NÃO estão no Webhook.
+// Desconta automaticamente o que o Webhook já tem até a data de corte,
+// então nunca conta a mesma venda duas vezes.
+function baseExtra(){
+  const B=CONFIG.BASE_HISTORICA;
+  if(!B || !B.VENDAS) return {n:0,fat:0,ativa:false,noWebhook:0,fatWebhook:0};
+  const jaNoWebhook = SALES.filter(s=>s.data<=B.ATE);
+  const n   = Math.max(0, B.VENDAS - jaNoWebhook.length);
+  const fwh = jaNoWebhook.reduce((a,s)=>a+s.fatTotal,0);
+  const fat = (B.FATURAMENTO===null||B.FATURAMENTO===undefined)
+                ? null
+                : Math.max(0, B.FATURAMENTO - fwh);
+  return {n:n, fat:fat, ativa:true, noWebhook:jaNoWebhook.length, fatWebhook:fwh};
+}
+
+// A base entra no período selecionado se o período incluir a data de corte
+function baseNoPeriodo(from,to){
+  const B=CONFIG.BASE_HISTORICA;
+  const e=baseExtra();
+  if(!e.ativa || !e.n) return {n:0,fat:0};
+  if(from && B.ATE < from) return {n:0,fat:0};
+  if(to   && B.ATE > to)   return {n:0,fat:0};
+  return {n:e.n, fat:e.fat||0, fatConhecido:e.fat!==null};
+}
+
 // ══════════════════ LOAD ══════════════════
 async function loadData(){
   const ov=document.getElementById('loading-overlay');
@@ -605,7 +673,7 @@ async function loadData(){
     }
     WEBHOOK_ROWS=0;
     SALES=processWebhook(wRows);
-    USE_PIXEL = (SALES.length===0 && CONFIG.FALLBACK_PIXEL);
+    USE_PIXEL = (SALES.length===0);
 
     // dias agregados
     const byDay={};
@@ -704,15 +772,37 @@ function kpi(label,val,cls,sub){
 function renderTrafego(g,s,from,to){
   const nt=document.getElementById('wh-notice');
   if(USE_PIXEL){
-    nt.innerHTML='<div class="ob-info">⚠️ A aba <b>Webhook</b> ainda não tem vendas registradas. '+
-      'Enquanto isso, <b>compras e faturamento vêm do pixel do Meta</b> (colunas Omni Purchase do Gerenciador). '+
-      'Assim que a primeira linha cair no Webhook, o painel troca sozinho para os dados reais de venda, '+
-      'separando tráfego x orgânico e order bumps.</div>';
-  }else if(WEBHOOK_ROWS>0){
+    nt.innerHTML='<div class="ob-info">⚠️ Nenhuma venda de <b>'+esc(CONFIG.PRODUTO_NOME)+'</b> '+
+      'no Webhook neste período. Os KPIs de venda abaixo estão vindo do <b>pixel do Meta</b>.</div>';
+  }else{
     nt.innerHTML='<div class="ob-info">✅ Webhook ativo — '+fmtN(WEBHOOK_ROWS)+' linha(s) lida(s), '+
-      fmtN(SALES.length)+' venda(s) válida(s) desde '+fmtDia(DATA_MINIMA)+'. '+
-      'Faturamento e vendas vêm do Webhook; investimento e mídia, do Gerenciador.</div>';
-  }else{ nt.innerHTML=''; }
+      fmtN(SALES.length)+' venda(s) de <b>'+esc(CONFIG.PRODUTO_NOME)+'</b> desde '+fmtDia(DATA_MINIMA)+'. '+
+      'Investimento e mídia vêm do Gerenciador.</div>';
+  }
+
+  const on=document.getElementById('outros-notice');
+  let html='';
+  const be=baseExtra();
+  if(be.ativa){
+    html+='<div class="ob-info">📌 <b>Base histórica: '+fmtN(CONFIG.BASE_HISTORICA.VENDAS)+' vendas</b> até '+
+      fmtDia(CONFIG.BASE_HISTORICA.ATE)+'. O Webhook já tem '+fmtN(be.noWebhook)+' delas, '+
+      'então o painel injeta só as <b>'+fmtN(be.n)+' restantes</b> (feitas antes de '+
+      'o Webhook ser conectado, em 07/08). Toda venda nova soma por cima disso — '+
+      'e se o Webhook receber vendas antigas, a diferença encolhe sozinha, sem contar em dobro.'+
+      (be.fat===null
+        ? '<br><br>⚠️ <b>Falta o faturamento dessas '+fmtN(be.n)+' vendas.</b> Sem ele, '+
+          '"Fat. Total" mostra só os '+fmtR(be.fatWebhook)+' rastreados no Webhook. '+
+          'Preencha <code>BASE_HISTORICA.FATURAMENTO</code> no CONFIG com o valor total das '+
+          fmtN(CONFIG.BASE_HISTORICA.VENDAS)+' vendas.'
+        : '')+
+      '</div>';
+  }
+  if(OUTROS.n>0){
+    html+='<div class="ob-info">ℹ️ Foram ignoradas <b>'+fmtN(OUTROS.n)+'</b> venda(s) de outros '+
+      'produtos da conta Eduzz (Meraki, VendeRH etc.), somando '+fmtR(OUTROS.fat)+'. '+
+      'Elas não são desta campanha — para incluí-las, altere <code>PRODUTO_NOME</code> no CONFIG.</div>';
+  }
+  on.innerHTML=html;
 
   const traf=s.filter(isTrafego), org=s.filter(x=>!isTrafego(x));
   let fatT=traf.reduce((a,x)=>a+x.fatTotal,0);
@@ -722,6 +812,16 @@ function renderTrafego(g,s,from,to){
   let obCountT=traf.filter(x=>x.fatOB>0).length, obCountO=org.filter(x=>x.fatOB>0).length;
   if(USE_PIXEL){ nT=g.pxComp; fatT=g.pxVal; }
 
+  // ── Bloco PIXEL (Meta Ads) — sempre visível ──────────────────────
+  const pxRoas=g.inv?g.pxVal/g.inv:0;
+  const pxCac=g.pxComp?g.inv/g.pxComp:0;
+  document.getElementById('kpi-pixel').innerHTML=
+    kpi('Compras (Pixel)',fmtN(g.pxComp),'green','atribuição Meta')+
+    kpi('Fat. Pixel',fmtR(g.pxVal),'green')+
+    kpi('ROAS Pixel',fmtX(pxRoas),pxRoas>=1?'green':'red')+
+    kpi('CPA Pixel',fmtR(pxCac),'red')+
+    kpi('Ticket Médio Pixel',fmtR(g.pxComp?g.pxVal/g.pxComp:0),'orange');
+
   const roas=g.inv?fatT/g.inv:0;
   const cac=nT?g.inv/nT:0;
   const ticket=nT?fatT/nT:0;
@@ -729,17 +829,29 @@ function renderTrafego(g,s,from,to){
   const cpm=g.imp?g.inv/g.imp*1000:0;
   const ctr=g.imp?g.cliques/g.imp*100:0;
 
+  const bp=baseNoPeriodo(from,to);
+  const nTotal = nT + nO + bp.n;
+  const fatTotalGeral = fatT + fatO + bp.fat;
+  const ticketBase = (nT+nO)?(fatT+fatO)/(nT+nO):0;
+  const fatEstimado = bp.fatConhecido ? false : (bp.n>0);
+
   document.getElementById('kpi-trafego').innerHTML=
+    kpi('Vendas Totais',fmtN(nTotal),'green',
+        bp.n?(fmtN(bp.n)+' base + '+fmtN(nT+nO)+' webhook'):'todas do webhook')+
+    kpi('Fat. Total',
+        fatEstimado?fmtR(fatTotalGeral)+'*':fmtR(fatTotalGeral),
+        'green', fatEstimado?'* só o rastreado':'')+
     kpi('Investimento (Meta Ads)',fmtR(g.inv),'orange')+
-    kpi('Fat. Tráfego',fmtR(fatT),'green',USE_PIXEL?'via pixel':'')+
-    kpi('Fat. Orgânico',fmtR(fatO),'yellow',USE_PIXEL?'aguardando webhook':'')+
+    kpi('Fat. Tráfego',fmtR(fatT),'green')+
+    kpi('Fat. Orgânico',fmtR(fatO),'yellow')+
     kpi('ROAS Tráfego',fmtX(roas),roas>=1?'green':'red')+
     kpi('Vendas Tráfego',fmtN(nT),'green',obCountT?('+'+obCountT+' OB'):'')+
     kpi('Vendas Orgânico',fmtN(nO),'yellow',obCountO?('+'+obCountO+' OB'):'')+
+    kpi('Vendas Base',fmtN(bp.n),'yellow','sem origem rastreada')+
     kpi('Fat. OB Tráfego',fmtR(obT),'orange')+
     kpi('Fat. OB Orgânico',fmtR(obO),'orange')+
     kpi('CAC',fmtR(cac),'red')+
-    kpi('Ticket Médio',fmtR(ticket),'orange')+
+    kpi('Ticket Médio',fmtR(ticketBase),'orange','base rastreada')+
     kpi('Cliques',fmtN(g.cliques))+
     kpi('Impressões',fmtN(g.imp))+
     kpi('CTR',fmtP(ctr),'orange')+
@@ -795,17 +907,25 @@ function renderVisao(g,s,from,to){
   const nV=USE_PIXEL?g.pxComp:s.length;
   const nT=USE_PIXEL?g.pxComp:s.filter(isTrafego).length;
   const nO=USE_PIXEL?0:s.length-nT;
-  const roas=g.inv?fat/g.inv:0;
+  const bp=baseNoPeriodo(from,to);
+  const fatComBase=fat+bp.fat;
+  const nComBase=nV+bp.n;
+  const roas=g.inv?fatComBase/g.inv:0;
 
   document.getElementById('kpi-visao').innerHTML=
+    kpi('Vendas Totais',fmtN(nComBase),'green',
+        bp.n?(fmtN(bp.n)+' base + '+fmtN(nV)+' webhook'):'')+
     kpi('Investimento',fmtR(g.inv),'orange')+
-    kpi('Fat. Total',fmtR(fat),'green')+
+    kpi('Fat. Total',fmtR(fatComBase),'green',bp.n&&!bp.fatConhecido?'só o rastreado':'')+
     kpi('ROAS Total',fmtX(roas),roas>=1?'green':'red')+
-    kpi('Vendas Total',fmtN(nV))+
     kpi('Tráfego',fmtN(nT),'green')+
     kpi('Orgânicas',fmtN(nO),'yellow')+
-    kpi('Ticket Médio',fmtR(nV?fat/nV:0),'orange')+
-    kpi('CAC Total',fmtR(nV?g.inv/nV:0),'red');
+    kpi('Base',fmtN(bp.n),'yellow')+
+    kpi('Ticket Médio',fmtR(nV?fat/nV:0),'orange','base rastreada')+
+    kpi('CAC Total',fmtR(nComBase?g.inv/nComBase:0),'red')+
+    kpi('Compras Pixel',fmtN(g.pxComp),'green')+
+    kpi('Fat. Pixel',fmtR(g.pxVal),'green')+
+    kpi('ROAS Pixel',fmtX(g.inv?g.pxVal/g.inv:0),(g.inv&&g.pxVal/g.inv>=1)?'green':'red');
 
   const dias=DIAS.filter(d=>(!from||d.data>=from)&&(!to||d.data<=to));
   const salesDia={};
@@ -816,23 +936,32 @@ function renderVisao(g,s,from,to){
   });
 
   let body='';
+  const B=CONFIG.BASE_HISTORICA;
   dias.forEach(function(d){
     const sd=salesDia[d.data]||{fat:0,n:0,t:0,o:0};
-    const f=USE_PIXEL?d.pxVal:sd.fat;
-    const n=USE_PIXEL?d.pxComp:sd.n;
+    let f=USE_PIXEL?d.pxVal:sd.fat;
+    let n=USE_PIXEL?d.pxComp:sd.n;
     const t=USE_PIXEL?d.pxComp:sd.t;
     const o=USE_PIXEL?0:sd.o;
-    body+='<tr><td>'+fmtDia(d.data)+'</td><td>'+fmtR(d.inv)+'</td><td>'+fmtR(f)+'</td>'+
+    let obs='';
+    if(bp.n && d.data===B.ATE){ n+=bp.n; f+=bp.fat; obs=' <span style="color:#f1c40f">+'+fmtN(bp.n)+' base</span>'; }
+    body+='<tr><td>'+fmtDia(d.data)+obs+'</td><td>'+fmtR(d.inv)+'</td>'+
+      '<td>'+fmtN(d.pxComp)+'</td><td>'+fmtR(d.pxVal)+'</td>'+
+      '<td>'+fmtR(f)+'</td>'+
       '<td>'+fmtX(d.inv?f/d.inv:0)+'</td><td>'+fmtN(n)+'</td><td>'+fmtN(t)+'</td><td>'+fmtN(o)+'</td>'+
       '<td>'+fmtR(n?f/n:0)+'</td><td>'+fmtR(n?d.inv/n:0)+'</td></tr>';
   });
+  const pxC=dias.reduce((a,d)=>a+d.pxComp,0), pxV=dias.reduce((a,d)=>a+d.pxVal,0);
+  const tkFoot = bp.fatConhecido ? (nComBase?fatComBase/nComBase:0) : (nV?fat/nV:0);
   document.getElementById('tbl-dias').innerHTML=
-    '<thead><tr><th>Data</th><th>Invest.</th><th>Fat. Total</th><th>ROAS</th><th>Compras</th>'+
+    '<thead><tr><th>Data</th><th>Invest.</th><th>Compras Pixel</th><th>Fat. Pixel</th>'+
+    '<th>Fat. Webhook</th><th>ROAS</th><th>Compras</th>'+
     '<th>Tráfego</th><th>Orgânicas</th><th>Ticket Médio</th><th>CAC</th></tr></thead><tbody>'+
-    (body||'<tr><td colspan="9">Sem dados no período</td></tr>')+'</tbody>'+
-    '<tfoot><tr><td>Total</td><td>'+fmtR(g.inv)+'</td><td>'+fmtR(fat)+'</td><td>'+fmtX(roas)+
-    '</td><td>'+fmtN(nV)+'</td><td>'+fmtN(nT)+'</td><td>'+fmtN(nO)+'</td><td>'+
-    fmtR(nV?fat/nV:0)+'</td><td>'+fmtR(nV?g.inv/nV:0)+'</td></tr></tfoot>';
+    (body||'<tr><td colspan="11">Sem dados no período</td></tr>')+'</tbody>'+
+    '<tfoot><tr><td>Total</td><td>'+fmtR(g.inv)+'</td><td>'+fmtN(pxC)+'</td><td>'+fmtR(pxV)+'</td>'+
+    '<td>'+fmtR(fatComBase)+'</td><td>'+fmtX(roas)+
+    '</td><td>'+fmtN(nComBase)+'</td><td>'+fmtN(nT)+'</td><td>'+fmtN(nO)+'</td><td>'+
+    fmtR(tkFoot)+'</td><td>'+fmtR(nComBase?g.inv/nComBase:0)+'</td></tr></tfoot>';
 
   const labels=dias.map(d=>fmtDia(d.data));
   line('ch-inv',labels,dias.map(d=>d.inv),'Investimento');
@@ -1010,21 +1139,32 @@ function agrupa(from,to,keyFn){
   });
   const arr=Object.keys(map).sort().map(k=>map[k]);
   if(USE_PIXEL) arr.forEach(function(o){ o.fat=o.pxVal; o.vendas=o.pxComp; });
+  // injeta a base histórica no bucket que contém a data de corte
+  const bp=baseNoPeriodo(from,to);
+  if(bp.n){
+    const kb=keyFn(CONFIG.BASE_HISTORICA.ATE);
+    const alvo=arr.filter(o=>o.k===kb)[0];
+    if(alvo){ alvo.vendas+=bp.n; alvo.fat+=bp.fat; alvo.base=bp.n; }
+  }
   return arr;
 }
 
 function tabelaPeriodo(arr,labelFn,head){
   let body=arr.map(function(o){
     const ctr=o.imp?o.cliques/o.imp*100:0;
-    return '<tr><td>'+labelFn(o.k)+'</td><td>'+fmtR(o.inv)+'</td><td>'+fmtN(o.imp)+'</td>'+
+    return '<tr><td>'+labelFn(o.k)+(o.base?' <span style="color:#f1c40f">+'+fmtN(o.base)+' base</span>':'')+
+      '</td><td>'+fmtR(o.inv)+'</td><td>'+fmtN(o.imp)+'</td>'+
       '<td>'+fmtN(o.cliques)+'</td><td>'+fmtP(ctr)+'</td><td>'+fmtR(o.cliques?o.inv/o.cliques:0)+'</td>'+
-      '<td>'+fmtN(o.pv)+'</td><td>'+fmtN(o.ck)+'</td><td>'+fmtN(o.vendas)+'</td>'+
+      '<td>'+fmtN(o.pv)+'</td><td>'+fmtN(o.ck)+'</td>'+
+      '<td>'+fmtN(o.pxComp)+'</td><td>'+fmtR(o.pxVal)+'</td>'+
+      '<td>'+fmtN(o.vendas)+'</td>'+
       '<td>'+fmtR(o.fat)+'</td><td>'+fmtX(o.inv?o.fat/o.inv:0)+'</td>'+
       '<td>'+fmtR(o.vendas?o.inv/o.vendas:0)+'</td></tr>';
   }).join('');
   return '<thead><tr><th>'+head+'</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>CTR</th><th>CPC</th>'+
-    '<th>PV</th><th>Checkout</th><th>Vendas</th><th>Fat.</th><th>ROAS</th><th>CAC</th></tr></thead><tbody>'+
-    (body||'<tr><td colspan="12">Sem dados no período</td></tr>')+'</tbody>';
+    '<th>PV</th><th>Checkout</th><th>Compras Pixel</th><th>Fat. Pixel</th>'+
+    '<th>Vendas</th><th>Fat.</th><th>ROAS</th><th>CAC</th></tr></thead><tbody>'+
+    (body||'<tr><td colspan="14">Sem dados no período</td></tr>')+'</tbody>';
 }
 
 function renderSemanal(from,to){
