@@ -45,8 +45,28 @@
     flex-shrink:0;
   }
   .header-divider{width:2px;height:44px;background:var(--borda);}
+  .header-text{flex:1;}
   .header-text h1{font-size:20px;font-weight:700;letter-spacing:.5px;}
   .header-text p{color:var(--apagado);font-size:13px;margin-top:4px;letter-spacing:.5px;}
+  .header-status{display:flex;align-items:center;gap:10px;}
+  .sync-dot{width:8px;height:8px;border-radius:50%;background:var(--verde);flex-shrink:0;}
+  .sync-dot.loading{background:var(--amarelo);animation:pulse 1s infinite;}
+  .sync-dot.error{background:var(--vermelho);}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+  .sync-text{font-size:11px;color:var(--apagado);}
+  .refresh-btn{
+    background:var(--card);border:1px solid var(--borda);color:var(--texto);
+    padding:8px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;
+    display:flex;align-items:center;gap:6px;transition:.15s;
+  }
+  .refresh-btn:hover{border-color:var(--laranja);color:var(--laranja);}
+  .refresh-btn:disabled{opacity:.5;cursor:not-allowed;}
+
+  .error-banner{
+    display:none;background:#2a0a0a;border:1px solid var(--vermelho);color:#ff8a8a;
+    padding:12px 32px;font-size:13px;
+  }
+  .error-banner.show{display:block;}
 
   .tabs{
     display:flex;background:#16213e;border-bottom:1px solid var(--borda);
@@ -134,11 +154,14 @@
 
   .note{font-size:12px;color:var(--apagado);margin-top:10px;padding:10px 14px;background:rgba(255,255,255,.02);border:1px dashed var(--borda);border-radius:10px;}
 
+  .loading-skel{padding:60px;text-align:center;color:var(--apagado);font-size:13px;}
+
   @media (max-width:900px){
     .kpi-grid{grid-template-columns:1fr 1fr;}
     .temp-grid{grid-template-columns:1fr;}
     .funnel-row{flex-direction:column;}
     .funnel-svg-wrap{max-width:100%;flex:none;}
+    .header{flex-wrap:wrap;}
   }
 </style>
 </head>
@@ -149,9 +172,16 @@
   <div class="header-divider"></div>
   <div class="header-text">
     <h1>DASHBOARD CAPTAÇÃO — ADRIANA · CAPTAÇÃO24.08</h1>
-    <p id="headerPeriod">CL40 · Aula Gratuita · período: 18–19/08/2026</p>
+    <p id="headerPeriod">CL40 · Aula Gratuita · carregando período...</p>
+  </div>
+  <div class="header-status">
+    <span class="sync-dot loading" id="syncDot"></span>
+    <span class="sync-text" id="syncText">buscando dados na planilha...</span>
+    <button class="refresh-btn" id="refreshBtn" disabled>🔄 Atualizar</button>
   </div>
 </div>
+
+<div class="error-banner" id="errorBanner"></div>
 
 <div class="tabs">
   <button class="tab-btn active" data-tab="geral">Visão Geral</button>
@@ -160,10 +190,11 @@
   <button class="tab-btn" data-tab="diaria">Análise Diária</button>
 </div>
 
-<div class="container">
+<div class="container" id="mainContainer">
+  <div class="loading-skel" id="loadingSkel">Carregando dados da planilha…</div>
 
   <!-- ABA 1: VISÃO GERAL -->
-  <div class="tab-content active" id="tab-geral">
+  <div class="tab-content" id="tab-geral" style="display:none">
 
     <div class="kpi-grid" id="kpiGrid"></div>
 
@@ -189,7 +220,7 @@
   </div>
 
   <!-- ABA 2: CRIATIVOS -->
-  <div class="tab-content" id="tab-criativos">
+  <div class="tab-content" id="tab-criativos" style="display:none">
     <div class="section-title">Ranking de Criativos — melhor CPL para o pior</div>
     <div class="table-wrap">
       <table id="creativeTable">
@@ -203,7 +234,7 @@
   </div>
 
   <!-- ABA 3: PÚBLICOS -->
-  <div class="tab-content" id="tab-publicos">
+  <div class="tab-content" id="tab-publicos" style="display:none">
     <div class="section-title">Ranking de Públicos — melhor CPL para o pior</div>
     <div class="table-wrap">
       <table id="audienceTable">
@@ -213,11 +244,11 @@
         <tbody id="audienceTableBody"></tbody>
       </table>
     </div>
-    <div class="note">Breakdown Feed vs Stories indisponível — a planilha não traz coluna de posicionamento (placement). Apenas 1 conjunto ativo no período (Engajamento 365D — público quente); nenhum público frio rodando.</div>
+    <div class="note" id="audienceNote"></div>
   </div>
 
   <!-- ABA 4: ANÁLISE DIÁRIA -->
-  <div class="tab-content" id="tab-diaria">
+  <div class="tab-content" id="tab-diaria" style="display:none">
     <div class="section-title">Detalhado por Dia e Criativo</div>
     <div class="table-wrap">
       <table id="detailTable">
@@ -232,23 +263,35 @@
 </div>
 
 <script>
-/* ===================== DADOS BRUTOS (planilha) ===================== */
-const rows = [
-  {date:'2026-08-18', campaign:'CAP240826 - Video', adset:'00 - Engajamento 365D', reach:226, impressions:240, spend:'16,75', clicks:4, pv:3, leads:0, link:'https://www.instagram.com/p/DcL--CAMURY/', ad:'ADV01 - Ajuda a Família'},
-  {date:'2026-08-18', campaign:'CAP240826 - Video', adset:'00 - Engajamento 365D', reach:259, impressions:265, spend:'11,5', clicks:6, pv:4, leads:1, link:'https://www.instagram.com/p/DcL-8hhMiEm/', ad:'ADV03 - Ela já Sabe'},
-  {date:'2026-08-18', campaign:'CAP240826 - Video', adset:'00 - Engajamento 365D', reach:463, impressions:500, spend:'28,37', clicks:11, pv:8, leads:2, link:'https://www.instagram.com/p/DcL-8XMsDXb/', ad:'ADV04 - Não queria mudar'},
-  {date:'2026-08-18', campaign:'CAP240826 - Video', adset:'00 - Engajamento 365D', reach:649, impressions:709, spend:'37,41', clicks:23, pv:20, leads:9, link:'https://www.instagram.com/p/DcL-8AoMLXZ/', ad:'ADV02 - E agora?'},
-  {date:'2026-08-19', campaign:'CAP240826 - Video', adset:'00 - Engajamento 365D', reach:182, impressions:192, spend:'11,29', clicks:6, pv:6, leads:0, link:'https://www.instagram.com/p/DcL--CAMURY/', ad:'ADV01 - Ajuda a Família'},
-  {date:'2026-08-19', campaign:'CAP240826 - Video', adset:'00 - Engajamento 365D', reach:186, impressions:197, spend:'12,08', clicks:4, pv:4, leads:3, link:'https://www.instagram.com/p/DcL-8hhMiEm/', ad:'ADV03 - Ela já Sabe'},
-  {date:'2026-08-19', campaign:'CAP240826 - Video', adset:'00 - Engajamento 365D', reach:252, impressions:271, spend:'15,21', clicks:10, pv:8, leads:3, link:'https://www.instagram.com/p/DcL-8XMsDXb/', ad:'ADV04 - Não queria mudar'},
-  {date:'2026-08-19', campaign:'CAP240826 - Video', adset:'00 - Engajamento 365D', reach:1266, impressions:1429, spend:'71,07', clicks:52, pv:35, leads:10, link:'https://www.instagram.com/p/DcL-8AoMLXZ/', ad:'ADV02 - E agora?'},
-  {date:'2026-08-19', campaign:'CAP240826 — Estáticos', adset:'00 - Engajamento 365D', reach:207, impressions:219, spend:'11,08', clicks:10, pv:7, leads:3, link:'https://www.instagram.com/p/DcNMM3fjPeS/', ad:'CAR01'},
-  {date:'2026-08-19', campaign:'CAP240826 — Estáticos', adset:'00 - Engajamento 365D', reach:321, impressions:328, spend:'12,74', clicks:5, pv:3, leads:2, link:'https://www.instagram.com/p/DcMoisrsGAV/', ad:'ADE02 - Manchete'},
-  {date:'2026-08-19', campaign:'CAP240826 — Estáticos', adset:'00 - Engajamento 365D', reach:979, impressions:1233, spend:'52,73', clicks:24, pv:14, leads:8, link:'https://www.instagram.com/p/DcMoiHwMexH/', ad:'ADE01 - Aula'},
+/* =========================================================================
+   CONFIG — planilha ao vivo (Google Sheets, via gviz JSONP — sem CORS,
+   funciona direto no navegador desde que a aba esteja compartilhada como
+   "qualquer pessoa com o link pode visualizar").
+========================================================================= */
+const SHEET_ID   = '1XJpYOMM1X0cQlqxYToFQ3e_3H6aOoYg_R9NPXtVD-hE';
+const SHEET_NAME = 'Meta_ads';
+const AUTO_REFRESH_MINUTES = 5;
+
+/* Snapshot de segurança (usado só se a busca ao vivo falhar) */
+const FALLBACK_ROWS = [
+  {date:'2026-08-18', campaign:'CAP240826 - Video', adset:'00 - Engajamento 365D', reach:226, impressions:240, spend:16.75, clicks:4, pv:3, leads:0, link:'https://www.instagram.com/p/DcL--CAMURY/', ad:'ADV01 - Ajuda a Família'},
+  {date:'2026-08-18', campaign:'CAP240826 - Video', adset:'00 - Engajamento 365D', reach:259, impressions:265, spend:11.5, clicks:6, pv:4, leads:1, link:'https://www.instagram.com/p/DcL-8hhMiEm/', ad:'ADV03 - Ela já Sabe'},
+  {date:'2026-08-18', campaign:'CAP240826 - Video', adset:'00 - Engajamento 365D', reach:463, impressions:500, spend:28.37, clicks:11, pv:8, leads:2, link:'https://www.instagram.com/p/DcL-8XMsDXb/', ad:'ADV04 - Não queria mudar'},
+  {date:'2026-08-18', campaign:'CAP240826 - Video', adset:'00 - Engajamento 365D', reach:649, impressions:709, spend:37.41, clicks:23, pv:20, leads:9, link:'https://www.instagram.com/p/DcL-8AoMLXZ/', ad:'ADV02 - E agora?'},
+  {date:'2026-08-19', campaign:'CAP240826 - Video', adset:'00 - Engajamento 365D', reach:182, impressions:192, spend:11.29, clicks:6, pv:6, leads:0, link:'https://www.instagram.com/p/DcL--CAMURY/', ad:'ADV01 - Ajuda a Família'},
+  {date:'2026-08-19', campaign:'CAP240826 - Video', adset:'00 - Engajamento 365D', reach:186, impressions:197, spend:12.08, clicks:4, pv:4, leads:3, link:'https://www.instagram.com/p/DcL-8hhMiEm/', ad:'ADV03 - Ela já Sabe'},
+  {date:'2026-08-19', campaign:'CAP240826 - Video', adset:'00 - Engajamento 365D', reach:252, impressions:271, spend:15.21, clicks:10, pv:8, leads:3, link:'https://www.instagram.com/p/DcL-8XMsDXb/', ad:'ADV04 - Não queria mudar'},
+  {date:'2026-08-19', campaign:'CAP240826 - Video', adset:'00 - Engajamento 365D', reach:1266, impressions:1429, spend:71.07, clicks:52, pv:35, leads:10, link:'https://www.instagram.com/p/DcL-8AoMLXZ/', ad:'ADV02 - E agora?'},
+  {date:'2026-08-19', campaign:'CAP240826 — Estáticos', adset:'00 - Engajamento 365D', reach:207, impressions:219, spend:11.08, clicks:10, pv:7, leads:3, link:'https://www.instagram.com/p/DcNMM3fjPeS/', ad:'CAR01'},
+  {date:'2026-08-19', campaign:'CAP240826 — Estáticos', adset:'00 - Engajamento 365D', reach:321, impressions:328, spend:12.74, clicks:5, pv:3, leads:2, link:'https://www.instagram.com/p/DcMoisrsGAV/', ad:'ADE02 - Manchete'},
+  {date:'2026-08-19', campaign:'CAP240826 — Estáticos', adset:'00 - Engajamento 365D', reach:979, impressions:1233, spend:52.73, clicks:24, pv:14, leads:8, link:'https://www.instagram.com/p/DcMoiHwMexH/', ad:'ADE01 - Aula'},
 ];
 
-/* ===================== HELPERS (OBRIGATÓRIO parseBR) ===================== */
-function parseBR(str){ return parseFloat(String(str).replace(/\./g,'').replace(',', '.')) || 0; }
+/* ===================== HELPERS ===================== */
+function parseBR(val){
+  if (typeof val === 'number') return val;
+  return parseFloat(String(val).replace(/\./g,'').replace(',', '.')) || 0;
+}
 function fmtBRL(n){ if(!isFinite(n)) return '–'; return 'R$ ' + n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function fmtNum(n){ return Math.round(n).toLocaleString('pt-BR'); }
 function fmtPct(n){ if(!isFinite(n)) return '–'; return n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%'; }
@@ -271,303 +314,422 @@ function calc(list){
   };
 }
 
-const TOTAL = calc(rows);
+/* ===================== BUSCA AO VIVO (JSONP via gviz) ===================== */
+let dailyChartInstance = null;
+let autoRefreshTimer = null;
 
-function getBadge(cpl, leads){
-  if(!leads || !isFinite(cpl)) return {label:'PAUSAR', cls:'badge-pausar'};
-  const avg = TOTAL.cpl;
-  if(cpl <= avg*0.75) return {label:'ESCALAR', cls:'badge-escalar'};
-  if(cpl <= avg*1.05) return {label:'MANTER', cls:'badge-manter'};
-  if(cpl <= avg*1.4) return {label:'AVALIAR', cls:'badge-avaliar'};
-  return {label:'PAUSAR', cls:'badge-pausar'};
+function setSyncState(state, text){
+  const dot = document.getElementById('syncDot');
+  const label = document.getElementById('syncText');
+  dot.className = 'sync-dot' + (state ? ' '+state : '');
+  label.textContent = text;
 }
 
-/* ===================== KPIs ===================== */
-document.getElementById('kpiGrid').innerHTML = `
-  <div class="kpi-card">
-    <div class="kpi-label">Investimento Total</div>
-    <div class="kpi-value">${fmtBRL(TOTAL.spend)}</div>
-  </div>
-  <div class="kpi-card">
-    <div class="kpi-label">CTR Médio</div>
-    <div class="kpi-value">${fmtPct(TOTAL.ctr)}</div>
-  </div>
-  <div class="kpi-card">
-    <div class="kpi-label">CPM Médio</div>
-    <div class="kpi-value">${fmtBRL(TOTAL.cpm)}</div>
-  </div>
-  <div class="kpi-card">
-    <div class="kpi-label">CPL Médio</div>
-    <div class="kpi-value">${fmtBRL(TOTAL.cpl)}</div>
-    <div class="kpi-sub">${TOTAL.leads} leads no período</div>
-  </div>
-`;
+function showError(msg){
+  const b = document.getElementById('errorBanner');
+  b.textContent = msg;
+  b.classList.add('show');
+}
+function clearError(){
+  document.getElementById('errorBanner').classList.remove('show');
+}
 
-/* ===================== QUENTE x FRIO ===================== */
-const quenteRows = rows.filter(r=>r.adset.toLowerCase().includes('engajamento'));
-const frioRows = rows.filter(r=>!r.adset.toLowerCase().includes('engajamento'));
-const QUENTE = calc(quenteRows);
-const pctQuente = TOTAL.leads ? (QUENTE.leads/TOTAL.leads*100) : 0;
-const pctFrio = 100 - pctQuente;
+function fetchLiveData(){
+  return new Promise((resolve, reject)=>{
+    const cbName = 'dashCallback_' + Date.now();
+    const timeout = setTimeout(()=>{
+      cleanup();
+      reject(new Error('timeout'));
+    }, 12000);
 
-document.getElementById('tempGrid').innerHTML = `
-  <div class="temp-card temp-quente">
-    <div class="temp-title">🔥 Público Quente</div>
-    <div class="temp-sub">00 - Engajamento 365D</div>
-    <div class="temp-metrics">
-      <div><div class="temp-metric-label">Investimento</div><div class="temp-metric-value">${fmtBRL(QUENTE.spend)}</div></div>
-      <div><div class="temp-metric-label">CPL</div><div class="temp-metric-value">${fmtBRL(QUENTE.cpl)}</div></div>
-      <div><div class="temp-metric-label">Leads</div><div class="temp-metric-value">${QUENTE.leads}</div></div>
-    </div>
-    <div class="temp-detail">Breakdown Feed vs Stories indisponível — a planilha não traz coluna de posicionamento.</div>
-  </div>
-  <div class="temp-card temp-frio">
-    <div class="temp-title">❄️ Público Frio</div>
-    <div class="temp-sub">LAK 1% + Parental SP (não ativo no período)</div>
-    <div class="temp-metrics">
-      <div><div class="temp-metric-label">Investimento</div><div class="temp-metric-value">${frioRows.length? fmtBRL(calc(frioRows).spend):'R$ 0,00'}</div></div>
-      <div><div class="temp-metric-label">CPL</div><div class="temp-metric-value">–</div></div>
-      <div><div class="temp-metric-label">Leads</div><div class="temp-metric-value">0</div></div>
-    </div>
-    <div class="temp-detail">Nenhum conjunto de público frio rodando no período analisado (18–19/08).</div>
-  </div>
-  <div class="temp-card temp-comp">
-    <div class="temp-title" style="color:var(--laranja)">Comparativo</div>
-    <div class="comp-bar-wrap">
-      <div class="comp-bar-quente" style="width:${pctQuente}%"></div>
-      <div class="comp-bar-frio" style="width:${pctFrio}%"></div>
-    </div>
-    <div class="comp-row"><span>% Leads Quente</span><strong style="color:var(--vermelho)">${fmtPct(pctQuente)}</strong></div>
-    <div class="comp-row"><span>% Leads Frio</span><strong style="color:var(--azul)">${fmtPct(pctFrio)}</strong></div>
-    <div class="comp-row"><span>Diferença de CPL</span><strong>Sem público frio para comparar</strong></div>
-  </div>
-`;
-
-/* ===================== FUNIL ===================== */
-const warnEntrada = TOTAL.txEntrada < 70;
-document.getElementById('funnelSvgWrap').innerHTML = `
-<svg viewBox="0 0 1200 540" width="100%" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="gradImp" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#0d1f3d"/>
-      <stop offset="50%" stop-color="#1f4e8f"/>
-      <stop offset="100%" stop-color="#0d1f3d"/>
-    </linearGradient>
-    <linearGradient id="gradClicks" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#173a63"/>
-      <stop offset="50%" stop-color="#3877c4"/>
-      <stop offset="100%" stop-color="#173a63"/>
-    </linearGradient>
-    <linearGradient id="gradPV" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#5c2c06"/>
-      <stop offset="50%" stop-color="#d9700f"/>
-      <stop offset="100%" stop-color="#5c2c06"/>
-    </linearGradient>
-    <linearGradient id="gradLeads" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#003d1f"/>
-      <stop offset="50%" stop-color="#00c853"/>
-      <stop offset="100%" stop-color="#003d1f"/>
-    </linearGradient>
-    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="10" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-  </defs>
-
-  <polygon points="150,0 1050,0 980,100 220,100" fill="url(#gradImp)" stroke="#0a1730" stroke-width="1"/>
-  <text x="600" y="45" text-anchor="middle" fill="#9fc3ff" font-size="15" font-weight="700" letter-spacing="1">IMPRESSÕES</text>
-  <text x="600" y="88" text-anchor="middle" fill="#ffffff" font-size="56" font-weight="800">${fmtNum(TOTAL.impressions)}</text>
-
-  <polygon points="560,112 640,112 600,140" fill="#444"/>
-  <text x="600" y="135" text-anchor="middle" fill="var(--laranja)" font-size="16" font-weight="800">CTR ${fmtPct(TOTAL.ctr)}</text>
-
-  <polygon points="220,145 980,145 880,245 320,245" fill="url(#gradClicks)" stroke="#0a1730" stroke-width="1"/>
-  <text x="600" y="190" text-anchor="middle" fill="#9fc3ff" font-size="15" font-weight="700" letter-spacing="1">CLIQUES</text>
-  <text x="600" y="233" text-anchor="middle" fill="#ffffff" font-size="56" font-weight="800">${fmtNum(TOTAL.clicks)}</text>
-
-  <polygon points="520,257 680,257 600,285" fill="#444"/>
-  <text x="600" y="280" text-anchor="middle" fill="${warnEntrada?'var(--vermelho)':'var(--amarelo)'}" font-size="16" font-weight="800">TX ENTRADA ${fmtPct(TOTAL.txEntrada)}${warnEntrada?' ⚠':''}</text>
-
-  <polygon points="320,290 880,290 790,390 410,390" fill="url(#gradPV)" stroke="#0a1730" stroke-width="1"/>
-  <text x="600" y="335" text-anchor="middle" fill="#ffd9b3" font-size="15" font-weight="700" letter-spacing="1">PAGE VIEWS</text>
-  <text x="600" y="378" text-anchor="middle" fill="#ffffff" font-size="56" font-weight="800">${fmtNum(TOTAL.pv)}</text>
-
-  <polygon points="480,402 720,402 600,430" fill="#444"/>
-  <text x="600" y="425" text-anchor="middle" fill="var(--verde)" font-size="16" font-weight="800">TX CADASTRO ${fmtPct(TOTAL.txCadastro)}</text>
-
-  <polygon points="410,435 790,435 710,538 490,538" fill="url(#gradLeads)" stroke="#003d1f" stroke-width="1" filter="url(#glow)"/>
-  <text x="600" y="478" text-anchor="middle" fill="#c8ffdf" font-size="15" font-weight="700" letter-spacing="1">LEADS</text>
-  <text x="600" y="525" text-anchor="middle" fill="#ffffff" font-size="68" font-weight="800">${TOTAL.leads}</text>
-</svg>
-`;
-
-document.getElementById('funnelMetricsRow').innerHTML = `
-  <div class="funnel-card">
-    <div class="label">CPC — Custo por Clique</div>
-    <div class="value" style="color:#ff6b35">${fmtBRL(TOTAL.cpc)}</div>
-    <div class="bar" style="background:#ff6b35"></div>
-  </div>
-  <div class="funnel-card">
-    <div class="label">TX Entrada — % cliques → página</div>
-    <div class="value" style="color:#ffd600">${fmtPct(TOTAL.txEntrada)}</div>
-    <div class="bar" style="background:#ffd600"></div>
-  </div>
-  <div class="funnel-card">
-    <div class="label">TX Cadastro — % PV → lead</div>
-    <div class="value" style="color:#00c853">${fmtPct(TOTAL.txCadastro)}</div>
-    <div class="bar" style="background:#00c853"></div>
-  </div>
-`;
-
-/* ===================== EVOLUÇÃO DIÁRIA ===================== */
-const days = [...new Set(rows.map(r=>r.date))].sort();
-const dailyBody = document.getElementById('dailyTableBody');
-const dailyAgg = days.map(d=>({date:d, ...calc(rows.filter(r=>r.date===d))}));
-
-dailyAgg.forEach(d=>{
-  dailyBody.innerHTML += `
-    <tr>
-      <td>${shortDate(d.date)}</td>
-      <td>${fmtBRL(d.spend)}</td>
-      <td>${fmtNum(d.impressions)}</td>
-      <td>${fmtNum(d.clicks)}</td>
-      <td>${fmtNum(d.pv)}</td>
-      <td>${d.leads}</td>
-      <td>${fmtPct(d.ctr)}</td>
-      <td>${fmtBRL(d.cpc)}</td>
-      <td>${fmtBRL(d.cpl)}</td>
-      <td>${fmtPct(d.txCadastro)}</td>
-    </tr>`;
-});
-dailyBody.innerHTML += `
-  <tr class="total-row">
-    <td>TOTAL</td>
-    <td>${fmtBRL(TOTAL.spend)}</td>
-    <td>${fmtNum(TOTAL.impressions)}</td>
-    <td>${fmtNum(TOTAL.clicks)}</td>
-    <td>${fmtNum(TOTAL.pv)}</td>
-    <td>${TOTAL.leads}</td>
-    <td>${fmtPct(TOTAL.ctr)}</td>
-    <td>${fmtBRL(TOTAL.cpc)}</td>
-    <td>${fmtBRL(TOTAL.cpl)}</td>
-    <td>${fmtPct(TOTAL.txCadastro)}</td>
-  </tr>`;
-
-new Chart(document.getElementById('dailyChart'), {
-  data: {
-    labels: dailyAgg.map(d=>shortDate(d.date)),
-    datasets: [
-      {
-        type:'bar', label:'Leads', data: dailyAgg.map(d=>d.leads),
-        backgroundColor:'#00c853', order:2, yAxisID:'y'
-      },
-      {
-        type:'line', label:'CPL (R$)', data: dailyAgg.map(d=>d.cpl),
-        borderColor:'#ff6b35', backgroundColor:'#ff6b35', tension:.3,
-        yAxisID:'y1', order:1, pointRadius:5, pointBackgroundColor:'#ff6b35'
-      }
-    ]
-  },
-  options: {
-    responsive:true, maintainAspectRatio:false,
-    plugins:{ legend:{ labels:{ color:'#fff' } } },
-    scales:{
-      x:{ ticks:{color:'#aaa'}, grid:{color:'#262640'} },
-      y:{ position:'left', ticks:{color:'#00c853'}, grid:{color:'#262640'}, title:{display:true,text:'Leads',color:'#00c853'} },
-      y1:{ position:'right', ticks:{color:'#ff6b35'}, grid:{drawOnChartArea:false}, title:{display:true,text:'CPL (R$)',color:'#ff6b35'} }
+    function cleanup(){
+      clearTimeout(timeout);
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
     }
+
+    window[cbName] = function(data){
+      cleanup();
+      try{
+        if (!data || data.status !== 'ok') throw new Error('status not ok');
+        const cols = data.table.cols;
+        const idx = {};
+        cols.forEach((c,i)=>{ idx[c.label] = i; });
+        const need = ['Date','Campaign Name','Adset Name','Reach (Estimated)','Impressions','Spend (Cost, Amount Spent)','Action Link Clicks','Action Landing Page View','Action Leads','Instagram Permalink URL','Ad Name'];
+        need.forEach(n=>{ if(!(n in idx)) throw new Error('coluna ausente: '+n); });
+
+        const rows = (data.table.rows || []).map(r=>{
+          const c = r.c || [];
+          const cell = (label)=> c[idx[label]] || null;
+          const dateCell = cell('Date');
+          const dateStr = dateCell ? (dateCell.f || dateCell.v || '') : '';
+          return {
+            date: dateStr,
+            campaign: (cell('Campaign Name')||{}).v || '',
+            adset: (cell('Adset Name')||{}).v || '',
+            reach: (cell('Reach (Estimated)')||{}).v || 0,
+            impressions: (cell('Impressions')||{}).v || 0,
+            spend: (cell('Spend (Cost, Amount Spent)')||{}).v || 0,
+            clicks: (cell('Action Link Clicks')||{}).v || 0,
+            pv: (cell('Action Landing Page View')||{}).v || 0,
+            leads: (cell('Action Leads')||{}).v || 0,
+            link: (cell('Instagram Permalink URL')||{}).v || '',
+            ad: (cell('Ad Name')||{}).v || ''
+          };
+        }).filter(r=>r.date && r.ad);
+
+        if (rows.length === 0) throw new Error('planilha sem linhas de dados');
+        resolve(rows);
+      }catch(err){
+        reject(err);
+      }
+    };
+
+    const url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID +
+      '/gviz/tq?tqx=out:json;responseHandler:' + cbName +
+      '&sheet=' + encodeURIComponent(SHEET_NAME) + '&_=' + Date.now();
+
+    const script = document.createElement('script');
+    script.src = url;
+    script.onerror = ()=>{ cleanup(); reject(new Error('falha ao carregar a planilha (rede ou permissão)')); };
+    document.head.appendChild(script);
+  });
+}
+
+async function refresh(isManual){
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = true;
+  setSyncState('loading', isManual ? 'atualizando...' : 'sincronizando...');
+  clearError();
+  try{
+    const rows = await fetchLiveData();
+    renderDashboard(rows);
+    const now = new Date();
+    setSyncState('', 'ao vivo · atualizado às ' + now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}));
+  }catch(err){
+    console.error(err);
+    setSyncState('error', 'falha ao buscar ao vivo — mostrando último snapshot');
+    showError('Não foi possível atualizar direto da planilha agora (' + err.message + '). Verifique se a planilha continua compartilhada como "qualquer pessoa com o link pode visualizar". Exibindo o último snapshot salvo.');
+    renderDashboard(FALLBACK_ROWS);
+  }finally{
+    btn.disabled = false;
   }
-});
+}
 
-/* ===================== CRIATIVOS ===================== */
-const adNames = [...new Set(rows.map(r=>r.ad))];
-let creativeAgg = adNames.map(ad=>({ad, campaign: rows.find(r=>r.ad===ad).campaign, link: rows.find(r=>r.ad===ad).link, ...calc(rows.filter(r=>r.ad===ad))}));
-creativeAgg.sort((a,b)=> (a.leads===0?Infinity:a.cpl) - (b.leads===0?Infinity:b.cpl));
+/* ===================== RENDER ===================== */
+function getBadgeFactory(avgCpl){
+  return function(cpl, leads){
+    if(!leads || !isFinite(cpl)) return {label:'PAUSAR', cls:'badge-pausar'};
+    if(cpl <= avgCpl*0.75) return {label:'ESCALAR', cls:'badge-escalar'};
+    if(cpl <= avgCpl*1.05) return {label:'MANTER', cls:'badge-manter'};
+    if(cpl <= avgCpl*1.4) return {label:'AVALIAR', cls:'badge-avaliar'};
+    return {label:'PAUSAR', cls:'badge-pausar'};
+  };
+}
 
-const creativeBody = document.getElementById('creativeTableBody');
-creativeAgg.forEach((c,i)=>{
-  const badge = getBadge(c.cpl, c.leads);
-  creativeBody.innerHTML += `
-    <tr>
-      <td>${i+1}</td>
-      <td><strong>${c.ad}</strong><br><span style="color:var(--apagado);font-size:11px">${c.campaign}</span></td>
-      <td>${fmtBRL(c.spend)}</td>
-      <td>${fmtNum(c.impressions)}</td>
-      <td>${fmtNum(c.clicks)}</td>
-      <td>${fmtNum(c.pv)}</td>
-      <td>${c.leads}</td>
-      <td>${fmtPct(c.ctr)}</td>
-      <td>${fmtBRL(c.cpc)}</td>
-      <td>${fmtBRL(c.cpl)}</td>
-      <td>${fmtPct(c.txEntrada)}</td>
-      <td>${fmtPct(c.txCadastro)}</td>
-      <td>–</td>
-      <td><a class="ad-link" href="${c.link}" target="_blank" rel="noopener">Ver anúncio ↗</a></td>
-      <td><span class="badge ${badge.cls}">${badge.label}</span></td>
+function renderDashboard(rows){
+  document.getElementById('loadingSkel').style.display = 'none';
+  document.querySelectorAll('.tab-content').forEach(c=>{ if(c.classList.contains('active')) c.style.display='block'; });
+  // ensure geral tab visible on first render
+  if(!document.querySelector('.tab-content.active')){
+    document.getElementById('tab-geral').classList.add('active');
+  }
+  document.querySelectorAll('.tab-content.active').forEach(c=>c.style.display='block');
+
+  const TOTAL = calc(rows);
+  const getBadge = getBadgeFactory(TOTAL.cpl);
+
+  const minDate = rows.map(r=>r.date).sort()[0];
+  const maxDate = rows.map(r=>r.date).sort().slice(-1)[0];
+  document.getElementById('headerPeriod').textContent =
+    'CL40 · Aula Gratuita · período: ' + shortDate(minDate) + '–' + shortDate(maxDate) + '/' + minDate.slice(0,4);
+
+  /* KPIs */
+  document.getElementById('kpiGrid').innerHTML = `
+    <div class="kpi-card">
+      <div class="kpi-label">Investimento Total</div>
+      <div class="kpi-value">${fmtBRL(TOTAL.spend)}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">CTR Médio</div>
+      <div class="kpi-value">${fmtPct(TOTAL.ctr)}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">CPM Médio</div>
+      <div class="kpi-value">${fmtBRL(TOTAL.cpm)}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">CPL Médio</div>
+      <div class="kpi-value">${fmtBRL(TOTAL.cpl)}</div>
+      <div class="kpi-sub">${TOTAL.leads} leads no período</div>
+    </div>
+  `;
+
+  /* Quente x Frio */
+  const quenteRows = rows.filter(r=>r.adset.toLowerCase().includes('engajamento'));
+  const frioRows = rows.filter(r=>!r.adset.toLowerCase().includes('engajamento'));
+  const QUENTE = calc(quenteRows);
+  const FRIO = frioRows.length ? calc(frioRows) : null;
+  const pctQuente = TOTAL.leads ? (QUENTE.leads/TOTAL.leads*100) : 0;
+  const pctFrio = 100 - pctQuente;
+
+  document.getElementById('tempGrid').innerHTML = `
+    <div class="temp-card temp-quente">
+      <div class="temp-title">🔥 Público Quente</div>
+      <div class="temp-sub">${quenteRows.length ? [...new Set(quenteRows.map(r=>r.adset))].join(', ') : 'Engajamento 365D'}</div>
+      <div class="temp-metrics">
+        <div><div class="temp-metric-label">Investimento</div><div class="temp-metric-value">${fmtBRL(QUENTE.spend)}</div></div>
+        <div><div class="temp-metric-label">CPL</div><div class="temp-metric-value">${fmtBRL(QUENTE.cpl)}</div></div>
+        <div><div class="temp-metric-label">Leads</div><div class="temp-metric-value">${QUENTE.leads}</div></div>
+      </div>
+      <div class="temp-detail">Breakdown Feed vs Stories indisponível — a planilha não traz coluna de posicionamento.</div>
+    </div>
+    <div class="temp-card temp-frio">
+      <div class="temp-title">❄️ Público Frio</div>
+      <div class="temp-sub">${frioRows.length ? [...new Set(frioRows.map(r=>r.adset))].join(', ') : 'Nenhum conjunto frio ativo no período'}</div>
+      <div class="temp-metrics">
+        <div><div class="temp-metric-label">Investimento</div><div class="temp-metric-value">${FRIO ? fmtBRL(FRIO.spend) : 'R$ 0,00'}</div></div>
+        <div><div class="temp-metric-label">CPL</div><div class="temp-metric-value">${FRIO ? fmtBRL(FRIO.cpl) : '–'}</div></div>
+        <div><div class="temp-metric-label">Leads</div><div class="temp-metric-value">${FRIO ? FRIO.leads : 0}</div></div>
+      </div>
+      <div class="temp-detail">${FRIO ? 'Breakdown por conjunto disponível na aba Públicos.' : 'Nenhum público frio rodando no período analisado.'}</div>
+    </div>
+    <div class="temp-card temp-comp">
+      <div class="temp-title" style="color:var(--laranja)">Comparativo</div>
+      <div class="comp-bar-wrap">
+        <div class="comp-bar-quente" style="width:${pctQuente}%"></div>
+        <div class="comp-bar-frio" style="width:${pctFrio}%"></div>
+      </div>
+      <div class="comp-row"><span>% Leads Quente</span><strong style="color:var(--vermelho)">${fmtPct(pctQuente)}</strong></div>
+      <div class="comp-row"><span>% Leads Frio</span><strong style="color:var(--azul)">${fmtPct(pctFrio)}</strong></div>
+      <div class="comp-row"><span>Diferença de CPL</span><strong>${FRIO ? fmtBRL(Math.abs(QUENTE.cpl-FRIO.cpl)) : 'Sem público frio para comparar'}</strong></div>
+    </div>
+  `;
+
+  /* Funil */
+  const warnEntrada = TOTAL.txEntrada < 70;
+  document.getElementById('funnelSvgWrap').innerHTML = `
+  <svg viewBox="0 0 1200 540" width="100%" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="gradImp" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#0d1f3d"/><stop offset="50%" stop-color="#1f4e8f"/><stop offset="100%" stop-color="#0d1f3d"/>
+      </linearGradient>
+      <linearGradient id="gradClicks" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#173a63"/><stop offset="50%" stop-color="#3877c4"/><stop offset="100%" stop-color="#173a63"/>
+      </linearGradient>
+      <linearGradient id="gradPV" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#5c2c06"/><stop offset="50%" stop-color="#d9700f"/><stop offset="100%" stop-color="#5c2c06"/>
+      </linearGradient>
+      <linearGradient id="gradLeads" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#003d1f"/><stop offset="50%" stop-color="#00c853"/><stop offset="100%" stop-color="#003d1f"/>
+      </linearGradient>
+      <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="10" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+
+    <polygon points="150,0 1050,0 980,100 220,100" fill="url(#gradImp)" stroke="#0a1730" stroke-width="1"/>
+    <text x="600" y="45" text-anchor="middle" fill="#9fc3ff" font-size="15" font-weight="700" letter-spacing="1">IMPRESSÕES</text>
+    <text x="600" y="88" text-anchor="middle" fill="#ffffff" font-size="56" font-weight="800">${fmtNum(TOTAL.impressions)}</text>
+
+    <polygon points="560,112 640,112 600,140" fill="#444"/>
+    <text x="600" y="135" text-anchor="middle" fill="var(--laranja)" font-size="16" font-weight="800">CTR ${fmtPct(TOTAL.ctr)}</text>
+
+    <polygon points="220,145 980,145 880,245 320,245" fill="url(#gradClicks)" stroke="#0a1730" stroke-width="1"/>
+    <text x="600" y="190" text-anchor="middle" fill="#9fc3ff" font-size="15" font-weight="700" letter-spacing="1">CLIQUES</text>
+    <text x="600" y="233" text-anchor="middle" fill="#ffffff" font-size="56" font-weight="800">${fmtNum(TOTAL.clicks)}</text>
+
+    <polygon points="520,257 680,257 600,285" fill="#444"/>
+    <text x="600" y="280" text-anchor="middle" fill="${warnEntrada?'var(--vermelho)':'var(--amarelo)'}" font-size="16" font-weight="800">TX ENTRADA ${fmtPct(TOTAL.txEntrada)}${warnEntrada?' ⚠':''}</text>
+
+    <polygon points="320,290 880,290 790,390 410,390" fill="url(#gradPV)" stroke="#0a1730" stroke-width="1"/>
+    <text x="600" y="335" text-anchor="middle" fill="#ffd9b3" font-size="15" font-weight="700" letter-spacing="1">PAGE VIEWS</text>
+    <text x="600" y="378" text-anchor="middle" fill="#ffffff" font-size="56" font-weight="800">${fmtNum(TOTAL.pv)}</text>
+
+    <polygon points="480,402 720,402 600,430" fill="#444"/>
+    <text x="600" y="425" text-anchor="middle" fill="var(--verde)" font-size="16" font-weight="800">TX CADASTRO ${fmtPct(TOTAL.txCadastro)}</text>
+
+    <polygon points="410,435 790,435 710,538 490,538" fill="url(#gradLeads)" stroke="#003d1f" stroke-width="1" filter="url(#glow)"/>
+    <text x="600" y="478" text-anchor="middle" fill="#c8ffdf" font-size="15" font-weight="700" letter-spacing="1">LEADS</text>
+    <text x="600" y="525" text-anchor="middle" fill="#ffffff" font-size="68" font-weight="800">${TOTAL.leads}</text>
+  </svg>
+  `;
+
+  document.getElementById('funnelMetricsRow').innerHTML = `
+    <div class="funnel-card">
+      <div class="label">CPC — Custo por Clique</div>
+      <div class="value" style="color:#ff6b35">${fmtBRL(TOTAL.cpc)}</div>
+      <div class="bar" style="background:#ff6b35"></div>
+    </div>
+    <div class="funnel-card">
+      <div class="label">TX Entrada — % cliques → página</div>
+      <div class="value" style="color:#ffd600">${fmtPct(TOTAL.txEntrada)}</div>
+      <div class="bar" style="background:#ffd600"></div>
+    </div>
+    <div class="funnel-card">
+      <div class="label">TX Cadastro — % PV → lead</div>
+      <div class="value" style="color:#00c853">${fmtPct(TOTAL.txCadastro)}</div>
+      <div class="bar" style="background:#00c853"></div>
+    </div>
+  `;
+
+  /* Evolução diária */
+  const days = [...new Set(rows.map(r=>r.date))].sort();
+  const dailyAgg = days.map(d=>({date:d, ...calc(rows.filter(r=>r.date===d))}));
+  const dailyBody = document.getElementById('dailyTableBody');
+  dailyBody.innerHTML = '';
+  dailyAgg.forEach(d=>{
+    dailyBody.innerHTML += `
+      <tr>
+        <td>${shortDate(d.date)}</td>
+        <td>${fmtBRL(d.spend)}</td>
+        <td>${fmtNum(d.impressions)}</td>
+        <td>${fmtNum(d.clicks)}</td>
+        <td>${fmtNum(d.pv)}</td>
+        <td>${d.leads}</td>
+        <td>${fmtPct(d.ctr)}</td>
+        <td>${fmtBRL(d.cpc)}</td>
+        <td>${fmtBRL(d.cpl)}</td>
+        <td>${fmtPct(d.txCadastro)}</td>
+      </tr>`;
+  });
+  dailyBody.innerHTML += `
+    <tr class="total-row">
+      <td>TOTAL</td>
+      <td>${fmtBRL(TOTAL.spend)}</td>
+      <td>${fmtNum(TOTAL.impressions)}</td>
+      <td>${fmtNum(TOTAL.clicks)}</td>
+      <td>${fmtNum(TOTAL.pv)}</td>
+      <td>${TOTAL.leads}</td>
+      <td>${fmtPct(TOTAL.ctr)}</td>
+      <td>${fmtBRL(TOTAL.cpc)}</td>
+      <td>${fmtBRL(TOTAL.cpl)}</td>
+      <td>${fmtPct(TOTAL.txCadastro)}</td>
     </tr>`;
-});
 
-/* ===================== PÚBLICOS ===================== */
-const adsets = [...new Set(rows.map(r=>r.adset))];
-let audienceAgg = adsets.map(a=>({adset:a, ...calc(rows.filter(r=>r.adset===a))}));
-audienceAgg.sort((a,b)=> (a.leads===0?Infinity:a.cpl) - (b.leads===0?Infinity:b.cpl));
+  if (dailyChartInstance) dailyChartInstance.destroy();
+  dailyChartInstance = new Chart(document.getElementById('dailyChart'), {
+    data: {
+      labels: dailyAgg.map(d=>shortDate(d.date)),
+      datasets: [
+        { type:'bar', label:'Leads', data: dailyAgg.map(d=>d.leads), backgroundColor:'#00c853', order:2, yAxisID:'y' },
+        { type:'line', label:'CPL (R$)', data: dailyAgg.map(d=>d.cpl), borderColor:'#ff6b35', backgroundColor:'#ff6b35', tension:.3, yAxisID:'y1', order:1, pointRadius:5, pointBackgroundColor:'#ff6b35' }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ labels:{ color:'#fff' } } },
+      scales:{
+        x:{ ticks:{color:'#aaa'}, grid:{color:'#262640'} },
+        y:{ position:'left', ticks:{color:'#00c853'}, grid:{color:'#262640'}, title:{display:true,text:'Leads',color:'#00c853'} },
+        y1:{ position:'right', ticks:{color:'#ff6b35'}, grid:{drawOnChartArea:false}, title:{display:true,text:'CPL (R$)',color:'#ff6b35'} }
+      }
+    }
+  });
 
-const audienceBody = document.getElementById('audienceTableBody');
-audienceAgg.forEach((a,i)=>{
-  const badge = getBadge(a.cpl, a.leads);
-  audienceBody.innerHTML += `
-    <tr>
-      <td>${i+1}</td>
-      <td>${a.adset} <span style="color:var(--vermelho);font-size:11px;font-weight:700">(quente)</span></td>
-      <td>${fmtBRL(a.spend)}</td>
-      <td>${fmtNum(a.impressions)}</td>
-      <td>${fmtNum(a.clicks)}</td>
-      <td>${fmtNum(a.pv)}</td>
-      <td>${a.leads}</td>
-      <td>${fmtPct(a.ctr)}</td>
-      <td>${fmtBRL(a.cpc)}</td>
-      <td>${fmtBRL(a.cpl)}</td>
-      <td><span class="badge ${badge.cls}">${badge.label}</span></td>
-    </tr>`;
-});
+  /* Criativos */
+  const adNames = [...new Set(rows.map(r=>r.ad))];
+  let creativeAgg = adNames.map(ad=>({ad, campaign: rows.find(r=>r.ad===ad).campaign, link: rows.find(r=>r.ad===ad).link, ...calc(rows.filter(r=>r.ad===ad))}));
+  creativeAgg.sort((a,b)=> (a.leads===0?Infinity:a.cpl) - (b.leads===0?Infinity:b.cpl));
+  const creativeBody = document.getElementById('creativeTableBody');
+  creativeBody.innerHTML = '';
+  creativeAgg.forEach((c,i)=>{
+    const badge = getBadge(c.cpl, c.leads);
+    creativeBody.innerHTML += `
+      <tr>
+        <td>${i+1}</td>
+        <td><strong>${c.ad}</strong><br><span style="color:var(--apagado);font-size:11px">${c.campaign}</span></td>
+        <td>${fmtBRL(c.spend)}</td>
+        <td>${fmtNum(c.impressions)}</td>
+        <td>${fmtNum(c.clicks)}</td>
+        <td>${fmtNum(c.pv)}</td>
+        <td>${c.leads}</td>
+        <td>${fmtPct(c.ctr)}</td>
+        <td>${fmtBRL(c.cpc)}</td>
+        <td>${fmtBRL(c.cpl)}</td>
+        <td>${fmtPct(c.txEntrada)}</td>
+        <td>${fmtPct(c.txCadastro)}</td>
+        <td>–</td>
+        <td><a class="ad-link" href="${c.link}" target="_blank" rel="noopener">Ver anúncio ↗</a></td>
+        <td><span class="badge ${badge.cls}">${badge.label}</span></td>
+      </tr>`;
+  });
 
-/* ===================== ANÁLISE DIÁRIA (detalhado) ===================== */
-const detailBody = document.getElementById('detailTableBody');
-[...rows].sort((a,b)=> a.date.localeCompare(b.date) || parseBR(b.spend)-parseBR(a.spend)).forEach(r=>{
-  const spend = parseBR(r.spend);
-  const ctr = r.clicks/r.impressions*100;
-  const cpc = spend/r.clicks;
-  const cpl = spend/r.leads;
-  const txCad = r.leads? r.leads/r.pv*100 : (r.pv? 0/r.pv*100 : NaN);
-  detailBody.innerHTML += `
-    <tr>
-      <td>${shortDate(r.date)}</td>
-      <td>${r.campaign}</td>
-      <td>${r.ad}</td>
-      <td>${fmtBRL(spend)}</td>
-      <td>${fmtNum(r.impressions)}</td>
-      <td>${fmtNum(r.clicks)}</td>
-      <td>${fmtNum(r.pv)}</td>
-      <td>${r.leads}</td>
-      <td>${fmtPct(ctr)}</td>
-      <td>${fmtBRL(cpc)}</td>
-      <td>${r.leads? fmtBRL(cpl) : '–'}</td>
-      <td>${fmtPct(r.pv? (r.leads/r.pv*100) : NaN)}</td>
-    </tr>`;
-});
+  /* Públicos */
+  const adsets = [...new Set(rows.map(r=>r.adset))];
+  let audienceAgg = adsets.map(a=>({adset:a, ...calc(rows.filter(r=>r.adset===a))}));
+  audienceAgg.sort((a,b)=> (a.leads===0?Infinity:a.cpl) - (b.leads===0?Infinity:b.cpl));
+  const audienceBody = document.getElementById('audienceTableBody');
+  audienceBody.innerHTML = '';
+  audienceAgg.forEach((a,i)=>{
+    const badge = getBadge(a.cpl, a.leads);
+    const temp = a.adset.toLowerCase().includes('engajamento') ? '(quente)' : '(frio)';
+    const tempColor = a.adset.toLowerCase().includes('engajamento') ? 'var(--vermelho)' : 'var(--azul)';
+    audienceBody.innerHTML += `
+      <tr>
+        <td>${i+1}</td>
+        <td>${a.adset} <span style="color:${tempColor};font-size:11px;font-weight:700">${temp}</span></td>
+        <td>${fmtBRL(a.spend)}</td>
+        <td>${fmtNum(a.impressions)}</td>
+        <td>${fmtNum(a.clicks)}</td>
+        <td>${fmtNum(a.pv)}</td>
+        <td>${a.leads}</td>
+        <td>${fmtPct(a.ctr)}</td>
+        <td>${fmtBRL(a.cpc)}</td>
+        <td>${fmtBRL(a.cpl)}</td>
+        <td><span class="badge ${badge.cls}">${badge.label}</span></td>
+      </tr>`;
+  });
+  document.getElementById('audienceNote').textContent =
+    'Breakdown Feed vs Stories indisponível — a planilha não traz coluna de posicionamento (placement).' +
+    (frioRows.length ? '' : ' Apenas conjunto(s) quente(s) ativo(s) no período; nenhum público frio rodando.');
+
+  /* Análise diária detalhada */
+  const detailBody = document.getElementById('detailTableBody');
+  detailBody.innerHTML = '';
+  [...rows].sort((a,b)=> a.date.localeCompare(b.date) || parseBR(b.spend)-parseBR(a.spend)).forEach(r=>{
+    const spend = parseBR(r.spend);
+    const ctr = r.clicks/r.impressions*100;
+    const cpc = spend/r.clicks;
+    const cpl = spend/r.leads;
+    detailBody.innerHTML += `
+      <tr>
+        <td>${shortDate(r.date)}</td>
+        <td>${r.campaign}</td>
+        <td>${r.ad}</td>
+        <td>${fmtBRL(spend)}</td>
+        <td>${fmtNum(r.impressions)}</td>
+        <td>${fmtNum(r.clicks)}</td>
+        <td>${fmtNum(r.pv)}</td>
+        <td>${r.leads}</td>
+        <td>${fmtPct(ctr)}</td>
+        <td>${fmtBRL(cpc)}</td>
+        <td>${r.leads? fmtBRL(cpl) : '–'}</td>
+        <td>${fmtPct(r.pv? (r.leads/r.pv*100) : NaN)}</td>
+      </tr>`;
+  });
+}
 
 /* ===================== TABS ===================== */
 document.querySelectorAll('.tab-btn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c=>{ c.classList.remove('active'); c.style.display='none'; });
     btn.classList.add('active');
-    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+    const el = document.getElementById('tab-'+btn.dataset.tab);
+    el.classList.add('active');
+    el.style.display = 'block';
   });
 });
+
+/* ===================== INICIALIZAÇÃO ===================== */
+document.getElementById('refreshBtn').addEventListener('click', ()=>refresh(true));
+document.getElementById('tab-geral').classList.add('active');
+refresh(false);
+if (AUTO_REFRESH_MINUTES > 0){
+  autoRefreshTimer = setInterval(()=>refresh(false), AUTO_REFRESH_MINUTES*60*1000);
+}
 </script>
 </body>
 </html>
