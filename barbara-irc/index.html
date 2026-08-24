@@ -155,7 +155,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
 
 <!-- ============ TRÁFEGO ============ -->
 <div class="content active" id="tab-trafego">
-  <div class="ob-info">📡 Vendas confirmadas até a manhã de 19/08 vêm da aba <b>"VENDAS ATÉ 19/08"</b>; a partir daí, as vendas chegam via <b>"Webhook"</b> (postback Hotmart em tempo real). Os dois cadastros são combinados automaticamente abaixo — sem duplicidade.</div>
+  <div class="ob-info">📡 Vendas confirmadas até a manhã de 19/08 vêm da aba <b>"VENDAS ATÉ 19/08"</b>; a partir daí, as vendas chegam via <b>"Webhook"</b> (postback Hotmart em tempo real). Os dois cadastros são combinados automaticamente abaixo — sem duplicidade. 100% da aquisição hoje é via tráfego pago; algumas vendas chegam sem o SCK detalhado (link do Instagram ou linha do webhook desalinhada) e por isso não têm criativo específico identificado — mas continuam contadas como tráfego pago.</div>
   <div class="kpi-grid" id="kpi-trafego"></div>
   <div class="sec-title">Funil de Tráfego</div>
   <div class="funil-section">
@@ -493,8 +493,17 @@ function parseWebhookSales(rows, histTxSet){
 }
 
 // ── ATRIBUIÇÃO SCK → campanha/conjunto/anúncio (Meta Ads) ─────────
+// Nesta conta, hoje, 100% da aquisição é via tráfego pago (sem canal
+// orgânico ativo). Além do padrão "meta_ads-...", a campanha também
+// gera vendas via um link de redirecionamento do Instagram
+// ("instagram.com/---imersao-reforma-contabil-1-") que não carrega
+// o nome do anúncio — e algumas linhas do Webhook chegam sem o SCK
+// por causa do desalinhamento de colunas do postback. Em todos esses
+// casos a venda é tráfego pago, só que sem atribuição de criativo.
 function isTrafego(sck){
-  return /^meta_ads-/i.test((sck||'').trim());
+  const s = (sck||'').trim();
+  if (/hotmart_product_page|organico|organic|\bdireto\b|link_in_bio/i.test(s)) return false;
+  return true;
 }
 function matchCombo(sck, combos){
   if (!sck) return null;
@@ -616,6 +625,8 @@ function renderTrafego(grows, trafegoSales, organicoSales){
   const ticket = safeDiv(fatTrafego, trafegoSales.length);
   const cpc = safeDiv(g.inv, g.clicks);
   const cpm = safeDiv(g.inv, g.imp)*1000;
+  const combosAll = buildCombos(GROWS);
+  const semAtribuicao = trafegoSales.filter(s=>!matchCombo(s.sck, combosAll)).length;
 
   const kpis = [
     ['Investimento', formatBRL(g.inv), 'orange'],
@@ -632,6 +643,7 @@ function renderTrafego(grows, trafegoSales, organicoSales){
     ['Impressões', formatInt(g.imp), ''],
     ['CPC', formatBRL(cpc), ''],
     ['CPM', formatBRL(cpm), ''],
+    ['Sem atribuição de criativo', formatInt(semAtribuicao), 'yellow'],
   ];
   document.getElementById('kpi-trafego').innerHTML = kpis.map(([label,val,cls])=>
     `<div class="kpi-card"><div class="kpi-label">${label}</div><div class="kpi-value ${cls}">${val}</div></div>`
@@ -675,6 +687,7 @@ function renderTrafego(grows, trafegoSales, organicoSales){
       const combo = trafego ? matchCombo(s.sck, buildCombos(GROWS)) : null;
       const icon = trafego ? '✅' : '⭐';
       const origem = trafego ? 'Tráfego pago' : 'Orgânico';
+      const semCriativo = trafego && !combo;
       const dataFmt = s.data.split('-').reverse().join('/');
       const fonteBadge = s.fonte==='webhook' ? '🔗 webhook' : '📄 histórico';
       return `<div class="sale-card ${trafego?'trafego':'organico'}">
@@ -686,6 +699,7 @@ function renderTrafego(grows, trafegoSales, organicoSales){
           <div>${dataFmt} · <b>${origem}</b></div>
           ${s.fatOB>0 ? `<div>🛒 OB: ${formatBRL(s.fatOB)}</div>` : ''}
           ${combo ? `<div>🎯 ${escapeHtml(combo.ad)} · ${escapeHtml(shortCampaign(combo.campaign))}</div>` : ''}
+          ${semCriativo ? `<div style="color:rgba(241,196,15,.7)">⚠️ sem criativo identificado</div>` : ''}
           <div style="margin-top:4px"><span class="src-badge">${fonteBadge}</span></div>
         </div>
       </div>`;
