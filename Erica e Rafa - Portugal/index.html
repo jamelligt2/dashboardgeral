@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Captação — Erica/Rafa · Microblading e Microlabial</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%231a1a2e'/%3E%3Ctext x='50' y='64' font-size='32' font-family='Arial' font-weight='900' fill='%23ff6b35' text-anchor='middle'%3EJGT%3C/text%3E%3C/svg%3E">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0f0f1a;
+    --card:#1e1e35;
+    --border:#262640;
+    --laranja:#ff6b35;
+    --laranja-esc:#e04e1c;
+    --verde:#00c853;
+    --vermelho:#ff1744;
+    --amarelo:#ffd600;
+    --azul:#42a5f5;
+    --texto:#ffffff;
+    --apagado:#8a8aa3;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--texto);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:60px;
+  }
+  a{ color:inherit; }
+
+  /* HEADER */
+  .header{
+    display:flex; align-items:center; gap:18px;
+    background:#16213e; border-bottom:2px solid var(--laranja);
+    padding:18px 32px;
+  }
+  .logo-badge{
+    background:linear-gradient(135deg, var(--laranja), var(--laranja-esc));
+    border-radius:10px; width:56px; height:56px;
+    display:flex; align-items:center; justify-content:center;
+    font-weight:900; font-size:18px; color:#fff; letter-spacing:0.5px;
+    flex-shrink:0;
+  }
+  .header-divider{ width:2px; height:44px; background:var(--border); }
+  .header-text h1{ font-size:19px; letter-spacing:0.4px; font-weight:800; }
+  .header-text p{ font-size:13px; color:var(--apagado); margin-top:4px; }
+
+  /* TABS */
+  .tabs{
+    display:flex; gap:4px; background:#16213e;
+    padding:0 32px; border-bottom:1px solid var(--border);
+    overflow-x:auto;
+  }
+  .tab-btn{
+    background:none; border:none; color:var(--apagado);
+    font-size:14px; font-weight:700; letter-spacing:0.3px;
+    padding:16px 20px; cursor:pointer; border-bottom:3px solid transparent;
+    white-space:nowrap; transition:.15s;
+  }
+  .tab-btn:hover{ color:#ccc; }
+  .tab-btn.active{ color:var(--laranja); border-bottom:3px solid var(--laranja); }
+
+  .content{ max-width:1360px; margin:0 auto; padding:28px 32px; }
+  .tab-pane{ display:none; }
+  .tab-pane.active{ display:block; }
+
+  /* KPI CARDS */
+  .kpi-grid{
+    display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:32px;
+  }
+  .kpi-card{
+    background:var(--card); border:1px solid var(--border); border-radius:14px;
+    padding:20px 22px; position:relative; overflow:hidden;
+  }
+  .kpi-card::before{
+    content:""; position:absolute; top:0; left:0; width:100%; height:3px;
+    background:var(--laranja);
+  }
+  .kpi-label{ font-size:12px; text-transform:uppercase; letter-spacing:0.6px; color:var(--apagado); font-weight:700; margin-bottom:10px; }
+  .kpi-value{ font-size:32px; font-weight:800; }
+  .kpi-sub{ font-size:12.5px; color:var(--apagado); margin-top:6px; }
+
+  /* SECTION TITLES */
+  .section-title{
+    font-size:15px; text-transform:uppercase; letter-spacing:0.6px;
+    color:var(--texto); font-weight:800; margin:8px 0 6px 0;
+    display:flex; align-items:center; gap:10px;
+  }
+  .section-title::before{ content:""; width:4px; height:16px; background:var(--laranja); border-radius:2px; }
+  .section-note{ font-size:12.5px; color:var(--apagado); margin-bottom:16px; line-height:1.5; }
+
+  /* CAMPANHA COMPARISON CARDS */
+  .comp-grid{
+    display:grid; grid-template-columns:1fr 1fr 0.9fr; gap:18px; margin-bottom:38px;
+  }
+  .comp-card{
+    border-radius:16px; padding:24px; border:2px solid;
+  }
+  .comp-card.geral{ border-color:var(--vermelho); background:#2a0a0a; }
+  .comp-card.microlabial{ border-color:var(--azul); background:#061428; }
+  .comp-card.compare{ border:2px solid var(--border); background:var(--card); display:flex; flex-direction:column; justify-content:center; }
+  .comp-tag{
+    display:inline-block; font-size:11px; font-weight:800; letter-spacing:0.6px;
+    padding:4px 10px; border-radius:20px; margin-bottom:12px; text-transform:uppercase;
+  }
+  .comp-card.geral .comp-tag{ background:var(--vermelho); color:#fff; }
+  .comp-card.microlabial .comp-tag{ background:var(--azul); color:#04101f; }
+  .comp-card h3{ font-size:20px; font-weight:800; margin-bottom:2px; }
+  .comp-card .comp-sub{ font-size:12.5px; color:var(--apagado); margin-bottom:18px; }
+  .comp-metrics{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:16px; }
+  .comp-metric-label{ font-size:11px; text-transform:uppercase; color:var(--apagado); letter-spacing:0.5px; font-weight:700; }
+  .comp-metric-value{ font-size:24px; font-weight:800; margin-top:4px; }
+  .comp-detail{
+    font-size:12.5px; color:#c9c9dd; border-top:1px solid rgba(255,255,255,0.08);
+    padding-top:14px; line-height:1.6;
+  }
+  .comp-detail b{ color:#fff; }
+
+  .compare-row{ display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--border); }
+  .compare-row:last-child{ border-bottom:none; }
+  .compare-row .lbl{ font-size:12.5px; color:var(--apagado); }
+  .compare-row .val{ font-size:17px; font-weight:800; }
+  .bar-track{ width:100%; height:8px; background:#12121f; border-radius:4px; overflow:hidden; display:flex; margin:14px 0 4px 0; }
+  .bar-fill-a{ background:var(--vermelho); height:100%; }
+  .bar-fill-b{ background:var(--azul); height:100%; }
+  .bar-caption{ display:flex; justify-content:space-between; font-size:11px; color:var(--apagado); }
+
+  /* FUNIL */
+  .funnel-wrap{ display:flex; gap:24px; margin-bottom:38px; align-items:stretch; }
+  .funnel-svg-wrap{ flex:0 0 52%; max-width:52%; background:var(--card); border:1px solid var(--border); border-radius:16px; padding:12px; display:flex; align-items:center; }
+  .funnel-metrics-row{ flex:1; display:flex; flex-direction:column; gap:12px; }
+  .side-card{ flex:1; background:var(--card); border:1px solid var(--border); border-radius:14px; padding:18px 20px; position:relative; display:flex; flex-direction:column; justify-content:center; overflow:hidden; }
+  .side-card .kpi-label{ margin-bottom:8px; }
+  .side-card .kpi-value{ font-size:30px; }
+  .side-bar{ position:absolute; bottom:0; left:0; width:100%; height:3px; border-radius:0 0 12px 12px; }
+  .side-bar.cpc{ background:var(--laranja); }
+  .side-bar.entrada{ background:var(--amarelo); }
+  .side-bar.cadastro{ background:var(--verde); }
+
+  /* TABLES */
+  .table-wrap{ background:var(--card); border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-bottom:28px; }
+  table{ width:100%; border-collapse:collapse; font-size:13.5px; }
+  thead th{
+    background:#161628; color:var(--apagado); text-transform:uppercase; font-size:11px;
+    letter-spacing:0.4px; font-weight:700; text-align:left; padding:12px 14px; white-space:nowrap;
+    border-bottom:1px solid var(--border);
+  }
+  tbody td{ padding:11px 14px; border-bottom:1px solid var(--border); white-space:nowrap; }
+  tbody tr:last-child td{ border-bottom:none; }
+  tbody tr:hover{ background:rgba(255,255,255,0.02); }
+  tr.total-row td{ background:#2a1608; font-weight:800; color:var(--laranja); border-top:2px solid var(--laranja); }
+  tr.day-total-row td{ background:#161628; font-weight:800; color:var(--laranja); }
+  .num{ text-align:right; font-variant-numeric:tabular-nums; }
+  .tag{ display:inline-block; font-size:10.5px; font-weight:800; padding:3px 8px; border-radius:10px; letter-spacing:0.3px; }
+  .tag.geral{ background:rgba(255,23,68,0.18); color:#ff6b6b; }
+  .tag.microlabial{ background:rgba(66,165,245,0.18); color:var(--azul); }
+  .badge{ display:inline-block; font-size:10.5px; font-weight:800; padding:4px 10px; border-radius:20px; letter-spacing:0.3px; }
+  .badge.escalar{ background:var(--verde); color:#04220f; }
+  .badge.manter{ background:var(--laranja); color:#2a0f00; }
+  .badge.avaliar{ background:var(--amarelo); color:#2a2400; }
+  .badge.pausar{ background:var(--vermelho); color:#2a0004; }
+  .lnk{ color:var(--azul); text-decoration:none; font-weight:600; font-size:12.5px; }
+  .lnk:hover{ text-decoration:underline; }
+  .muted{ color:var(--apagado); }
+
+  .chart-card{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:22px; margin-bottom:28px; }
+  .chart-card canvas{ max-height:320px; }
+
+  .day-block{ margin-bottom:26px; }
+  .day-block-header{
+    display:flex; align-items:center; justify-content:space-between;
+    background:#161628; border:1px solid var(--border); border-bottom:none;
+    border-radius:14px 14px 0 0; padding:14px 18px;
+  }
+  .day-block-header h4{ font-size:15px; font-weight:800; }
+  .day-block-header .day-kpis{ display:flex; gap:22px; font-size:12.5px; color:var(--apagado); }
+  .day-block-header .day-kpis b{ color:#fff; }
+  .day-block .table-wrap{ border-radius:0 0 14px 14px; margin-bottom:0; border-top:none; }
+
+  @media (max-width: 1100px){
+    .kpi-grid{ grid-template-columns:repeat(2,1fr); }
+    .comp-grid{ grid-template-columns:1fr; }
+    .funnel-wrap{ flex-direction:column; }
+    .funnel-svg-wrap{ flex:1; max-width:100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo-badge">JGT</div>
+  <div class="header-divider"></div>
+  <div class="header-text">
+    <h1>DASHBOARD CAPTAÇÃO — ERICA/RAFA · MICROBLADING E MICROLABIAL</h1>
+    <p>CAP WHATSAPP · Agendamento Microblading, Henna &amp; Microlabial · 25 a 28/08/2026</p>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="visao">Visão Geral</button>
+  <button class="tab-btn" data-tab="criativos">Criativos</button>
+  <button class="tab-btn" data-tab="publicos">Públicos</button>
+  <button class="tab-btn" data-tab="diaria">Análise Diária</button>
+</div>
+
+<div class="content">
+
+  <!-- ===================== ABA 1: VISÃO GERAL ===================== -->
+  <div class="tab-pane active" id="visao">
+
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Investimento Total</div>
+        <div class="kpi-value">€ 72,84</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">CTR Médio</div>
+        <div class="kpi-value">3,59%</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">CPM Médio</div>
+        <div class="kpi-value">€ 3,97</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">CPL Médio</div>
+        <div class="kpi-value">€ 0,91</div>
+        <div class="kpi-sub">80 leads no período</div>
+      </div>
+    </div>
+
+    <div class="section-title">Comparativo de Campanhas — Geral vs Microlabial</div>
+    <div class="section-note">Obs.: as duas campanhas rodam para o mesmo público (<b>00 - Feminino - 30+</b>) — a planilha não traz outra segmentação (lookalike, interesse, retargeting) nem breakdown de posicionamento (Feed/Stories), por isso o comparativo abaixo é por linha de produto.</div>
+
+    <div class="comp-grid">
+      <div class="comp-card geral">
+        <span class="comp-tag">Campanha Geral</span>
+        <h3>Microblading + Henna</h3>
+        <div class="comp-sub">6 criativos ativos no período</div>
+        <div class="comp-metrics">
+          <div><div class="comp-metric-label">Investimento</div><div class="comp-metric-value">€ 41,49</div></div>
+          <div><div class="comp-metric-label">CPL</div><div class="comp-metric-value">€ 0,75</div></div>
+          <div><div class="comp-metric-label">Leads</div><div class="comp-metric-value">55</div></div>
+          <div><div class="comp-metric-label">CTR</div><div class="comp-metric-value">3,43%</div></div>
+        </div>
+        <div class="comp-detail">Top criativo: <b>ADV02</b> — 45 leads · CPL € 0,70<br>Representa <b>68,75%</b> de todos os leads do período.</div>
+      </div>
+
+      <div class="comp-card microlabial">
+        <span class="comp-tag">Campanha Microlabial</span>
+        <h3>Erica Microlabial</h3>
+        <div class="comp-sub">7 criativos ativos no período</div>
+        <div class="comp-metrics">
+          <div><div class="comp-metric-label">Investimento</div><div class="comp-metric-value">€ 31,35</div></div>
+          <div><div class="comp-metric-label">CPL</div><div class="comp-metric-value">€ 1,25</div></div>
+          <div><div class="comp-metric-label">Leads</div><div class="comp-metric-value">25</div></div>
+          <div><div class="comp-metric-label">CTR</div><div class="comp-metric-value">3,82%</div></div>
+        </div>
+        <div class="comp-detail">Top criativo: <b>ADE01 - MICROLABIAL</b> — 11 leads · CPL € 1,31<br>Representa <b>31,25%</b> de todos os leads do período.</div>
+      </div>
+
+      <div class="comp-card compare">
+        <div class="compare-row">
+          <div class="lbl">% Leads — Geral</div>
+          <div class="val" style="color:var(--vermelho)">68,75%</div>
+        </div>
+        <div class="compare-row">
+          <div class="lbl">% Leads — Microlabial</div>
+          <div class="val" style="color:var(--azul)">31,25%</div>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill-a" style="width:68.75%"></div>
+          <div class="bar-fill-b" style="width:31.25%"></div>
+        </div>
+        <div class="bar-caption"><span>Geral</span><span>Microlabial</span></div>
+        <div class="compare-row" style="margin-top:10px;">
+          <div class="lbl">Diferença de CPL</div>
+          <div class="val" style="color:var(--amarelo)">+66,2%</div>
+        </div>
+        <div class="comp-detail" style="border-top:none; padding-top:0;">Microlabial custa ~66% a mais por lead do que a campanha Geral (€ 1,25 vs € 0,75).</div>
+      </div>
+    </div>
+
+    <div class="section-title">Funil de Conversão</div>
+    <div class="funnel-wrap">
+      <div class="funnel-svg-wrap">
+        <svg viewBox="0 0 1200 540" width="100%" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="gradImp" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#0a2f5c"/>
+              <stop offset="50%" stop-color="#1e6fd9"/>
+              <stop offset="100%" stop-color="#0a2f5c"/>
+            </linearGradient>
+            <linearGradient id="gradClicks" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#0d3f73"/>
+              <stop offset="50%" stop-color="#42a5f5"/>
+              <stop offset="100%" stop-color="#0d3f73"/>
+            </linearGradient>
+            <linearGradient id="gradPV" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#7a2e00"/>
+              <stop offset="50%" stop-color="#ff6b35"/>
+              <stop offset="100%" stop-color="#7a2e00"/>
+            </linearGradient>
+            <linearGradient id="gradLeads" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#003d1f"/>
+              <stop offset="50%" stop-color="#00c853"/>
+              <stop offset="100%" stop-color="#003d1f"/>
+            </linearGradient>
+            <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+              <feGaussianBlur stdDeviation="9" result="blur"/>
+              <feMerge>
+                <feMergeNode in="blur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+          </defs>
+
+          <!-- STAGE 1: IMPRESSOES -->
+          <polygon points="150,10 1050,10 975,120 225,120" fill="url(#gradImp)" stroke="#0a2f5c" stroke-width="1"/>
+          <text x="600" y="45" text-anchor="middle" fill="#bcd6ff" font-size="20" font-weight="700" letter-spacing="1">IMPRESSÕES</text>
+          <text x="600" y="98" text-anchor="middle" fill="#ffffff" font-size="56" font-weight="800">18.368</text>
+
+          <!-- CONNECTOR 1: CTR -->
+          <text x="600" y="150" text-anchor="middle" fill="#ffffff" font-size="22" font-weight="700">▼ CTR 3,59%</text>
+
+          <!-- STAGE 2: CLIQUES -->
+          <polygon points="225,160 975,160 880,270 320,270" fill="url(#gradClicks)" stroke="#0d3f73" stroke-width="1"/>
+          <text x="600" y="195" text-anchor="middle" fill="#dceeff" font-size="20" font-weight="700" letter-spacing="1">CLIQUES</text>
+          <text x="600" y="248" text-anchor="middle" fill="#ffffff" font-size="56" font-weight="800">659</text>
+
+          <!-- CONNECTOR 2: TX ENTRADA -->
+          <text x="600" y="300" text-anchor="middle" fill="#ffd600" font-size="22" font-weight="700">▼ TX Entrada 74,20%</text>
+
+          <!-- STAGE 3: PAGE VIEWS -->
+          <polygon points="320,310 880,310 800,400 400,400" fill="url(#gradPV)" stroke="#7a2e00" stroke-width="1"/>
+          <text x="600" y="340" text-anchor="middle" fill="#ffe3d1" font-size="19" font-weight="700" letter-spacing="1">PAGE VIEWS</text>
+          <text x="600" y="380" text-anchor="middle" fill="#ffffff" font-size="56" font-weight="800">489</text>
+
+          <!-- CONNECTOR 3: TX CADASTRO -->
+          <text x="600" y="430" text-anchor="middle" fill="#00c853" font-size="22" font-weight="700">▼ TX Cadastro 16,36%</text>
+
+          <!-- STAGE 4: LEADS (glow) -->
+          <g filter="url(#glow)">
+            <polygon points="400,440 800,440 740,530 460,530" fill="url(#gradLeads)" stroke="#00c853" stroke-width="1.5"/>
+          </g>
+          <text x="600" y="468" text-anchor="middle" fill="#c9ffe0" font-size="19" font-weight="700" letter-spacing="1">LEADS</text>
+          <text x="600" y="514" text-anchor="middle" fill="#ffffff" font-size="46" font-weight="800" filter="url(#glow)">80</text>
+        </svg>
+      </div>
+      <div class="funnel-metrics-row">
+        <div class="side-card">
+          <div class="kpi-label">CPC — Custo por Clique</div>
+          <div class="kpi-value" style="color:var(--laranja)">€ 0,11</div>
+          <div class="side-bar cpc"></div>
+        </div>
+        <div class="side-card">
+          <div class="kpi-label">TX Entrada — % cliques que chegam à página</div>
+          <div class="kpi-value" style="color:var(--amarelo)">74,20%</div>
+          <div class="side-bar entrada"></div>
+        </div>
+        <div class="side-card">
+          <div class="kpi-label">TX Cadastro — % page views que viram lead</div>
+          <div class="kpi-value" style="color:var(--verde)">16,36%</div>
+          <div class="side-bar cadastro"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title">Evolução Diária</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Dia</th><th class="num">Investimento</th><th class="num">Impressões</th><th class="num">Cliques</th>
+            <th class="num">PV</th><th class="num">Leads</th><th class="num">CTR</th><th class="num">CPC</th>
+            <th class="num">CPL</th><th class="num">TX Cadastro</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>25/08</td><td class="num">€ 26,13</td><td class="num">6.111</td><td class="num">234</td><td class="num">171</td><td class="num">27</td><td class="num">3,83%</td><td class="num">€ 0,11</td><td class="num">€ 0,97</td><td class="num">15,79%</td></tr>
+          <tr><td>26/08</td><td class="num">€ 22,30</td><td class="num">4.987</td><td class="num">167</td><td class="num">123</td><td class="num">34</td><td class="num">3,35%</td><td class="num">€ 0,13</td><td class="num">€ 0,66</td><td class="num">27,64%</td></tr>
+          <tr><td>27/08</td><td class="num">€ 19,35</td><td class="num">5.613</td><td class="num">201</td><td class="num">154</td><td class="num">17</td><td class="num">3,58%</td><td class="num">€ 0,10</td><td class="num">€ 1,14</td><td class="num">11,04%</td></tr>
+          <tr><td>28/08</td><td class="num">€ 5,06</td><td class="num">1.657</td><td class="num">57</td><td class="num">41</td><td class="num">2</td><td class="num">3,44%</td><td class="num">€ 0,09</td><td class="num">€ 2,53</td><td class="num">4,88%</td></tr>
+          <tr class="total-row"><td>TOTAL</td><td class="num">€ 72,84</td><td class="num">18.368</td><td class="num">659</td><td class="num">489</td><td class="num">80</td><td class="num">3,59%</td><td class="num">€ 0,11</td><td class="num">€ 0,91</td><td class="num">16,36%</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="chart-card">
+      <canvas id="chartEvolucao"></canvas>
+    </div>
+
+  </div>
+
+  <!-- ===================== ABA 2: CRIATIVOS ===================== -->
+  <div class="tab-pane" id="criativos">
+    <div class="section-title">Ranking de Criativos — Melhor para Pior CPL</div>
+    <div class="section-note">Hook Rate não disponível: a planilha desta campanha não traz métrica de visualizações de vídeo (Views 3s).</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>Criativo</th><th class="num">Invest.</th><th class="num">Imp.</th><th class="num">Cliques</th>
+            <th class="num">PV</th><th class="num">Leads</th><th class="num">CTR</th><th class="num">CPC</th><th class="num">CPL</th>
+            <th class="num">TX Entrada</th><th class="num">TX Cadastro</th><th class="num">Hook Rate</th><th>Link</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td>ADV04 - Microblading <span class="tag geral">GERAL</span></td><td class="num">€ 0,62</td><td class="num">222</td><td class="num">17</td><td class="num">9</td><td class="num">2</td><td class="num">7,66%</td><td class="num">€ 0,04</td><td class="num"><b>€ 0,31</b></td><td class="num">52,94%</td><td class="num">22,22%</td><td class="num muted">—</td><td><a class="lnk" href="https://www.instagram.com/p/Dcb57-OABgZ/" target="_blank" rel="noopener">Ver anúncio ↗</a></td><td><span class="badge escalar">ESCALAR</span></td></tr>
+          <tr><td>2</td><td>ADV01 - MICROLABIAL <span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 0,32</td><td class="num">52</td><td class="num">4</td><td class="num">2</td><td class="num">1</td><td class="num">7,69%</td><td class="num">€ 0,08</td><td class="num"><b>€ 0,32</b></td><td class="num">50,00%</td><td class="num">50,00%</td><td class="num muted">—</td><td><a class="lnk" href="https://www.instagram.com/p/Dcb5-aLgeWk/" target="_blank" rel="noopener">Ver anúncio ↗</a></td><td><span class="badge avaliar">AVALIAR</span></td></tr>
+          <tr><td>3</td><td>ADE01 - Henna <span class="tag geral">GERAL</span></td><td class="num">€ 0,42</td><td class="num">116</td><td class="num">3</td><td class="num">3</td><td class="num">1</td><td class="num">2,59%</td><td class="num">€ 0,14</td><td class="num"><b>€ 0,42</b></td><td class="num">100,00%</td><td class="num">33,33%</td><td class="num muted">—</td><td><a class="lnk" href="https://www.instagram.com/p/Dcb57juAORT/" target="_blank" rel="noopener">Ver anúncio ↗</a></td><td><span class="badge avaliar">AVALIAR</span></td></tr>
+          <tr><td>4</td><td>ADV02 <span class="tag geral">GERAL</span></td><td class="num">€ 31,34</td><td class="num">8.327</td><td class="num">270</td><td class="num">221</td><td class="num">45</td><td class="num">3,24%</td><td class="num">€ 0,12</td><td class="num"><b>€ 0,70</b></td><td class="num">81,85%</td><td class="num">20,36%</td><td class="num muted">—</td><td><a class="lnk" href="https://www.instagram.com/p/Dcb57-XgH8d/" target="_blank" rel="noopener">Ver anúncio ↗</a></td><td><span class="badge escalar">ESCALAR</span></td></tr>
+          <tr><td>5</td><td>ADV01 <span class="tag geral">GERAL</span></td><td class="num">€ 2,39</td><td class="num">578</td><td class="num">27</td><td class="num">22</td><td class="num">3</td><td class="num">4,67%</td><td class="num">€ 0,09</td><td class="num"><b>€ 0,80</b></td><td class="num">81,48%</td><td class="num">13,64%</td><td class="num muted">—</td><td><a class="lnk" href="https://www.instagram.com/p/Dcb57vBgC1e/" target="_blank" rel="noopener">Ver anúncio ↗</a></td><td><span class="badge manter">MANTER</span></td></tr>
+          <tr><td>6</td><td>ADV04 - MICROLABIAL <span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 0,86</td><td class="num">158</td><td class="num">6</td><td class="num">4</td><td class="num">1</td><td class="num">3,80%</td><td class="num">€ 0,14</td><td class="num"><b>€ 0,86</b></td><td class="num">66,67%</td><td class="num">25,00%</td><td class="num muted">—</td><td><a class="lnk" href="https://www.instagram.com/p/Dcb5-izgHdT/" target="_blank" rel="noopener">Ver anúncio ↗</a></td><td><span class="badge avaliar">AVALIAR</span></td></tr>
+          <tr><td>7</td><td>ADV06 - MICROLABIAL <span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 3,72</td><td class="num">675</td><td class="num">19</td><td class="num">14</td><td class="num">4</td><td class="num">2,81%</td><td class="num">€ 0,20</td><td class="num"><b>€ 0,93</b></td><td class="num">73,68%</td><td class="num">28,57%</td><td class="num muted">—</td><td><a class="lnk" href="https://www.instagram.com/p/Dcb5--6gc8E/" target="_blank" rel="noopener">Ver anúncio ↗</a></td><td><span class="badge manter">MANTER</span></td></tr>
+          <tr><td>8</td><td>ADV02 - MICROLABIAL <span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 2,94</td><td class="num">592</td><td class="num">33</td><td class="num">21</td><td class="num">3</td><td class="num">5,57%</td><td class="num">€ 0,09</td><td class="num"><b>€ 0,98</b></td><td class="num">63,64%</td><td class="num">14,29%</td><td class="num muted">—</td><td><a class="lnk" href="https://www.instagram.com/p/Dcb5-IZA03_/" target="_blank" rel="noopener">Ver anúncio ↗</a></td><td><span class="badge manter">MANTER</span></td></tr>
+          <tr><td>9</td><td>ADV03 - MICROLABIAL <span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 1,13</td><td class="num">210</td><td class="num">19</td><td class="num">12</td><td class="num">1</td><td class="num">9,05%</td><td class="num">€ 0,06</td><td class="num"><b>€ 1,13</b></td><td class="num">63,16%</td><td class="num">8,33%</td><td class="num muted">—</td><td><a class="lnk" href="https://www.instagram.com/p/Dcb5-jKAExI/" target="_blank" rel="noopener">Ver anúncio ↗</a></td><td><span class="badge avaliar">AVALIAR</span></td></tr>
+          <tr><td>10</td><td>ADE01 - MICROLABIAL <span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 14,40</td><td class="num">4.010</td><td class="num">102</td><td class="num">75</td><td class="num">11</td><td class="num">2,54%</td><td class="num">€ 0,14</td><td class="num"><b>€ 1,31</b></td><td class="num">73,53%</td><td class="num">14,67%</td><td class="num muted">—</td><td><a class="lnk" href="https://www.instagram.com/p/Dcb587FAUHl/" target="_blank" rel="noopener">Ver anúncio ↗</a></td><td><span class="badge manter">MANTER</span></td></tr>
+          <tr><td>11</td><td>ADE02 - Microblading <span class="tag geral">GERAL</span></td><td class="num">€ 6,53</td><td class="num">1.692</td><td class="num">58</td><td class="num">41</td><td class="num">4</td><td class="num">3,43%</td><td class="num">€ 0,11</td><td class="num"><b>€ 1,63</b></td><td class="num">70,69%</td><td class="num">9,76%</td><td class="num muted">—</td><td><a class="lnk" href="https://www.instagram.com/p/Dcb6Dn0gKjs/" target="_blank" rel="noopener">Ver anúncio ↗</a></td><td><span class="badge avaliar">AVALIAR</span></td></tr>
+          <tr><td>12</td><td>ADV05 - MICROLABIAL <span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 7,98</td><td class="num">1.679</td><td class="num">99</td><td class="num">64</td><td class="num">4</td><td class="num">5,90%</td><td class="num">€ 0,08</td><td class="num"><b>€ 2,00</b></td><td class="num">64,65%</td><td class="num">6,25%</td><td class="num muted">—</td><td><a class="lnk" href="https://www.instagram.com/p/Dcb6AMwgyXF/" target="_blank" rel="noopener">Ver anúncio ↗</a></td><td><span class="badge pausar">PAUSAR</span></td></tr>
+          <tr><td>13</td><td>ADV03 - Henna <span class="tag geral">GERAL</span></td><td class="num">€ 0,19</td><td class="num">57</td><td class="num">2</td><td class="num">1</td><td class="num">0</td><td class="num">3,51%</td><td class="num">€ 0,10</td><td class="num muted">—</td><td class="num">50,00%</td><td class="num">0,00%</td><td class="num muted">—</td><td><a class="lnk" href="https://www.instagram.com/p/Dcb58EcAioM/" target="_blank" rel="noopener">Ver anúncio ↗</a></td><td><span class="badge pausar">PAUSAR</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===================== ABA 3: PÚBLICOS ===================== -->
+  <div class="tab-pane" id="publicos">
+    <div class="section-title">Públicos / Conjuntos — Ranqueado por CPL</div>
+    <div class="section-note">A planilha desta conta usa uma única audiência configurada — <b>00 - Feminino - 30+</b> — aplicada nas duas campanhas do período. Não há segmentação por lookalike, interesse ou retargeting nem breakdown de posicionamento (Feed/Stories) disponível nos dados. O ranking abaixo compara o desempenho dessa audiência em cada campanha/produto.</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>Público / Conjunto</th><th>Campanha</th><th class="num">Invest.</th><th class="num">Imp.</th>
+            <th class="num">Cliques</th><th class="num">PV</th><th class="num">Leads</th><th class="num">CTR</th><th class="num">CPL</th>
+            <th>Top Criativo</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td><td>00 - Feminino - 30+</td><td><span class="tag geral">GERAL</span></td>
+            <td class="num">€ 41,49</td><td class="num">10.992</td><td class="num">377</td><td class="num">297</td><td class="num">55</td>
+            <td class="num">3,43%</td><td class="num"><b>€ 0,75</b></td>
+            <td>ADV02 (45 leads)</td><td><span class="badge escalar">ESCALAR</span></td>
+          </tr>
+          <tr>
+            <td>2</td><td>00 - Feminino - 30+</td><td><span class="tag microlabial">MICROLABIAL</span></td>
+            <td class="num">€ 31,35</td><td class="num">7.376</td><td class="num">282</td><td class="num">192</td><td class="num">25</td>
+            <td class="num">3,82%</td><td class="num"><b>€ 1,25</b></td>
+            <td>ADE01 - MICROLABIAL (11 leads)</td><td><span class="badge manter">MANTER</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===================== ABA 4: ANÁLISE DIÁRIA ===================== -->
+  <div class="tab-pane" id="diaria">
+    <div class="section-title">Comparativo Dia a Dia</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Dia</th><th class="num">Investimento</th><th class="num">Impressões</th><th class="num">Cliques</th>
+            <th class="num">PV</th><th class="num">Leads</th><th class="num">CTR</th><th class="num">CPC</th>
+            <th class="num">CPL</th><th class="num">TX Entrada</th><th class="num">TX Cadastro</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>25/08</td><td class="num">€ 26,13</td><td class="num">6.111</td><td class="num">234</td><td class="num">171</td><td class="num">27</td><td class="num">3,83%</td><td class="num">€ 0,11</td><td class="num">€ 0,97</td><td class="num">73,08%</td><td class="num">15,79%</td></tr>
+          <tr><td>26/08</td><td class="num">€ 22,30</td><td class="num">4.987</td><td class="num">167</td><td class="num">123</td><td class="num">34</td><td class="num">3,35%</td><td class="num">€ 0,13</td><td class="num">€ 0,66</td><td class="num">73,65%</td><td class="num">27,64%</td></tr>
+          <tr><td>27/08</td><td class="num">€ 19,35</td><td class="num">5.613</td><td class="num">201</td><td class="num">154</td><td class="num">17</td><td class="num">3,58%</td><td class="num">€ 0,10</td><td class="num">€ 1,14</td><td class="num">76,62%</td><td class="num">11,04%</td></tr>
+          <tr><td>28/08</td><td class="num">€ 5,06</td><td class="num">1.657</td><td class="num">57</td><td class="num">41</td><td class="num">2</td><td class="num">3,44%</td><td class="num">€ 0,09</td><td class="num">€ 2,53</td><td class="num">71,93%</td><td class="num">4,88%</td></tr>
+          <tr class="total-row"><td>TOTAL</td><td class="num">€ 72,84</td><td class="num">18.368</td><td class="num">659</td><td class="num">489</td><td class="num">80</td><td class="num">3,59%</td><td class="num">€ 0,11</td><td class="num">€ 0,91</td><td class="num">74,20%</td><td class="num">16,36%</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section-title" style="margin-top:34px;">Detalhamento por Dia e Criativo</div>
+
+    <!-- DIA 25/08 -->
+    <div class="day-block">
+      <div class="day-block-header">
+        <h4>25/08/2026</h4>
+        <div class="day-kpis"><span>Invest. <b>€ 26,13</b></span><span>Leads <b>27</b></span><span>CPL <b>€ 0,97</b></span></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Criativo</th><th>Campanha</th><th class="num">Invest.</th><th class="num">Imp.</th><th class="num">Cliques</th><th class="num">PV</th><th class="num">Leads</th><th class="num">CPL</th></tr></thead>
+          <tbody>
+            <tr><td>ADV02</td><td><span class="tag geral">GERAL</span></td><td class="num">€ 6,39</td><td class="num">1.294</td><td class="num">48</td><td class="num">39</td><td class="num">11</td><td class="num">€ 0,58</td></tr>
+            <tr><td>ADE01 - MICROLABIAL</td><td><span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 7,12</td><td class="num">1.652</td><td class="num">45</td><td class="num">35</td><td class="num">6</td><td class="num">€ 1,19</td></tr>
+            <tr><td>ADE02 - Microblading</td><td><span class="tag geral">GERAL</span></td><td class="num">€ 5,41</td><td class="num">1.430</td><td class="num">45</td><td class="num">31</td><td class="num">2</td><td class="num">€ 2,71</td></tr>
+            <tr><td>ADV05 - MICROLABIAL</td><td><span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 2,54</td><td class="num">602</td><td class="num">46</td><td class="num">31</td><td class="num">2</td><td class="num">€ 1,27</td></tr>
+            <tr><td>ADV04 - Microblading</td><td><span class="tag geral">GERAL</span></td><td class="num">€ 0,14</td><td class="num">78</td><td class="num">6</td><td class="num">3</td><td class="num">1</td><td class="num">€ 0,14</td></tr>
+            <tr><td>ADE01 - Henna</td><td><span class="tag geral">GERAL</span></td><td class="num">€ 0,40</td><td class="num">112</td><td class="num">3</td><td class="num">3</td><td class="num">1</td><td class="num">€ 0,40</td></tr>
+            <tr><td>ADV01 - MICROLABIAL</td><td><span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 0,16</td><td class="num">28</td><td class="num">2</td><td class="num">1</td><td class="num">1</td><td class="num">€ 0,16</td></tr>
+            <tr><td>ADV04 - MICROLABIAL</td><td><span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 0,47</td><td class="num">92</td><td class="num">3</td><td class="num">1</td><td class="num">1</td><td class="num">€ 0,47</td></tr>
+            <tr><td>ADV02 - MICROLABIAL</td><td><span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 0,73</td><td class="num">165</td><td class="num">14</td><td class="num">9</td><td class="num">1</td><td class="num">€ 0,73</td></tr>
+            <tr><td>ADV06 - MICROLABIAL</td><td><span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 0,84</td><td class="num">192</td><td class="num">5</td><td class="num">3</td><td class="num">1</td><td class="num">€ 0,84</td></tr>
+            <tr><td>ADV03 - Henna</td><td><span class="tag geral">GERAL</span></td><td class="num">€ 0,04</td><td class="num">15</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num muted">—</td></tr>
+            <tr><td>ADV01</td><td><span class="tag geral">GERAL</span></td><td class="num">€ 1,58</td><td class="num">372</td><td class="num">13</td><td class="num">11</td><td class="num">0</td><td class="num muted">—</td></tr>
+            <tr><td>ADV03 - MICROLABIAL</td><td><span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 0,31</td><td class="num">79</td><td class="num">4</td><td class="num">4</td><td class="num">0</td><td class="num muted">—</td></tr>
+            <tr class="day-total-row"><td>TOTAL DIA</td><td></td><td class="num">€ 26,13</td><td class="num">6.111</td><td class="num">234</td><td class="num">171</td><td class="num">27</td><td class="num">€ 0,97</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- DIA 26/08 -->
+    <div class="day-block">
+      <div class="day-block-header">
+        <h4>26/08/2026</h4>
+        <div class="day-kpis"><span>Invest. <b>€ 22,30</b></span><span>Leads <b>34</b></span><span>CPL <b>€ 0,66</b></span></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Criativo</th><th>Campanha</th><th class="num">Invest.</th><th class="num">Imp.</th><th class="num">Cliques</th><th class="num">PV</th><th class="num">Leads</th><th class="num">CPL</th></tr></thead>
+          <tbody>
+            <tr><td>ADV02</td><td><span class="tag geral">GERAL</span></td><td class="num">€ 11,01</td><td class="num">2.643</td><td class="num">71</td><td class="num">61</td><td class="num">21</td><td class="num">€ 0,52</td></tr>
+            <tr><td>ADE01 - MICROLABIAL</td><td><span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 3,24</td><td class="num">719</td><td class="num">17</td><td class="num">13</td><td class="num">4</td><td class="num">€ 0,81</td></tr>
+            <tr><td>ADV01</td><td><span class="tag geral">GERAL</span></td><td class="num">€ 0,49</td><td class="num">107</td><td class="num">9</td><td class="num">6</td><td class="num">3</td><td class="num">€ 0,16</td></tr>
+            <tr><td>ADV05 - MICROLABIAL</td><td><span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 2,40</td><td class="num">511</td><td class="num">19</td><td class="num">12</td><td class="num">2</td><td class="num">€ 1,20</td></tr>
+            <tr><td>ADV04 - Microblading</td><td><span class="tag geral">GERAL</span></td><td class="num">€ 0,43</td><td class="num">128</td><td class="num">11</td><td class="num">6</td><td class="num">1</td><td class="num">€ 0,43</td></tr>
+            <tr><td>ADV03 - MICROLABIAL</td><td><span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 0,70</td><td class="num">104</td><td class="num">11</td><td class="num">6</td><td class="num">1</td><td class="num">€ 0,70</td></tr>
+            <tr><td>ADV02 - MICROLABIAL</td><td><span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 1,29</td><td class="num">251</td><td class="num">7</td><td class="num">4</td><td class="num">1</td><td class="num">€ 1,29</td></tr>
+            <tr><td>ADV06 - MICROLABIAL</td><td><span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 1,58</td><td class="num">255</td><td class="num">11</td><td class="num">8</td><td class="num">1</td><td class="num">€ 1,58</td></tr>
+            <tr><td>ADE01 - Henna</td><td><span class="tag geral">GERAL</span></td><td class="num">€ 0,01</td><td class="num">3</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num muted">—</td></tr>
+            <tr><td>ADV03 - Henna</td><td><span class="tag geral">GERAL</span></td><td class="num">€ 0,14</td><td class="num">39</td><td class="num">2</td><td class="num">1</td><td class="num">0</td><td class="num muted">—</td></tr>
+            <tr><td>ADE02 - Microblading</td><td><span class="tag geral">GERAL</span></td><td class="num">€ 0,79</td><td class="num">185</td><td class="num">7</td><td class="num">5</td><td class="num">0</td><td class="num muted">—</td></tr>
+            <tr><td>ADV01 - MICROLABIAL</td><td><span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 0,13</td><td class="num">18</td><td class="num">2</td><td class="num">1</td><td class="num">0</td><td class="num muted">—</td></tr>
+            <tr><td>ADV04 - MICROLABIAL</td><td><span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 0,09</td><td class="num">24</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num muted">—</td></tr>
+            <tr class="day-total-row"><td>TOTAL DIA</td><td></td><td class="num">€ 22,30</td><td class="num">4.987</td><td class="num">167</td><td class="num">123</td><td class="num">34</td><td class="num">€ 0,66</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- DIA 27/08 -->
+    <div class="day-block">
+      <div class="day-block-header">
+        <h4>27/08/2026</h4>
+        <div class="day-kpis"><span>Invest. <b>€ 19,35</b></span><span>Leads <b>17</b></span><span>CPL <b>€ 1,14</b></span></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Criativo</th><th>Campanha</th><th class="num">Invest.</th><th class="num">Imp.</th><th class="num">Cliques</th><th class="num">PV</th><th class="num">Leads</th><th class="num">CPL</th></tr></thead>
+          <tbody>
+            <tr><td>ADV02</td><td><span class="tag geral">GERAL</span></td><td class="num">€ 11,01</td><td class="num">3.461</td><td class="num">130</td><td class="num">102</td><td class="num">12</td><td class="num">€ 0,92</td></tr>
+            <tr><td>ADE02 - Microblading</td><td><span class="tag geral">GERAL</span></td><td class="num">€ 0,33</td><td class="num">77</td><td class="num">6</td><td class="num">5</td><td class="num">2</td><td class="num">€ 0,17</td></tr>
+            <tr><td>ADV06 - MICROLABIAL</td><td><span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 0,84</td><td class="num">139</td><td class="num">2</td><td class="num">2</td><td class="num">2</td><td class="num">€ 0,42</td></tr>
+            <tr><td>ADV02 - MICROLABIAL</td><td><span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 0,91</td><td class="num">166</td><td class="num">12</td><td class="num">8</td><td class="num">1</td><td class="num">€ 0,91</td></tr>
+            <tr><td>ADE01 - Henna</td><td><span class="tag geral">GERAL</span></td><td class="num">€ 0,01</td><td class="num">1</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num muted">—</td></tr>
+            <tr><td>ADV04 - Microblading</td><td><span class="tag geral">GERAL</span></td><td class="num">€ 0,04</td><td class="num">14</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num muted">—</td></tr>
+            <tr><td>ADV01</td><td><span class="tag geral">GERAL</span></td><td class="num">€ 0,30</td><td class="num">88</td><td class="num">5</td><td class="num">5</td><td class="num">0</td><td class="num muted">—</td></tr>
+            <tr><td>ADV01 - MICROLABIAL</td><td><span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 0,03</td><td class="num">6</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num muted">—</td></tr>
+            <tr><td>ADV03 - MICROLABIAL</td><td><span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 0,12</td><td class="num">24</td><td class="num">4</td><td class="num">2</td><td class="num">0</td><td class="num muted">—</td></tr>
+            <tr><td>ADV05 - MICROLABIAL</td><td><span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 2,80</td><td class="num">515</td><td class="num">20</td><td class="num">14</td><td class="num">0</td><td class="num muted">—</td></tr>
+            <tr><td>ADE01 - MICROLABIAL</td><td><span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 2,96</td><td class="num">1.122</td><td class="num">22</td><td class="num">16</td><td class="num">0</td><td class="num muted">—</td></tr>
+            <tr class="day-total-row"><td>TOTAL DIA</td><td></td><td class="num">€ 19,35</td><td class="num">5.613</td><td class="num">201</td><td class="num">154</td><td class="num">17</td><td class="num">€ 1,14</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- DIA 28/08 -->
+    <div class="day-block">
+      <div class="day-block-header">
+        <h4>28/08/2026</h4>
+        <div class="day-kpis"><span>Invest. <b>€ 5,06</b></span><span>Leads <b>2</b></span><span>CPL <b>€ 2,53</b></span></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Criativo</th><th>Campanha</th><th class="num">Invest.</th><th class="num">Imp.</th><th class="num">Cliques</th><th class="num">PV</th><th class="num">Leads</th><th class="num">CPL</th></tr></thead>
+          <tbody>
+            <tr><td>ADV02</td><td><span class="tag geral">GERAL</span></td><td class="num">€ 2,93</td><td class="num">929</td><td class="num">21</td><td class="num">19</td><td class="num">1</td><td class="num">€ 2,93</td></tr>
+            <tr><td>ADE01 - MICROLABIAL</td><td><span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 1,08</td><td class="num">517</td><td class="num">18</td><td class="num">11</td><td class="num">1</td><td class="num">€ 1,08</td></tr>
+            <tr><td>ADV04 - Microblading</td><td><span class="tag geral">GERAL</span></td><td class="num">€ 0,01</td><td class="num">2</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num muted">—</td></tr>
+            <tr><td>ADV03 - Henna</td><td><span class="tag geral">GERAL</span></td><td class="num">€ 0,01</td><td class="num">3</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num muted">—</td></tr>
+            <tr><td>ADV01</td><td><span class="tag geral">GERAL</span></td><td class="num">€ 0,02</td><td class="num">11</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num muted">—</td></tr>
+            <tr><td>ADV03 - MICROLABIAL</td><td><span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 0,00</td><td class="num">3</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num muted">—</td></tr>
+            <tr><td>ADV02 - MICROLABIAL</td><td><span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 0,01</td><td class="num">10</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num muted">—</td></tr>
+            <tr><td>ADV04 - MICROLABIAL</td><td><span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 0,30</td><td class="num">42</td><td class="num">3</td><td class="num">3</td><td class="num">0</td><td class="num muted">—</td></tr>
+            <tr><td>ADV05 - MICROLABIAL</td><td><span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 0,24</td><td class="num">51</td><td class="num">14</td><td class="num">7</td><td class="num">0</td><td class="num muted">—</td></tr>
+            <tr><td>ADV06 - MICROLABIAL</td><td><span class="tag microlabial">MICROLABIAL</span></td><td class="num">€ 0,46</td><td class="num">89</td><td class="num">1</td><td class="num">1</td><td class="num">0</td><td class="num muted">—</td></tr>
+            <tr class="day-total-row"><td>TOTAL DIA</td><td></td><td class="num">€ 5,06</td><td class="num">1.657</td><td class="num">57</td><td class="num">41</td><td class="num">2</td><td class="num">€ 2,53</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+  // parser de numeros no padrao brasileiro (ponto = milhar, virgula = decimal)
+  function parseBR(str) {
+    return parseFloat(String(str).replace(/\./g, '').replace(',', '.')) || 0;
+  }
+
+  // ---- TABS ----
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ---- CHART: Evolução Diária ----
+  const ctx = document.getElementById('chartEvolucao').getContext('2d');
+  new Chart(ctx, {
+    data: {
+      labels: ['25/08', '26/08', '27/08', '28/08'],
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Leads',
+          data: [27, 34, 17, 2],
+          backgroundColor: '#00c853',
+          borderRadius: 6,
+          yAxisID: 'y'
+        },
+        {
+          type: 'line',
+          label: 'CPL (€)',
+          data: [0.97, 0.66, 1.14, 2.53],
+          borderColor: '#ff6b35',
+          backgroundColor: '#ff6b35',
+          tension: 0.35,
+          pointRadius: 5,
+          pointBackgroundColor: '#ff6b35',
+          borderWidth: 3,
+          yAxisID: 'y1'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: '#ffffff', font: { size: 12, weight: '600' } } },
+        title: { display: true, text: 'Leads e CPL por Dia', color: '#ffffff', font: { size: 14, weight: '700' } }
+      },
+      scales: {
+        x: { ticks: { color: '#8a8aa3' }, grid: { color: '#262640' } },
+        y: {
+          position: 'left',
+          ticks: { color: '#00c853' },
+          grid: { color: '#262640' },
+          title: { display: true, text: 'Leads', color: '#00c853' }
+        },
+        y1: {
+          position: 'right',
+          ticks: { color: '#ff6b35', callback: v => '€ ' + v.toFixed(2).replace('.', ',') },
+          grid: { drawOnChartArea: false },
+          title: { display: true, text: 'CPL (€)', color: '#ff6b35' }
+        }
+      }
+    }
+  });
+</script>
+
+</body>
+</html>
