@@ -452,10 +452,11 @@ const NAME_EXCLUDE = /LTDA|CURSOS|TREINAMENTO|PESSOA F|PESSOA J|AFFILIATE|PRODUC
 function parseWebhookSales(rows, histTxSet){
   const produtoNomeUpper = CONFIG.PRODUTO_NOME.toUpperCase();
   const sales = [];
+  const seenTx = new Set();
   for (let i=1;i<rows.length;i++){
     const r = rows[i];
     if (!r || !r.some(c=>c && c.trim())) continue;
-    let productMatched=false, eventStatus='', email='', transaction='', sck='', epoch=null, nomeCandidate='';
+    let productMatched=false, eventStatus='', email='', transaction='', sck='', epoch=null;
     const valueCounts = {};
     for (const raw of r){
       const c = (raw||'').trim();
@@ -473,23 +474,35 @@ function parseWebhookSales(rows, histTxSet){
         const v = parseBRNumber(c);
         if (v>=5 && v<=5000) valueCounts[v] = (valueCounts[v]||0)+1;
       }
-      if (!nomeCandidate && /^[A-Za-zÀ-ÿ]+(\s[A-Za-zÀ-ÿ']+){1,3}$/.test(c) && c.length<=40 && !NAME_EXCLUDE.test(c) && !/\d/.test(c) && !cu.includes(produtoNomeUpper) && cu!=='OFERTA AGOSTO' && !cu.startsWith('OFERTA ')){
-        nomeCandidate = c;
-      }
     }
     if (!productMatched || eventStatus !== 'OK') continue;
-    if (transaction && histTxSet.has(transaction)) continue; // evita duplicidade com a aba histórica
+    const txKey = transaction || ('WH-'+i);
+    if (transaction && histTxSet.has(transaction)) continue; // já está na aba histórica
+    if (seenTx.has(txKey)) continue; // Hotmart reenviou o mesmo evento (duplicidade dentro do próprio webhook)
     let bestVal=0, bestCount=0;
     for (const v in valueCounts){ if (valueCounts[v]>bestCount){ bestCount=valueCounts[v]; bestVal=Number(v); } }
     const data = epoch ? epochToDate(epoch) : '';
-    const nome = nomeCandidate || (email ? email.split('@')[0].replace(/[._]/g,' ').replace(/\b\w/g,ch=>ch.toUpperCase()) : 'Comprador');
     if (!data || !bestVal) continue; // linha sem dados suficientes para compor uma venda confiável
+    seenTx.add(txKey);
+    // Nome: derivado sempre do e-mail (o padrão "duas palavras com maiúscula" não é
+    // confiável aqui — em várias linhas desalinhadas, o campo de bairro/cidade do
+    // comprador (ex: "Belo Horizonte", "Jardim Petrópolis") vem antes do nome real
+    // e seria capturado por engano como se fosse o nome do comprador).
+    const nome = deriveNameFromEmail(email);
     sales.push({
       data, nome, email, fatTotal: bestVal, fatPrincipal: bestVal, fatOB: 0,
-      sck, transaction: transaction || ('WH-'+i), fonte: 'webhook',
+      sck, transaction: txKey, fonte: 'webhook',
     });
   }
   return sales;
+}
+function deriveNameFromEmail(email){
+  if (!email) return 'Comprador';
+  let local = email.split('@')[0];
+  local = local.replace(/[0-9]+$/,'');
+  local = local.replace(/[._-]+/g,' ').trim();
+  if (!local) return 'Comprador';
+  return local.replace(/\b\w/g, ch=>ch.toUpperCase());
 }
 
 // ── ATRIBUIÇÃO SCK → campanha/conjunto/anúncio (Meta Ads) ─────────
