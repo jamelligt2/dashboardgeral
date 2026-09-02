@@ -215,9 +215,10 @@ tr:hover td{background:rgba(255,255,255,.025)}
 <div id="tab-visao" class="content">
   <div class="kpi-grid" id="kpi-visao"></div>
   <div class="sec-title">Dia a Dia — Visão Geral</div>
-  <div class="ob-info">ℹ️ <strong>Hotmart:</strong> Todas as vendas contadas (orgânico + pago) a partir de 14/01/2026. Faturamento inclui produto principal + order bumps vinculados via <strong>transaction_root</strong>. Investimento = Meta Ads (Gerenciador).</div>
+  <div class="ob-info">ℹ️ <strong>Hotmart:</strong> Todas as vendas contadas (orgânico + pago) a partir de 14/01/2026. Faturamento inclui produto principal + order bumps vinculados via <strong>transaction_root</strong>. Investimento = Meta Ads (Gerenciador).<br>
+  🏷️ <strong>Classificação:</strong> só é <strong>Orgânica</strong> a venda cujo <em>utm_source</em> contém "orgânico". Todo o resto (meta_ads, facebook, instagram, ig, sem informação) é contado como <strong>Tráfego</strong>. A coluna <em>s/ UTM*</em> é apenas informativa — essas vendas já estão dentro de Tráfego.</div>
   <div class="tbl-wrap"><table><thead><tr>
-    <th>Data</th><th>Invest.</th><th>Fat. Total</th><th>ROAS</th><th>Compras Total</th><th>Tráfego</th><th>Orgânicas</th><th>Sem UTM</th><th>Ticket Médio</th><th>CAC</th>
+    <th>Data</th><th>Invest.</th><th>Fat. Total</th><th>ROAS</th><th>Compras Total</th><th>Tráfego</th><th>Orgânicas</th><th>s/ UTM*</th><th>Ticket Médio</th><th>CAC</th>
   </tr></thead><tbody id="tbody-geral"></tbody></table></div>
 </div>
 
@@ -409,11 +410,20 @@ function statusBadge(inv,fat){
 }
 
 // ============ CLASSIFICAÇÃO DE VENDA POR UTM ============
-// Tráfego = utm_source == meta_ads | Sem UTM = utm_source vazio | Orgânico = tem utm_source mas não é meta_ads
-function utmSourceNorm(s){return (s.utmSource||'').toLowerCase().replace(/[\s_-]/g,'');}
-function isTrafego(s){return utmSourceNorm(s)==='metaads';}
-function isSemUTM(s){return !utmSourceNorm(s);}
-function isOrganico(s){return !isTrafego(s)&&!isSemUTM(s);}
+// REGRA:
+//   Orgânico = utm_source CONTÉM "organico" / "orgânico" (acento e maiúsculas ignorados)
+//   Tráfego  = TODO o resto — meta_ads, facebook, instagram, ig, ou sem informação
+//   isSemUTM = apenas informativo (subconjunto de Tráfego), não é uma categoria à parte
+function utmSourceNorm(s){
+  return (s.utmSource||'')
+    .toString()
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'') // remove acentos: orgânico -> organico
+    .replace(/[\s_\-.]/g,'');
+}
+function isOrganico(s){return utmSourceNorm(s).includes('organico');}
+function isTrafego(s){return !isOrganico(s);}
+function isSemUTM(s){return !utmSourceNorm(s);} // informativo: venda de tráfego sem UTM preenchida
 
 // ============ PROCESS DATA ============
 async function loadData(){
@@ -546,8 +556,9 @@ async function loadData(){
     }
 
     // Distribuir vendas nos dias e criativos/públicos pelo utm_content (nome do anúncio)
+    // Aba Tráfego / Semanal / Mensal usam SOMENTE vendas de tráfego (não orgânicas)
     sales.forEach(s=>{
-      if(diaMap[s.data]){
+      if(isTrafego(s)&&diaMap[s.data]){
         diaMap[s.data].fat+=s.fatTotal;
         diaMap[s.data].compras+=1;
       }
@@ -726,22 +737,19 @@ function renderKpiTrafego(dias,fSales){
   const cpc=cliques>0?inv/cliques:0;
   const cpm=imp>0?inv/imp*1000:0;
 
-  // Separar tráfego / orgânico / sem UTM
+  // Apenas 2 categorias: Tráfego (padrão) e Orgânico (utm_source com "orgânico")
   const vendTraf=fSales.filter(isTrafego);
   const vendOrg=fSales.filter(isOrganico);
-  const vendSemUTM=fSales.filter(isSemUTM);
+  const vendTrafSemUtm=vendTraf.filter(isSemUTM); // informativo (já dentro de Tráfego)
 
   const fatTraf=vendTraf.reduce((s,v)=>s+v.fatTotal,0);
   const fatOrg=vendOrg.reduce((s,v)=>s+v.fatTotal,0);
-  const fatSemUTM=vendSemUTM.reduce((s,v)=>s+v.fatTotal,0);
 
   // OBs: vendas que têm fatOB > 0
   const obTraf=vendTraf.filter(v=>v.fatOB>0);
   const obOrg=vendOrg.filter(v=>v.fatOB>0);
-  const obSemUTM=vendSemUTM.filter(v=>v.fatOB>0);
   const fatObTraf=obTraf.reduce((s,v)=>s+v.fatOB,0);
   const fatObOrg=obOrg.reduce((s,v)=>s+v.fatOB,0);
-  const fatObSemUTM=obSemUTM.reduce((s,v)=>s+v.fatOB,0);
 
   const roas=inv>0?fatTraf/inv:0;
   const cac=vendTraf.length>0?inv/vendTraf.length:0;
@@ -751,11 +759,9 @@ function renderKpiTrafego(dias,fSales){
     '<div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">'+brl(inv)+'</div></div>'
    +'<div class="kpi-card"><div class="kpi-label">Fat. Tráfego</div><div class="kpi-value orange">'+brl(fatTraf)+'</div>'+(fatObTraf>0?'<div class="kpi-sub">+'+brl(fatObTraf)+' OB</div>':'')+'</div>'
    +'<div class="kpi-card"><div class="kpi-label">Fat. Orgânico</div><div class="kpi-value yellow">'+brl(fatOrg)+'</div>'+(fatObOrg>0?'<div class="kpi-sub">+'+brl(fatObOrg)+' OB</div>':'')+'</div>'
-   +'<div class="kpi-card"><div class="kpi-label">Fat. Sem UTM</div><div class="kpi-value gray">'+brl(fatSemUTM)+'</div>'+(fatObSemUTM>0?'<div class="kpi-sub">+'+brl(fatObSemUTM)+' OB</div>':'')+'</div>'
    +'<div class="kpi-card"><div class="kpi-label">ROAS Tráfego</div><div class="kpi-value '+(roas>=1?'green':'red')+'">'+br(roas,2)+'x</div></div>'
-   +'<div class="kpi-card"><div class="kpi-label">Vendas Tráfego</div><div class="kpi-value orange">'+vendTraf.length+'<span style="font-size:11px;color:rgba(255,255,255,.4);margin-left:6px">+'+obTraf.length+' OB</span></div></div>'
+   +'<div class="kpi-card"><div class="kpi-label">Vendas Tráfego</div><div class="kpi-value orange">'+vendTraf.length+'<span style="font-size:11px;color:rgba(255,255,255,.4);margin-left:6px">+'+obTraf.length+' OB</span></div>'+(vendTrafSemUtm.length>0?'<div class="kpi-sub">'+vendTrafSemUtm.length+' sem UTM</div>':'')+'</div>'
    +'<div class="kpi-card"><div class="kpi-label">Vendas Orgânico</div><div class="kpi-value yellow">'+vendOrg.length+'<span style="font-size:11px;color:rgba(255,255,255,.4);margin-left:6px">+'+obOrg.length+' OB</span></div></div>'
-   +'<div class="kpi-card"><div class="kpi-label">Vendas Sem UTM</div><div class="kpi-value gray">'+vendSemUTM.length+'<span style="font-size:11px;color:rgba(255,255,255,.4);margin-left:6px">+'+obSemUTM.length+' OB</span></div></div>'
    +'<div class="kpi-card"><div class="kpi-label">CAC</div><div class="kpi-value">'+brl(cac)+'</div></div>'
    +'<div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value">'+brl(ticket)+'</div></div>'
    +'<div class="kpi-card"><div class="kpi-label">Cliques</div><div class="kpi-value">'+br(cliques,0)+'</div></div>'
@@ -771,26 +777,26 @@ function renderSalesPanel(fSales){
   const totalFat=fSales.reduce((s,v)=>s+v.fatTotal,0);
   const tracked=fSales.filter(isTrafego);
   const organic=fSales.filter(isOrganico);
-  const semUtm=fSales.filter(isSemUTM);
+  const semUtm=tracked.filter(isSemUTM); // subconjunto de tráfego, só informativo
   const cards=fSales.map(s=>{
-    const traf=isTrafego(s), org=isOrganico(s);
+    const org=isOrganico(s), semU=isSemUTM(s);
     let color,border,icon,srcLabel;
-    if(traf){color='rgba(46,204,113,.12)';border='rgba(46,204,113,.35)';icon='✅';srcLabel='meta_ads';}
-    else if(org){color='rgba(241,196,15,.08)';border='rgba(241,196,15,.25)';icon='⭐';srcLabel='orgânico';}
-    else{color='rgba(255,255,255,.05)';border='rgba(255,255,255,.15)';icon='❔';srcLabel='sem UTM';}
+    if(org){color='rgba(241,196,15,.08)';border='rgba(241,196,15,.25)';icon='⭐';srcLabel='orgânico';}
+    else if(semU){color='rgba(46,204,113,.07)';border='rgba(46,204,113,.2)';icon='❔';srcLabel='tráfego (sem UTM)';}
+    else{color='rgba(46,204,113,.12)';border='rgba(46,204,113,.35)';icon='✅';srcLabel=s.utmSource||'tráfego';}
     const utmMedShort=s.utmMedium?(s.utmMedium.length>28?s.utmMedium.slice(0,28)+'…':s.utmMedium):'—';
     const obTag=s.fatOB>0
       ?'<div style="font-size:10px;color:#f39c12;margin-bottom:3px">🛒 OB: '+brl(s.fatOB)+'</div>'
       :'';
     let trackedHtml;
-    if(traf){
-      trackedHtml='<div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:2px">🎨 <span style="color:#2ecc71">'+( s.utmContent||'—')+'</span></div>'
+    if(org){
+      trackedHtml='<div style="font-size:10px;color:rgba(241,196,15,.7);margin-top:4px">⭐ Venda orgânica</div>';
+    }else if(semU){
+      trackedHtml='<div style="font-size:10px;color:rgba(46,204,113,.6);margin-top:4px">❔ Tráfego · sem UTM</div>';
+    }else{
+      trackedHtml='<div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:2px">🎨 <span style="color:#2ecc71">'+(s.utmContent||'—')+'</span></div>'
        +'<div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:2px">👥 <span style="color:#2ecc71">'+utmMedShort+'</span></div>'
        +'<div style="font-size:10px;color:rgba(255,255,255,.45)">📣 <span style="color:#e8e6f0">'+srcLabel+'</span></div>';
-    }else if(org){
-      trackedHtml='<div style="font-size:10px;color:rgba(241,196,15,.7);margin-top:4px">⭐ Venda orgânica</div>';
-    }else{
-      trackedHtml='<div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:4px">❔ Venda sem UTM</div>';
     }
     return '<div style="flex-shrink:0;width:210px;background:'+color+';border:1px solid '+border+';border-radius:8px;padding:10px 12px">'
       +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">'
@@ -807,7 +813,7 @@ function renderSalesPanel(fSales){
     +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">'
     +'<span style="font-size:18px">💸</span>'
     +'<div><div style="font-size:13px;font-weight:600;color:#ff9a3c">Vendas no Período ('+fSales.length+')</div>'
-    +'<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px">'+SALES.length+' total · '+brl(totalFat)+' faturamento · ✅ '+tracked.length+' rastreadas · ⭐ '+organic.length+' orgânicas · ❔ '+semUtm.length+' sem UTM · ← arraste para ver mais</div>'
+    +'<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px">'+SALES.length+' total · '+brl(totalFat)+' faturamento · ✅ '+tracked.length+' tráfego (❔ '+semUtm.length+' sem UTM) · ⭐ '+organic.length+' orgânicas · ← arraste para ver mais</div>'
     +'</div></div>'
     +'<div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:6px">'+cards+emptyMsg+'</div>'
     +'</div>';
@@ -820,7 +826,7 @@ function renderKpiVisao(dias,fSales){
   const comprasTotal=fSales.length;
   const comprasRastr=fSales.filter(isTrafego).length;
   const comprasOrg=fSales.filter(isOrganico).length;
-  const comprasSemUTM=fSales.filter(isSemUTM).length;
+  const comprasSemUTM=fSales.filter(s=>isTrafego(s)&&isSemUTM(s)).length;
   const ticket=comprasTotal>0?fatTotal/comprasTotal:0;
   const cac=comprasTotal>0?inv/comprasTotal:0;
   const roas=inv>0?fatTotal/inv:0;
@@ -830,9 +836,8 @@ function renderKpiVisao(dias,fSales){
     <div class="kpi-card"><div class="kpi-label">Fat. Total</div><div class="kpi-value orange">${brl(fatTotal)}</div></div>
     <div class="kpi-card"><div class="kpi-label">ROAS Total</div><div class="kpi-value ${roas>=1?'green':'red'}">${br(roas,2)}x</div></div>
     <div class="kpi-card"><div class="kpi-label">Vendas Total</div><div class="kpi-value orange">${br(comprasTotal,0)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Tráfego</div><div class="kpi-value green">${br(comprasRastr,0)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Tráfego</div><div class="kpi-value green">${br(comprasRastr,0)}</div>${comprasSemUTM>0?`<div class="kpi-sub">${comprasSemUTM} sem UTM</div>`:''}</div>
     <div class="kpi-card"><div class="kpi-label">Orgânicas</div><div class="kpi-value yellow">${br(comprasOrg,0)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Sem UTM</div><div class="kpi-value gray">${br(comprasSemUTM,0)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value">${brl(ticket)}</div></div>
     <div class="kpi-card"><div class="kpi-label">CAC Total</div><div class="kpi-value">${brl(cac)}</div></div>
   `;
@@ -842,16 +847,19 @@ function renderKpiVisao(dias,fSales){
 function renderTbodyGeral(dias,fSales){
   const el=document.getElementById('tbody-geral');
   if(!el)return;
-  // Agrupa vendas por data (tráfego / orgânico / sem UTM)
+  // Agrupa vendas por data (tráfego / orgânico). "semUtm" é subconjunto de tráfego (informativo)
   const salesByDate={};
   fSales.forEach(s=>{
     if(!salesByDate[s.data])salesByDate[s.data]={total:0,fat:0,traf:0,org:0,semUtm:0};
     const sd=salesByDate[s.data];
     sd.total+=1;
     sd.fat+=s.fatTotal;
-    if(isTrafego(s))sd.traf+=1;
-    else if(isOrganico(s))sd.org+=1;
-    else sd.semUtm+=1;
+    if(isOrganico(s)){
+      sd.org+=1;
+    }else{
+      sd.traf+=1;
+      if(isSemUTM(s))sd.semUtm+=1;
+    }
   });
   el.innerHTML=dias.slice().reverse().map(d=>{
     const inv=d.inv;
@@ -1003,6 +1011,8 @@ function buildCriPubMaps(from,to){
     p.ctr=p.imp>0?p.cliques/p.imp*100:0;
     p.connectRate=p.cliques>0?p.pv/p.cliques*100:0;
     p.roas=p.inv>0&&p.fat>0?p.fat/p.inv:0;
+    p.cac=p.compras>0?p.inv/p.compras:0;
+    p.taxaConv=p.pv>0&&p.compras>0?p.compras/p.pv*100:0;
   });
   return {criMap,pubMap};
 }
@@ -1029,7 +1039,7 @@ function renderCriativos(from,to){
         <div class="cri-metric-val hl">${brl(c.inv)}</div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px">
-        <div><div class="cri-metric-label">ROAS</div><div class="cri-metric-val ${c.roas>=1?'':''}${c.roas>0?br(c.roas,2)+'x':'—'}">${c.roas>0?br(c.roas,2)+'x':'—'}</div></div>
+        <div><div class="cri-metric-label">ROAS</div><div class="cri-metric-val">${c.roas>0?br(c.roas,2)+'x':'—'}</div></div>
         <div><div class="cri-metric-label">Vendas</div><div class="cri-metric-val">${br(c.compras,0)}</div></div>
         <div><div class="cri-metric-label">Ticket</div><div class="cri-metric-val">${brl(c.ticket)}</div></div>
         <div><div class="cri-metric-label">Faturado</div><div class="cri-metric-val">${c.fat>0?brl(c.fat):'—'}</div></div>
