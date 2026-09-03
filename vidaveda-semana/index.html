@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard Captação — Vida Veda Semana do Ayurveda</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1a2e'/%3E%3Ctext x='16' y='21' font-family='Arial,sans-serif' font-size='11' font-weight='700' fill='%23ff6b35' text-anchor='middle'%3EJGT%3C/text%3E%3C/svg%3E">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0f0f1a;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;line-height:1.5}
+.wrap{max-width:1400px;margin:0 auto;padding:0 24px 64px}
+
+/* header */
+.header{background:#16213e;border-bottom:2px solid #ff6b35;padding:20px 24px;display:flex;align-items:center;gap:18px}
+.logo-badge{width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,#ff6b35,#e04e1c);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;letter-spacing:.5px;flex:none}
+.header-divider{width:1px;height:40px;background:#262640}
+.header-text h1{font-size:19px;font-weight:700;letter-spacing:.3px}
+.header-text p{font-size:13px;color:#777;margin-top:3px}
+.header-text p b{color:#ff6b35;font-weight:600}
+
+/* tabs */
+.tabs{background:#16213e;display:flex;gap:2px;padding:0 24px;overflow-x:auto;border-bottom:1px solid #262640;position:sticky;top:0;z-index:20}
+.tab{background:none;border:none;color:#777;font-size:13px;font-weight:600;padding:14px 20px;cursor:pointer;white-space:nowrap;border-bottom:3px solid transparent;font-family:inherit;letter-spacing:.3px}
+.tab:hover{color:#bbb}
+.tab.active{color:#ff6b35;border-bottom-color:#ff6b35}
+.panel{display:none}
+.panel.active{display:block}
+
+/* aviso de medicao */
+.banner{background:#2a0a0a;border:1px solid #ff1744;border-left-width:4px;border-radius:10px;padding:14px 18px;margin:24px 0 0;display:flex;gap:14px;align-items:flex-start}
+.banner .ic{color:#ff1744;font-size:18px;line-height:1.2}
+.banner h4{font-size:13px;font-weight:700;color:#ff1744;margin-bottom:4px}
+.banner p{font-size:13px;color:#c9c9d6}
+
+section{margin-top:32px}
+.sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:14px;flex-wrap:wrap}
+.sec-head h2{font-size:14px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#fff}
+.sec-head .note{font-size:12px;color:#777;margin-left:auto}
+
+/* kpis */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+.kpi{background:#1e1e35;border:1px solid #262640;border-radius:12px;padding:20px 22px}
+.kpi .k{font-size:11px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:#777}
+.kpi .v{font-size:32px;font-weight:800;margin-top:8px;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+.kpi .d{font-size:12px;color:#999;margin-top:6px}
+
+/* temperatura */
+.temp{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.temp-card{border-radius:12px;padding:20px 22px;border:2px solid}
+.temp-card.quente{border-color:#ff1744;background:#2a0a0a}
+.temp-card.frio{border-color:#42a5f5;background:#061428}
+.temp-card.comp{border-color:#262640;background:#1e1e35}
+.temp-card .tt{font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase}
+.temp-card.quente .tt{color:#ff1744}
+.temp-card.frio .tt{color:#42a5f5}
+.temp-card.comp .tt{color:#ff6b35}
+.temp-card .sub{font-size:13px;color:#bbb;margin-top:4px;font-weight:600}
+.temp-nums{display:flex;gap:26px;margin-top:16px;flex-wrap:wrap}
+.temp-nums div .l{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#777}
+.temp-nums div .n{font-size:22px;font-weight:800;margin-top:3px;font-variant-numeric:tabular-nums}
+.temp-break{margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1)}
+.temp-break .bl{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#777;margin-bottom:8px}
+.temp-break .br{display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;color:#ddd}
+.temp-break .br span:last-child{font-variant-numeric:tabular-nums;color:#fff;font-weight:600}
+.temp-empty{margin-top:18px;font-size:13px;color:#7a8fa6;line-height:1.6}
+
+/* funil */
+.funnel-row{display:flex;gap:16px;align-items:stretch;flex-wrap:wrap}
+.funnel-svg-wrap{flex:0 0 52%;max-width:52%;background:#1e1e35;border:1px solid #262640;border-radius:12px;padding:16px}
+.funnel-metrics-row{flex:1;display:flex;flex-direction:column;gap:12px;min-width:240px}
+.fm{background:#1e1e35;border:1px solid #262640;border-radius:12px;padding:18px 20px;flex:1;display:flex;flex-direction:column;justify-content:center;position:relative;overflow:hidden}
+.fm .k{font-size:11px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:#777}
+.fm .v{font-size:34px;font-weight:800;margin-top:6px;font-variant-numeric:tabular-nums}
+.fm .d{font-size:12px;color:#999;margin-top:4px}
+.fm .barra{position:absolute;left:0;right:0;bottom:0;height:3px;border-radius:0 0 12px 12px}
+
+/* tabelas */
+.tblwrap{overflow-x:auto;background:#1e1e35;border:1px solid #262640;border-radius:12px}
+table{border-collapse:collapse;width:100%;min-width:760px}
+th,td{padding:11px 14px;text-align:right;border-bottom:1px solid #262640;white-space:nowrap;font-variant-numeric:tabular-nums}
+th{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#777;font-weight:700;background:#16213e;text-align:right}
+th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
+td{font-size:13px}
+tbody tr:hover{background:rgba(255,107,53,.04)}
+tbody tr:last-child td{border-bottom:none}
+tr.total td{background:rgba(255,107,53,.1);color:#ff6b35;font-weight:800;border-top:2px solid #ff6b35}
+td a{color:#42a5f5;text-decoration:none;font-size:12px}
+td a:hover{text-decoration:underline}
+.badge{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.8px;padding:4px 9px;border-radius:20px}
+.b-escalar{background:rgba(0,200,83,.16);color:#00c853;border:1px solid rgba(0,200,83,.4)}
+.b-manter{background:rgba(255,107,53,.16);color:#ff6b35;border:1px solid rgba(255,107,53,.4)}
+.b-avaliar{background:rgba(255,214,0,.14);color:#ffd600;border:1px solid rgba(255,214,0,.4)}
+.b-pausar{background:rgba(255,23,68,.16);color:#ff1744;border:1px solid rgba(255,23,68,.4)}
+.rk{color:#777;font-weight:700}
+.dim{color:#555}
+
+/* grafico */
+.chartbox{background:#1e1e35;border:1px solid #262640;border-radius:12px;padding:20px;height:340px}
+
+footer{margin-top:40px;padding-top:18px;border-top:1px solid #262640;font-size:12px;color:#555;display:flex;gap:18px;flex-wrap:wrap}
+
+@media (max-width:1000px){
+  .temp{grid-template-columns:1fr}
+  .funnel-svg-wrap{flex:1 1 100%;max-width:100%}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo-badge">JGT</div>
+  <div class="header-divider"></div>
+  <div class="header-text">
+    <h1>DASHBOARD CAPTAÇÃO — VIDA VEDA SEMANA DO AYURVEDA</h1>
+    <p><b>LL2109</b> · 01 a 02 de setembro de 2026 · conjunto único 00 - Engajamento 365D · 42 inscrições · CPL R$ 3,94</p>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" data-p="p1">VISÃO GERAL</button>
+  <button class="tab" data-p="p2">CRIATIVOS</button>
+  <button class="tab" data-p="p3">PÚBLICOS</button>
+  <button class="tab" data-p="p4">ANÁLISE DIÁRIA</button>
+</div>
+
+<div class="wrap">
+
+  <div class="banner" style="background:#0d2318;border-color:#00c853">
+    <div class="ic" style="color:#00c853">&#10003;</div>
+    <div>
+      <h4 style="color:#00c853">LEADS RECONSTRUÍDOS A PARTIR DAS EXPORTAÇÕES</h4>
+      <p>A API de Conversões esteve fora do ar em 01–02/09 e o gerenciador registrou só 1 lead. Os números abaixo usam as <b>42 inscrições reais</b> da exportação do Tally, atribuídas por anúncio pelo <code>utm_content</code>. Investimento, impressões, cliques e visitas vêm do gerenciador.</p>
+    </div>
+  </div>
+
+  <!-- ================= VISÃO GERAL ================= -->
+  <div class="panel active" id="p1">
+
+    <section>
+      <div class="sec-head"><h2>KPIs Gerais</h2><span class="note">gerenciador + exportação do Tally</span></div>
+      <div class="kpis">
+        <div class="kpi"><div class="k">Investimento</div><div class="v">R$ 165,49</div><div class="d">0,83% da verba de R$ 20.000</div></div>
+        <div class="kpi"><div class="k">CTR médio</div><div class="v">3,41%</div><div class="d">191 cliques no link</div></div>
+        <div class="kpi"><div class="k">CPM médio</div><div class="v">R$ 29,54</div><div class="d">5.603 impressões</div></div>
+        <div class="kpi"><div class="k">CPL médio</div><div class="v" style="color:#00c853">R$ 3,94</div><div class="d">42 inscrições atribuídas à campanha</div></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="sec-head"><h2>Público Quente vs Público Frio</h2><span class="note">fase de teste rodou só em quente</span></div>
+      <div class="temp">
+        <div class="temp-card quente">
+          <div class="tt">Público Quente</div>
+          <div class="sub">00 - Engajamento 365D</div>
+          <div class="temp-nums">
+            <div><div class="l">Investimento</div><div class="n">R$ 165,49</div></div>
+            <div><div class="l">CPL</div><div class="n" style="color:#00c853">R$ 3,94</div></div>
+            <div><div class="l">Leads</div><div class="n">42</div></div>
+          </div>
+          <div class="temp-break">
+            <div class="bl">Breakdown por formato</div>
+            <div class="br"><span>Vídeo (ADV01–03)</span><span>15 leads · CPL R$ 4,27</span></div>
+            <div class="br"><span>Estático (ADE01–06)</span><span>27 leads · CPL R$ 3,76</span></div>
+          </div>
+        </div>
+
+        <div class="temp-card frio">
+          <div class="tt">Público Frio</div>
+          <div class="sub">Não rodou nesta fase</div>
+          <div class="temp-empty">
+            A campanha subiu apenas com o conjunto de engajamento 365 dias. Não há LAK, lookalike nem interesses no ar, então esta fase não produz base de comparação entre temperaturas.
+          </div>
+        </div>
+
+        <div class="temp-card comp">
+          <div class="tt">Comparativo</div>
+          <div class="sub">Concentração de verba</div>
+          <div class="temp-nums">
+            <div><div class="l">Leads do quente</div><div class="n">100%</div></div>
+            <div><div class="l">Leads do frio</div><div class="n" style="color:#555">—</div></div>
+          </div>
+          <div class="temp-break">
+            <div class="bl">Distribuição do investimento</div>
+            <div class="br"><span>Quente</span><span>R$ 165,49 · 100%</span></div>
+            <div class="br"><span>Frio</span><span>R$ 0,00 · 0%</span></div>
+            <div class="br"><span>Diferença de CPL</span><span class="dim">sem base</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="sec-head"><h2>Funil de Conversão</h2><span class="note">acumulado 01–02/09</span></div>
+      <div class="funnel-row">
+        <div class="funnel-svg-wrap">
+          <svg viewBox="0 0 1200 540" width="100%" role="img" aria-label="Funil de conversão">
+            <defs>
+              <linearGradient id="g1" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#0d1f38"/><stop offset="50%" stop-color="#1e4d80"/><stop offset="100%" stop-color="#0d1f38"/>
+              </linearGradient>
+              <linearGradient id="g2" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#14375c"/><stop offset="50%" stop-color="#2f7fc4"/><stop offset="100%" stop-color="#14375c"/>
+              </linearGradient>
+              <linearGradient id="g3" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#5c2a0f"/><stop offset="50%" stop-color="#c25219"/><stop offset="100%" stop-color="#5c2a0f"/>
+              </linearGradient>
+              <linearGradient id="g4" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#0a3d1d"/><stop offset="50%" stop-color="#00a344"/><stop offset="100%" stop-color="#0a3d1d"/>
+              </linearGradient>
+              <filter id="glow" x="-30%" y="-60%" width="160%" height="220%">
+                <feGaussianBlur stdDeviation="10" result="b"/>
+                <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+              </filter>
+            </defs>
+
+            <polygon points="60,10 1140,10 1030,110 170,110" fill="url(#g1)"/>
+            <text x="600" y="72" text-anchor="middle" font-size="56" font-weight="800" fill="#fff">5.603</text>
+            <text x="600" y="98" text-anchor="middle" font-size="17" font-weight="600" fill="#9fb6cf" letter-spacing="2">IMPRESSÕES</text>
+
+            <text x="600" y="140" text-anchor="middle" font-size="18" font-weight="700" fill="#42a5f5">CTR 3,41%</text>
+
+            <polygon points="175,160 1025,160 940,270 260,270" fill="url(#g2)"/>
+            <text x="600" y="228" text-anchor="middle" font-size="56" font-weight="800" fill="#fff">191</text>
+            <text x="600" y="254" text-anchor="middle" font-size="17" font-weight="600" fill="#bcd6ee" letter-spacing="2">CLIQUES NO LINK</text>
+
+            <text x="600" y="300" text-anchor="middle" font-size="18" font-weight="700" fill="#00c853">TX ENTRADA 93,2%</text>
+
+            <polygon points="265,320 935,320 860,420 340,420" fill="url(#g3)"/>
+            <text x="600" y="386" text-anchor="middle" font-size="56" font-weight="800" fill="#fff">178</text>
+            <text x="600" y="410" text-anchor="middle" font-size="17" font-weight="600" fill="#f2c3a3" letter-spacing="2">VISITAS NA PÁGINA</text>
+
+            <text x="600" y="450" text-anchor="middle" font-size="18" font-weight="700" fill="#00c853">TX CADASTRO 23,6%</text>
+
+            <polygon points="345,470 855,470 790,532 410,532" fill="url(#g4)" filter="url(#glow)"/>
+            <text x="600" y="512" text-anchor="middle" font-size="44" font-weight="800" fill="#fff">42</text>
+            <text x="600" y="530" text-anchor="middle" font-size="12" font-weight="600" fill="#a7e8c0" letter-spacing="2">INSCRIÇÕES</text>
+          </svg>
+        </div>
+
+        <div class="funnel-metrics-row">
+          <div class="fm">
+            <div class="k">CPC</div>
+            <div class="v" style="color:#ff6b35">R$ 0,87</div>
+            <div class="d">Custo por clique no link</div>
+            <div class="barra" style="background:#ff6b35"></div>
+          </div>
+          <div class="fm">
+            <div class="k">TX Entrada</div>
+            <div class="v" style="color:#00c853">93,2%</div>
+            <div class="d">Dos cliques chegam a carregar a página</div>
+            <div class="barra" style="background:#00c853"></div>
+          </div>
+          <div class="fm">
+            <div class="k">TX Cadastro</div>
+            <div class="v" style="color:#00c853">23,6%</div>
+            <div class="d">Das visitas viram inscrição</div>
+            <div class="barra" style="background:#00c853"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="sec-head"><h2>Evolução Diária</h2></div>
+      <div class="tblwrap">
+        <table>
+          <thead><tr><th>Dia</th><th>Investimento</th><th>Impressões</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th><th>TX Cadastro</th></tr></thead>
+          <tbody>
+<tr><td>01/09</td><td>R$ 109,13</td><td>3.524</td><td>121</td><td>113</td><td>20</td><td>3,4%</td><td>R$ 0,90</td><td>R$ 5,46</td><td>17,7%</td></tr>
+<tr><td>02/09</td><td>R$ 56,36</td><td>2.079</td><td>70</td><td>65</td><td>22</td><td>3,4%</td><td>R$ 0,81</td><td>R$ 2,56</td><td>33,8%</td></tr>
+<tr class="total"><td>Total</td><td>R$ 165,49</td><td>5.603</td><td>191</td><td>178</td><td>42</td><td>3,4%</td><td>R$ 0,87</td><td>R$ 3,94</td><td>23,6%</td></tr>
+</tbody>
+        </table>
+      </div>
+      <div class="chartbox" style="margin-top:16px"><canvas id="chartDia"></canvas></div>
+    </section>
+  </div>
+
+  <!-- ================= CRIATIVOS ================= -->
+  <div class="panel" id="p2">
+    <section>
+      <div class="sec-head"><h2>Ranking de Criativos</h2><span class="note">ordenado por CPL real · leads do export do Tally por utm_content</span></div>
+      <div class="tblwrap">
+        <table>
+          <thead><tr>
+            <th>#</th><th>Criativo</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Leads</th>
+            <th>CTR</th><th>CPC</th><th>CPL</th><th>TX Entrada</th><th>TX Cadastro</th><th>Hook Rate</th><th>Link</th><th>Status</th>
+          </tr></thead>
+          <tbody>
+<tr><td class="rk">1</td><td>ADE01</td><td>R$ 18,66</td><td>670</td><td>18</td><td>17</td><td>11</td><td>2,7%</td><td>R$ 1,04</td><td>R$ 1,70</td><td>94,4%</td><td>64,7%</td><td class="dim">—</td><td><a href="https://www.instagram.com/p/Dcuh9AtAIo3/" target="_blank" rel="noopener">ver</a></td><td><span class="badge b-escalar">ESCALAR</span></td></tr>
+<tr><td class="rk">2</td><td>ADE02</td><td>R$ 14,98</td><td>474</td><td>17</td><td>18</td><td>5</td><td>3,6%</td><td>R$ 0,88</td><td>R$ 3,00</td><td>105,9%</td><td>27,8%</td><td class="dim">—</td><td><a href="https://www.instagram.com/p/Dcuh8WZgXv-/" target="_blank" rel="noopener">ver</a></td><td><span class="badge b-escalar">ESCALAR</span></td></tr>
+<tr><td class="rk">3</td><td>ADV03</td><td>R$ 21,34</td><td>681</td><td>35</td><td>33</td><td>7</td><td>5,1%</td><td>R$ 0,61</td><td>R$ 3,05</td><td>94,3%</td><td>21,2%</td><td class="dim">—</td><td><a href="https://www.instagram.com/p/Dcuh-tuAx-w/" target="_blank" rel="noopener">ver</a></td><td><span class="badge b-escalar">ESCALAR</span></td></tr>
+<tr><td class="rk">4</td><td>ADV01</td><td>R$ 21,72</td><td>669</td><td>37</td><td>30</td><td>5</td><td>5,5%</td><td>R$ 0,59</td><td>R$ 4,34</td><td>81,1%</td><td>16,7%</td><td class="dim">—</td><td><a href="https://www.instagram.com/p/DcuiAZ4gYQH/" target="_blank" rel="noopener">ver</a></td><td><span class="badge b-manter">MANTER</span></td></tr>
+<tr><td class="rk">5</td><td>ADE03</td><td>R$ 15,85</td><td>532</td><td>17</td><td>20</td><td>3</td><td>3,2%</td><td>R$ 0,93</td><td>R$ 5,28</td><td>117,6%</td><td>15,0%</td><td class="dim">—</td><td><a href="https://www.instagram.com/p/Dcuh8_bgcUa/" target="_blank" rel="noopener">ver</a></td><td><span class="badge b-avaliar">AVALIAR</span></td></tr>
+<tr><td class="rk">6</td><td>ADE06</td><td>R$ 16,63</td><td>671</td><td>8</td><td>8</td><td>3</td><td>1,2%</td><td>R$ 2,08</td><td>R$ 5,54</td><td>100,0%</td><td>37,5%</td><td class="dim">—</td><td><a href="https://www.instagram.com/p/Dcuh9dHgBJ_/" target="_blank" rel="noopener">ver</a></td><td><span class="badge b-avaliar">AVALIAR</span></td></tr>
+<tr><td class="rk">7</td><td>ADE04</td><td>R$ 20,52</td><td>614</td><td>16</td><td>13</td><td>3</td><td>2,6%</td><td>R$ 1,28</td><td>R$ 6,84</td><td>81,2%</td><td>23,1%</td><td class="dim">—</td><td><a href="https://www.instagram.com/p/Dcuh8LWgjt4/" target="_blank" rel="noopener">ver</a></td><td><span class="badge b-avaliar">AVALIAR</span></td></tr>
+<tr><td class="rk">8</td><td>ADV02</td><td>R$ 20,93</td><td>668</td><td>31</td><td>31</td><td>3</td><td>4,6%</td><td>R$ 0,68</td><td>R$ 6,98</td><td>100,0%</td><td>9,7%</td><td class="dim">—</td><td><a href="https://www.instagram.com/p/Dcuh_c6gNVC/" target="_blank" rel="noopener">ver</a></td><td><span class="badge b-avaliar">AVALIAR</span></td></tr>
+<tr><td class="rk">9</td><td>ADE05</td><td>R$ 14,86</td><td>624</td><td>12</td><td>8</td><td>2</td><td>1,9%</td><td>R$ 1,24</td><td>R$ 7,43</td><td>66,7%</td><td>25,0%</td><td class="dim">—</td><td><a href="https://www.instagram.com/p/Dcuh-vjgX-o/" target="_blank" rel="noopener">ver</a></td><td><span class="badge b-pausar">PAUSAR</span></td></tr>
+<tr class="total"><td></td><td>Total</td><td>R$ 165,49</td><td>5.603</td><td>191</td><td>178</td><td>42</td><td>3,4%</td><td>R$ 0,87</td><td>R$ 3,94</td><td>93,2%</td><td>23,6%</td><td>—</td><td></td><td></td></tr>
+</tbody>
+        </table>
+      </div>
+      <div class="chartbox" style="margin-top:16px"><canvas id="chartCriativo"></canvas></div>
+    </section>
+  </div>
+
+  <!-- ================= PÚBLICOS ================= -->
+  <div class="panel" id="p3">
+    <section>
+      <div class="sec-head"><h2>Desempenho por Conjunto</h2><span class="note">um conjunto no ar nesta fase</span></div>
+      <div class="tblwrap">
+        <table>
+          <thead><tr><th>#</th><th>Conjunto</th><th>Temperatura</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th><th>TX Entrada</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td class="rk">1</td><td>00 - Engajamento 365D</td><td style="color:#ff1744;font-weight:700">QUENTE</td><td>R$ 165,49</td><td>5.603</td><td>191</td><td>178</td><td>42</td><td>3,41%</td><td>R$ 0,87</td><td>R$ 3,94</td><td>93,2%</td><td><span class="badge b-manter">MANTER</span></td></tr>
+            <tr class="total"><td></td><td>Total</td><td></td><td>R$ 165,49</td><td>5.603</td><td>191</td><td>178</td><td>42</td><td>3,41%</td><td>R$ 0,87</td><td>R$ 3,94</td><td>93,2%</td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="sec-head"><h2>Breakdown por Formato dentro do Conjunto</h2></div>
+      <div class="tblwrap">
+        <table>
+          <thead><tr><th>Formato</th><th>Criativos</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th><th>Status</th></tr></thead>
+          <tbody>
+<tr><td>Vídeo</td><td>ADV01–ADV03</td><td>R$ 63,99</td><td>2.018</td><td>103</td><td>94</td><td>15</td><td>5,1%</td><td>R$ 0,62</td><td>R$ 4,27</td><td><span class="badge b-manter">MANTER</span></td></tr>
+<tr><td>Estático</td><td>ADE01–ADE06</td><td>R$ 101,50</td><td>3.585</td><td>88</td><td>84</td><td>27</td><td>2,5%</td><td>R$ 1,15</td><td>R$ 3,76</td><td><span class="badge b-manter">MANTER</span></td></tr>
+<tr class="total"><td>Total</td><td>9 criativos</td><td>R$ 165,49</td><td>5.603</td><td>191</td><td>178</td><td>42</td><td>3,4%</td><td>R$ 0,87</td><td>R$ 3,94</td><td></td></tr>
+</tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <!-- ================= ANÁLISE DIÁRIA ================= -->
+  <div class="panel" id="p4">
+    <section>
+      <div class="sec-head"><h2>Comparativo Dia a Dia</h2></div>
+      <div class="tblwrap">
+        <table>
+          <thead><tr><th>Métrica</th><th>01/09</th><th>02/09</th><th>Variação</th></tr></thead>
+          <tbody>
+            <tr><td>Investimento</td><td>R$ 109,13</td><td>R$ 56,36</td><td style="color:#ff1744">−48,4%</td></tr>
+            <tr><td>Impressões</td><td>3.524</td><td>2.079</td><td style="color:#ff1744">−41,0%</td></tr>
+            <tr><td>Cliques no link</td><td>121</td><td>70</td><td style="color:#ff1744">−42,1%</td></tr>
+            <tr><td>Visitas na página</td><td>113</td><td>65</td><td style="color:#ff1744">−42,5%</td></tr>
+            <tr><td>CTR</td><td>3,43%</td><td>3,37%</td><td style="color:#ffd600">−1,7%</td></tr>
+            <tr><td>CPC</td><td>R$ 0,90</td><td>R$ 0,81</td><td style="color:#00c853">−10,0%</td></tr>
+            <tr><td>CPM</td><td>R$ 30,97</td><td>R$ 27,11</td><td style="color:#00c853">−12,5%</td></tr>
+            <tr><td>TX Entrada</td><td>93,4%</td><td>92,9%</td><td style="color:#ffd600">−0,5 p.p.</td></tr>
+            <tr><td>Inscrições</td><td>20</td><td>22</td><td style="color:#00c853">+10,0%</td></tr>
+<tr><td>CPL</td><td>R$ 5,46</td><td>R$ 2,56</td><td style="color:#00c853">−53,1%</td></tr>
+<tr><td>TX Cadastro</td><td>17,7%</td><td>33,8%</td><td style="color:#00c853">+16,1 p.p.</td></tr>
+<tr><td>Checkouts iniciados</td><td class="dim">0</td><td>10</td><td style="color:#00c853">novo</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="sec-head"><h2>Detalhe por Dia e Criativo</h2></div>
+      <div class="tblwrap">
+        <table>
+          <thead><tr><th>Dia</th><th>Criativo</th><th>Invest.</th><th>Imp.</th><th>Alcance</th><th>Freq.</th><th>Cliques</th><th>PV</th><th>Leads</th><th>Checkout</th><th>CTR</th><th>CPC</th><th>CPL</th></tr></thead>
+          <tbody id="tbDiario">
+<tr><td>01/09</td><td>ADE01</td><td>R$ 13,43</td><td>434</td><td>381</td><td>1,14</td><td>15</td><td>14</td><td>6</td><td class="dim">0</td><td>3,5%</td><td>R$ 0,90</td><td>R$ 2,24</td></tr>
+<tr><td>01/09</td><td>ADE02</td><td>R$ 9,62</td><td>273</td><td>258</td><td>1,06</td><td>8</td><td>8</td><td>2</td><td class="dim">0</td><td>2,9%</td><td>R$ 1,20</td><td>R$ 4,81</td></tr>
+<tr><td>01/09</td><td>ADE03</td><td>R$ 11,21</td><td>369</td><td>341</td><td>1,08</td><td>14</td><td>17</td><td>1</td><td class="dim">0</td><td>3,8%</td><td>R$ 0,80</td><td>R$ 11,21</td></tr>
+<tr><td>01/09</td><td>ADE04</td><td>R$ 13,93</td><td>390</td><td>344</td><td>1,13</td><td>10</td><td>8</td><td>2</td><td class="dim">0</td><td>2,6%</td><td>R$ 1,39</td><td>R$ 6,96</td></tr>
+<tr><td>01/09</td><td>ADE05</td><td>R$ 10,04</td><td>384</td><td>353</td><td>1,09</td><td>9</td><td>6</td><td>1</td><td class="dim">0</td><td>2,3%</td><td>R$ 1,12</td><td>R$ 10,04</td></tr>
+<tr><td>01/09</td><td>ADE06</td><td>R$ 11,18</td><td>448</td><td>409</td><td>1,10</td><td>5</td><td>5</td><td>1</td><td class="dim">0</td><td>1,1%</td><td>R$ 2,24</td><td>R$ 11,18</td></tr>
+<tr><td>01/09</td><td>ADV01</td><td>R$ 12,93</td><td>409</td><td>361</td><td>1,13</td><td>26</td><td>20</td><td>2</td><td class="dim">0</td><td>6,4%</td><td>R$ 0,50</td><td>R$ 6,46</td></tr>
+<tr><td>01/09</td><td>ADV02</td><td>R$ 12,80</td><td>391</td><td>367</td><td>1,07</td><td>15</td><td>15</td><td>2</td><td class="dim">0</td><td>3,8%</td><td>R$ 0,85</td><td>R$ 6,40</td></tr>
+<tr><td>01/09</td><td>ADV03</td><td>R$ 13,99</td><td>426</td><td>385</td><td>1,11</td><td>19</td><td>20</td><td>3</td><td class="dim">0</td><td>4,5%</td><td>R$ 0,74</td><td>R$ 4,66</td></tr>
+<tr><td>02/09</td><td>ADE01</td><td>R$ 5,23</td><td>236</td><td>224</td><td>1,05</td><td>3</td><td>3</td><td>5</td><td class="dim">0</td><td>1,3%</td><td>R$ 1,74</td><td>R$ 1,05</td></tr>
+<tr><td>02/09</td><td>ADE02</td><td>R$ 5,36</td><td>201</td><td>190</td><td>1,06</td><td>9</td><td>10</td><td>3</td><td>2</td><td>4,5%</td><td>R$ 0,60</td><td>R$ 1,79</td></tr>
+<tr><td>02/09</td><td>ADE03</td><td>R$ 4,64</td><td>163</td><td>151</td><td>1,08</td><td>3</td><td>3</td><td>2</td><td class="dim">0</td><td>1,8%</td><td>R$ 1,55</td><td>R$ 2,32</td></tr>
+<tr><td>02/09</td><td>ADE04</td><td>R$ 6,59</td><td>224</td><td>210</td><td>1,07</td><td>6</td><td>5</td><td>1</td><td>2</td><td>2,7%</td><td>R$ 1,10</td><td>R$ 6,59</td></tr>
+<tr><td>02/09</td><td>ADE05</td><td>R$ 4,82</td><td>240</td><td>216</td><td>1,11</td><td>3</td><td>2</td><td>1</td><td>2</td><td>1,2%</td><td>R$ 1,61</td><td>R$ 4,82</td></tr>
+<tr><td>02/09</td><td>ADE06</td><td>R$ 5,45</td><td>223</td><td>202</td><td>1,10</td><td>3</td><td>3</td><td>2</td><td class="dim">0</td><td>1,3%</td><td>R$ 1,82</td><td>R$ 2,73</td></tr>
+<tr><td>02/09</td><td>ADV01</td><td>R$ 8,79</td><td>260</td><td>240</td><td>1,08</td><td>11</td><td>10</td><td>3</td><td class="dim">0</td><td>4,2%</td><td>R$ 0,80</td><td>R$ 2,93</td></tr>
+<tr><td>02/09</td><td>ADV02</td><td>R$ 8,13</td><td>277</td><td>258</td><td>1,07</td><td>16</td><td>16</td><td>1</td><td>4</td><td>5,8%</td><td>R$ 0,51</td><td>R$ 8,13</td></tr>
+<tr><td>02/09</td><td>ADV03</td><td>R$ 7,35</td><td>255</td><td>239</td><td>1,07</td><td>16</td><td>13</td><td>4</td><td class="dim">0</td><td>6,3%</td><td>R$ 0,46</td><td>R$ 1,84</td></tr>
+</tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <footer>
+    <span>Jamelli GT · JGTCL0047</span>
+    <span>Conta act_350223922299464</span>
+    <span>Pixel 691298534641123</span>
+    <span>Mídia: aba GERENCIADOR · Inscrições: exportação do Tally (form 2EGO6A)</span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  function parseBR(str) {
+    return parseFloat(String(str).replace(/\./g, '').replace(',', '.')) || 0;
+  }
+
+
+  var brl = function (n) { return "R$ " + n.toLocaleString("pt-BR", {minimumFractionDigits:2, maximumFractionDigits:2}); };
+  var pct = function (n) { return n.toLocaleString("pt-BR", {minimumFractionDigits:1, maximumFractionDigits:1}) + "%"; };
+  var int = function (n) { return n.toLocaleString("pt-BR"); };
+
+
+  /* abas */
+  var tabs = document.querySelectorAll(".tab");
+  for (var i = 0; i < tabs.length; i++) {
+    tabs[i].addEventListener("click", function () {
+      document.querySelector(".tab.active").classList.remove("active");
+      document.querySelector(".panel.active").classList.remove("active");
+      this.classList.add("active");
+      document.getElementById(this.dataset.p).classList.add("active");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }
+
+  if (typeof Chart === "undefined") {
+    /* CDN indisponivel: nao deixa caixa vazia na tela */
+    var boxes = document.querySelectorAll(".chartbox");
+    for (var b = 0; b < boxes.length; b++) {
+      boxes[b].innerHTML = '<div style="height:100%;display:flex;align-items:center;justify-content:center;' +
+        'color:#777;font-size:13px;text-align:center;padding:20px">Os gráficos não carregaram — a biblioteca Chart.js ' +
+        'vem de um CDN e a rede bloqueou. Os números nas tabelas acima estão completos.</div>';
+    }
+    return;
+  }
+  Chart.defaults.color = "#777";
+  Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  Chart.defaults.borderColor = "#262640";
+
+  new Chart(document.getElementById("chartDia"), {
+    data: {
+      labels: ["01/09", "02/09"],
+      datasets: [
+        { type: "bar", label: "Inscrições", data: [20, 22], backgroundColor: "rgba(0,200,83,.75)", borderRadius: 6, yAxisID: "y" },
+        { type: "line", label: "CPL (R$)", data: [5.46, 2.56], borderColor: "#ff6b35", backgroundColor: "#ff6b35", borderWidth: 3, tension: .3, pointRadius: 6, yAxisID: "y1" }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: "bottom", labels: { boxWidth: 12, padding: 16 } },
+                 title: { display: true, text: "Inscrições e CPL por dia", color: "#fff", font: { size: 13, weight: "700" }, padding: { bottom: 14 } } },
+      scales: {
+        y:  { position: "left",  grid: { color: "#262640" }, beginAtZero: true, title: { display: true, text: "inscrições" } },
+        y1: { position: "right", grid: { drawOnChartArea: false }, beginAtZero: true, title: { display: true, text: "CPL R$" } },
+        x:  { grid: { display: false } }
+      }
+    }
+  });
+
+  new Chart(document.getElementById("chartCriativo"), {
+    type: "bar",
+    data: {
+      labels: ["ADE01", "ADE02", "ADV03", "ADV01", "ADE03", "ADE06", "ADE04", "ADV02", "ADE05"],
+      datasets: [
+        { label: "CPL (R$)", data: [1.7, 3.0, 3.05, 4.34, 5.28, 5.54, 6.84, 6.98, 7.43],
+          backgroundColor: ["#00c853","#00c853","#00c853","#ff6b35","#ffd600","#ffd600","#ffd600","#ffd600","#ff1744"],
+          borderRadius: 6, yAxisID: "y" },
+        { type: "line", label: "CTR (%)", data: [2.69, 3.59, 5.14, 5.53, 3.2, 1.19, 2.61, 4.64, 1.92],
+          borderColor: "#42a5f5", backgroundColor: "#42a5f5", borderWidth: 3, tension: .3, pointRadius: 4, yAxisID: "y1" }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: "bottom", labels: { boxWidth: 12, padding: 16 } },
+                 title: { display: true, text: "CPL e CTR por criativo", color: "#fff", font: { size: 13, weight: "700" }, padding: { bottom: 14 } } },
+      scales: {
+        y:  { position: "left", grid: { color: "#262640" }, title: { display: true, text: "CPL R$" } },
+        y1: { position: "right", grid: { drawOnChartArea: false }, title: { display: true, text: "CTR %" } },
+        x:  { grid: { display: false } }
+      }
+    }
+  });
+})();
+</script>
+</body>
+</html>
