@@ -143,13 +143,27 @@ tr.total td{background:rgba(255,107,53,.10);font-weight:800;color:#ff6b35;border
       </section>
 
       <section>
-        <div class="sec-head"><h2>Ingressos Semana+</h2><span class="note">venda do Guru cruzada por UTM e por e-mail</span></div>
+        <div class="sec-head"><h2>Funil de Vendas — Ingresso Semana+</h2><span class="note" id="f2-note"></span></div>
+        <div class="funil">
+          <div class="funnel-svg-wrap"><div id="funil2"></div></div>
+          <div class="funnel-metrics-row" id="fmet2"></div>
+        </div>
+        <p class="note" id="f2-rodape" style="margin-top:10px"></p>
+      </section>
+
+      <section>
+        <div class="sec-head"><h2>Ingressos Semana+</h2><span class="note">a inscrição e a venda são contadas cada uma pela sua própria origem — as colunas não formam um funil</span></div>
         <div class="kpis" id="ing"></div>
         <div class="tblwrap" style="margin-top:14px"><table id="t-origem"></table></div>
       </section>
 
       <section>
-        <div class="sec-head"><h2>Evolução Diária</h2></div>
+        <div class="sec-head"><h2>Campanha Completa por Dia</h2><span class="note">todos os canais, inclusive antes de o rastreio existir</span></div>
+        <div class="tblwrap"><table id="t-full"></table></div>
+      </section>
+
+      <section>
+        <div class="sec-head"><h2>Evolução Diária do Anúncio</h2><span class="note">só o que o Meta Ads entregou</span></div>
         <div class="tblwrap"><table id="t-dia"></table></div>
         <div class="chartbox"><canvas id="cdia"></canvas></div>
       </section>
@@ -273,6 +287,11 @@ var RX_CAMP = /SEMANADOAYURVEDA/i;
 var RX_ADS  = /LL2109/i;
 var RX_CRIA = /^AD[EV]\s?\d+$/i;
 
+/* linhas de teste da agencia nunca entram na conta do cliente */
+function ehTeste(r){
+  var em=String(r.email||"").toLowerCase(), nm=String(r.nome||"").toLowerCase();
+  return /@jamelligt\.com\.br$/.test(em) || nm.indexOf("teste")===0 || /\(apagar\)/.test(nm);
+}
 function veioDeAnuncio(r){
   var m=(r.utm_medium||"")+" "+(r.utm_campaign||"");
   if(RX_ADS.test(m)) return true;
@@ -303,20 +322,29 @@ function preparar(d){
   var cfg={}; CONFIG.forEach(function(r){ cfg[r.chave]=r.valor; });
   var ticket=parseBR(cfg.ticket)||TICKET_PADRAO;
 
-  var vistos={}, leads=[];
+  /* Dedup com a ULTIMA linha vencendo: uma reimportacao feita depois
+     corrige a data de um registro que a automação antiga gravou errado. */
+  var mapaL={}, ordemL=[];
   LEADS.forEach(function(r){
+    if(ehTeste(r)) return;
     var e=String(r.email||"").trim().toLowerCase();
     var ch=e||("__"+r.event_id+r.timestamp);
-    if(vistos[ch]) return; vistos[ch]=1;
-    r.__iso=isoDeBR(r.data); leads.push(r);
+    r.__iso=isoDeBR(r.data);
+    if(!(ch in mapaL)) ordemL.push(ch);
+    mapaL[ch]=r;
   });
-  var vtx={}, vendas=[];
+  var leads=ordemL.map(function(k){ return mapaL[k]; });
+
+  var mapaV={}, ordemV=[];
   VENDAS.forEach(function(r){
+    if(ehTeste(r)) return;
     if(!/approved|paid|aprovad/.test(String(r.status||"").toLowerCase())) return;
     var id=String(r.transacao_id||"").trim() || (String(r.email||"")+r.timestamp);
-    if(vtx[id]) return; vtx[id]=1;
-    r.__iso=isoDeBR(r.data); vendas.push(r);
+    r.__iso=isoDeBR(r.data);
+    if(!(id in mapaV)) ordemV.push(id);
+    mapaV[id]=r;
   });
+  var vendas=ordemV.map(function(k){ return mapaV[k]; });
   var ger=GER.filter(function(r){ return RX_CAMP.test(r["Campaign Name"]||""); })
              .map(function(r){
     return {
@@ -328,6 +356,8 @@ function preparar(d){
       imp:  parseBR(r["Impressions"]),
       cli:  parseBR(r["Action Link Clicks"]),
       pv:   parseBR(r["Action Landing Page View"]),
+      ic:   parseBR(r["Action Omni Initiated Checkout"]),
+      pur:  parseBR(r["Action Omni Purchase"]),
       st:   String(r["Ad Status"]||"").toUpperCase()
     };
   });
@@ -390,7 +420,7 @@ function render(){
     card("Investimento total",brl(INV),dias.length+" dias no ar")+
     card("CTR médio",pct(div(CLI,IMP)*100),n0(CLI)+" cliques no link")+
     card("CPM médio",brl(div(INV,IMP)*1000),n0(IMP)+" impressões")+
-    card("CPL médio",brl(CPL),n0(LEADS_AD)+" inscrições vindas de anúncio","#00c853");
+    card("CPL médio",(INV&&LEADS_AD)?brl(CPL):"—",n0(LEADS_AD)+" inscrições vindas de anúncio","#00c853");
   document.getElementById("k-note").textContent="inscrição = linha do formulário com UTM de anúncio, sem e-mail repetido";
 
   var tp={quente:{inv:0,leads:0,sets:{}},frio:{inv:0,leads:0,sets:{}}};
@@ -429,12 +459,36 @@ function render(){
       trow("Diferença de CPL",comp)+
       '<div class="tsub">A UTM identifica o criativo, não o conjunto. A inscrição é dividida entre os conjuntos que rodaram aquele criativo, na proporção do investimento de cada um.</div></div>';
 
-  document.getElementById("funil").innerHTML=funilSVG(IMP,CLI,PV,LEADS_AD);
+  document.getElementById("funil").innerHTML=funilSVG([
+    {t:"IMPRESSÕES",v:IMP,     a:"#0d2545",b:"#1b4f8f"},
+    {t:"CLIQUES",   v:CLI,     a:"#123a63",b:"#2b7fd4"},
+    {t:"PAGE VIEWS",v:PV,      a:"#5a2a10",b:"#ff6b35"},
+    {t:"INSCRIÇÕES",v:LEADS_AD,a:"#0a3d22",b:"#00c853"}
+  ],["CTR","TX ENTRADA","TX CADASTRO"],"fl");
   document.getElementById("fmet").innerHTML=
     fm("CPC","custo por clique no link",brl(div(INV,CLI)),"#ff6b35")+
     fm("TX Entrada","cliques que abriram a página",pct(div(PV,CLI)*100),"#ffd600")+
     fm("TX Cadastro","page views que viraram inscrição",pct(div(LEADS_AD,PV)*100),"#00c853");
   document.getElementById("f-note").textContent="impressões → cliques no link → page views → inscrições";
+
+  /* ---------- funil de venda do ingresso ---------- */
+  var IC =soma(g,function(x){return x.ic;});
+  var PUR=soma(g,function(x){return x.pur;});
+  document.getElementById("funil2").innerHTML=funilSVG([
+    {t:"CLIQUES",          v:CLI, a:"#123a63",b:"#2b7fd4"},
+    {t:"PAGE VIEWS",       v:PV,  a:"#5a2a10",b:"#ff6b35"},
+    {t:"INICIOU CHECKOUT", v:IC,  a:"#4a3a08",b:"#e0b800"},
+    {t:"INGRESSOS",        v:PUR, a:"#0a3d22",b:"#00c853"}
+  ],["TX ENTRADA","TX CHECKOUT","TX FECHAMENTO"],"fv");
+  document.getElementById("fmet2").innerHTML=
+    fm("TX Checkout","page views que abriram o checkout",pct(div(IC,PV)*100),"#ffd600")+
+    fm("TX Fechamento","checkouts que viraram ingresso",pct(div(PUR,IC)*100),"#00c853")+
+    fm("CAC","custo por ingresso vendido",(PUR?brl(div(INV,PUR)):"—"),"#ff6b35");
+  document.getElementById("f2-note").textContent="cliques → page views → checkout aberto → ingresso pago";
+  document.getElementById("f2-rodape").innerHTML=
+    "Este funil usa o que a <b>Meta</b> registra: "+n0(PUR)+" ingressos na janela de atribuição dela. "+
+    "Pelo cruzamento de UTM na planilha são "+n0(vendasAd.length)+" — a Meta credita quem viu o anúncio e comprou depois por outro caminho, a UTM só credita quem chegou com o parâmetro na URL. "+
+    "O número menor é o conservador; o maior é o que o algoritmo usa para otimizar.";
 
   var RECEITA=soma(vendas,function(v){return parseBR(v.valor)||ticket;});
   var recAd=soma(vendasAd,function(v){return parseBR(v.valor)||ticket;});
@@ -453,12 +507,12 @@ function render(){
   vendas.forEach(function(v){ var b=bucket(canal(v)); b.v++; b.r+=parseBR(v.valor)||ticket; });
   var linhasOrg=Object.keys(org).sort(function(a,b){return org[b].l-org[a].l;}).map(function(c){
     var o=org[c];
-    return "<tr><td>"+c+"</td><td>"+n0(o.l)+"</td><td>"+n0(o.v)+"</td><td>"+(o.l?pct(div(o.v,o.l)*100):"—")+"</td><td>"+brl(o.r)+"</td></tr>";
+    return "<tr><td>"+c+"</td><td>"+n0(o.l)+"</td><td>"+(leads.length?pct(div(o.l,leads.length)*100):"—")+"</td><td>"+n0(o.v)+"</td><td>"+(vendas.length?pct(div(o.v,vendas.length)*100):"—")+"</td><td>"+brl(o.r)+"</td></tr>";
   }).join("");
   document.getElementById("t-origem").innerHTML=
-    "<thead><tr><th>Origem</th><th>Inscritos</th><th>Ingressos</th><th>Ingresso por inscrito</th><th>Receita</th></tr></thead><tbody>"+
+    "<thead><tr><th>Origem</th><th>Inscritos</th><th>% das inscrições</th><th>Ingressos</th><th>% dos ingressos</th><th>Receita</th></tr></thead><tbody>"+
     linhasOrg+
-    "<tr class='total'><td>Total</td><td>"+n0(leads.length)+"</td><td>"+n0(vendas.length)+"</td><td>"+(leads.length?pct(div(vendas.length,leads.length)*100):"—")+"</td><td>"+brl(RECEITA)+"</td></tr></tbody>";
+    "<tr class='total'><td>Total</td><td>"+n0(leads.length)+"</td><td>100,0%</td><td>"+n0(vendas.length)+"</td><td>100,0%</td><td>"+brl(RECEITA)+"</td></tr></tbody>";
 
   var pd={};
   function dia(k){ if(!pd[k]) pd[k]={inv:0,imp:0,cli:0,pv:0,lead:0,vd:0,rec:0}; return pd[k]; }
@@ -476,6 +530,24 @@ function render(){
     linhasDia+
     "<tr class='total'><td>Total</td><td>"+brl(tot.inv)+"</td><td>"+n0(tot.imp)+"</td><td>"+n0(tot.cli)+"</td><td>"+n0(tot.pv)+"</td><td>"+n0(tot.lead)+"</td><td>"+pct(div(tot.cli,tot.imp)*100)+"</td><td>"+brl(div(tot.inv,tot.cli))+"</td><td>"+brl(div(tot.inv,tot.lead))+"</td><td>"+pct(div(tot.lead,tot.pv)*100)+"</td><td>"+n0(tot.vd)+"</td></tr></tbody>";
   grafico(ordem.map(ddmm),ordem.map(function(k){return pd[k].lead;}),ordem.map(function(k){return pd[k].lead?pd[k].inv/pd[k].lead:null;}));
+
+  /* ---- campanha completa por dia: todo canal, com e sem anúncio ---- */
+  var td={};
+  function diaT(k){ if(!td[k]) td[k]={ins:0,insAd:0,vd:0,vdAd:0,rec:0,inv:0}; return td[k]; }
+  leads.forEach(function(l){ if(!l.__iso) return; var o=diaT(l.__iso); o.ins++; if(veioDeAnuncio(l)) o.insAd++; });
+  vendas.forEach(function(v){ if(!v.__iso) return; var o=diaT(v.__iso); o.vd++; o.rec+=parseBR(v.valor)||ticket; if(veioDeAnuncio(v)) o.vdAd++; });
+  g.forEach(function(x){ if(x.iso) diaT(x.iso).inv+=x.inv; });
+  var ordT=Object.keys(td).sort();
+  var tt={ins:0,insAd:0,vd:0,vdAd:0,rec:0,inv:0};
+  var linhasT=ordT.map(function(k){
+    var o=td[k]; for(var f in tt) tt[f]+=o[f];
+    var marca = o.inv>0 ? '<span style="color:#00c853">no ar</span>' : '<span style="color:#777">sem mídia</span>';
+    return "<tr><td>"+ddmm(k)+"</td><td>"+marca+"</td><td>"+brl(o.inv)+"</td><td>"+n0(o.ins)+"</td><td>"+n0(o.insAd)+"</td><td>"+(o.ins?pct(div(o.insAd,o.ins)*100):"—")+"</td><td>"+n0(o.vd)+"</td><td>"+n0(o.vdAd)+"</td><td>"+brl(o.rec)+"</td></tr>";
+  }).join("");
+  document.getElementById("t-full").innerHTML=
+    "<thead><tr><th>Dia</th><th>Anúncio</th><th>Investimento</th><th>Inscrições</th><th>de anúncio</th><th>% do anúncio</th><th>Ingressos</th><th>de anúncio</th><th>Receita</th></tr></thead><tbody>"+
+    linhasT+
+    "<tr class='total'><td>Total</td><td>—</td><td>"+brl(tt.inv)+"</td><td>"+n0(tt.ins)+"</td><td>"+n0(tt.insAd)+"</td><td>"+(tt.ins?pct(div(tt.insAd,tt.ins)*100):"—")+"</td><td>"+n0(tt.vd)+"</td><td>"+n0(tt.vdAd)+"</td><td>"+brl(tt.rec)+"</td></tr></tbody>";
 
   var cri={};
   g.forEach(function(x){
@@ -525,8 +597,8 @@ function render(){
     av.push(["","Parte das inscrições chega sem origem",
       "<b>"+n0(semUTM)+"</b> de "+n0(leads.length)+" inscrições ("+pct(div(semUTM,leads.length)*100)+") não trazem UTM nenhuma. Elas contam no total, mas não entram em nenhuma conta por canal ou por criativo."]);
   }
-  av.push(["","Como ler a data",
-    "Inscrição e venda são carimbadas na hora em que o Make grava a linha, não na hora em que a pessoa preencheu. Se a automação ficar parada e voltar, o acúmulo todo aparece no dia em que ela voltou."]);
+  av.push(["","Inscrições conferidas com o formulário; vendas ainda com um ajuste pendente",
+    "As <b>inscrições</b> foram reconciliadas com o export do Tally de 08/09: data real do envio, dia a dia, de 26/08 até hoje. As <b>vendas</b> batem no total e na receita com o Guru, mas cerca de <b>80 ingressos do dia 06/09 ainda aparecem no dia 07/09</b> — resquício da automação antiga, que carimbava a hora da gravação. Isso desloca só a curva diária de ingressos entre esses dois dias; canal, criativo, receita e total estão corretos."]);
   document.getElementById("avisos").innerHTML=av.map(function(a){
     return '<div class="banner '+a[0]+'"><div class="ic">&#9888;</div><div><h4>'+a[1]+'</h4><p>'+a[2]+'</p></div></div>';
   }).join("");
@@ -553,30 +625,29 @@ function tcard(cls,titulo,o,cpl){
 function fm(k,d,v,cor){
   return '<div class="fm"><div class="k">'+k+'</div><div class="v" style="color:'+cor+'">'+v+'</div><div class="d">'+d+'</div><div class="bar" style="background:'+cor+'"></div></div>';
 }
-function funilSVG(imp,cli,pv,lead){
-  var e=[
-    {t:"IMPRESSÕES",v:imp, a:"#0d2545",b:"#1b4f8f",y:0,  w1:560,w2:430,fs:56},
-    {t:"CLIQUES",   v:cli, a:"#123a63",b:"#2b7fd4",y:140,w1:430,w2:320,fs:56},
-    {t:"PAGE VIEWS",v:pv,  a:"#5a2a10",b:"#ff6b35",y:280,w1:320,w2:225,fs:56},
-    {t:"INSCRIÇÕES",v:lead,a:"#0a3d22",b:"#00c853",y:420,w1:225,w2:140,fs:68}
-  ];
+function funilSVG(estagios,rotulos,pref){
+  pref = pref || "f";
+  var larg=[560,430,320,225,140];
+  var e=estagios.map(function(x,i){
+    return {t:x.t,v:x.v,a:x.a,b:x.b,y:i*140,w1:larg[i],w2:larg[i+1],fs:(i===estagios.length-1?68:56)};
+  });
   var cx=600, h=112, s="";
   s+='<svg viewBox="0 0 1200 540" width="100%" xmlns="http://www.w3.org/2000/svg">';
-  s+='<defs><filter id="glow" x="-60%" y="-60%" width="220%" height="220%">'+
+  s+='<defs><filter id="'+pref+'glow" x="-60%" y="-60%" width="220%" height="220%">'+
      '<feGaussianBlur stdDeviation="14" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
   e.forEach(function(x,i){
-    s+='<linearGradient id="g'+i+'" x1="0" x2="1"><stop offset="0" stop-color="'+x.a+'"/><stop offset=".5" stop-color="'+x.b+'"/><stop offset="1" stop-color="'+x.a+'"/></linearGradient>';
+    s+='<linearGradient id="'+pref+i+'" x1="0" x2="1"><stop offset="0" stop-color="'+x.a+'"/><stop offset=".5" stop-color="'+x.b+'"/><stop offset="1" stop-color="'+x.a+'"/></linearGradient>';
   });
   s+='</defs>';
   e.forEach(function(x,i){
     var p=[cx-x.w1,x.y, cx+x.w1,x.y, cx+x.w2,x.y+h, cx-x.w2,x.y+h].join(" ");
-    s+='<polygon points="'+p+'" fill="url(#g'+i+')"'+(i===3?' filter="url(#glow)"':'')+'/>';
+    s+='<polygon points="'+p+'" fill="url(#'+pref+i+')"'+(i===3?' filter="url(#'+pref+'glow)"':'')+'/>';
     s+='<text x="'+cx+'" y="'+(x.y+h/2-4)+'" text-anchor="middle" fill="#fff" font-family="Arial" font-size="'+x.fs+'" font-weight="800">'+n0(x.v)+'</text>';
     s+='<text x="'+cx+'" y="'+(x.y+h/2+28)+'" text-anchor="middle" fill="rgba(255,255,255,.72)" font-family="Arial" font-size="15" letter-spacing="2">'+x.t+'</text>';
-    if(i<3){
+    if(i<e.length-1){
       var taxa=div(e[i+1].v,x.v)*100;
-      var rot=["CTR","TX ENTRADA","TX CADASTRO"][i];
-      var alerta=(i===1&&taxa<70);
+      var rot=rotulos[i];
+      var alerta=(rot==="TX ENTRADA"&&taxa<70);
       s+='<text x="'+cx+'" y="'+(x.y+h+21)+'" text-anchor="middle" fill="'+(alerta?"#ff1744":"#8b8ba0")+'" font-family="Arial" font-size="16" font-weight="700">'+
          rot+' '+pct(taxa)+(alerta?"  ⚠":"")+'</text>';
     }
