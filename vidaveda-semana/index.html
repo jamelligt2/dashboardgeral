@@ -67,6 +67,9 @@ th:first-child,th:nth-child(2){text-align:left}
 td{padding:10px;border-top:1px solid #262640;text-align:right;white-space:nowrap}
 td:first-child,td:nth-child(2){text-align:left}
 tr.total td{background:rgba(255,107,53,.10);font-weight:800;color:#ff6b35;border-top:2px solid #ff6b35}
+.verad{color:#42a5f5;text-decoration:none;font-weight:600;white-space:nowrap}
+.verad:hover{text-decoration:underline}
+.verad:focus-visible{outline:2px solid #42a5f5;outline-offset:2px;border-radius:3px}
 .badge{border-radius:5px;font-size:10px;font-weight:800;letter-spacing:.5px;padding:3px 8px}
 .b-esc{background:rgba(0,200,83,.18);color:#00c853}
 .b-man{background:rgba(255,107,53,.18);color:#ff6b35}
@@ -358,6 +361,7 @@ function preparar(d){
       pv:   parseBR(r["Action Landing Page View"]),
       ic:   parseBR(r["Action Omni Initiated Checkout"]),
       pur:  parseBR(r["Action Omni Purchase"]),
+      link: String(r["Instagram Permalink URL"]||"").trim(),
       st:   String(r["Ad Status"]||"").toUpperCase()
     };
   });
@@ -482,13 +486,26 @@ function render(){
   ],["TX ENTRADA","TX CHECKOUT","TX FECHAMENTO"],"fv");
   document.getElementById("fmet2").innerHTML=
     fm("TX Checkout","page views que abriram o checkout",pct(div(IC,PV)*100),"#ffd600")+
-    fm("TX Fechamento","checkouts que viraram ingresso",pct(div(PUR,IC)*100),"#00c853")+
-    fm("CAC","custo por ingresso vendido",(PUR?brl(div(INV,PUR)):"—"),"#ff6b35");
+    fm("TX Fechamento","piso — a compra depende da CAPI",pct(div(PUR,IC)*100),"#00c853")+
+    fm("CAC","teto — calculado sobre o piso de vendas",(PUR?brl(div(INV,PUR)):"—"),"#ff6b35");
   document.getElementById("f2-note").textContent="cliques → page views → checkout aberto → ingresso pago";
+  /* dias com investimento e checkout mas sem compra registrada = evento nao chegou na Meta */
+  var diasCegos=[];
+  var porDia={};
+  g.forEach(function(x){
+    if(!x.iso) return;
+    if(!porDia[x.iso]) porDia[x.iso]={inv:0,ic:0,pur:0};
+    porDia[x.iso].inv+=x.inv; porDia[x.iso].ic+=x.ic; porDia[x.iso].pur+=x.pur;
+  });
+  Object.keys(porDia).sort().forEach(function(k){
+    var o=porDia[k];
+    if(o.inv>0 && o.ic>0 && o.pur/Math.max(o.ic,1) < 0.05) diasCegos.push(ddmm(k));
+  });
   document.getElementById("f2-rodape").innerHTML=
-    "Este funil usa o que a <b>Meta</b> registra: "+n0(PUR)+" ingressos na janela de atribuição dela. "+
-    "Pelo cruzamento de UTM na planilha são "+n0(vendasAd.length)+" — a Meta credita quem viu o anúncio e comprou depois por outro caminho, a UTM só credita quem chegou com o parâmetro na URL. "+
-    "O número menor é o conservador; o maior é o que o algoritmo usa para otimizar.";
+    "<b>O último degrau depende da API de Conversões.</b> A Meta só conta a compra que o nosso servidor manda para ela — o checkout, não: esse é medido pelo navegador e está completo. "+
+    (diasCegos.length ? "Nos dias <b>"+diasCegos.join(", ")+"</b> houve investimento e checkout aberto, mas quase nenhuma compra chegou. " : "")+
+    "Isso significa que a <b>TX de fechamento está subestimada</b>: o numerador tem buraco e o denominador não. "+
+    "Para efeito de comparação: pelo cruzamento de UTM na planilha o anúncio tem "+n0(vendasAd.length)+" ingressos, e o Guru registra "+n0(vendas.length)+" ingressos na campanha inteira, somando todos os canais.";
 
   var RECEITA=soma(vendas,function(v){return parseBR(v.valor)||ticket;});
   var recAd=soma(vendasAd,function(v){return parseBR(v.valor)||ticket;});
@@ -552,12 +569,13 @@ function render(){
   var cri={};
   g.forEach(function(x){
     var k=x.ad||"(sem nome)";
-    if(!cri[k]) cri[k]={inv:0,imp:0,cli:0,pv:0,lead:0,vd:0,rec:0};
+    if(!cri[k]) cri[k]={inv:0,imp:0,cli:0,pv:0,lead:0,vd:0,rec:0,link:""};
     cri[k].inv+=x.inv;cri[k].imp+=x.imp;cri[k].cli+=x.cli;cri[k].pv+=x.pv;
+    if(!cri[k].link && x.link) cri[k].link=x.link;
   });
   leadsAd.forEach(function(l){var k=String(l.utm_content||"").trim().toUpperCase(); if(cri[k]) cri[k].lead++;});
   vendasAd.forEach(function(v){var k=String(v.utm_content||"").trim().toUpperCase(); if(cri[k]){cri[k].vd++;cri[k].rec+=parseBR(v.valor)||ticket;}});
-  document.getElementById("t-cri").innerHTML=tabelaRank(cri,"Criativo",CPL,false);
+  document.getElementById("t-cri").innerHTML=tabelaRank(cri,"Criativo",CPL,false,true);
 
   var pub={};
   g.forEach(function(x){
@@ -655,16 +673,17 @@ function funilSVG(estagios,rotulos,pref){
   s+='</svg>';
   return s;
 }
-function tabelaRank(obj,rotulo,cplMedio,mostraTemp){
+function tabelaRank(obj,rotulo,cplMedio,mostraTemp,comLink){
   var ks=Object.keys(obj).filter(function(k){return obj[k].inv>0;})
     .sort(function(a,b){
       var ca=obj[a].lead?obj[a].inv/obj[a].lead:1e9, cb=obj[b].lead?obj[b].inv/obj[b].lead:1e9;
       return ca-cb;
     });
   var cab="<thead><tr><th>#</th><th>"+rotulo+"</th>"+(mostraTemp?"<th>Temp.</th>":"")+
-    "<th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Inscrições</th><th>CTR</th><th>CPC</th><th>CPL</th><th>TX Entrada</th><th>TX Cadastro</th><th>Ingressos</th><th>Status</th></tr></thead>";
+    "<th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Inscrições</th><th>CTR</th><th>CPC</th><th>CPL</th><th>TX Entrada</th><th>TX Cadastro</th><th>Ingressos</th>"+
+    (comLink?"<th>Anúncio</th>":"")+"<th>Status</th></tr></thead>";
   if(!ks.length){
-    return cab+"<tbody><tr><td colspan='"+(mostraTemp?15:14)+"' style='text-align:center;color:#777;padding:24px'>Nenhuma veiculação no período selecionado.</td></tr></tbody>";
+    return cab+"<tbody><tr><td colspan='"+(14+(mostraTemp?1:0)+(comLink?1:0))+"' style='text-align:center;color:#777;padding:24px'>Nenhuma veiculação no período selecionado.</td></tr></tbody>";
   }
   var t={inv:0,imp:0,cli:0,pv:0,lead:0,vd:0};
   var linhas=ks.map(function(k,i){
@@ -680,12 +699,14 @@ function tabelaRank(obj,rotulo,cplMedio,mostraTemp){
       (mostraTemp?"<td>"+(o.temp==="frio"?'<span style="color:#42a5f5">frio</span>':'<span style="color:#ff1744">quente</span>')+"</td>":"")+
       "<td>"+brl(o.inv)+"</td><td>"+n0(o.imp)+"</td><td>"+n0(o.cli)+"</td><td>"+n0(o.pv)+"</td><td>"+n0(o.lead)+"</td>"+
       "<td>"+(o.imp?pct(div(o.cli,o.imp)*100):"—")+"</td><td>"+(o.cli?brl(div(o.inv,o.cli)):"—")+"</td><td>"+(o.lead?brl(cpl):"—")+"</td>"+
-      "<td>"+(o.cli?pct(div(o.pv,o.cli)*100):"—")+"</td><td>"+(o.pv?pct(div(o.lead,o.pv)*100):"—")+"</td><td>"+n0(o.vd)+"</td><td>"+bd+"</td></tr>";
+      "<td>"+(o.cli?pct(div(o.pv,o.cli)*100):"—")+"</td><td>"+(o.pv?pct(div(o.lead,o.pv)*100):"—")+"</td><td>"+n0(o.vd)+"</td>"+
+      (comLink?"<td>"+(o.link?'<a class="verad" href="'+o.link+'" target="_blank" rel="noopener">ver peça &#8599;</a>':'<span style="color:#555">—</span>')+"</td>":"")+
+      "<td>"+bd+"</td></tr>";
   }).join("");
   var colspan=mostraTemp?3:2;
   return cab+"<tbody>"+linhas+
     "<tr class='total'><td colspan='"+colspan+"'>Total</td><td>"+brl(t.inv)+"</td><td>"+n0(t.imp)+"</td><td>"+n0(t.cli)+"</td><td>"+n0(t.pv)+"</td><td>"+n0(t.lead)+"</td>"+
-    "<td>"+pct(div(t.cli,t.imp)*100)+"</td><td>"+brl(div(t.inv,t.cli))+"</td><td>"+(t.lead?brl(div(t.inv,t.lead)):"—")+"</td><td>"+pct(div(t.pv,t.cli)*100)+"</td><td>"+pct(div(t.lead,t.pv)*100)+"</td><td>"+n0(t.vd)+"</td><td>—</td></tr></tbody>";
+    "<td>"+pct(div(t.cli,t.imp)*100)+"</td><td>"+brl(div(t.inv,t.cli))+"</td><td>"+(t.lead?brl(div(t.inv,t.lead)):"—")+"</td><td>"+pct(div(t.pv,t.cli)*100)+"</td><td>"+pct(div(t.lead,t.pv)*100)+"</td><td>"+n0(t.vd)+"</td>"+(comLink?"<td>—</td>":"")+"<td>—</td></tr></tbody>";
 }
 function grafico(labels,leads,cpl){
   var el=document.getElementById("cdia");
