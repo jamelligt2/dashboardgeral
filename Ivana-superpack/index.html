@@ -101,6 +101,8 @@ tr:hover td{background:rgba(255,255,255,.025)}
 /* Hotmart OB info box */
 .ob-info{background:rgba(255,107,43,.06);border:1px solid rgba(255,107,43,.2);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:12px;color:rgba(255,255,255,.6)}
 .ob-info strong{color:#ff6b2b}
+.audit-box{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:11px;color:rgba(255,255,255,.45);font-family:'DM Mono',monospace}
+.audit-box b{color:#ff9a3c;font-weight:600}
 </style>
 </head>
 <body>
@@ -139,15 +141,12 @@ tr:hover td{background:rgba(255,255,255,.025)}
 })();
 </script>
 <!-- JAMELLI-GT LOGIN GATE END -->
-
-
 <!-- LOADING OVERLAY -->
 <div id="loading-overlay" style="position:fixed;inset:0;background:#1a1a2e;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px">
   <div style="width:40px;height:40px;border:3px solid rgba(255,107,43,.2);border-top-color:#ff6b2b;border-radius:50%;animation:spin 1s linear infinite"></div>
   <div style="color:rgba(255,255,255,.5);font-size:13px" id="loading-msg">Conectando com a planilha...</div>
   <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 </div>
-
 <!-- TOPBAR -->
 <div class="topbar">
   <div style="display:flex;align-items:center;gap:16px">
@@ -176,7 +175,6 @@ tr:hover td{background:rgba(255,255,255,.025)}
     <span class="range-info" id="range-info"></span>
   </div>
 </div>
-
 <!-- TABS -->
 <div class="tabs">
   <div class="tab active" onclick="showTab('trafego',this)">📊 Tráfego</div>
@@ -186,7 +184,6 @@ tr:hover td{background:rgba(255,255,255,.025)}
   <div class="tab" onclick="showTab('semanal',this)">Semana a Semana</div>
   <div class="tab" onclick="showTab('mensal',this)">Mês a Mês</div>
 </div>
-
 <!-- TRÁFEGO (principal) -->
 <div id="tab-trafego" class="content active">
   <div class="kpi-grid" id="kpi-trafego"></div>
@@ -210,18 +207,21 @@ tr:hover td{background:rgba(255,255,255,.025)}
     <th>Data</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Cliques</th><th>PV</th><th>CK</th><th>Imp.</th><th>CPC</th><th>Ticket</th><th>Status</th>
   </tr></thead><tbody id="tbody-dias"></tbody></table></div>
 </div>
-
 <!-- VISÃO GERAL -->
 <div id="tab-visao" class="content">
   <div class="kpi-grid" id="kpi-visao"></div>
   <div class="sec-title">Dia a Dia — Visão Geral</div>
   <div class="ob-info">ℹ️ <strong>Hotmart:</strong> Todas as vendas contadas (orgânico + pago) a partir de 14/01/2026. Faturamento inclui produto principal + order bumps vinculados via <strong>transaction_root</strong>. Investimento = Meta Ads (Gerenciador).<br>
+  🧾 <strong>O que conta como venda:</strong> uma <strong>compra</strong> do Super Pack do RH (nome do produto ou coluna "É Super Pack?" = 1), identificada pelo <strong>ID da compra na Hotmart</strong>. Compra parcelada conta <strong>1 venda só</strong>, na data da primeira cobrança.<br>
+  💰 <strong>Ticket:</strong> venda parcelada entra pelo <strong>ticket cheio de R$ 397</strong>, não pela parcela cobrada (a Hotmart reporta só a parcela — R$ 72, R$ 84, R$ 147...). Cobrança isolada de R$ 200 ou mais é tratada como preço praticado e mantida como está (247 / 327 / 347 / 397 / 447 / 494).<br>
+  💱 <strong>Moeda:</strong> venda com moeda diferente de BRL na coluna <strong>Q</strong> é convertida pela <strong>cotação de venda do Banco Central (PTAX) na data da venda</strong>, buscada ao vivo pelo próprio dash. O card mostra o valor original, a taxa e a data da cotação. PTAX não publica em fim de semana e feriado — nesse caso vale o dia útil anterior, e o card diz qual foi.<br>
+  ⚠️ <strong>Histórico:</strong> as linhas gravadas antes de 09/09/2026 estão com a coluna Q vazia, então são tratadas como BRL. Para corrigir uma venda antiga, basta escrever a moeda (ex.: <code>USD</code>) na coluna Q daquela linha — o dash converte sozinho no próximo carregamento.<br>
   🏷️ <strong>Classificação:</strong> só é <strong>Orgânica</strong> a venda cujo <em>utm_source</em> contém "orgânico". Todo o resto (meta_ads, facebook, instagram, ig, sem informação) é contado como <strong>Tráfego</strong>. A coluna <em>s/ UTM*</em> é apenas informativa — essas vendas já estão dentro de Tráfego.</div>
+  <div class="audit-box" id="audit-box"></div>
   <div class="tbl-wrap"><table><thead><tr>
     <th>Data</th><th>Invest.</th><th>Fat. Total</th><th>ROAS</th><th>Compras Total</th><th>Tráfego</th><th>Orgânicas</th><th>s/ UTM*</th><th>Ticket Médio</th><th>CAC</th>
   </tr></thead><tbody id="tbody-geral"></tbody></table></div>
 </div>
-
 <!-- CRIATIVOS -->
 <div id="tab-criativos" class="content">
   <div class="cri-filterbar">
@@ -242,7 +242,6 @@ tr:hover td{background:rgba(255,255,255,.025)}
     <th>Criativo</th><th>Invest.</th><th>Cliques</th><th>Imp.</th><th>PV</th><th>Connect Rate</th><th>CK</th><th>Taxa Checkout</th><th>Compras</th><th>Taxa Conversão</th><th>Fat.</th><th>CTR</th><th>CPC</th><th>CPM</th><th>CAC</th><th>ROAS</th><th>Status</th>
   </tr></thead><tbody id="tbody-criativos"></tbody></table></div>
 </div>
-
 <!-- PÚBLICOS -->
 <div id="tab-publicos" class="content">
   <div class="cri-filterbar">
@@ -262,7 +261,6 @@ tr:hover td{background:rgba(255,255,255,.025)}
     <th>Público (Adset)</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>CAC</th><th>Taxa Conv.</th><th>Cliques</th><th>PV</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Connect Rate</th><th>Status</th>
   </tr></thead><tbody id="tbody-publicos"></tbody></table></div>
 </div>
-
 <!-- SEMANAL -->
 <div id="tab-semanal" class="content">
   <div class="kpi-grid" id="kpi-semanal"></div>
@@ -275,7 +273,6 @@ tr:hover td{background:rgba(255,255,255,.025)}
     <th>Semana</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Cliques</th><th>PV</th><th>CK</th><th>Imp.</th><th>CPC</th><th>CPM</th><th>CTR</th><th>Connect Rate</th><th>Retorno</th><th>Status</th>
   </tr></thead><tbody id="tbody-semanal"></tbody></table></div>
 </div>
-
 <!-- MENSAL -->
 <div id="tab-mensal" class="content">
   <div class="kpi-grid" id="kpi-mensal"></div>
@@ -284,7 +281,6 @@ tr:hover td{background:rgba(255,255,255,.025)}
     <th>Mês</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Cliques</th><th>PV</th><th>CK</th><th>Imp.</th><th>CPC</th><th>CPM</th><th>CTR</th><th>Connect Rate</th><th>Ticket</th><th>Retorno</th><th>Status</th>
   </tr></thead><tbody id="tbody-mensal"></tbody></table></div>
 </div>
-
 <script>
 // ============ CONFIG ============
 const SHEET_ID = '1UMarMGS4aQRJBJbmRyCx7_Njj5QhdMYV90sjqo3ofqA';
@@ -292,25 +288,57 @@ const GERENCIADOR_SHEET = 'Gerenciador';
 const WEBHOOK_SHEET = 'Webhook';
 // Data mínima: 14/01/2026
 const DATA_MINIMA = '2026-01-14';
-
+// Ticket cheio do Super Pack. Quando a compra é parcelada, a Hotmart reporta só a
+// parcela (R$ 38,97 / 62,92 / 72 / 84 / 147...). A VENDA vale o ticket cheio, não a
+// parcela — senão ROAS, CAC e faturamento saem subestimados.
+const TICKET_CHEIO = 397;
+// Abaixo disso a cobrança é parcela, não preço de venda. Os preços praticados na
+// planilha são 247 / 327 / 347 / 397 / 447 / 494; as parcelas vão de 38,97 a 147.
+// O corte em 200 fica no vão entre os dois grupos.
+const LIMITE_PARCELA = 200;
+// VENDA EM MOEDA ESTRANGEIRA — a planilha não tem coluna de moeda, então o dash
+// não consegue identificar sozinho. Sinal indireto: cobrança ÚNICA e valor REDONDO
+// (84, 72, 70), enquanto parcela em real vem com centavo quebrado (38,97 / 62,92 /
+// 41,06) ou se repete todo mês. Caso confirmado: Telma Silva, 84 + 12 na planilha,
+// R$ 488,55 na Hotmart — razão 5,0891 nos DOIS produtos.
+// Enquanto a automação não gravar a moeda, essas compras ficam MARCADAS no dash.
+// Preencha TAXA_CAMBIO (ex.: 5.0891) para converter; deixe null para exibir cru.
+const TAXA_CAMBIO = null;
+// VALORES CONFIRMADOS NA MÃO. Quando você conferir uma compra na Hotmart, coloque aqui
+// pelo e-mail do comprador. Isso vence TODA heurística — vira o valor oficial da venda.
+// É o único jeito de acertar o histórico anterior a 09/09/2026, que não tem moeda nem
+// preço cheio na planilha.
+const CORRECOES_MANUAIS = {
+  'tms001.ts@gmail.com': { fatTotal: 488.55, nota: 'conferido na Hotmart' }
+};
+// MOEDA DECLARADA NA MÃO, para as linhas antigas em que a coluna Q está vazia.
+// Serve para o histórico anterior a 09/09/2026. Declarar a moeda é o suficiente:
+//   BRL + cobrança abaixo do ticket -> é parcela, e a venda vale o ticket cheio.
+//   outra moeda                     -> converte pela PTAX da data da venda.
+// Preencher aqui é equivalente a escrever a moeda na coluna Q da planilha.
+const MOEDA_DECLARADA = {
+  'janinelguedes@gmail.com': 'BRL'   // R$ 72 é parcela em real — confirmado por você
+};
 // Gerenciador colunas (0-based):
 // 0:Data | 1:Campanha | 2:Conjunto | 3:Anúncio | 4:Link | 5:Investimento
 // 6:Alcance | 7:Impressões | 8:Clicks | 9:PageView | 10:Checkout
 // 11:Status Anúncio | 12:Status Conjunto | 13:Status Campanha
 const G = { date:0, campaign:1, adset:2, ad:3, link:4, inv:5, reach:6, imp:7, cliques:8, pv:9, ck:10, statusCampaign:11, statusAdset:12, statusAd:13 };
-
 // Webhook colunas (0-based):
 // 0:Data | 1:Produto | 2:É Super Pack? | 3:Status | 4:Cliente | 5:Email
 // 6:Faturado Total | 7:Faturado principal | 8:Faturado OB | 9:transaction_root
 // 10:Tipo | 11:SRC | 12:UTM_source | 13:UTM_Medium | 14:UTM_campaign | 15:UTM_content
+// 16..20 passaram a ser gravadas em 09/09/2026 pelo cenário Make "PP236 - Ivana Souza".
+// Linhas antigas vêm vazias — por isso todo uso delas é condicional, com a heurística
+// antiga como plano B. Conforme a planilha for enchendo, o dash migra sozinho.
 const W = { data:0, produto:1, isSuperPack:2, status:3, cliente:4, email:5,
             fatTotal:6, fatPrincipal:7, fatOB:8, txRoot:9, tipo:10, src:11,
-            utmSource:12, utmMedium:13, utmCampaign:14, utmContent:15 };
-
+            utmSource:12, utmMedium:13, utmCampaign:14, utmContent:15,
+            moeda:16, precoCheio:17, parcelas:18, transacao:19, transacaoPai:20 };
 let DIAS=[], SEMANAL=[], MENSAL=[], CRIATIVOS=[], PUBLICOS=[], SALES=[], GROWS=[], WROWS=[];
+let AUDIT={linhas:0,aprovadas:0,grupos:0,vendas:0,semTx:0,foraData:0,diasSoVenda:0};
 let dateFrom=null, dateTo=null;
 let chartInstances={};
-
 // ============ CSV PARSER ============
 function parseCSV(csv){
   const lines=[];let cur='',inQ=false;
@@ -333,21 +361,84 @@ function parseCSV(csv){
     return cols;
   });
 }
-
+// ---- FIX 1: parser numérico robusto ----
+// Antes: "1,497,00" virava 1,497 (perdia R$ 1.495 de faturamento).
+// Agora: a ÚLTIMA vírgula é sempre o separador decimal; todo o resto é milhar.
 function pNum(v){
-  if(!v||v==='')return 0;
-  // Remove R$, spaces, handle BR format (1.234,56)
-  let s=String(v).replace(/R\$\s*/g,'').trim();
-  // If has comma as decimal separator (BR format): remove dots, replace comma
-  if(s.includes(',')&&s.includes('.')){
-    s=s.replace(/\./g,'').replace(',','.');
-  } else if(s.includes(',')&&!s.includes('.')){
-    s=s.replace(',','.');
+  if(v===null||v===undefined||v==='')return 0;
+  let s=String(v).replace(/R\$/gi,'').replace(/[\s ]/g,'');
+  if(!s)return 0;
+  const neg=/^\(.*\)$/.test(s)||s.trim().startsWith('-');
+  s=s.replace(/[^0-9.,]/g,'');
+  if(!s)return 0;
+  if(s.indexOf(',')>-1){
+    const i=s.lastIndexOf(',');
+    s=s.slice(0,i).replace(/[.,]/g,'')+'.'+s.slice(i+1).replace(/[.,]/g,'');
+  } else if((s.match(/\./g)||[]).length>1){
+    s=s.replace(/\./g,'');
   }
-  return parseFloat(s)||0;
+  const n=parseFloat(s);
+  if(isNaN(n))return 0;
+  return neg?-Math.abs(n):n;
 }
-
+// ============ COTAÇÃO OFICIAL (PTAX / Banco Central) ============
+// Venda em moeda estrangeira é convertida pela cotação de VENDA do dia da venda,
+// direto da API aberta do Banco Central. Sem chave, sem login, sem depender de ninguém:
+// o dash cota sozinho toda vez que carrega. PTAX não publica em fim de semana e feriado,
+// então voltamos até o dia útil anterior (padrão contábil), e o dash mostra qual dia usou.
+const PTAX_CACHE = {};
+async function cotacaoPTAX(moeda, isoData){
+  const chave = moeda+'@'+isoData;
+  if(PTAX_CACHE[chave]!==undefined) return PTAX_CACHE[chave];
+  const [y,m,d] = isoData.split('-').map(Number);
+  for(let k=0;k<8;k++){
+    const dt = new Date(y, m-1, d-k);
+    const mm = String(dt.getMonth()+1).padStart(2,'0');
+    const dd = String(dt.getDate()).padStart(2,'0');
+    const us = mm+'-'+dd+'-'+dt.getFullYear();
+    const url = 'https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/'
+      +'CotacaoMoedaDia(moeda=@moeda,dataCotacao=@dataCotacao)'
+      +"?@moeda='"+encodeURIComponent(moeda)+"'&@dataCotacao='"+us+"'"
+      +'&$format=json&$select=cotacaoVenda';
+    try{
+      const ctl=new AbortController();
+      const t=setTimeout(()=>ctl.abort(),6000);
+      const resp = await fetch(url,{signal:ctl.signal});
+      clearTimeout(t);
+      if(!resp.ok) continue;
+      const j = await resp.json();
+      if(j && j.value && j.value.length && j.value[0].cotacaoVenda){
+        const r = { taxa: j.value[0].cotacaoVenda, dataCotacao: dt.toISOString().slice(0,10), diasAtras: k };
+        PTAX_CACHE[chave] = r;
+        return r;
+      }
+    }catch(e){ /* tenta o dia anterior */ }
+  }
+  PTAX_CACHE[chave] = null;   // não achou: o dash marca, não inventa
+  return null;
+}
+// Converte todas as vendas que declaram moeda diferente de BRL.
+async function converterMoedas(sales){
+  const pendentes = sales.filter(s=>s.moedaDeclarada && s.moedaDeclarada!=='BRL' && !s.corrigidaManual);
+  if(!pendentes.length) return;
+  const chaves = [...new Set(pendentes.map(s=>s.moedaDeclarada+'|'+s.data))];
+  await Promise.all(chaves.map(k=>{const[mo,dt]=k.split('|');return cotacaoPTAX(mo,dt);}));
+  pendentes.forEach(s=>{
+    const c = PTAX_CACHE[s.moedaDeclarada+'@'+s.data];
+    if(c){
+      s.convertida=true; s.taxaUsada=c.taxa; s.dataCotacao=c.dataCotacao;
+      s.valorOriginal=s.fatPrincipal+s.fatOB;
+      s.fatPrincipal*=c.taxa; s.fatOB*=c.taxa; s.fatTotal=s.fatPrincipal+s.fatOB;
+    }else{
+      s.cotacaoFalhou=true;
+    }
+  });
+}
 // ============ FETCH ============
+// Duas rotas, porque fetch() cai por CORS quando o arquivo é aberto como file:///
+// (duplo clique no .html). O <script> JSONP não passa por CORS e funciona em
+// qualquer contexto — file://, servidor local ou dash.jamelligt.com.br.
+let MODO_CARGA='';
 async function fetchSheetCSV(sheetName){
   const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
   const controller=new AbortController();
@@ -355,20 +446,82 @@ async function fetchSheetCSV(sheetName){
   try{
     const resp=await fetch(url,{signal:controller.signal});
     clearTimeout(timeout);
-    if(!resp.ok)throw new Error(`Planilha "${sheetName}": HTTP ${resp.status}. Verifique se a planilha está pública (Compartilhar → Qualquer pessoa com o link).`);
+    if(!resp.ok)throw new Error(`HTTP ${resp.status}`);
     const text=await resp.text();
-    if(text.includes('Signin')||text.includes('accounts.google'))throw new Error(`Planilha "${sheetName}" requer login. Defina como pública: Compartilhar → Qualquer pessoa com o link → Visualizador.`);
-    return text;
+    if(text.includes('Signin')||text.includes('accounts.google'))throw new Error('LOGIN_REQUIRED');
+    return parseCSV(text);
   }catch(e){
     clearTimeout(timeout);
-    if(e.name==='AbortError')throw new Error(`Timeout ao carregar "${sheetName}". Verifique a conexão e se a planilha está pública.`);
-    throw e;
+    if(e&&e.message==='LOGIN_REQUIRED')throw e;
+    throw new Error('FETCH_FAIL');
   }
 }
-
+// Fallback JSONP: gviz devolve JSON dentro de um callback via <script>.
+function fetchSheetJSONP(sheetName){
+  return new Promise((resolve,reject)=>{
+    const cb='__jgt_cb_'+Math.random().toString(36).slice(2);
+    const s=document.createElement('script');
+    const timer=setTimeout(()=>{cleanup();reject(new Error('JSONP_TIMEOUT'));},25000);
+    function cleanup(){clearTimeout(timer);try{delete window[cb];}catch(e){window[cb]=undefined;}if(s.parentNode)s.parentNode.removeChild(s);}
+    window[cb]=function(resp){
+      cleanup();
+      try{
+        if(!resp||!resp.table)return reject(new Error('JSONP_EMPTY'));
+        resolve(gvizToRows(resp.table));
+      }catch(err){reject(err);}
+    };
+    s.onerror=function(){cleanup();reject(new Error('JSONP_ERROR'));};
+    s.src=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq`
+      +`?tqx=out:json;responseHandler:${cb}&sheet=${encodeURIComponent(sheetName)}&headers=1`;
+    document.head.appendChild(s);
+  });
+}
+// Converte a tabela gviz para o mesmo formato do parseCSV: array de arrays,
+// linha 0 = cabeçalho. Usa o valor FORMATADO quando existir (igual ao CSV).
+function gvizToRows(table){
+  const cols=(table.cols||[]).map(c=>c.label||c.id||'');
+  const out=[cols];
+  (table.rows||[]).forEach(r=>{
+    const cells=(r.c||[]).map(c=>{
+      if(c===null||c===undefined)return '';
+      if(c.f!==null&&c.f!==undefined&&c.f!=='')return String(c.f);
+      if(c.v===null||c.v===undefined)return '';
+      return String(c.v);
+    });
+    while(cells.length<cols.length)cells.push('');
+    out.push(cells);
+  });
+  return out;
+}
+async function fetchSheet(sheetName){
+  try{
+    const rows=await fetchSheetCSV(sheetName);
+    MODO_CARGA=MODO_CARGA||'direto';
+    return rows;
+  }catch(e){
+    if(e&&e.message==='LOGIN_REQUIRED'){
+      throw new Error(`A planilha não está pública. Abra o Google Sheets → Compartilhar → "Qualquer pessoa com o link" → Leitor.`);
+    }
+    try{
+      const rows=await fetchSheetJSONP(sheetName);
+      MODO_CARGA='jsonp';
+      return rows;
+    }catch(e2){
+      throw new Error(`Não consegui ler a aba "${sheetName}" da planilha. Causas prováveis: (1) a planilha não está compartilhada como "Qualquer pessoa com o link"; (2) o nome da aba mudou; (3) sem conexão. Detalhe técnico: ${e.message} / ${e2.message}`);
+    }
+  }
+}
 // ============ DATE HELPERS ============
 function toISO(d){
   if(!d)return '';
+  d=String(d).trim();
+  // Date(2026,0,13) — formato que o gviz JSON devolve em coluna de data (mês 0-based)
+  const gd=d.match(/^Date\((\d{4}),(\d{1,2}),(\d{1,2})/);
+  if(gd){
+    const mm=String(parseInt(gd[2],10)+1).padStart(2,'0');
+    const dd=String(parseInt(gd[3],10)).padStart(2,'0');
+    return `${gd[1]}-${mm}-${dd}`;
+  }
   // DD-MM-YYYY HH:MM => YYYY-MM-DD
   if(d.match(/^\d{2}-\d{2}-\d{4}/)){
     const[dd,mm,yyyy]=d.split(' ')[0].split('-');
@@ -377,7 +530,7 @@ function toISO(d){
   // YYYY-MM-DD already
   if(d.match(/^\d{4}-\d{2}-\d{2}/))return d.slice(0,10);
   // DD/MM/YYYY
-  if(d.includes('/')){const[dd,mm,yy]=d.split('/');return`${yy}-${mm}-${dd}`;}
+  if(d.includes('/')){const[dd,mm,yy]=d.split(' ')[0].split('/');return`${yy}-${mm}-${dd}`;}
   return d.slice(0,10);
 }
 function toBR(iso){const[y,m,d]=iso.split('-');return`${d}/${m}/${y}`;}
@@ -389,14 +542,17 @@ function dateToWeekKey(iso){
   const w=Math.ceil((Math.floor((dt-jan1)/86400000)+1)/7);
   return String(y).slice(-2)+String(w).padStart(2,'0');
 }
+// ---- FIX 2: o range "Tudo" tem que cobrir Gerenciador E vendas ----
+function allDates(){
+  return [...DIAS.map(d=>d.data),...SALES.map(s=>s.data)].filter(Boolean).sort();
+}
 function last7iso(){
-  const dates=DIAS.map(d=>d.data).sort();
+  const dates=allDates();
   if(!dates.length)return '';
   const last=new Date(dates[dates.length-1]+'T00:00:00');
   last.setDate(last.getDate()-6);
   return last.toISOString().slice(0,10);
 }
-
 // ============ FORMAT ============
 function br(n,d=2){if(n===null||n===undefined||isNaN(n))return'—';return new Intl.NumberFormat('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}).format(n);}
 function brl(n){if(n===null||n===undefined||isNaN(n))return'—';return'R$ '+br(n,2);}
@@ -408,70 +564,65 @@ function statusBadge(inv,fat){
   if(r>=1)return'<span class="badge otimizar">Otimizar</span>';
   return'<span class="badge corrigir">Corrigir</span>';
 }
-
 // ============ CLASSIFICAÇÃO DE VENDA POR UTM ============
-// REGRA:
-//   Orgânico = utm_source CONTÉM "organico" / "orgânico" (acento e maiúsculas ignorados)
-//   Tráfego  = TODO o resto — meta_ads, facebook, instagram, ig, ou sem informação
-//   isSemUTM = apenas informativo (subconjunto de Tráfego), não é uma categoria à parte
 function utmSourceNorm(s){
   return (s.utmSource||'')
     .toString()
     .toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g,'') // remove acentos: orgânico -> organico
+    .normalize('NFD').replace(/[̀-ͯ]/g,'')
     .replace(/[\s_\-.]/g,'');
 }
 function isOrganico(s){return utmSourceNorm(s).includes('organico');}
 function isTrafego(s){return !isOrganico(s);}
-function isSemUTM(s){return !utmSourceNorm(s);} // informativo: venda de tráfego sem UTM preenchida
-
+// "Sem UTM" antes era só utm_source vazio — e dava 0 numa semana em que NENHUMA venda
+// tinha criativo, porque a Hotmart preenche o source com um ID interno
+// ("1788937266966_17889368019215"), que passa por UTM mas não atribui nada.
+// O que interessa para o gestor é: dá para saber qual anúncio vendeu? Isso é o utm_content.
+function isSemUTM(s){
+  if(!utmSourceNorm(s))return true;
+  if(/^\d{10,}[_|]/.test(String(s.utmSource||'').trim()))return true; // ID interno Hotmart
+  return false;
+}
+function semCriativo(s){return !String(s.utmContent||'').trim();}
+function normProd(s){
+  return (s||'').toString().toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[^a-z0-9]/g,'');
+}
 // ============ PROCESS DATA ============
 async function loadData(){
   try{
     document.getElementById('loading-msg').textContent='Carregando Gerenciador...';
-    const[gCSV,wCSV]=await Promise.all([fetchSheetCSV(GERENCIADOR_SHEET),fetchSheetCSV(WEBHOOK_SHEET)]);
-
+    const[gRows,wRows]=await Promise.all([fetchSheet(GERENCIADOR_SHEET),fetchSheet(WEBHOOK_SHEET)]);
     document.getElementById('loading-msg').textContent='Processando dados Hotmart...';
-    const gRows=parseCSV(gCSV);
-    const wRows=parseCSV(wCSV);
-
     // ============ WEBHOOK HOTMART ============
-    // Regras:
-    // 1. Status = APPROVED
-
-    // 3. Data >= 14/01/2026
-    // 4. Para identificar vendas únicas: usar transaction_root (col 9)
-    //    O transaction_root agrupa linhas do mesmo comprador (principal + OBs)
-    //    Precisamos contar 1 venda por grupo de transaction_root
-    //    e somar o faturamento de todas as linhas do grupo (principal + OBs)
-    //
-    // 5. Identificar se é compra do Super Pack: coluna B (produto) contém "Super Pack"
-    //    ou coluna C (isSuperPack) = 1
-    //    Um grupo transaction_root só entra se tiver ao menos 1 linha com Super Pack
-
-    // Primeiro: agrupar por transaction_root
-    // transaction_root formato: "email||source|medium|campaign|content|adid||datetime"
-    // Cada linha pode ser produto principal ou order bump
-    // O grupo representa 1 venda
-
-    const txGroups = {}; // key: transaction_root, value: {lines}
-
+    // A CHAVE DA CORREÇÃO:
+    // O transaction_root termina com a DATA/HORA da cobrança, então cada parcela
+    // de um parcelado gera um transaction_root diferente e parecia uma venda nova.
+    // Mas o ID da compra na Hotmart (o número longo dentro do transaction_root/SRC)
+    // é o MESMO em todas as parcelas. Então agrupamos por esse ID: 1 compra = 1 venda,
+    // na data da PRIMEIRA cobrança, com todas as parcelas somadas no faturamento.
+    // Quando a linha não tem ID (UTM vazia), o e-mail do comprador é o desempate.
+    const compras = {};
+    AUDIT={linhas:0,aprovadas:0,grupos:0,vendas:0,semTx:0,foraData:0,diasSoVenda:0,parcelas:0};
     for(let i=1;i<wRows.length;i++){
       const r=wRows[i];
       if(!r||!r[W.status])continue;
-      const status=r[W.status].trim().toUpperCase();
+      AUDIT.linhas++;
+      const status=(r[W.status]||'').trim().toUpperCase();
       if(status!=='APPROVED')continue;
-
+      AUDIT.aprovadas++;
       const rawDate=r[W.data]||'';
       const iso=toISO(rawDate);
-      if(!iso||iso<DATA_MINIMA)continue;
-
-
-      const txRoot=r[W.txRoot]||'';
-      if(!txRoot)continue;
-
-      if(!txGroups[txRoot]){
-        txGroups[txRoot]={
+      if(!iso||iso<DATA_MINIMA){AUDIT.foraData++;continue;}
+      const email=(r[W.email]||'').trim().toLowerCase();
+      const idMatch=((r[W.txRoot]||'')+'|'+(r[W.src]||'')).match(/\b(\d{10,})\b/);
+      let key;
+      if(idMatch){key='ID:'+idMatch[1];}
+      else if(email){key='EM:'+email;AUDIT.semTx++;}
+      else {key='LN:'+((r[W.txRoot]||'').trim()||i);AUDIT.semTx++;}
+      if(!compras[key]){
+        compras[key]={
           data:iso,
           utmMedium:r[W.utmMedium]||'',
           utmCampaign:r[W.utmCampaign]||'',
@@ -480,41 +631,141 @@ async function loadData(){
           nome:r[W.cliente]||'',
           email:r[W.email]||'',
           hasSuperPack:false,
+          cobrancas:0,
+          maiorCobrancaSP:0,
+          parcelado:false,
+          moedaDeclarada:'',
+          precoCheioSP:0,
+          parcelasSP:0,
           fatPrincipal:0,
           fatOB:0,
           fatTotal:0
         };
       }
-      const g=txGroups[txRoot];
-      // Identifica Super Pack: col B = "Super Pack do RH" E col G (fatTotal) >= 300
-      const nomeProd=(r[W.produto]||'').toLowerCase();
-      const fatG=pNum(r[W.fatTotal]);
-      if(nomeProd.includes('super pack do rh')&&fatG>=300)g.hasSuperPack=true;
-
+      const g=compras[key];
+      // a venda pertence ao dia da PRIMEIRA cobrança, não ao dia da parcela
+      if(iso<g.data)g.data=iso;
+      // a UTM boa pode estar em qualquer linha da compra (às vezes só o principal traz)
+      if(!g.utmSource&&r[W.utmSource])g.utmSource=r[W.utmSource];
+      if(!g.utmContent&&r[W.utmContent])g.utmContent=r[W.utmContent];
+      if(!g.utmMedium&&r[W.utmMedium])g.utmMedium=r[W.utmMedium];
+      if(!g.utmCampaign&&r[W.utmCampaign])g.utmCampaign=r[W.utmCampaign];
+      if(!g.nome&&r[W.cliente])g.nome=r[W.cliente];
+      // Identifica o Super Pack pelo nome OU pela coluna "É Super Pack?".
+      // SEM piso de valor: um Super Pack parcelado entra na Hotmart por R$ 72 ou
+      // R$ 84 e é venda do mesmo jeito — era esse corte que escondia vendas.
+      const prodNorm=normProd(r[W.produto]);
+      const flagSP=(r[W.isSuperPack]||'').toString().trim()==='1';
+      if(prodNorm.includes('superpackdorh')||prodNorm.includes('superpackrh')||flagSP){
+        if(g.hasSuperPack)AUDIT.parcelas++;
+        g.hasSuperPack=true;
+        g.cobrancas++;
+        // a MAIOR cobrança isolada diz se foi à vista (>=200) ou parcelado (<200).
+        // Usar a soma daria errado: 6 parcelas de 62,92 somam 377 e passariam por
+        // preço cheio, quando ainda são o mesmo parcelado de R$ 397.
+        const vSP=pNum(r[W.fatTotal]);
+        if(vSP>g.maiorCobrancaSP)g.maiorCobrancaSP=vSP;
+        // Campos novos (Q/R/S). Quando vierem preenchidos, valem mais que a heurística.
+        const moedaLinha=(r[W.moeda]||'').trim().toUpperCase();
+        if(moedaLinha)g.moedaDeclarada=moedaLinha;
+        const pc=pNum(r[W.precoCheio]);
+        if(pc>g.precoCheioSP)g.precoCheioSP=pc;
+        const np=parseInt(r[W.parcelas],10);
+        if(!isNaN(np)&&np>g.parcelasSP)g.parcelasSP=np;
+      }
       const fp=pNum(r[W.fatPrincipal]);
       const fob=pNum(r[W.fatOB]);
       g.fatPrincipal+=fp;
       g.fatOB+=fob;
       g.fatTotal+=fp+fob;
     }
-
-    // Filtrar apenas grupos que têm o Super Pack (col H >= 300)
+    AUDIT.grupos=Object.keys(compras).length;
     const sales=[];
-    for(const [key,g] of Object.entries(txGroups)){
+    AUDIT.parceladas=0;AUDIT.moedaSuspeita=0;AUDIT.aConfirmar=0;AUDIT.corrigidas=0;
+    for(const [key,g] of Object.entries(compras)){
       if(!g.hasSuperPack)continue;
+      // Valor conferido na mão vence tudo — nem heurística, nem campo da planilha.
+      const emailKey=(g.email||'').trim().toLowerCase();
+      // moeda declarada na mão vale quando a coluna Q da planilha está vazia
+      if(!g.moedaDeclarada&&MOEDA_DECLARADA[emailKey])g.moedaDeclarada=MOEDA_DECLARADA[emailKey].toUpperCase();
+      const fix=CORRECOES_MANUAIS[emailKey];
+      if(fix&&fix.fatTotal>0){
+        g.corrigidaManual=true;g.notaCorrecao=fix.nota||'';
+        AUDIT.corrigidas++;
+        g.fatPrincipal=fix.fatTotal-g.fatOB;
+        g.fatTotal=fix.fatTotal;
+        sales.push(g);
+        continue;
+      }
+      const baixo=g.maiorCobrancaSP>0&&g.maiorCobrancaSP<LIMITE_PARCELA;
+      const redondo=Math.abs(g.maiorCobrancaSP-Math.round(g.maiorCobrancaSP))<0.005;
+      // ---- CAMINHO NOVO: a planilha já diz a moeda e o preço cheio ----
+      // Nada de adivinhar. Vale a partir das vendas gravadas de 09/09/2026 em diante.
+      if(g.moedaDeclarada||g.precoCheioSP>0||g.parcelasSP>0){
+        g.dadoOficial=true;
+        if(g.moedaDeclarada&&g.moedaDeclarada!=='BRL'){
+          // Só marca. A conversão pela PTAX acontece logo abaixo, em converterMoedas().
+          g.moedaSuspeita=true;g.moedaCodigo=g.moedaDeclarada;
+          AUDIT.moedaSuspeita++;
+        }else if(g.precoCheioSP>0&&g.precoCheioSP>g.fatPrincipal){
+          // parcelado em real: o preço cheio veio da Hotmart, sem estimativa
+          g.parcelado=true;AUDIT.parceladas++;
+          g.fatPrincipal=g.precoCheioSP;
+        }else if(g.moedaDeclarada==='BRL'&&baixo){
+          // Moeda confirmada como real e cobrança abaixo do ticket: é parcela.
+          // Com a moeda declarada não sobra ambiguidade — a venda vale o ticket cheio,
+          // mesmo que só uma parcela tenha sido cobrada até agora.
+          g.parcelado=true;AUDIT.parceladas++;
+          g.fatPrincipal=TICKET_CHEIO;
+        }
+        g.fatTotal=g.fatPrincipal+g.fatOB;
+        sales.push(g);
+        continue;
+      }
+      // ---- CAMINHO ANTIGO (linhas gravadas antes de 09/09/2026) ----
+      // Aqui a planilha guarda UM número e nada mais. Uma cobrança única de R$ 84 pode ser
+      // dólar (Telma Silva, R$ 488,55 de verdade) ou a 1ª parcela de um R$ 397. Com uma
+      // cobrança só, NÃO dá para saber — e o dash não vai fingir que sabe.
+      if(baixo&&g.cobrancas>=2){
+        // 2+ cobranças da mesma compra = parcelado comprovado. Aí sim, ticket cheio.
+        g.parcelado=true;
+        AUDIT.parceladas++;
+        g.fatPrincipal=TICKET_CHEIO;
+        g.fatTotal=g.fatPrincipal+g.fatOB;
+      } else if(baixo){
+        // Cobrança única e baixa: fica com o valor cru e MARCADA. Antes eu promovia a
+        // R$ 397 (inventava faturamento) ou chutava moeda — os dois davam número errado.
+        g.aConfirmar=true;
+        g.motivoConfirmar=redondo
+          ?'valor redondo e cobrança única: pode ser venda em outra moeda'
+          :'cobrança única abaixo do ticket: pode ser 1ª parcela ou outra moeda';
+        AUDIT.aConfirmar++;
+        g.fatTotal=g.fatPrincipal+g.fatOB;
+      }
       sales.push(g);
     }
+    AUDIT.vendas=sales.length;
+    document.getElementById('loading-msg').textContent='Cotando moedas no Banco Central...';
+    // Teto de 15s para a cotação inteira. Se o Banco Central estiver fora do ar, o dash
+    // abre mesmo assim com as vendas em real corretas e marca as estrangeiras — nunca
+    // fica preso numa tela de carregamento por causa de um serviço externo.
+    await Promise.race([
+      converterMoedas(sales).catch(e=>{console.error('PTAX falhou:',e);}),
+      new Promise(res=>setTimeout(res,15000))
+    ]);
+    sales.forEach(s=>{ if(s.moedaSuspeita&&!s.convertida)s.cotacaoFalhou=true; });
+    AUDIT.convertidas=sales.filter(s=>s.convertida).length;
+    AUDIT.cotacaoFalhou=sales.filter(s=>s.cotacaoFalhou).length;
     SALES=sales.slice().sort((a,b)=>b.data.localeCompare(a.data));
-
     // ============ GERENCIADOR ============
     const diaMap={}, criMap={}, pubMap={};
     for(let i=1;i<gRows.length;i++){
       const r=gRows[i];
       if(!r||!r[G.date])continue;
-      const dt=r[G.date].trim();
+      // toISO aqui também: no modo JSONP a data pode vir como Date(2026,0,13) ou 13/01/2026
+      const dt=toISO(r[G.date]);
       if(!dt.match(/^\d{4}-\d{2}-\d{2}$/))continue;
       if(dt<DATA_MINIMA)continue;
-
       const inv=pNum(r[G.inv]);
       const cliq=pNum(r[G.cliques]);
       const pv=pNum(r[G.pv]);
@@ -523,21 +774,14 @@ async function loadData(){
       const adset=r[G.adset]||'';
       const ad=r[G.ad]||'';
       const link=r[G.link]||'';
-
-      // Determinar status ativo para criativos e conjuntos
-      // Ativo = nenhum status contém PAUSED
       const sAd=(r[G.statusAd]||'').trim().toUpperCase();
       const sAdset=(r[G.statusAdset]||'').trim().toUpperCase();
       const sCamp=(r[G.statusCampaign]||'').trim().toUpperCase();
       const isPaused=(s)=>s.includes('PAUSED');
       const isActive=!isPaused(sAd)&&!isPaused(sAdset)&&!isPaused(sCamp)&&(sAd!==''||sAdset!==''||sCamp!=='');
-
-      // DIA
       if(!diaMap[dt])diaMap[dt]={data:dt,inv:0,fat:0,compras:0,cliques:0,pv:0,ck:0,imp:0};
       const d=diaMap[dt];
       d.inv+=inv;d.cliques+=cliq;d.pv+=pv;d.ck+=ck;d.imp+=imp;
-
-      // CRIATIVO
       if(ad){
         if(!criMap[ad])criMap[ad]={nome:ad,inv:0,cliques:0,imp:0,pv:0,ck:0,compras:0,fat:0,link:'',lastDate:'',ativo:false};
         const c=criMap[ad];
@@ -545,8 +789,6 @@ async function loadData(){
         if(link)c.link=link;
         if(dt>c.lastDate){c.lastDate=dt;c.ativo=isActive;}
       }
-
-      // PÚBLICO
       if(adset){
         if(!pubMap[adset])pubMap[adset]={nome:adset,inv:0,cliques:0,imp:0,pv:0,ck:0,compras:0,fat:0,lastDate:'',ativo:false};
         const p=pubMap[adset];
@@ -554,37 +796,38 @@ async function loadData(){
         if(dt>p.lastDate){p.lastDate=dt;p.ativo=isActive;}
       }
     }
-
-    // Distribuir vendas nos dias e criativos/públicos pelo utm_content (nome do anúncio)
-    // Aba Tráfego / Semanal / Mensal usam SOMENTE vendas de tráfego (não orgânicas)
+    // ---- FIX 5 (o principal): venda em dia que não existe no Gerenciador ----
+    // Antes: `if(isTrafego(s)&&diaMap[s.data])` — se o Gerenciador ainda não tinha
+    // a linha daquele dia (dia sem veiculação, ou planilha de ads atrasada em
+    // relação à Hotmart), a venda era descartada do Dia a Dia, do Funil, do
+    // Semanal e do Mensal. Agora o dia é criado com investimento zero.
+    sales.forEach(s=>{
+      if(!s.data)return;
+      if(!diaMap[s.data]){
+        diaMap[s.data]={data:s.data,inv:0,fat:0,compras:0,cliques:0,pv:0,ck:0,imp:0};
+        AUDIT.diasSoVenda++;
+      }
+    });
+    // Distribui vendas nos dias (só tráfego) e nos criativos/públicos pela UTM
     sales.forEach(s=>{
       if(isTrafego(s)&&diaMap[s.data]){
         diaMap[s.data].fat+=s.fatTotal;
         diaMap[s.data].compras+=1;
       }
-      // Match criativo por utmContent (nome do anúncio)
       const content=s.utmContent||'';
       if(content&&criMap[content]){
         criMap[content].fat+=s.fatTotal;
         criMap[content].compras+=1;
       }
-      // Match público por utmMedium (nome do conjunto de anúncios)
       const adsetName=s.utmMedium||'';
       if(adsetName&&pubMap[adsetName]){
         pubMap[adsetName].fat+=s.fatTotal;
         pubMap[adsetName].compras+=1;
       }
     });
-
-    // Save raw rows for re-filtering
     GROWS=gRows;
     WROWS=wRows;
-
-    // Build DIAS
     DIAS=Object.values(diaMap).sort((a,b)=>a.data.localeCompare(b.data));
-
-    // CRIATIVOS metrics
-    const cutoff7=last7iso();
     CRIATIVOS=Object.values(criMap).map(c=>{
       c.cpc=c.cliques>0?c.inv/c.cliques:0;
       c.cpm=c.imp>0?c.inv/c.imp*1000:0;
@@ -594,8 +837,6 @@ async function loadData(){
       c.roas=c.inv>0?c.fat/c.inv:0;
       return c;
     });
-
-    // PÚBLICOS metrics
     PUBLICOS=Object.values(pubMap).map(p=>{
       p.cpc=p.cliques>0?p.inv/p.cliques:0;
       p.cpm=p.imp>0?p.inv/p.imp*1000:0;
@@ -606,60 +847,69 @@ async function loadData(){
       p.taxaConv=p.pv>0&&p.compras>0?p.compras/p.pv*100:0;
       return p;
     });
-
-    // SEMANAL
-    const semMap={};
-    DIAS.forEach(r=>{
-      const k=dateToWeekKey(r.data);
-      if(!semMap[k])semMap[k]={semana:k,inv:0,fat:0,compras:0,cliques:0,pv:0,ck:0,imp:0};
-      const s=semMap[k];
-      s.inv+=r.inv;s.fat+=r.fat;s.compras+=r.compras;s.cliques+=r.cliques;s.pv+=r.pv;s.ck+=r.ck;s.imp+=r.imp;
-    });
-    SEMANAL=Object.values(semMap).sort((a,b)=>a.semana.localeCompare(b.semana));
-    SEMANAL.forEach(s=>{
-      s.roas=s.inv>0?Math.round(s.fat/s.inv*100)/100:0;
-      s.ticket=s.compras>0?Math.round(s.fat/s.compras*100)/100:0;
-      s.retorno=Math.round((s.fat-s.inv)*100)/100;
-      s.taxaCompra=s.pv>0?Math.round(s.compras/s.pv*100*100)/100:0;
-      s.cpc=s.cliques>0?Math.round(s.inv/s.cliques*100)/100:0;
-      s.cpm=s.imp>0?Math.round(s.inv/s.imp*1000*100)/100:0;
-      s.ctr=s.imp>0?Math.round(s.cliques/s.imp*100*100)/100:0;
-      s.connectRate=s.cliques>0?Math.round(s.pv/s.cliques*100*100)/100:0;
-    });
-
-    // MENSAL
-    const monMap={};
-    DIAS.forEach(r=>{
-      const k=dateToMonthKey(r.data);
-      if(!monMap[k])monMap[k]={mes:k,inv:0,fat:0,compras:0,cliques:0,pv:0,ck:0,imp:0};
-      const m=monMap[k];
-      m.inv+=r.inv;m.fat+=r.fat;m.compras+=r.compras;m.cliques+=r.cliques;m.pv+=r.pv;m.ck+=r.ck;m.imp+=r.imp;
-    });
-    MENSAL=Object.values(monMap);
-    MENSAL.forEach(m=>{
-      m.roas=m.inv>0?Math.round(m.fat/m.inv*100)/100:0;
-      m.ticket=m.compras>0?Math.round(m.fat/m.compras*100)/100:0;
-      m.retorno=Math.round((m.fat-m.inv)*100)/100;
-      m.taxaCompra=m.pv>0?Math.round(m.compras/m.pv*100*100)/100:0;
-      m.cpc=m.cliques>0?Math.round(m.inv/m.cliques*100)/100:0;
-      m.cpm=m.imp>0?Math.round(m.inv/m.imp*1000*100)/100:0;
-      m.ctr=m.imp>0?Math.round(m.cliques/m.imp*100*100)/100:0;
-      m.connectRate=m.cliques>0?Math.round(m.pv/m.cliques*100*100)/100:0;
-    });
-
+    buildSemanalMensal();
     initDatePickers();
     renderAll();
     document.getElementById('loading-overlay').style.display='none';
   }catch(err){
-    document.getElementById('loading-msg').textContent='Erro: '+err.message;
-    document.getElementById('loading-msg').style.color='#e74c3c';
+    const box=document.getElementById('loading-msg');
+    box.style.color='#e74c3c';
+    box.style.maxWidth='620px';
+    box.style.textAlign='left';
+    box.style.lineHeight='1.6';
+    box.innerHTML='<div style="font-size:15px;font-weight:600;margin-bottom:10px">Não consegui carregar a planilha</div>'
+      +'<div style="color:rgba(255,255,255,.6);font-size:12px;margin-bottom:14px">'+err.message+'</div>'
+      +'<div style="color:rgba(255,255,255,.5);font-size:12px;margin-bottom:14px">Checklist rápido:<br>'
+      +'1. A planilha precisa estar em <b style="color:#ff9a3c">Compartilhar → Qualquer pessoa com o link → Leitor</b>.<br>'
+      +'2. As abas precisam se chamar exatamente <b style="color:#ff9a3c">Gerenciador</b> e <b style="color:#ff9a3c">Webhook</b>.<br>'
+      +'3. Se você abriu este arquivo com duplo clique (endereço <code>file:///</code>), publique no servidor do dash — alguns navegadores bloqueiam a leitura externa nesse modo.</div>'
+      +'<button onclick="location.reload()" style="padding:9px 18px;background:#ff6b2b;border:none;border-radius:8px;color:#111;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">Tentar de novo</button>';
     console.error(err);
   }
 }
-
+function buildSemanalMensal(){
+  const semMap={};
+  DIAS.forEach(r=>{
+    const k=dateToWeekKey(r.data);
+    if(!semMap[k])semMap[k]={semana:k,inv:0,fat:0,compras:0,cliques:0,pv:0,ck:0,imp:0};
+    const s=semMap[k];
+    s.inv+=r.inv;s.fat+=r.fat;s.compras+=r.compras;s.cliques+=r.cliques;s.pv+=r.pv;s.ck+=r.ck;s.imp+=r.imp;
+  });
+  SEMANAL=Object.values(semMap).sort((a,b)=>a.semana.localeCompare(b.semana));
+  SEMANAL.forEach(s=>{
+    s.roas=s.inv>0?Math.round(s.fat/s.inv*100)/100:0;
+    s.ticket=s.compras>0?Math.round(s.fat/s.compras*100)/100:0;
+    s.retorno=Math.round((s.fat-s.inv)*100)/100;
+    s.taxaCompra=s.pv>0?Math.round(s.compras/s.pv*100*100)/100:0;
+    s.cpc=s.cliques>0?Math.round(s.inv/s.cliques*100)/100:0;
+    s.cpm=s.imp>0?Math.round(s.inv/s.imp*1000*100)/100:0;
+    s.ctr=s.imp>0?Math.round(s.cliques/s.imp*100*100)/100:0;
+    s.connectRate=s.cliques>0?Math.round(s.pv/s.cliques*100*100)/100:0;
+  });
+  const monMap={};
+  DIAS.forEach(r=>{
+    const k=dateToMonthKey(r.data);
+    if(!monMap[k])monMap[k]={mes:k,inv:0,fat:0,compras:0,cliques:0,pv:0,ck:0,imp:0};
+    const m=monMap[k];
+    m.inv+=r.inv;m.fat+=r.fat;m.compras+=r.compras;m.cliques+=r.cliques;m.pv+=r.pv;m.ck+=r.ck;m.imp+=r.imp;
+  });
+  MENSAL=Object.values(monMap);
+  MENSAL.forEach(m=>{
+    m.roas=m.inv>0?Math.round(m.fat/m.inv*100)/100:0;
+    m.ticket=m.compras>0?Math.round(m.fat/m.compras*100)/100:0;
+    m.retorno=Math.round((m.fat-m.inv)*100)/100;
+    m.taxaCompra=m.pv>0?Math.round(m.compras/m.pv*100*100)/100:0;
+    m.cpc=m.cliques>0?Math.round(m.inv/m.cliques*100)/100:0;
+    m.cpm=m.imp>0?Math.round(m.inv/m.imp*1000*100)/100:0;
+    m.ctr=m.imp>0?Math.round(m.cliques/m.imp*100*100)/100:0;
+    m.connectRate=m.cliques>0?Math.round(m.pv/m.cliques*100*100)/100:0;
+  });
+}
 // ============ DATE PICKERS ============
 function initDatePickers(){
-  const dates=DIAS.map(d=>d.data).sort();
+  // FIX 2 aplicado: usa Gerenciador + vendas, senão a venda mais recente
+  // (dia que a planilha de ads ainda não tem) nasce fora do período padrão.
+  const dates=allDates();
   if(!dates.length)return;
   document.getElementById('dateFrom').value=dates[0];
   document.getElementById('dateTo').value=dates[dates.length-1];
@@ -668,12 +918,9 @@ function initDatePickers(){
 }
 function setPreset(days,btn){
   document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
-  // Pegar a data mais recente entre Gerenciador e Vendas
-  const diasDates=DIAS.map(d=>d.data);
-  const salesDates=SALES.map(s=>s.data);
-  const allDates=[...diasDates,...salesDates].filter(Boolean).sort();
-  if(!allDates.length)return;
-  const first=allDates[0], last=allDates[allDates.length-1];
+  const all=allDates();
+  if(!all.length)return;
+  const first=all[0], last=all[all.length-1];
   if(days==='all'){
     document.getElementById('dateFrom').value=first;
     document.getElementById('dateTo').value=last;
@@ -700,14 +947,12 @@ function updateRangeInfo(){
 function filteredDias(){
   return DIAS.filter(d=>(!dateFrom||d.data>=dateFrom)&&(!dateTo||d.data<=dateTo));
 }
-
 // ============ TAB NAV ============
 function showTab(id,el){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.content').forEach(c=>c.classList.remove('active'));
   el.classList.add('active');document.getElementById('tab-'+id).classList.add('active');
 }
-
 // ============ RENDER ALL ============
 function renderAll(){
   const dias=filteredDias();
@@ -717,18 +962,36 @@ function renderAll(){
   renderFunil(dias);
   renderTbodyDias(dias);
   renderKpiVisao(dias,fSales);
+  renderAudit();
   renderTbodyGeral(dias,fSales);
   renderCriativos(dateFrom,dateTo);
   renderPublicos(dateFrom,dateTo);
   renderSemanal(dias);
   renderMensal(dias);
-  renderCharts(dias);
+  try{renderCharts(dias);}catch(e){console.error('Falha só nos gráficos:',e);}
 }
-
 function filteredSales(){
   return SALES.filter(s=>(!dateFrom||s.data>=dateFrom)&&(!dateTo||s.data<=dateTo));
 }
-
+// ============ AUDITORIA (conferência de venda) ============
+function renderAudit(){
+  const el=document.getElementById('audit-box');
+  if(!el)return;
+  const ultimaVenda=SALES.length?toBR(SALES[0].data):'—';
+  const ultimoDiaAds=DIAS.filter(d=>d.inv>0).map(d=>d.data).sort().pop();
+  el.innerHTML='🔎 <b>Conferência:</b> '+AUDIT.linhas+' linhas no Webhook · '+AUDIT.aprovadas+' APPROVED · '
+    +AUDIT.grupos+' compras distintas · <b>'+AUDIT.vendas+' vendas do Super Pack</b>'
+    +' · última venda: <b>'+ultimaVenda+'</b> · último dia com investimento: <b>'+(ultimoDiaAds?toBR(ultimoDiaAds):'—')+'</b>'
+    +(AUDIT.parceladas>0?' · <b>'+AUDIT.parceladas+' venda(s) parcelada(s)</b> contabilizadas pelo ticket cheio de R$ '+TICKET_CHEIO:'')
+    +(AUDIT.corrigidas>0?' · ✔️ '+AUDIT.corrigidas+' venda(s) com valor conferido na mão':'')
+    +(AUDIT.convertidas>0?' · 💱 <b>'+AUDIT.convertidas+' venda(s) em moeda estrangeira convertida(s)</b> pela PTAX do Banco Central na data da venda':'')
+    +(AUDIT.cotacaoFalhou>0?' · <b style="color:#e74c3c">⚠️ '+AUDIT.cotacaoFalhou+' sem cotação disponível</b>':'')
+    +(AUDIT.aConfirmar>0?' · <b style="color:#e74c3c">⚠️ '+AUDIT.aConfirmar+' venda(s) com valor a confirmar</b> (cobrança única abaixo do ticket: 1ª parcela ou outra moeda — o dash não inventa o valor)':'')
+    +(AUDIT.parcelas>0?' · '+AUDIT.parcelas+' cobrança(s) de parcela agrupada(s) na compra original (não contam como venda nova)':'')
+    +(AUDIT.semTx>0?' · '+AUDIT.semTx+' linha(s) sem ID Hotmart (agrupadas pelo e-mail)':'')
+    +(AUDIT.diasSoVenda>0?' · ⚠ '+AUDIT.diasSoVenda+' dia(s) com venda e sem linha no Gerenciador (incluídos com investimento R$ 0)':'')
+    +(AUDIT.foraData>0?' · '+AUDIT.foraData+' venda(s) antes de '+toBR(DATA_MINIMA)+' (fora do recorte)':'');
+}
 // ============ TRÁFEGO KPIs ============
 function renderKpiTrafego(dias,fSales){
   const inv=dias.reduce((s,d)=>s+d.inv,0);
@@ -736,25 +999,18 @@ function renderKpiTrafego(dias,fSales){
   const imp=dias.reduce((s,d)=>s+d.imp,0);
   const cpc=cliques>0?inv/cliques:0;
   const cpm=imp>0?inv/imp*1000:0;
-
-  // Apenas 2 categorias: Tráfego (padrão) e Orgânico (utm_source com "orgânico")
   const vendTraf=fSales.filter(isTrafego);
   const vendOrg=fSales.filter(isOrganico);
-  const vendTrafSemUtm=vendTraf.filter(isSemUTM); // informativo (já dentro de Tráfego)
-
+  const vendTrafSemUtm=vendTraf.filter(isSemUTM);
   const fatTraf=vendTraf.reduce((s,v)=>s+v.fatTotal,0);
   const fatOrg=vendOrg.reduce((s,v)=>s+v.fatTotal,0);
-
-  // OBs: vendas que têm fatOB > 0
   const obTraf=vendTraf.filter(v=>v.fatOB>0);
   const obOrg=vendOrg.filter(v=>v.fatOB>0);
   const fatObTraf=obTraf.reduce((s,v)=>s+v.fatOB,0);
   const fatObOrg=obOrg.reduce((s,v)=>s+v.fatOB,0);
-
   const roas=inv>0?fatTraf/inv:0;
   const cac=vendTraf.length>0?inv/vendTraf.length:0;
   const ticket=vendTraf.length>0?fatTraf/vendTraf.length:0;
-
   document.getElementById('kpi-trafego').innerHTML=
     '<div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">'+brl(inv)+'</div></div>'
    +'<div class="kpi-card"><div class="kpi-label">Fat. Tráfego</div><div class="kpi-value orange">'+brl(fatTraf)+'</div>'+(fatObTraf>0?'<div class="kpi-sub">+'+brl(fatObTraf)+' OB</div>':'')+'</div>'
@@ -769,7 +1025,6 @@ function renderKpiTrafego(dias,fSales){
    +'<div class="kpi-card"><div class="kpi-label">CPC</div><div class="kpi-value">'+brl(cpc)+'</div></div>'
    +'<div class="kpi-card"><div class="kpi-label">CPM</div><div class="kpi-value">'+brl(cpm)+'</div></div>';
 }
-
 // ============ PAINEL DE VENDAS (cards compradores) ============
 function renderSalesPanel(fSales){
   const panel=document.getElementById('sales-panel');
@@ -777,7 +1032,9 @@ function renderSalesPanel(fSales){
   const totalFat=fSales.reduce((s,v)=>s+v.fatTotal,0);
   const tracked=fSales.filter(isTrafego);
   const organic=fSales.filter(isOrganico);
-  const semUtm=tracked.filter(isSemUTM); // subconjunto de tráfego, só informativo
+  const semUtm=tracked.filter(isSemUTM);
+  const semCri=tracked.filter(semCriativo);
+  const aConf=fSales.filter(s=>s.aConfirmar||s.moedaSuspeita);
   const cards=fSales.map(s=>{
     const org=isOrganico(s), semU=isSemUTM(s);
     let color,border,icon,srcLabel;
@@ -788,6 +1045,20 @@ function renderSalesPanel(fSales){
     const obTag=s.fatOB>0
       ?'<div style="font-size:10px;color:#f39c12;margin-bottom:3px">🛒 OB: '+brl(s.fatOB)+'</div>'
       :'';
+    let flagTag='';
+    if(s.corrigidaManual){
+      flagTag='<div style="font-size:10px;color:#2ecc71;margin-bottom:3px" title="'+(s.notaCorrecao||'')+'">✔️ valor conferido na Hotmart</div>';
+    }else if(s.convertida){
+      flagTag='<div style="font-size:10px;color:#2ecc71;margin-bottom:3px" title="Convertido pela cotação de venda do Banco Central (PTAX) na data da venda.">'
+        +'💱 '+s.moedaCodigo+' '+br(s.valorOriginal,2)+' × '+br(s.taxaUsada,4)+'<br>'
+        +'<span style="color:rgba(255,255,255,.4)">PTAX '+toBR(s.dataCotacao)+'</span></div>';
+    }else if(s.cotacaoFalhou){
+      flagTag='<div style="font-size:10px;color:#e74c3c;margin-bottom:3px">⚠️ '+s.moedaCodigo+' — cotação indisponível, valor mostrado é o bruto</div>';
+    }else if(s.aConfirmar){
+      flagTag='<div style="font-size:10px;color:#e74c3c;margin-bottom:3px" title="'+(s.motivoConfirmar||'')+'">⚠️ valor a confirmar na Hotmart</div>';
+    }else if(s.parcelado){
+      flagTag='<div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:3px">📆 parcelado ('+s.cobrancas+' cobranças) · ticket cheio</div>';
+    }
     let trackedHtml;
     if(org){
       trackedHtml='<div style="font-size:10px;color:rgba(241,196,15,.7);margin-top:4px">⭐ Venda orgânica</div>';
@@ -805,6 +1076,7 @@ function renderSalesPanel(fSales){
       +'</div>'
       +'<div style="font-size:10px;color:rgba(255,255,255,.45);margin-bottom:4px">📅 '+(toBR(s.data)||'—')+'</div>'
       +obTag
+      +flagTag
       +trackedHtml
       +'</div>';
   }).join('');
@@ -813,12 +1085,14 @@ function renderSalesPanel(fSales){
     +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">'
     +'<span style="font-size:18px">💸</span>'
     +'<div><div style="font-size:13px;font-weight:600;color:#ff9a3c">Vendas no Período ('+fSales.length+')</div>'
-    +'<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px">'+SALES.length+' total · '+brl(totalFat)+' faturamento · ✅ '+tracked.length+' tráfego (❔ '+semUtm.length+' sem UTM) · ⭐ '+organic.length+' orgânicas · ← arraste para ver mais</div>'
+    +'<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px">'+SALES.length+' total · '+brl(totalFat)+' faturamento · ✅ '+tracked.length+' tráfego · ⭐ '+organic.length+' orgânicas'
+    +' · <span style="color:'+(semCri.length?'#e74c3c':'rgba(255,255,255,.4)')+'">🎨 '+semCri.length+' de '+tracked.length+' sem criativo identificado</span>'
+    +(aConf.length?' · <span style="color:#e74c3c">⚠️ '+aConf.length+' com valor a confirmar</span>':'')
+    +' · ← arraste para ver mais</div>'
     +'</div></div>'
     +'<div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:6px">'+cards+emptyMsg+'</div>'
     +'</div>';
 }
-
 // ============ VISÃO GERAL KPIs (todas as vendas) ============
 function renderKpiVisao(dias,fSales){
   const inv=dias.reduce((s,d)=>s+d.inv,0);
@@ -830,7 +1104,6 @@ function renderKpiVisao(dias,fSales){
   const ticket=comprasTotal>0?fatTotal/comprasTotal:0;
   const cac=comprasTotal>0?inv/comprasTotal:0;
   const roas=inv>0?fatTotal/inv:0;
-
   document.getElementById('kpi-visao').innerHTML=`
     <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange">${brl(inv)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Fat. Total</div><div class="kpi-value orange">${brl(fatTotal)}</div></div>
@@ -842,12 +1115,10 @@ function renderKpiVisao(dias,fSales){
     <div class="kpi-card"><div class="kpi-label">CAC Total</div><div class="kpi-value">${brl(cac)}</div></div>
   `;
 }
-
 // ============ TABELA VISÃO GERAL ============
 function renderTbodyGeral(dias,fSales){
   const el=document.getElementById('tbody-geral');
   if(!el)return;
-  // Agrupa vendas por data (tráfego / orgânico). "semUtm" é subconjunto de tráfego (informativo)
   const salesByDate={};
   fSales.forEach(s=>{
     if(!salesByDate[s.data])salesByDate[s.data]={total:0,fat:0,traf:0,org:0,semUtm:0};
@@ -883,7 +1154,6 @@ function renderTbodyGeral(dias,fSales){
       +'</tr>';
   }).join('');
 }
-
 // ============ FUNIL ============
 function renderFunil(dias){
   const cliques=dias.reduce((s,d)=>s+d.cliques,0);
@@ -891,11 +1161,11 @@ function renderFunil(dias){
   const ck=dias.reduce((s,d)=>s+d.ck,0);
   const compras=dias.reduce((s,d)=>s+d.compras,0);
   const maxV=cliques||1;
-  const ctr=cliques>0&&dias.reduce((s,d)=>s+d.imp,0)>0?cliques/dias.reduce((s,d)=>s+d.imp,0)*100:0;
+  const imps=dias.reduce((s,d)=>s+d.imp,0);
+  const ctr=cliques>0&&imps>0?cliques/imps*100:0;
   const connectRate=cliques>0?pv/cliques*100:0;
   const taxaCK=pv>0?ck/pv*100:0;
   const taxaCompra=pv>0?compras/pv*100:0;
-
   document.getElementById('funil-bars').innerHTML=`
     <div class="funil-bar-wrap">
       <div class="funil-label"><span>Cliques</span><span>${br(cliques,0)}</span></div>
@@ -921,7 +1191,6 @@ function renderFunil(dias){
     <div class="taxa-item"><span>Taxa Compra</span><span class="taxa-val">${pct(taxaCompra)}</span></div>
   `;
 }
-
 // ============ TABELA DIAS ============
 function renderTbodyDias(dias){
   document.getElementById('tbody-dias').innerHTML=dias.slice().reverse().map(d=>{
@@ -932,7 +1201,7 @@ function renderTbodyDias(dias){
       <td>${toBR(d.data)}</td>
       <td>${brl(d.inv)}</td>
       <td>${d.fat>0?brl(d.fat):'—'}</td>
-      <td>${d.fat>0?br(roas,2)+'x':'—'}</td>
+      <td>${d.fat>0&&d.inv>0?br(roas,2)+'x':'—'}</td>
       <td>${d.compras>0?br(d.compras,0):'—'}</td>
       <td>${br(d.cliques,0)}</td>
       <td>${br(d.pv,0)}</td>
@@ -944,7 +1213,6 @@ function renderTbodyDias(dias){
     </tr>`;
   }).join('');
 }
-
 // ============ CRIATIVOS ============
 let criFilter='todos', criSort='inv';
 function setCriFiltro(f,btn){criFilter=f;document.querySelectorAll('.cri-status-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderCriativos(dateFrom,dateTo);}
@@ -955,7 +1223,7 @@ function buildCriPubMaps(from,to){
   for(let i=1;i<GROWS.length;i++){
     const r=GROWS[i];
     if(!r||!r[G.date])continue;
-    const dt=r[G.date].trim();
+    const dt=toISO(r[G.date]);
     if(!dt.match(/^\d{4}-\d{2}-\d{2}$/))continue;
     if(dt<DATA_MINIMA)continue;
     if(from&&dt<from)continue;
@@ -993,7 +1261,6 @@ function buildCriPubMaps(from,to){
     const m=s.utmMedium||'';
     if(m&&pubMap[m]){pubMap[m].fat+=s.fatTotal;pubMap[m].compras+=1;}
   });
-  // Compute metrics
   Object.values(criMap).forEach(c=>{
     c.cpc=c.cliques>0?c.inv/c.cliques:0;
     c.cpm=c.imp>0?c.inv/c.imp*1000:0;
@@ -1016,7 +1283,6 @@ function buildCriPubMaps(from,to){
   });
   return {criMap,pubMap};
 }
-
 function renderCriativos(from,to){
   const {criMap}=buildCriPubMaps(from,to);
   let cris=Object.values(criMap);
@@ -1027,7 +1293,6 @@ function renderCriativos(from,to){
   else if(criSort==='cpc')cris.sort((a,b)=>(a.cpc||999)-(b.cpc||999));
   else if(criSort==='roas')cris.sort((a,b)=>b.roas-a.roas);
   else if(criSort==='vendas')cris.sort((a,b)=>b.compras-a.compras);
-
   document.getElementById('cri-cards').innerHTML=cris.map(c=>`
     <div class="cri-card ${c.ativo?'ativo':''}">
       <div class="cri-card-header">
@@ -1058,7 +1323,6 @@ function renderCriativos(from,to){
       ${c.link?`<a class="cri-link-btn" href="${c.link}" target="_blank">🔗 Ver criativo</a>`:''}
     </div>
   `).join('');
-
   document.getElementById('tbody-criativos').innerHTML=cris.map(c=>`
     <tr>
       <td>${c.nome}</td>
@@ -1081,7 +1345,6 @@ function renderCriativos(from,to){
     </tr>
   `).join('');
 }
-
 // ============ PÚBLICOS ============
 let pubFilter='todos', pubSort='inv';
 function setPubFiltro(f,btn){pubFilter=f;document.querySelectorAll('.pub-filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderPublicos(dateFrom,dateTo);}
@@ -1123,7 +1386,6 @@ function renderPublicos(from,to){
       </div>
     </div>`;
   }).join('');
-
   document.getElementById('tbody-publicos').innerHTML=pubs.map(p=>`
     <tr>
       <td>${p.nome}</td>
@@ -1143,12 +1405,14 @@ function renderPublicos(from,to){
     </tr>
   `).join('');
 }
-
 // ============ SEMANAL ============
 function renderSemanal(dias){
-  const inv=SEMANAL.reduce((s,r)=>s+r.inv,0);
-  const fat=SEMANAL.reduce((s,r)=>s+r.fat,0);
-  const compras=SEMANAL.reduce((s,r)=>s+r.compras,0);
+  // Semanal/Mensal respeitam o período selecionado (antes somavam sempre tudo)
+  const keys=new Set(dias.map(d=>dateToWeekKey(d.data)));
+  const rows=SEMANAL.filter(s=>keys.has(s.semana));
+  const inv=rows.reduce((s,r)=>s+r.inv,0);
+  const fat=rows.reduce((s,r)=>s+r.fat,0);
+  const compras=rows.reduce((s,r)=>s+r.compras,0);
   const roas=inv>0?fat/inv:0;
   document.getElementById('kpi-semanal').innerHTML=`
     <div class="kpi-card"><div class="kpi-label">Invest. Total</div><div class="kpi-value orange">${brl(inv)}</div></div>
@@ -1156,12 +1420,12 @@ function renderSemanal(dias){
     <div class="kpi-card"><div class="kpi-label">ROAS Médio</div><div class="kpi-value ${roas>=1?'green':'red'}">${br(roas,2)}x</div></div>
     <div class="kpi-card"><div class="kpi-label">Total Compras</div><div class="kpi-value">${br(compras,0)}</div></div>
   `;
-  document.getElementById('tbody-semanal').innerHTML=SEMANAL.map(s=>`
+  document.getElementById('tbody-semanal').innerHTML=rows.map(s=>`
     <tr>
       <td>${s.semana}</td>
       <td>${brl(s.inv)}</td>
       <td>${s.fat>0?brl(s.fat):'—'}</td>
-      <td>${s.fat>0?br(s.roas,2)+'x':'—'}</td>
+      <td>${s.fat>0&&s.inv>0?br(s.roas,2)+'x':'—'}</td>
       <td>${s.compras>0?br(s.compras,0):'—'}</td>
       <td>${br(s.cliques,0)}</td>
       <td>${br(s.pv,0)}</td>
@@ -1176,12 +1440,13 @@ function renderSemanal(dias){
     </tr>
   `).join('');
 }
-
 // ============ MENSAL ============
 function renderMensal(dias){
-  const inv=MENSAL.reduce((s,r)=>s+r.inv,0);
-  const fat=MENSAL.reduce((s,r)=>s+r.fat,0);
-  const compras=MENSAL.reduce((s,r)=>s+r.compras,0);
+  const keys=new Set(dias.map(d=>dateToMonthKey(d.data)));
+  const rows=MENSAL.filter(m=>keys.has(m.mes));
+  const inv=rows.reduce((s,r)=>s+r.inv,0);
+  const fat=rows.reduce((s,r)=>s+r.fat,0);
+  const compras=rows.reduce((s,r)=>s+r.compras,0);
   const roas=inv>0?fat/inv:0;
   document.getElementById('kpi-mensal').innerHTML=`
     <div class="kpi-card"><div class="kpi-label">Invest. Total</div><div class="kpi-value orange">${brl(inv)}</div></div>
@@ -1189,12 +1454,12 @@ function renderMensal(dias){
     <div class="kpi-card"><div class="kpi-label">ROAS Médio</div><div class="kpi-value ${roas>=1?'green':'red'}">${br(roas,2)}x</div></div>
     <div class="kpi-card"><div class="kpi-label">Total Compras</div><div class="kpi-value">${br(compras,0)}</div></div>
   `;
-  document.getElementById('tbody-mensal').innerHTML=MENSAL.map(m=>`
+  document.getElementById('tbody-mensal').innerHTML=rows.map(m=>`
     <tr>
       <td>${m.mes}</td>
       <td>${brl(m.inv)}</td>
       <td>${m.fat>0?brl(m.fat):'—'}</td>
-      <td>${m.fat>0?br(m.roas,2)+'x':'—'}</td>
+      <td>${m.fat>0&&m.inv>0?br(m.roas,2)+'x':'—'}</td>
       <td>${m.compras>0?br(m.compras,0):'—'}</td>
       <td>${br(m.cliques,0)}</td>
       <td>${br(m.pv,0)}</td>
@@ -1210,28 +1475,39 @@ function renderMensal(dias){
     </tr>
   `).join('');
 }
-
 // ============ CHARTS ============
-function destroyChart(id){if(chartInstances[id]){chartInstances[id].destroy();delete chartInstances[id];}}
+function destroyChart(id){if(chartInstances[id]){try{chartInstances[id].destroy();}catch(e){}delete chartInstances[id];}}
+// Gráfico é enfeite: se o Chart.js não carregar (CDN bloqueada, rede da cliente,
+// offline), o dash TEM que continuar mostrando KPIs e tabelas. Antes, essa falha
+// derrubava o render inteiro e a tela ficava só com "Erro".
 function renderCharts(dias){
+  if(typeof Chart==='undefined'){
+    document.querySelectorAll('.chart-card').forEach(c=>{
+      const cv=c.querySelector('canvas');if(cv)cv.style.display='none';
+      if(!c.querySelector('.chart-off')){
+        const d=document.createElement('div');
+        d.className='chart-off';
+        d.style.cssText='color:rgba(255,255,255,.3);font-size:11px;padding:24px 0;text-align:center';
+        d.textContent='Gráfico indisponível (biblioteca não carregou) — os números das tabelas estão corretos.';
+        c.appendChild(d);
+      }
+    });
+    return;
+  }
   const labels=dias.map(d=>toBR(d.data));
   const invData=dias.map(d=>d.inv);
   const cliqData=dias.map(d=>d.cliques);
   const pvData=dias.map(d=>d.pv);
-
   destroyChart('inv');destroyChart('cliqpv');destroyChart('invsem');destroyChart('ctrsem');
-
   const commonOpts={responsive:true,plugins:{legend:{labels:{color:'rgba(255,255,255,.5)',font:{size:10}}}},scales:{x:{ticks:{color:'rgba(255,255,255,.35)',font:{size:9}},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'rgba(255,255,255,.35)',font:{size:9}},grid:{color:'rgba(255,255,255,.06)'}}}};
-
   chartInstances['inv']=new Chart(document.getElementById('chart-inv-dia'),{type:'bar',data:{labels,datasets:[{label:'Investimento',data:invData,backgroundColor:'rgba(255,107,43,0.85)',borderRadius:3}]},options:commonOpts});
-
   chartInstances['cliqpv']=new Chart(document.getElementById('chart-cliq-pv'),{type:'bar',data:{labels,datasets:[{label:'Cliques',data:cliqData,backgroundColor:'rgba(255,107,43,0.85)',borderRadius:3},{label:'PV',data:pvData,backgroundColor:'rgba(255,183,55,0.85)',borderRadius:3}]},options:commonOpts});
-
-  const semLabels=SEMANAL.map(s=>s.semana);
-  chartInstances['invsem']=new Chart(document.getElementById('chart-inv-sem'),{type:'bar',data:{labels:semLabels,datasets:[{label:'Investimento',data:SEMANAL.map(s=>s.inv),backgroundColor:'rgba(255,107,43,0.85)',borderRadius:3}]},options:commonOpts});
-  chartInstances['ctrsem']=new Chart(document.getElementById('chart-ctr-sem'),{type:'line',data:{labels:semLabels,datasets:[{label:'CTR %',data:SEMANAL.map(s=>s.ctr),borderColor:'rgba(255,107,43,0.95)',backgroundColor:'rgba(255,107,43,0.13)',tension:.3,fill:true,pointRadius:4}]},options:commonOpts});
+  const semKeys=new Set(dias.map(d=>dateToWeekKey(d.data)));
+  const semRows=SEMANAL.filter(s=>semKeys.has(s.semana));
+  const semLabels=semRows.map(s=>s.semana);
+  chartInstances['invsem']=new Chart(document.getElementById('chart-inv-sem'),{type:'bar',data:{labels:semLabels,datasets:[{label:'Investimento',data:semRows.map(s=>s.inv),backgroundColor:'rgba(255,107,43,0.85)',borderRadius:3}]},options:commonOpts});
+  chartInstances['ctrsem']=new Chart(document.getElementById('chart-ctr-sem'),{type:'line',data:{labels:semLabels,datasets:[{label:'CTR %',data:semRows.map(s=>s.ctr),borderColor:'rgba(255,107,43,0.95)',backgroundColor:'rgba(255,107,43,0.13)',tension:.3,fill:true,pointRadius:4}]},options:commonOpts});
 }
-
 // ============ INIT ============
 document.addEventListener('DOMContentLoaded',()=>loadData());
 </script>
