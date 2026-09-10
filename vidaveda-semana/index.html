@@ -76,6 +76,17 @@ tr.total td{background:rgba(255,107,53,.10);font-weight:800;color:#ff6b35;border
 .b-ava{background:rgba(255,214,0,.18);color:#ffd600}
 .b-pau{background:rgba(255,23,68,.18);color:#ff1744}
 .chartbox{background:#1e1e35;border:1px solid #262640;border-radius:12px;padding:16px;margin-top:14px;height:320px}
+.duelo{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.dcard{background:#1e1e35;border:1px solid #262640;border-radius:12px;padding:18px;position:relative;overflow:hidden}
+.dcard.vence{border-color:#00c853}
+.dcard h3{font-size:15px;font-weight:800;letter-spacing:.5px;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.dcard .selo{font-size:9px;font-weight:800;letter-spacing:.7px;padding:3px 8px;border-radius:5px;background:rgba(0,200,83,.18);color:#00c853}
+.dcard .destaque{font-size:34px;font-weight:800;color:#ffd600;margin:14px 0 2px}
+.dcard .sob{font-size:11px;color:#777;margin-bottom:14px}
+.dcard .faixa{height:6px;border-radius:4px;background:#0f0f1a;overflow:hidden;margin:10px 0 16px}
+.dcard .faixa i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,#ff6b35,#ffd600)}
+.dcard .rod{position:absolute;left:0;right:0;bottom:0;height:3px;background:#262640}
+.dcard.vence .rod{background:#00c853}
 .banner{background:#0e1b2c;border:1px solid #262640;border-left:3px solid #ffd600;border-radius:10px;padding:14px 16px;margin-bottom:14px;display:flex;gap:12px}
 .banner .ic{color:#ffd600;font-size:18px;line-height:1}
 .banner h4{font-size:12px;letter-spacing:.6px;text-transform:uppercase;color:#ffd600;margin-bottom:5px}
@@ -108,6 +119,8 @@ tr.total td{background:rgba(255,107,53,.10);font-weight:800;color:#ff6b35;border
   <button class="tab" data-p="p2">CRIATIVOS</button>
   <button class="tab" data-p="p3">PÚBLICOS</button>
   <button class="tab" data-p="p4">ANÁLISE DIÁRIA</button>
+  <button class="tab" data-p="p5">ENGAJAMENTO</button>
+  <button class="tab" data-p="p6">LIVES</button>
 </div>
 
 <div class="filtro" id="filtro" style="display:none">
@@ -193,6 +206,68 @@ tr.total td{background:rgba(255,107,53,.10);font-weight:800;color:#ff6b35;border
       </section>
     </div>
 
+    <div class="panel" id="p5">
+      <div id="eng-aviso"></div>
+      <div id="eng-corpo" style="display:none">
+
+        <section>
+          <div class="sec-head"><h2>Campanha de Engajamento</h2><span class="note" id="eng-note"></span></div>
+          <div class="kpis" id="eng-kpis"></div>
+        </section>
+
+        <section>
+          <div class="sec-head"><h2>Criativo a Criativo</h2><span class="note">quem entrega comentário mais barato</span></div>
+          <div class="duelo" id="eng-duelo"></div>
+        </section>
+
+        <section>
+          <div class="sec-head"><h2>Comparativo Completo</h2><span class="note">ranqueado do menor para o maior custo por comentário</span></div>
+          <div class="tblwrap"><table id="t-eng"></table></div>
+        </section>
+
+        <section>
+          <div class="sec-head"><h2>Comentários por Dia</h2><span class="note">barras = comentários · linha = custo por comentário</span></div>
+          <div class="chartbox"><canvas id="ceng"></canvas></div>
+          <div class="tblwrap" style="margin-top:14px"><table id="t-engdia"></table></div>
+        </section>
+
+      </div>
+    </div>
+
+    <div class="panel" id="p6">
+      <div id="lv-aviso"></div>
+      <div id="lv-corpo" style="display:none">
+
+        <section>
+          <div class="sec-head"><h2>Campanhas de Live</h2><span class="note" id="lv-note"></span></div>
+          <div class="kpis" id="lv-kpis"></div>
+        </section>
+
+        <section>
+          <div class="sec-head"><h2>Cada Live</h2><span class="note">uma campanha por live · ranqueado por investimento</span></div>
+          <div class="tblwrap"><table id="t-lv"></table></div>
+        </section>
+
+        <section>
+          <div class="sec-head"><h2>Inscrições e Ingressos</h2><span class="note">as duas leituras da mesma pergunta</span></div>
+          <div class="duelo" id="lv-cruz"></div>
+          <p class="note" id="lv-cruz-rodape" style="margin-top:12px"></p>
+        </section>
+
+        <section>
+          <div class="sec-head"><h2>A Cauda da Live</h2><span class="note">quando entrou quem veio pelo link da live · barras = inscrições · linha = ingressos</span></div>
+          <div class="chartbox"><canvas id="clv"></canvas></div>
+          <div class="tblwrap" style="margin-top:14px"><table id="t-lvdia"></table></div>
+        </section>
+
+        <section>
+          <div class="sec-head"><h2>Por Edição de Live</h2><span class="note">separado pela marca de data na UTM do link</span></div>
+          <div class="tblwrap"><table id="t-lved"></table></div>
+        </section>
+
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -207,6 +282,8 @@ tr.total td{background:rgba(255,107,53,.10);font-weight:800;color:#ff6b35;border
 var SHEET = "1cd4NIjtg00keHeOi6HllrEQoKdVq7fEb6Uauh_kqsmQ";
 var TICKET_PADRAO = 18;
 var chart = null;
+var chartEng = null;
+var chartLive = null;
 var RAW = null;       /* dados brutos da planilha */
 var FILTRO = {de:null, ate:null, rotulo:"tudo"};
 
@@ -314,14 +391,37 @@ function canal(r){
   return "Outros";
 }
 
+/* Aba que pode não existir ainda. Volta lista vazia em vez de derrubar
+   o painel inteiro — quem não tem a aba na planilha ainda precisa ver
+   as outras abas funcionando.
+
+   ARMADILHA DO GVIZ, verificada em 10/09/2026: quando a aba pedida NÃO
+   existe, o gviz não devolve erro. Ele responde status "ok" e entrega
+   a PRIMEIRA aba da planilha — no nosso caso a LEADS, com 2.959 linhas.
+   Ou seja: pedir uma aba inexistente devolve dados de outra aba, calados.
+   Por isso não basta try/catch: é obrigatório conferir se veio mesmo a
+   aba certa, e a única prova disso é uma coluna que só ela tem. */
+function lerAbaOpcional(tab, colunaObrigatoria){
+  return lerAba(tab).then(function(linhas){
+    if(!linhas.length) return [];
+    if(colunaObrigatoria && !(colunaObrigatoria in linhas[0])){
+      return [];   /* veio outra aba disfarçada — trata como inexistente */
+    }
+    return linhas;
+  }).catch(function(){ return []; });
+}
+
 /* ---------- carga ---------- */
 function carregar(){
   document.getElementById("upd").textContent="atualizando…";
-  return Promise.all(["LEADS","VENDAS","GERENCIADOR","CONFIG"].map(lerAba));
+  return Promise.all(
+    ["LEADS","VENDAS","GERENCIADOR","CONFIG"].map(lerAba)
+      .concat([lerAbaOpcional("ENGAJAMENTO","Comments"),
+               lerAbaOpcional("LIVES","Link Clicks")]));
 }
 
 function preparar(d){
-  var LEADS=d[0], VENDAS=d[1], GER=d[2], CONFIG=d[3];
+  var LEADS=d[0], VENDAS=d[1], GER=d[2], CONFIG=d[3], ENG=d[4]||[], LIV=d[5]||[];
   var cfg={}; CONFIG.forEach(function(r){ cfg[r.chave]=r.valor; });
   var ticket=parseBR(cfg.ticket)||TICKET_PADRAO;
 
@@ -366,13 +466,63 @@ function preparar(d){
     };
   });
 
+  /* ---------- campanha de engajamento ----------
+     Vem da aba ENGAJAMENTO, que o Apps Script preenche de hora em hora
+     direto na API da Meta. O Stract não traz nem esta campanha nem a
+     coluna de comentários, por isso ela tem fonte própria. */
+  var eng=ENG.map(function(r){
+    return {
+      iso:   isoDeGer(r["Date"]),
+      camp:  r["Campaign Name"]||"",
+      adset: r["Adset Name"]||"",
+      ad:    String(r["Ad Name"]||"").trim(),
+      inv:   parseBR(r["Spend"]),
+      imp:   parseBR(r["Impressions"]),
+      alc:   parseBR(r["Reach"]),
+      com:   parseBR(r["Comments"]),
+      eng:   parseBR(r["Post Engagement"]),
+      rea:   parseBR(r["Post Reactions"]),
+      sal:   parseBR(r["Post Saves"]),
+      cli:   parseBR(r["Clicks"]),
+      thru:  parseBR(r["ThruPlays"]),
+      seg:   parseBR(r["New Followers"]),
+      link:  String(r["Permalink"]||"").trim()
+    };
+  }).filter(function(x){ return x.ad; });
+
+  /* ---------- campanhas de live ----------
+     Também fora do Stract. Filtradas por NOME na origem, então a live
+     de 12/09 e a de 19/09 entram sozinhas quando forem criadas. */
+  var lives=LIV.map(function(r){
+    return {
+      iso:   isoDeGer(r["Date"]),
+      camp:  String(r["Campaign Name"]||"").trim(),
+      adset: r["Adset Name"]||"",
+      ad:    String(r["Ad Name"]||"").trim(),
+      inv:   parseBR(r["Spend"]),
+      imp:   parseBR(r["Impressions"]),
+      alc:   parseBR(r["Reach"]),
+      com:   parseBR(r["Comments"]),
+      eng:   parseBR(r["Post Engagement"]),
+      rea:   parseBR(r["Post Reactions"]),
+      sal:   parseBR(r["Post Saves"]),
+      cli:   parseBR(r["Clicks"]),
+      lcli:  parseBR(r["Link Clicks"]),
+      pv:    parseBR(r["Landing Page Views"]),
+      lead:  parseBR(r["Leads"]),
+      pur:   parseBR(r["Purchases"])
+    };
+  }).filter(function(x){ return x.camp; });
+
   var todos={};
   ger.forEach(function(x){ if(x.iso) todos[x.iso]=1; });
   leads.forEach(function(x){ if(x.__iso) todos[x.__iso]=1; });
   vendas.forEach(function(x){ if(x.__iso) todos[x.__iso]=1; });
+  eng.forEach(function(x){ if(x.iso) todos[x.iso]=1; });
+  lives.forEach(function(x){ if(x.iso) todos[x.iso]=1; });
   var dias=Object.keys(todos).sort();
 
-  RAW={leads:leads,vendas:vendas,ger:ger,ticket:ticket,dias:dias};
+  RAW={leads:leads,vendas:vendas,ger:ger,eng:eng,lives:lives,ticket:ticket,dias:dias};
 
   document.getElementById("filtro").style.display="flex";
   if(dias.length){
@@ -621,9 +771,409 @@ function render(){
     return '<div class="banner '+a[0]+'"><div class="ic">&#9888;</div><div><h4>'+a[1]+'</h4><p>'+a[2]+'</p></div></div>';
   }).join("");
 
+  renderEngajamento();
+  renderLives();
+
   document.getElementById("upd").textContent="atualizado "+new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
   document.getElementById("boot").style.display="none";
   document.getElementById("app").style.display="block";
+}
+
+/* ============================================================
+   ABA ENGAJAMENTO
+   A pergunta que esta aba responde: quantos comentários cada
+   criativo trouxe e quanto custou cada um deles.
+   ============================================================ */
+function renderEngajamento(){
+  var aviso=document.getElementById("eng-aviso");
+  var corpo=document.getElementById("eng-corpo");
+
+  if(!RAW.eng || !RAW.eng.length){
+    corpo.style.display="none";
+    aviso.innerHTML='<div class="banner"><div class="ic">&#9881;</div><div>'+
+      '<h4>Falta um passo para ligar esta aba</h4>'+
+      '<p><b>Não é erro</b> — o resto do painel está funcionando normalmente. '+
+      'Esta tela lê a aba <b>ENGAJAMENTO</b> da planilha, que ainda não foi criada. '+
+      'Ela é separada porque o Stract não traz a campanha <b>[JGT][ENGAJAMENTO][SEMANA]</b> '+
+      'nem a coluna de <b>comentários</b> — que é justamente o que se mede aqui.<br><br>'+
+      'No Apps Script do projeto, arquivo <b>Engajamento.gs</b>: rode <b>semear()</b> para preencher agora, '+
+      'ou <b>ligarEngajamento()</b> — depois de cadastrar o <b>META_TOKEN</b> — para a aba passar a se atualizar '+
+      'de hora em hora sozinha. Feito isso, esta tela se preenche no próximo refresh.</p></div></div>';
+    return;
+  }
+  aviso.innerHTML="";
+  corpo.style.display="block";
+
+  var e=RAW.eng.filter(function(x){ return dentro(x.iso); });
+  if(!e.length){
+    document.getElementById("eng-kpis").innerHTML="";
+    document.getElementById("eng-duelo").innerHTML=
+      '<p class="note">Nenhuma veiculação da campanha de engajamento no período selecionado.</p>';
+    document.getElementById("t-eng").innerHTML="";
+    document.getElementById("t-engdia").innerHTML="";
+    if(chartEng){ chartEng.destroy(); chartEng=null; }
+    return;
+  }
+
+  var T={inv:0,imp:0,alc:0,com:0,eng:0,rea:0,sal:0,cli:0,thru:0,seg:0};
+  e.forEach(function(x){
+    T.inv+=x.inv;T.imp+=x.imp;T.alc+=x.alc;T.com+=x.com;T.eng+=x.eng;
+    T.rea+=x.rea;T.sal+=x.sal;T.cli+=x.cli;T.thru+=x.thru;T.seg+=x.seg;
+  });
+
+  var d0=e.map(function(x){return x.iso;}).sort();
+  document.getElementById("eng-note").textContent=
+    "[JGT][ENGAJAMENTO][SEMANA] · "+ddmm(d0[0])+" a "+ddmm(d0[d0.length-1]);
+
+  document.getElementById("eng-kpis").innerHTML=
+    card("Comentários",n0(T.com),"o que a campanha existe para gerar","#ffd600")+
+    card("Custo por Comentário",T.com?brl(div(T.inv,T.com)):"—","investimento ÷ comentários","#ff6b35")+
+    card("Investimento",brl(T.inv),"no período selecionado")+
+    /* custo por engajamento dá R$ 0,01 e não compara nada entre criativos;
+       por mil já mostra a diferença real */
+    card("Engajamentos",n0(T.eng),T.eng?brl(div(T.inv,T.eng)*1000)+" por mil":"","#00c853")+
+    card("Alcance",n0(T.alc),"contas distintas alcançadas","#42a5f5")+
+    card("CPM",T.imp?brl(div(T.inv,T.imp)*1000):"—",n0(T.imp)+" impressões")+
+    card("Salvamentos",n0(T.sal),n0(T.rea)+" reações")+
+    card("Seguidores Novos",n0(T.seg),"pelo perfil do Instagram");
+
+  /* ---------- por criativo ---------- */
+  var cri={};
+  e.forEach(function(x){
+    if(!cri[x.ad]) cri[x.ad]={inv:0,imp:0,alc:0,com:0,eng:0,rea:0,sal:0,cli:0,thru:0,seg:0,link:"",dias:{}};
+    var o=cri[x.ad];
+    o.inv+=x.inv;o.imp+=x.imp;o.alc+=x.alc;o.com+=x.com;o.eng+=x.eng;
+    o.rea+=x.rea;o.sal+=x.sal;o.cli+=x.cli;o.thru+=x.thru;o.seg+=x.seg;
+    if(!o.link && x.link) o.link=x.link;
+    o.dias[x.iso]=1;
+  });
+  /* sem comentário nenhum vai para o fim da fila, não para o topo */
+  var ks=Object.keys(cri).sort(function(a,b){
+    var ca=cri[a].com?cri[a].inv/cri[a].com:1e9;
+    var cb=cri[b].com?cri[b].inv/cri[b].com:1e9;
+    return ca-cb;
+  });
+
+  var pior=Math.max.apply(null,ks.map(function(k){
+    return cri[k].com?cri[k].inv/cri[k].com:0;
+  }))||1;
+
+  document.getElementById("eng-duelo").innerHTML=ks.map(function(k,i){
+    var o=cri[k], cpc=o.com?o.inv/o.com:0;
+    var ndias=Object.keys(o.dias).length;
+    return '<div class="dcard'+(i===0&&ks.length>1?" vence":"")+'">'+
+      '<h3>'+k+(i===0&&ks.length>1?'<span class="selo">COMENTÁRIO MAIS BARATO</span>':'')+'</h3>'+
+      '<div class="destaque">'+(o.com?brl(cpc):"—")+'</div>'+
+      '<div class="sob">por comentário · '+n0(o.com)+' comentários em '+ndias+' dia'+(ndias>1?"s":"")+'</div>'+
+      '<div class="faixa"><i style="width:'+(cpc?Math.max(6,div(cpc,pior)*100):0).toFixed(1)+'%'+
+        (i===0&&ks.length>1?';background:linear-gradient(90deg,#00c853,#7ee08f)':'')+'"></i></div>'+
+      '<div class="sob" style="margin-top:-10px">barra cheia = comentário mais caro</div>'+
+      trow("Investimento",brl(o.inv))+
+      trow("Alcance",n0(o.alc))+
+      trow("Engajamentos",n0(o.eng))+
+      trow("Custo por mil engajamentos",o.eng?brl(div(o.inv,o.eng)*1000):"—")+
+      trow("Salvamentos",n0(o.sal))+
+      trow("CPM",o.imp?brl(div(o.inv,o.imp)*1000):"—")+
+      (o.link?'<div class="tsub"><a class="verad" href="'+o.link+'" target="_blank" rel="noopener">ver peça &#8599;</a></div>':"")+
+      '<div class="rod"></div></div>';
+  }).join("");
+
+  /* ---------- tabela comparativa ---------- */
+  var mediaCPC=T.com?T.inv/T.com:0;
+  var linhas=ks.map(function(k,i){
+    var o=cri[k], cpc=o.com?o.inv/o.com:0;
+    var bd;
+    if(!o.com)                     bd='<span class="badge b-pau">PAUSAR</span>';
+    else if(cpc<=mediaCPC*0.85)    bd='<span class="badge b-esc">ESCALAR</span>';
+    else if(cpc<=mediaCPC*1.15)    bd='<span class="badge b-man">MANTER</span>';
+    else if(cpc<=mediaCPC*1.5)     bd='<span class="badge b-ava">AVALIAR</span>';
+    else                           bd='<span class="badge b-pau">PAUSAR</span>';
+    return "<tr><td>"+(i+1)+"</td><td>"+k+"</td><td>"+brl(o.inv)+"</td><td>"+n0(o.imp)+"</td><td>"+n0(o.alc)+"</td>"+
+      "<td>"+(o.imp?brl(div(o.inv,o.imp)*1000):"—")+"</td>"+
+      '<td style="color:#ffd600;font-weight:800">'+n0(o.com)+"</td>"+
+      '<td style="color:#ff6b35;font-weight:800">'+(o.com?brl(cpc):"—")+"</td>"+
+      "<td>"+n0(o.eng)+"</td><td>"+(o.eng?brl(div(o.inv,o.eng)*1000):"—")+"</td>"+
+      "<td>"+n0(o.rea)+"</td><td>"+n0(o.sal)+"</td><td>"+n0(o.thru)+"</td><td>"+n0(o.seg)+"</td>"+
+      "<td>"+(o.link?'<a class="verad" href="'+o.link+'" target="_blank" rel="noopener">ver peça &#8599;</a>':'<span style="color:#555">—</span>')+"</td>"+
+      "<td>"+bd+"</td></tr>";
+  }).join("");
+  document.getElementById("t-eng").innerHTML=
+    "<thead><tr><th>#</th><th>Criativo</th><th>Invest.</th><th>Impressões</th><th>Alcance</th><th>CPM</th>"+
+    "<th>Comentários</th><th>Custo/Coment.</th><th>Engajam.</th><th>Custo/1k Engaj.</th>"+
+    "<th>Reações</th><th>Salvos</th><th>ThruPlays</th><th>Seguidores</th><th>Anúncio</th><th>Leitura</th></tr></thead><tbody>"+
+    linhas+
+    "<tr class='total'><td colspan='2'>Total</td><td>"+brl(T.inv)+"</td><td>"+n0(T.imp)+"</td><td>"+n0(T.alc)+"</td>"+
+    "<td>"+(T.imp?brl(div(T.inv,T.imp)*1000):"—")+"</td><td>"+n0(T.com)+"</td><td>"+(T.com?brl(mediaCPC):"—")+"</td>"+
+    "<td>"+n0(T.eng)+"</td><td>"+(T.eng?brl(div(T.inv,T.eng)*1000):"—")+"</td><td>"+n0(T.rea)+"</td><td>"+n0(T.sal)+"</td>"+
+    "<td>"+n0(T.thru)+"</td><td>"+n0(T.seg)+"</td><td>—</td><td>—</td></tr></tbody>";
+
+  /* ---------- dia a dia ---------- */
+  var porDia={};
+  e.forEach(function(x){
+    if(!porDia[x.iso]) porDia[x.iso]={inv:0,com:0,eng:0,imp:0,alc:0,sal:0};
+    var o=porDia[x.iso];
+    o.inv+=x.inv;o.com+=x.com;o.eng+=x.eng;o.imp+=x.imp;o.alc+=x.alc;o.sal+=x.sal;
+  });
+  var dsort=Object.keys(porDia).sort();
+  graficoEng(
+    dsort.map(ddmm),
+    dsort.map(function(k){ return porDia[k].com; }),
+    dsort.map(function(k){ return porDia[k].com?+(porDia[k].inv/porDia[k].com).toFixed(2):null; })
+  );
+
+  document.getElementById("t-engdia").innerHTML=
+    "<thead><tr><th>Dia</th><th>Investimento</th><th>Impressões</th><th>Alcance</th><th>Comentários</th>"+
+    "<th>Custo/Coment.</th><th>Engajamentos</th><th>Custo/1k Engaj.</th><th>Salvos</th></tr></thead><tbody>"+
+    dsort.slice().reverse().map(function(k){
+      var o=porDia[k];
+      return "<tr><td>"+ddmm(k)+"</td><td>"+brl(o.inv)+"</td><td>"+n0(o.imp)+"</td><td>"+n0(o.alc)+"</td>"+
+        '<td style="color:#ffd600;font-weight:700">'+n0(o.com)+"</td>"+
+        "<td>"+(o.com?brl(div(o.inv,o.com)):"—")+"</td><td>"+n0(o.eng)+"</td>"+
+        "<td>"+(o.eng?brl(div(o.inv,o.eng)*1000):"—")+"</td><td>"+n0(o.sal)+"</td></tr>";
+    }).join("")+"</tbody>";
+}
+
+/* ============================================================
+   ABA LIVES
+   Duas perguntas diferentes, respondidas separadas:
+     1. o que a CAMPANHA de live entregou (dado da Meta)
+     2. quantas inscrições e ingressos aconteceram (dado do Tally
+        e da Guru) — no calendário e rastreados pela UTM da live
+   ============================================================ */
+var RX_UTM_LIVE = /live/i;
+function veioDaLive(r){
+  return RX_UTM_LIVE.test(String(r.utm_medium||"")) ||
+         RX_UTM_LIVE.test(String(r.utm_source||""));
+}
+/* a UTM carrega a data da edição no fim do utm_content: ..._05set_ */
+var RX_EDICAO = /_(\d{2})(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)_/i;
+function edicaoLive(r){
+  var m = RX_EDICAO.exec(String(r.utm_content||""));
+  return m ? (m[1] + m[2].toLowerCase()) : "sem marca";
+}
+
+function renderLives(){
+  var aviso=document.getElementById("lv-aviso");
+  var corpo=document.getElementById("lv-corpo");
+
+  if(!RAW.lives || !RAW.lives.length){
+    corpo.style.display="none";
+    aviso.innerHTML='<div class="banner"><div class="ic">&#9881;</div><div>'+
+      '<h4>Falta um passo para ligar esta aba</h4>'+
+      '<p><b>Não é erro</b> — o resto do painel está funcionando normalmente. '+
+      'Esta tela lê a aba <b>LIVES</b> da planilha, que ainda não foi criada. '+
+      'Assim como a de engajamento, ela é separada porque o Stract não manda as campanhas de live '+
+      'para a GERENCIADOR.<br><br>'+
+      'No Apps Script do projeto, arquivo <b>Engajamento.gs</b>: rode <b>semear()</b> para preencher agora, '+
+      'ou <b>ligarEngajamento()</b> — depois de cadastrar o <b>META_TOKEN</b> — para as abas passarem a se '+
+      'atualizar de hora em hora sozinhas.</p></div></div>';
+    return;
+  }
+  aviso.innerHTML="";
+  corpo.style.display="block";
+
+  var lv=RAW.lives.filter(function(x){ return dentro(x.iso); });
+  if(!lv.length){
+    document.getElementById("lv-kpis").innerHTML="";
+    document.getElementById("lv-cruz").innerHTML=
+      '<p class="note">Nenhuma campanha de live no período selecionado.</p>';
+    ["t-lv","t-lvdia","t-lved"].forEach(function(id){ document.getElementById(id).innerHTML=""; });
+    document.getElementById("lv-cruz-rodape").textContent="";
+    if(chartLive){ chartLive.destroy(); chartLive=null; }
+    return;
+  }
+
+  var T={inv:0,imp:0,alc:0,com:0,eng:0,rea:0,sal:0,cli:0,lcli:0,pv:0,lead:0,pur:0};
+  lv.forEach(function(x){
+    T.inv+=x.inv;T.imp+=x.imp;T.alc+=x.alc;T.com+=x.com;T.eng+=x.eng;T.rea+=x.rea;
+    T.sal+=x.sal;T.cli+=x.cli;T.lcli+=x.lcli;T.pv+=x.pv;T.lead+=x.lead;T.pur+=x.pur;
+  });
+
+  /* dias em que alguma campanha de live esteve no ar */
+  var diasNoAr={};
+  lv.forEach(function(x){ if(x.iso && x.inv>0) diasNoAr[x.iso]=1; });
+  var listaDias=Object.keys(diasNoAr).sort();
+
+  document.getElementById("lv-note").textContent =
+    listaDias.length
+      ? (listaDias.length===1 ? "no ar em " + ddmm(listaDias[0])
+                              : listaDias.length + " dias no ar · " + ddmm(listaDias[0]) + " a " + ddmm(listaDias[listaDias.length-1]))
+      : "sem veiculação no período";
+
+  var cliqueUtil = T.lcli || T.cli;
+  document.getElementById("lv-kpis").innerHTML=
+    card("Investimento",brl(T.inv),listaDias.length+" dia"+(listaDias.length>1?"s":"")+" no ar")+
+    card("Alcance",n0(T.alc),n0(T.imp)+" impressões","#42a5f5")+
+    card("Cliques no Link",n0(cliqueUtil),cliqueUtil?brl(div(T.inv,cliqueUtil))+" cada":"","#00c853")+
+    card("CTR",T.imp?pct(div(T.cli,T.imp)*100):"—","cliques ÷ impressões","#ffd600")+
+    card("CPM",T.imp?brl(div(T.inv,T.imp)*1000):"—","custo por mil impressões")+
+    card("Comentários",n0(T.com),T.com?brl(div(T.inv,T.com))+" cada":"")+
+    card("Engajamentos",n0(T.eng),T.eng?brl(div(T.inv,T.eng)*1000)+" por mil":"")+
+    card("Page Views",n0(T.pv),"o que o pixel viu chegar","#ff1744");
+
+  /* ---------- uma linha por campanha ---------- */
+  var porCamp={};
+  lv.forEach(function(x){
+    if(!porCamp[x.camp]) porCamp[x.camp]={inv:0,imp:0,alc:0,cli:0,lcli:0,com:0,eng:0,pv:0,dias:{}};
+    var o=porCamp[x.camp];
+    o.inv+=x.inv;o.imp+=x.imp;o.alc+=x.alc;o.cli+=x.cli;o.lcli+=x.lcli;
+    o.com+=x.com;o.eng+=x.eng;o.pv+=x.pv;
+    if(x.inv>0) o.dias[x.iso]=1;
+  });
+  var camps=Object.keys(porCamp).sort(function(a,b){ return porCamp[b].inv-porCamp[a].inv; });
+  document.getElementById("t-lv").innerHTML=
+    "<thead><tr><th>#</th><th>Campanha</th><th>Dias no ar</th><th>Invest.</th><th>Impressões</th><th>Alcance</th>"+
+    "<th>CPM</th><th>Cliques Link</th><th>CTR</th><th>Custo/Clique Link</th><th>Comentários</th><th>Engajam.</th><th>Page Views</th></tr></thead><tbody>"+
+    camps.map(function(k,i){
+      var o=porCamp[k], c=o.lcli||o.cli;
+      var ds=Object.keys(o.dias).sort();
+      return "<tr><td>"+(i+1)+"</td><td>"+k+"</td>"+
+        "<td>"+(ds.length?ds.map(ddmm).join(", "):"—")+"</td>"+
+        "<td>"+brl(o.inv)+"</td><td>"+n0(o.imp)+"</td><td>"+n0(o.alc)+"</td>"+
+        "<td>"+(o.imp?brl(div(o.inv,o.imp)*1000):"—")+"</td>"+
+        '<td style="color:#00c853;font-weight:800">'+n0(c)+"</td>"+
+        "<td>"+(o.imp?pct(div(o.cli,o.imp)*100):"—")+"</td>"+
+        "<td>"+(c?brl(div(o.inv,c)):"—")+"</td>"+
+        "<td>"+n0(o.com)+"</td><td>"+n0(o.eng)+"</td>"+
+        '<td'+(o.pv<o.lcli*0.1?' style="color:#ff1744;font-weight:700"':'')+'>'+n0(o.pv)+"</td></tr>";
+    }).join("")+
+    "<tr class='total'><td colspan='3'>Total</td><td>"+brl(T.inv)+"</td><td>"+n0(T.imp)+"</td><td>"+n0(T.alc)+"</td>"+
+    "<td>"+(T.imp?brl(div(T.inv,T.imp)*1000):"—")+"</td><td>"+n0(cliqueUtil)+"</td>"+
+    "<td>"+pct(div(T.cli,T.imp)*100)+"</td><td>"+(cliqueUtil?brl(div(T.inv,cliqueUtil)):"—")+"</td>"+
+    "<td>"+n0(T.com)+"</td><td>"+n0(T.eng)+"</td><td>"+n0(T.pv)+"</td></tr></tbody>";
+
+  /* ---------- o cruzamento com Tally e Guru ---------- */
+  var noAr = RAW.leads.filter(function(r){ return diasNoAr[r.__iso]; });
+  var vnAr = RAW.vendas.filter(function(r){ return diasNoAr[r.__iso]; });
+  var recAr = vnAr.reduce(function(s,v){ return s + (parseBR(v.valor)||RAW.ticket); },0);
+
+  /* Quais edições pertencem às campanhas que estão em tela.
+     "[JGT][LIVE] 05/09" -> marca "05set", que é como a UTM do link
+     identifica a edição. Sem isso os cartões misturariam a live de
+     29/08 com a de 05/09 e inflariam o resultado. */
+  var MES=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+  var marcas={}, temMarca=false;
+  camps.forEach(function(nome){
+    var m=/(\d{2})\s*\/\s*(\d{2})/.exec(nome);
+    if(m){ marcas[m[1]+MES[parseInt(m[2],10)-1]]=1; temMarca=true; }
+  });
+  function daEdicaoEmTela(r){
+    return temMarca ? !!marcas[edicaoLive(r)] : true;
+  }
+
+  var todosLive  = RAW.leads.filter(function(r){ return dentro(r.__iso) && veioDaLive(r); });
+  var leadsLive  = todosLive.filter(daEdicaoEmTela);
+  var todasVLive = RAW.vendas.filter(function(r){ return dentro(r.__iso) && veioDaLive(r); });
+  var vendLive   = todasVLive.filter(daEdicaoEmTela);
+  var recLive    = vendLive.reduce(function(s,v){ return s + (parseBR(v.valor)||RAW.ticket); },0);
+
+  document.getElementById("lv-cruz").innerHTML=
+    '<div class="dcard"><h3>Nos dias em que a live esteve no ar</h3>'+
+      '<div class="destaque">'+n0(noAr.length)+'</div>'+
+      '<div class="sob">inscrições em '+(listaDias.length?listaDias.map(ddmm).join(", "):"—")+' — de todas as origens</div>'+
+      trow("Ingressos",n0(vnAr.length))+
+      trow("Receita",brl(recAr))+
+      trow("Investimento na live",brl(T.inv))+
+      '<div class="tsub">Este número é do calendário, não é mérito da live: '+
+      'todo o resto do tráfego também estava rodando nesses dias.</div>'+
+      '<div class="rod"></div></div>'+
+    '<div class="dcard vence"><h3>Rastreado pelo link da live<span class="selo">ATRIBUÍDO</span></h3>'+
+      '<div class="destaque">'+n0(leadsLive.length)+'</div>'+
+      '<div class="sob">inscrições com UTM do link '+
+        (temMarca?'da'+(Object.keys(marcas).length>1?'s':'')+' live'+(Object.keys(marcas).length>1?'s':'')+' '+Object.keys(marcas).sort().join(", ")
+                 :'de live')+'</div>'+
+      trow("Ingressos",n0(vendLive.length))+
+      trow("Receita",brl(recLive))+
+      trow("Custo por inscrição",leadsLive.length?brl(div(T.inv,leadsLive.length)):"—")+
+      trow("Retorno sobre o investido",T.inv?num2(div(recLive,T.inv))+"x":"—")+
+      '<div class="tsub">Só quem clicou no link com UTM. Quem assistiu e se inscreveu por outro caminho '+
+      'não aparece aqui — então é um piso, não o total.</div>'+
+      '<div class="rod"></div></div>';
+
+  var pvBaixo = T.pv < cliqueUtil*0.1 && cliqueUtil>0;
+  document.getElementById("lv-cruz-rodape").innerHTML =
+    (pvBaixo
+      ? '<b style="color:#ff1744">Atenção:</b> a campanha registrou <b>'+n0(cliqueUtil)+'</b> cliques no link e só <b>'+
+        n0(T.pv)+'</b> page view'+(T.pv===1?"":"s")+'. O destino do anúncio não tem o pixel — é link de live '+
+        '(YouTube, WhatsApp, Instagram), não a página do site. Por isso a Meta não consegue atribuir inscrição nem venda '+
+        'a esta campanha, e a coluna do meio acima é a única ponte que existe entre o anúncio e o resultado. '
+      : '') +
+    'As duas leituras respondem perguntas diferentes: a da esquerda é <b>quanto aconteceu enquanto a live rodava</b>, '+
+    'a da direita é <b>quanto dá para provar que veio dela</b>. A verdade está entre as duas.';
+
+  /* ---------- a cauda ---------- */
+  var cauda={};
+  leadsLive.forEach(function(r){
+    if(!cauda[r.__iso]) cauda[r.__iso]={l:0,v:0,r:0};
+    cauda[r.__iso].l++;
+  });
+  vendLive.forEach(function(r){
+    if(!cauda[r.__iso]) cauda[r.__iso]={l:0,v:0,r:0};
+    cauda[r.__iso].v++; cauda[r.__iso].r += (parseBR(r.valor)||RAW.ticket);
+  });
+  var dc=Object.keys(cauda).sort();
+  graficoLive(dc.map(ddmm), dc.map(function(k){return cauda[k].l;}), dc.map(function(k){return cauda[k].v;}));
+
+  document.getElementById("t-lvdia").innerHTML=
+    "<thead><tr><th>Dia</th><th>Inscrições pelo link da live</th><th>Ingressos</th><th>Receita</th><th>Dia da live?</th></tr></thead><tbody>"+
+    (dc.length?dc.map(function(k){
+      return "<tr><td>"+ddmm(k)+"</td>"+
+        '<td style="color:#ffd600;font-weight:700">'+n0(cauda[k].l)+"</td>"+
+        "<td>"+n0(cauda[k].v)+"</td><td>"+brl(cauda[k].r)+"</td>"+
+        "<td>"+(diasNoAr[k]?'<span class="badge b-esc">no ar</span>'
+               :(listaDias.length && k<listaDias[0] ? '<span style="color:#777">antes</span>'
+                                                    : '<span style="color:#777">depois</span>'))+"</td></tr>";
+    }).join("")
+    :"<tr><td colspan='5' style='text-align:center;color:#777;padding:24px'>Nenhuma inscrição com UTM de live no período.</td></tr>")+"</tbody>";
+
+  /* ---------- por edição ---------- */
+  /* a tabela por edição mostra TODAS, inclusive as de fora do recorte,
+     para nada ficar escondido — só marca quais entraram na conta */
+  var ed={};
+  todosLive.forEach(function(r){
+    var e=edicaoLive(r);
+    if(!ed[e]) ed[e]={l:0,v:0,r:0};
+    ed[e].l++;
+  });
+  todasVLive.forEach(function(r){
+    var e=edicaoLive(r);
+    if(!ed[e]) ed[e]={l:0,v:0,r:0};
+    ed[e].v++; ed[e].r += (parseBR(r.valor)||RAW.ticket);
+  });
+  var eds=Object.keys(ed).sort(function(a,b){ return ed[b].l-ed[a].l; });
+  document.getElementById("t-lved").innerHTML=
+    "<thead><tr><th>Edição</th><th>Inscrições</th><th>Ingressos</th><th>Receita</th><th>Conversão</th><th>Entra na conta?</th></tr></thead><tbody>"+
+    (eds.length?eds.map(function(k){
+      var o=ed[k], dentroDaConta=(!temMarca||marcas[k]);
+      return "<tr><td>"+k+"</td><td>"+n0(o.l)+"</td><td>"+n0(o.v)+"</td><td>"+brl(o.r)+"</td>"+
+        "<td>"+(o.l?pct(div(o.v,o.l)*100):"—")+"</td>"+
+        "<td>"+(dentroDaConta?'<span class="badge b-esc">sim</span>'
+                             :'<span style="color:#777">outra live</span>')+"</td></tr>";
+    }).join("")
+    :"<tr><td colspan='6' style='text-align:center;color:#777;padding:24px'>Sem edições no período.</td></tr>")+"</tbody>";
+}
+
+function graficoLive(labels,ins,ing){
+  var el=document.getElementById("clv");
+  if(!el) return;
+  if(typeof Chart==="undefined"){
+    el.parentNode.innerHTML='<div style="color:#777;font-size:12px;text-align:center;padding-top:120px">O gráfico depende do Chart.js pelo CDN e ele não carregou. A tabela abaixo tem os mesmos números.</div>';
+    return;
+  }
+  if(chartLive) chartLive.destroy();
+  chartLive=new Chart(el,{
+    data:{labels:labels,datasets:[
+      {type:"bar",label:"Inscrições",data:ins,backgroundColor:"rgba(255,214,0,.65)",borderRadius:5,yAxisID:"y",order:2},
+      {type:"line",label:"Ingressos",data:ing,borderColor:"#00c853",backgroundColor:"#00c853",tension:.3,yAxisID:"y1",spanGaps:true,order:1}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:"#c9c9d4",boxWidth:12}}},
+      scales:{
+        x:{ticks:{color:"#777"},grid:{color:"#262640"}},
+        y:{position:"left",beginAtZero:true,ticks:{color:"#ffd600",precision:0},grid:{color:"#262640"},title:{display:true,text:"Inscrições",color:"#ffd600"}},
+        y1:{position:"right",beginAtZero:true,ticks:{color:"#00c853",precision:0},grid:{drawOnChartArea:false},title:{display:true,text:"Ingressos",color:"#00c853"}}
+      }}
+  });
 }
 
 /* ---------- componentes ---------- */
@@ -727,6 +1277,29 @@ function grafico(labels,leads,cpl){
         x:{ticks:{color:"#777"},grid:{color:"#262640"}},
         y:{position:"left",beginAtZero:true,ticks:{color:"#00c853"},grid:{color:"#262640"},title:{display:true,text:"Inscrições",color:"#00c853"}},
         y1:{position:"right",beginAtZero:true,ticks:{color:"#ff6b35",callback:function(v){return "R$ "+v.toFixed(0);}},grid:{drawOnChartArea:false},title:{display:true,text:"CPL",color:"#ff6b35"}}
+      }}
+  });
+}
+
+function graficoEng(labels,coments,custo){
+  var el=document.getElementById("ceng");
+  if(!el) return;
+  if(typeof Chart==="undefined"){
+    el.parentNode.innerHTML='<div style="color:#777;font-size:12px;text-align:center;padding-top:120px">O gráfico depende do Chart.js pelo CDN e ele não carregou. A tabela abaixo tem os mesmos números.</div>';
+    return;
+  }
+  if(chartEng) chartEng.destroy();
+  chartEng=new Chart(el,{
+    data:{labels:labels,datasets:[
+      {type:"bar",label:"Comentários",data:coments,backgroundColor:"rgba(255,214,0,.65)",borderRadius:5,yAxisID:"y",order:2},
+      {type:"line",label:"Custo por comentário",data:custo,borderColor:"#ff6b35",backgroundColor:"#ff6b35",tension:.3,yAxisID:"y1",spanGaps:true,order:1}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:"#c9c9d4",boxWidth:12}}},
+      scales:{
+        x:{ticks:{color:"#777"},grid:{color:"#262640"}},
+        y:{position:"left",beginAtZero:true,ticks:{color:"#ffd600",precision:0},grid:{color:"#262640"},title:{display:true,text:"Comentários",color:"#ffd600"}},
+        y1:{position:"right",beginAtZero:true,ticks:{color:"#ff6b35",callback:function(v){return "R$ "+v.toFixed(0);}},grid:{drawOnChartArea:false},title:{display:true,text:"Custo/comentário",color:"#ff6b35"}}
       }}
   });
 }
