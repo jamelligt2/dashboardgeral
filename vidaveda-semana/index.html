@@ -16,6 +16,8 @@ body{background:#0f0f1a;color:#fff;font-family:-apple-system,BlinkMacSystemFont,
 .header-text p{font-size:12px;color:#777;margin-top:3px}
 .header-live{margin-left:auto;display:flex;align-items:center;gap:10px}
 .dot{width:9px;height:9px;border-radius:50%;background:#00c853;box-shadow:0 0 8px #00c853;animation:pulse 2s infinite}
+.dot.warn{background:#ffd600;box-shadow:0 0 8px #ffd600}
+.dot.err{background:#ff1744;box-shadow:0 0 8px #ff1744}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 .live-txt{font-size:11px;color:#777;line-height:1.4}
 .live-txt b{color:#00c853;display:block;font-size:12px}
@@ -108,7 +110,7 @@ tr.total td{background:rgba(255,107,53,.10);font-weight:800;color:#ff6b35;border
     <p id="hsub">LL2109 · carregando período…</p>
   </div>
   <div class="header-live">
-    <div class="dot"></div>
+    <div class="dot" id="dot"></div>
     <div class="live-txt"><b id="upd">carregando…</b>relê a planilha a cada 10 min</div>
     <button class="btn" id="rf">ATUALIZAR</button>
   </div>
@@ -286,6 +288,20 @@ var chartEng = null;
 var chartLive = null;
 var RAW = null;       /* dados brutos da planilha */
 var FILTRO = {de:null, ate:null, rotulo:"tudo"};
+
+/* ---------- confiabilidade da atualização ----------
+   Antes, qualquer falha passageira (timeout, blip de rede, gviz lento)
+   derrubava o dash inteiro pra tela de erro e só tentava de novo 10 min
+   depois. Como o cliente fica com a aba aberta o dia todo, isso significava
+   ver "não consegui ler a planilha" por até 10 minutos por causa de um
+   soluço bobo. Agora: se já tem dado bom na tela, uma falha NÃO apaga o
+   dashboard — só avisa discreto e tenta de novo rápido (15s, 30s, 1min,
+   2min). O erro cheio só aparece se a primeira carga nunca deu certo. */
+var ULTIMA_OK = null;
+var FALHAS_SEGUIDAS = 0;
+var TIMER_RETRY = null;
+var CARREGANDO = false;
+var RETRY_MS = [15000,30000,60000,120000];
 
 /* ---------- leitura por JSONP ---------- */
 var _seq = 0;
@@ -1342,18 +1358,63 @@ document.querySelectorAll(".chip").forEach(function(c){
 
 /* ---------- ciclo ---------- */
 function ciclo(){
-  carregar().then(preparar).catch(function(e){
-    document.getElementById("boot").style.display="none";
-    document.getElementById("app").style.display="block";
-    document.getElementById("avisos").innerHTML=
-      '<div class="banner err"><div class="ic">&#9888;</div><div><h4>Não consegui ler a planilha</h4><p>'+
-      String(e.message||e)+'. Confira se a planilha continua acessível por link e se a máquina tem internet. As abas precisam se chamar LEADS, VENDAS, GERENCIADOR e CONFIG.</p></div></div>';
-    document.getElementById("upd").textContent="falhou";
+  if(CARREGANDO) return;
+  CARREGANDO=true;
+  carregar().then(preparar).then(function(){
+    CARREGANDO=false;
+    ULTIMA_OK=new Date();
+    FALHAS_SEGUIDAS=0;
+    if(TIMER_RETRY){ clearTimeout(TIMER_RETRY); TIMER_RETRY=null; }
+    var dot=document.getElementById("dot");
+    if(dot) dot.className="dot";
+    document.getElementById("upd").style.color="";
+  }).catch(function(e){
+    CARREGANDO=false;
+    FALHAS_SEGUIDAS++;
+    var dot=document.getElementById("dot");
+    if(!RAW){
+      /* nunca carregou nada ainda — sem dado bom pra manter na tela */
+      document.getElementById("boot").style.display="none";
+      document.getElementById("app").style.display="block";
+      document.getElementById("avisos").innerHTML=
+        '<div class="banner err"><div class="ic">&#9888;</div><div><h4>Não consegui ler a planilha</h4><p>'+
+        String(e.message||e)+'. Confira se a planilha continua acessível por link e se a máquina tem internet. As abas precisam se chamar LEADS, VENDAS, GERENCIADOR e CONFIG. Tentando de novo automaticamente…</p></div></div>';
+      document.getElementById("upd").textContent="falhou — tentando de novo";
+      document.getElementById("upd").style.color="#ff1744";
+      if(dot) dot.className="dot err";
+    } else {
+      /* já tinha dado bom na tela: mantém tudo visível, não apaga nada.
+         Só avisa discreto no indicador do topo e tenta de novo rápido. */
+      var minAtras=Math.round((Date.now()-ULTIMA_OK.getTime())/60000);
+      var grave=minAtras>=20;
+      document.getElementById("upd").textContent=
+        (grave?("sem conexão há "+minAtras+"min"):"tentando reconectar…")+
+        " · última leitura ok "+ULTIMA_OK.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+      document.getElementById("upd").style.color=grave?"#ff1744":"#ffd600";
+      if(dot) dot.className=grave?"dot err":"dot warn";
+    }
+    var idx=Math.min(FALHAS_SEGUIDAS-1, RETRY_MS.length-1);
+    if(TIMER_RETRY) clearTimeout(TIMER_RETRY);
+    TIMER_RETRY=setTimeout(ciclo, RETRY_MS[idx]);
   });
 }
-document.getElementById("rf").addEventListener("click",ciclo);
+document.getElementById("rf").addEventListener("click",function(){
+  if(TIMER_RETRY){ clearTimeout(TIMER_RETRY); TIMER_RETRY=null; }
+  FALHAS_SEGUIDAS=0;
+  ciclo();
+});
 ciclo();
 setInterval(ciclo,600000);
+
+/* Aba em segundo plano (minimizada, notebook dormindo) pode atrasar o
+   setInterval do navegador. Ao voltar a ficar visível, se a última leitura
+   boa foi há mais de 2 min, força uma checagem na hora — assim o cliente
+   nunca reabre a aba e vê número velho parado. */
+document.addEventListener("visibilitychange", function(){
+  if(document.visibilityState==="visible" && (!ULTIMA_OK || (Date.now()-ULTIMA_OK.getTime())>120000)){
+    ciclo();
+  }
+});
 </script>
 </body>
 </html>
