@@ -1,1 +1,653 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dashboard Conversa — Refúgio Materno</title>
+<link rel="icon" href='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="%230a0a0a"/><text x="32" y="42" font-size="26" font-family="Arial,sans-serif" font-weight="bold" fill="%23ff6b35" text-anchor="middle">JGT</text></svg>'>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0a0a0a; --card:#151515; --card-2:#1c1c1c; --header:#111; --border:#2a2a2a; --border-strong:#3a3a3a;
+    --orange:#ff6b35; --orange-dark:#c44a1a; --orange-deep:#8b2a0a; --orange-bright:#ff8c42; --orange-pale:#ffb38a; --amber:#ff9500;
+    --text:#fff; --muted:#999; --muted-2:#b8b8b8;
+    color-scheme: dark;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; -webkit-font-smoothing:antialiased;}
+  img{max-width:100%;}
+  [hidden]{display:none!important;}
 
+  .header{background:var(--header); border-bottom:1px solid var(--border-strong); padding:16px 24px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; position:sticky; top:env(safe-area-inset-top,0px); z-index:20;}
+  .header-left{display:flex; align-items:center; gap:14px;}
+  .logo-badge{width:42px; height:42px; flex:0 0 auto; border-radius:9px; background:var(--orange); display:flex; align-items:center; justify-content:center; font-weight:800; letter-spacing:.5px; color:var(--bg); font-size:14px;}
+  .header-text h1{margin:0 0 3px; font-size:15px; letter-spacing:.2px; font-weight:700;}
+  .header-text p{margin:0; font-size:11.5px; color:var(--muted); letter-spacing:.1px;}
+  .header-right{font-size:11.5px; color:var(--muted); text-align:right; line-height:1.5;}
+  .header-right b{color:var(--orange-pale); font-weight:700;}
+
+  .tabs{background:#111; display:flex; gap:4px; padding:0 24px; overflow-x:auto; border-bottom:1px solid var(--border); position:sticky; top:calc(74px + env(safe-area-inset-top,0px)); z-index:19;}
+  .tab-btn{background:transparent; border:none; color:var(--muted-2); padding:13px 16px; font-size:13px; font-weight:600; cursor:pointer; border-bottom:3px solid transparent; white-space:nowrap;}
+  .tab-btn.active{color:var(--orange); border-bottom-color:var(--orange);}
+  .tab-btn:hover{color:var(--orange-pale);}
+
+  .wrap{max-width:1240px; margin:0 auto; padding:20px 16px 60px;}
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  .info-banner{background:rgba(255,107,53,.07); border:1px solid rgba(255,107,53,.25); border-left:3px solid var(--orange); border-radius:8px; padding:12px 16px; font-size:12.5px; color:var(--muted-2); line-height:1.55; margin-bottom:18px;}
+  .info-banner b{color:var(--orange-pale);}
+  .info-banner.reco{background:rgba(255,140,66,.08); border-color:rgba(255,140,66,.35); border-left-color:var(--orange-bright);}
+
+  .kpi-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:24px;}
+  .kpi{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:15px 17px;}
+  .kpi .lbl{font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.6px; margin-bottom:8px;}
+  .kpi .val{font-size:24px; font-weight:800; color:var(--kc,var(--orange));}
+  .kpi .sub{font-size:10.5px; color:var(--muted); margin-top:6px;}
+
+  .section-title{font-size:12px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted-2); margin:26px 0 12px; padding-left:10px; border-left:3px solid var(--orange); font-weight:700;}
+
+  .adset-row{display:flex; gap:14px; margin-bottom:8px; flex-wrap:wrap;}
+  .adset-card{flex:1 1 260px; background:var(--card); border:1px solid var(--border); border-radius:10px; padding:16px 18px; position:relative;}
+  .adset-card.primary{border-color:rgba(255,107,53,.35);}
+  .adset-card .pill{position:absolute; top:14px; right:14px; font-size:9.5px; font-weight:700; padding:3px 8px; border-radius:5px; letter-spacing:.4px;}
+  .pill.hot{background:var(--orange); color:var(--bg);}
+  .pill.new{background:var(--card-2); color:var(--orange-pale); border:1px solid var(--border-strong);}
+  .adset-card h3{margin:0 12px 10px 0; font-size:13px; color:var(--text); font-weight:700;}
+  .adset-card .big{font-size:21px; font-weight:800; margin-bottom:2px;}
+  .adset-card .big.a{color:var(--orange);}
+  .adset-card .big.b{color:var(--muted-2);}
+  .adset-card .cap{font-size:11px; color:var(--muted); margin-bottom:12px;}
+  .meta-row{display:flex; gap:14px; flex-wrap:wrap; font-size:11px; color:var(--muted-2); border-top:1px solid var(--border); padding-top:10px;}
+  .meta-row span b{color:var(--text); display:block; font-size:12.5px;}
+  .compare-card{flex:0 0 200px; background:var(--card-2); border:1px solid var(--border); border-radius:10px; padding:16px 18px; display:flex; flex-direction:column; justify-content:center; gap:10px;}
+  .compare-card .cline{display:flex; justify-content:space-between; gap:10px; font-size:11.5px; color:var(--muted-2); border-bottom:1px dashed var(--border); padding-bottom:8px;}
+  .compare-card .cline b{color:var(--orange-pale); font-size:12.5px; white-space:nowrap;}
+
+  .funnel-wrap{display:flex; gap:16px; align-items:stretch; flex-wrap:wrap; margin-bottom:6px;}
+  .funnel-svg{flex:1 1 58%; min-width:280px;}
+  .funil-list{display:flex; flex-direction:column; justify-content:center; gap:22px; height:100%; background:var(--card); border:1px solid var(--border); border-radius:10px; padding:22px 24px;}
+  .funil-row-top{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;}
+  .funil-row-top .flabel{font-size:12px; color:var(--muted-2); text-transform:uppercase; letter-spacing:.5px; font-weight:700;}
+  .funil-row-top .fval{font-size:24px; font-weight:800; color:var(--text);}
+  .funil-bar-bg{background:var(--card-2); border:1px solid var(--border); border-radius:6px; height:16px; overflow:hidden;}
+  .funil-bar-fill{background:linear-gradient(90deg,var(--orange-deep),var(--orange)); height:100%; border-radius:6px; transition:width .4s;}
+  .funnel-cards{flex:1 1 260px; display:flex; flex-direction:column; gap:12px;}
+  .fcard{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px 16px; flex:1; position:relative; overflow:hidden;}
+  .fcard::after{content:""; position:absolute; left:0; right:0; bottom:0; height:3px; background:var(--fc,var(--orange));}
+  .fcard .lbl{font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px;}
+  .fcard .val{font-size:21px; font-weight:800; color:var(--fc,var(--orange));}
+
+  .chart-grid{display:grid; grid-template-columns:2fr 1fr; gap:16px; margin-bottom:18px;}
+  .chart-box{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:16px; height:270px;}
+  .chart-box h4{margin:0 0 10px; font-size:11.5px; color:var(--muted-2); text-transform:uppercase; letter-spacing:.4px; font-weight:700;}
+  .chart-box .inner{height:210px;}
+
+  table{width:100%; border-collapse:collapse; font-size:12px;}
+  thead th{background:var(--bg); color:var(--muted); text-align:right; padding:10px 10px; font-weight:600; font-size:10.3px; text-transform:uppercase; letter-spacing:.3px; border-bottom:1px solid var(--border-strong); white-space:nowrap; position:sticky; top:0;}
+  thead th.left, td.left{text-align:left;}
+  tbody td{padding:9px 10px; text-align:right; border-bottom:1px solid var(--border); color:var(--muted-2); white-space:nowrap;}
+  tbody tr:hover{background:rgba(255,107,53,.05);}
+  tr.total td{background:#0a0a0a; color:var(--orange); border-top:2px solid var(--orange); font-weight:700;}
+  .table-scroll{overflow-x:auto; border-radius:10px; border:1px solid var(--border);}
+  .table-scroll table{min-width:760px;}
+  .table-scroll.fixed{max-height:520px; overflow-y:auto;}
+  a.ver{color:var(--orange-pale); text-decoration:none; font-weight:600; white-space:nowrap;}
+  a.ver:hover{text-decoration:underline;}
+
+  .medal{display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; font-weight:800; font-size:10.5px;}
+  .medal.g{background:var(--orange-bright); color:var(--bg);}
+  .medal.s{background:var(--orange-dark); color:#fff;}
+  .medal.b{background:var(--orange-deep); color:#fff; border:1px solid var(--border-strong);}
+  .medal.n{background:var(--card-2); color:var(--muted-2); border:1px solid var(--border);}
+
+  /* filtros (pills) */
+  .filter-bar{display:flex; gap:18px; flex-wrap:wrap; align-items:center; margin-bottom:16px; padding:12px 14px; background:var(--card); border:1px solid var(--border); border-radius:10px;}
+  .filter-group{display:flex; gap:6px; flex-wrap:wrap; align-items:center;}
+  .filter-label{font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; margin-right:2px;}
+  .fpill{background:var(--card-2); border:1px solid var(--border-strong); color:var(--muted-2); font-size:11px; font-weight:600; padding:6px 12px; border-radius:20px; cursor:pointer; white-space:nowrap;}
+  .fpill.active{background:var(--orange); color:var(--bg); border-color:var(--orange);}
+  .fpill:hover:not(.active){border-color:var(--orange-pale); color:var(--text);}
+
+  /* grid de criativos */
+  .creative-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:14px;}
+  .ccard{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:16px; display:flex; flex-direction:column; gap:10px;}
+  .ccard.inactive{opacity:.68;}
+  .ccard-head{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
+  .ccard-head h4{margin:0; font-size:12.5px; line-height:1.35; color:var(--text); font-weight:700;}
+  .status-chip{font-size:9.5px; font-weight:700; padding:3px 8px; border-radius:5px; letter-spacing:.3px; white-space:nowrap; flex:0 0 auto;}
+  .status-chip.ativo{background:var(--orange); color:var(--bg);}
+  .status-chip.inativo{background:var(--card-2); color:var(--muted-2); border:1px solid var(--border-strong);}
+  .status-chip.problema{background:rgba(139,42,10,.35); color:var(--orange-pale); border:1px solid var(--orange-deep);}
+  .frente-pill{align-self:flex-start; font-size:9.5px; font-weight:700; padding:2px 8px; border-radius:5px; letter-spacing:.3px; background:var(--card-2); color:var(--orange-pale); border:1px solid var(--border-strong);}
+  .ccard-metrics{display:grid; grid-template-columns:repeat(3,1fr); gap:10px 6px; border-top:1px solid var(--border); padding-top:10px;}
+  .ccard-metrics div{display:flex; flex-direction:column; gap:2px;}
+  .ccard-metrics .l{font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:.3px;}
+  .ccard-metrics .v{font-size:13px; font-weight:700; color:var(--text);}
+  .ccard-metrics .v.hl{color:var(--orange);}
+  .ccard-foot{display:flex; justify-content:space-between; align-items:center; gap:8px; border-top:1px solid var(--border); padding-top:10px; font-size:10.5px; color:var(--muted);}
+
+  .doughnut-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:18px;}
+  .dbox{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:16px; height:260px;}
+  .dbox h4{margin:0 0 10px; font-size:11.5px; color:var(--muted-2); text-transform:uppercase; letter-spacing:.4px; font-weight:700;}
+  .dbox .inner{height:195px;}
+
+  .tipo-txt{font-weight:700;}
+  .tipo-Vendas{color:var(--orange);}
+  .tipo-Engajamento{color:var(--muted-2);}
+
+  @media (max-width:860px){
+    .kpi-grid{grid-template-columns:repeat(2,1fr);}
+    .chart-grid{grid-template-columns:1fr;}
+    .doughnut-grid{grid-template-columns:1fr;}
+    .funnel-wrap{flex-direction:column;}
+    .adset-row{flex-direction:column;}
+    .compare-card{flex:1 1 auto;}
+    .header{padding:14px 16px;}
+    .header-right{width:100%; text-align:left;}
+    .filter-bar{flex-direction:column; align-items:flex-start; gap:10px;}
+  }
+
+  #loginGate{position:fixed; inset:0; background:var(--bg); z-index:9999; display:flex; align-items:center; justify-content:center; padding:20px;}
+  .login-box{background:var(--card); border:1px solid var(--border); border-radius:14px; padding:36px 32px; max-width:360px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,.5);}
+  .login-box .logo-badge{margin:0 auto 18px; width:48px; height:48px; font-size:16px;}
+  .login-box h2{margin:0 0 6px; font-size:16px; text-align:center; color:var(--text);}
+  .login-box p.sub{margin:0 0 24px; font-size:12px; text-align:center; color:var(--muted);}
+  .login-box label{display:block; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; margin-bottom:6px;}
+  .login-box input{width:100%; background:var(--card-2); border:1px solid var(--border-strong); color:var(--text); padding:10px 12px; border-radius:8px; font-size:13px; margin-bottom:16px; outline:none; font-family:inherit;}
+  .login-box input:focus{border-color:var(--orange);}
+  .login-box button{width:100%; background:var(--orange); color:var(--bg); border:none; padding:11px; border-radius:8px; font-weight:800; font-size:13px; cursor:pointer; font-family:inherit;}
+  .login-box button:hover{background:var(--orange-bright);}
+  .login-err{color:#ff8f6b; font-size:11.5px; text-align:center; margin-top:12px; min-height:14px;}
+</style>
+</head>
+<body>
+
+<div id="loginGate">
+  <div class="login-box">
+    <div class="logo-badge">JGT</div>
+    <h2>Refúgio Materno · Jéssica</h2>
+    <p class="sub">Dashboard de Conversa — acesso restrito</p>
+    <form id="loginForm">
+      <label for="loginUser">Usuário</label>
+      <input type="text" id="loginUser" autocomplete="username" required>
+      <label for="loginPass">Senha</label>
+      <input type="password" id="loginPass" autocomplete="current-password" required>
+      <button type="submit">Entrar</button>
+      <div class="login-err" id="loginErr"></div>
+    </form>
+  </div>
+</div>
+
+<div id="appContent" style="display:none">
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo-badge">JGT</div>
+    <div class="header-text">
+      <h1>Refúgio Materno · Jéssica</h1>
+      <p>Dashboard de Performance — Conversa via WhatsApp · Tráfego Pago</p>
+    </div>
+  </div>
+  <div class="header-right">
+    Período: <b>26/08 – 14/09/2026</b>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="geral">Visão Geral</button>
+  <button class="tab-btn" data-tab="criativos">Criativos</button>
+  <button class="tab-btn" data-tab="tipos">Objetivo de Campanha</button>
+  <button class="tab-btn" data-tab="diaria">Análise Diária</button>
+</div>
+
+<div class="wrap">
+
+  <!-- ABA 1: VISÃO GERAL -->
+  <div class="panel active" id="panel-geral">
+
+    <div class="kpi-grid">
+      <div class="kpi" style="--kc:var(--orange)">
+        <div class="lbl">Investimento Total</div>
+        <div class="val" id="kpi-spend">—</div>
+        <div class="sub">26/08 a 14/09</div>
+      </div>
+      <div class="kpi" style="--kc:var(--orange-bright)">
+        <div class="lbl">Custo por Conversa</div>
+        <div class="val" id="kpi-cpconv">—</div>
+        <div class="sub">Investimento ÷ Conversas iniciadas</div>
+      </div>
+      <div class="kpi" style="--kc:var(--amber)">
+        <div class="lbl">CTR Médio</div>
+        <div class="val" id="kpi-ctr">—</div>
+        <div class="sub">Cliques no link ÷ Impressões</div>
+      </div>
+      <div class="kpi" style="--kc:var(--muted-2)">
+        <div class="lbl">CPM Médio</div>
+        <div class="val" id="kpi-cpm">—</div>
+        <div class="sub">Custo por mil impressões</div>
+      </div>
+    </div>
+
+    <div class="section-title">Objetivos de campanha ativos</div>
+    <div class="adset-row">
+      <div class="adset-card primary">
+        <h3>Vendas <span style="color:var(--muted); font-weight:400;">· campanha de mensagem</span></h3>
+        <div class="big a" id="ven-spend">—</div>
+        <div class="cap">investido</div>
+        <div class="meta-row">
+          <span>Custo/Conversa<b id="ven-cpconv">—</b></span>
+          <span>Conversas<b id="ven-conv">—</b></span>
+          <span>Impr.<b id="ven-impr">—</b></span>
+          <span>CTR<b id="ven-ctr">—</b></span>
+        </div>
+      </div>
+      <div class="adset-card">
+        <span class="pill new">NOVO · 14/09</span>
+        <h3>Engajamento <span style="color:var(--muted); font-weight:400;">· campanha de mensagem</span></h3>
+        <div class="big b" id="eng-spend">—</div>
+        <div class="cap">investido</div>
+        <div class="meta-row">
+          <span>Custo/Conversa<b id="eng-cpconv">—</b></span>
+          <span>Conversas<b id="eng-conv">—</b></span>
+          <span>Impr.<b id="eng-impr">—</b></span>
+          <span>CTR<b id="eng-ctr">—</b></span>
+        </div>
+      </div>
+      <div class="compare-card">
+        <div class="cline">% do investimento em Vendas <b id="cmp-share-ven">—</b></div>
+        <div class="cline">Conversas vindas de Vendas <b id="cmp-conv-ven">—</b></div>
+        <div class="cline">Engajamento ainda sem dado suficiente <b>—</b></div>
+      </div>
+    </div>
+
+    <div class="section-title">Funil de conversão</div>
+    <div class="funnel-wrap">
+      <div class="funnel-svg">
+        <div class="funil-list">
+          <div class="funil-row">
+            <div class="funil-row-top"><span class="flabel">Impressões</span><span class="fval" id="fb-impr">—</span></div>
+            <div class="funil-bar-bg"><div class="funil-bar-fill" id="fb-impr-fill" style="width:100%"></div></div>
+          </div>
+          <div class="funil-row">
+            <div class="funil-row-top"><span class="flabel">Cliques no Link</span><span class="fval" id="fb-clicks">—</span></div>
+            <div class="funil-bar-bg"><div class="funil-bar-fill" id="fb-clicks-fill" style="width:0%"></div></div>
+          </div>
+          <div class="funil-row">
+            <div class="funil-row-top"><span class="flabel">Conversas Iniciadas</span><span class="fval" id="fb-conv">—</span></div>
+            <div class="funil-bar-bg"><div class="funil-bar-fill" id="fb-conv-fill" style="width:0%"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="funnel-cards">
+        <div class="fcard" style="--fc:var(--orange)">
+          <div class="lbl">CPC — Custo por Clique</div>
+          <div class="val" id="f-cpc">—</div>
+        </div>
+        <div class="fcard" style="--fc:var(--amber)">
+          <div class="lbl">CPM — Custo por Mil Impressões</div>
+          <div class="val" id="f-cpm">—</div>
+        </div>
+        <div class="fcard" style="--fc:var(--orange-bright)">
+          <div class="lbl">Taxa Clique → Conversa</div>
+          <div class="val" id="f-tx2">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title">Evolução diária</div>
+    <div class="chart-grid">
+      <div class="chart-box">
+        <h4>Conversas x Investimento por dia</h4>
+        <div class="inner"><canvas id="chartCombo"></canvas></div>
+      </div>
+      <div class="chart-box">
+        <h4>Custo por Conversa (diário)</h4>
+        <div class="inner"><canvas id="chartCpl"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ABA 2: CRIATIVOS -->
+  <div class="panel" id="panel-criativos">
+    <div class="filter-bar">
+      <div class="filter-group">
+        <span class="filter-label">Status</span>
+        <button class="fpill active" data-filter-status="todos">Todos</button>
+        <button class="fpill" data-filter-status="ativos">Ativos</button>
+        <button class="fpill" data-filter-status="inativos">Inativos</button>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Objetivo</span>
+        <button class="fpill active" data-filter-frente="todos">Todos</button>
+        <button class="fpill" data-filter-frente="Vendas">Vendas</button>
+        <button class="fpill" data-filter-frente="Engajamento">Engajamento</button>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Ordenar por</span>
+        <button class="fpill active" data-sort="spend">Investimento</button>
+        <button class="fpill" data-sort="ctr">CTR</button>
+        <button class="fpill" data-sort="cpconv">Custo/Conversa</button>
+        <button class="fpill" data-sort="conv">Conversas</button>
+      </div>
+    </div>
+
+    <div class="creative-grid" id="creative-grid"></div>
+  </div>
+
+  <!-- ABA 3: OBJETIVO DE CAMPANHA -->
+  <div class="panel" id="panel-tipos">
+    <div class="table-scroll">
+      <table>
+        <thead><tr>
+          <th class="left">#</th><th class="left">Objetivo</th><th>Invest.</th><th>Impr.</th><th>Cliques</th>
+          <th>Conversas</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Custo/Conv</th><th>Tx. Conversão</th><th class="left">Status</th>
+        </tr></thead>
+        <tbody id="tbl-tipos"></tbody>
+      </table>
+    </div>
+    <div class="doughnut-grid">
+      <div class="dbox">
+        <h4>Investimento por objetivo</h4>
+        <div class="inner"><canvas id="chartDoughSpend"></canvas></div>
+      </div>
+      <div class="dbox">
+        <h4>Conversas por objetivo</h4>
+        <div class="inner"><canvas id="chartDoughConv"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ABA 4: ANÁLISE DIÁRIA -->
+  <div class="panel" id="panel-diaria">
+    <div class="section-title">Detalhamento por dia, campanha e criativo</div>
+    <div class="table-scroll fixed">
+      <table>
+        <thead><tr>
+          <th class="left">Dia</th><th class="left">Objetivo</th><th class="left">Criativo</th>
+          <th>Invest.</th><th>Impr.</th><th>Cliques</th><th>Conversas</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Custo/Conv</th>
+        </tr></thead>
+        <tbody id="tbl-granular"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+</div>
+
+<script>
+(function(){
+  const EXP_U = 'jamelligt';
+  const EXP_P = 'jessica-refugiomsg';
+  const KEY = 'jgt_ok_jessica-refugio-whats';
+  const gate = document.getElementById('loginGate');
+  const app = document.getElementById('appContent');
+  function unlock(){ gate.style.display = 'none'; app.style.display = 'block'; }
+  let already = false;
+  try{ already = sessionStorage.getItem(KEY) === '1'; }catch(e){}
+  if (already) unlock();
+  document.getElementById('loginForm').addEventListener('submit', function(e){
+    e.preventDefault();
+    const u = document.getElementById('loginUser').value.trim();
+    const p = document.getElementById('loginPass').value;
+    if (u === EXP_U && p === EXP_P) {
+      try{ sessionStorage.setItem(KEY, '1'); }catch(e){}
+      unlock();
+    } else {
+      document.getElementById('loginErr').textContent = 'Usuário ou senha incorretos.';
+    }
+  });
+})();
+
+const DATA = [{"d":"2026-08-26","c":"[VENDAS] [WHATS] 260826","t":"Vendas","a":"AD01 - Puerpério não precisa ser solitário","l":"https://www.instagram.com/p/DchMPjmMgNR/","s":0.07,"i":4,"r":4,"k":0,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-08-26","c":"[VENDAS] [WHATS] 260826","t":"Vendas","a":"AD02 - Existe um lugar para cuidar dessa dor com respeito","l":"https://www.instagram.com/p/DchMPbKsuFV/","s":5.08,"i":111,"r":110,"k":1,"v":0,"st":"PAUSED"},{"d":"2026-08-26","c":"[VENDAS] [WHATS] 260826","t":"Vendas","a":"AD03 - Você não precisa atravessar essa jornada sozinha","l":"https://www.instagram.com/p/DchMSpzMZNa/","s":6.82,"i":201,"r":197,"k":7,"v":4,"st":"CAMPAIGN_PAUSED"},{"d":"2026-08-27","c":"[VENDAS] [WHATS] 260826","t":"Vendas","a":"AD01 - Puerpério não precisa ser solitário","l":"https://www.instagram.com/p/DchMPjmMgNR/","s":0.7,"i":36,"r":36,"k":0,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-08-27","c":"[VENDAS] [WHATS] 260826","t":"Vendas","a":"AD02 - Existe um lugar para cuidar dessa dor com respeito","l":"https://www.instagram.com/p/DchMPbKsuFV/","s":3.25,"i":195,"r":187,"k":0,"v":0,"st":"PAUSED"},{"d":"2026-08-28","c":"[VENDAS] [WHATS] 260826","t":"Vendas","a":"AD01 - Puerpério não precisa ser solitário","l":"https://www.instagram.com/p/DchMPjmMgNR/","s":1.85,"i":55,"r":55,"k":0,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-08-28","c":"[VENDAS] [WHATS] 260826","t":"Vendas","a":"AD02 - Existe um lugar para cuidar dessa dor com respeito","l":"https://www.instagram.com/p/DchMPbKsuFV/","s":5.66,"i":210,"r":202,"k":2,"v":0,"st":"PAUSED"},{"d":"2026-08-28","c":"[VENDAS] [WHATS] 260826","t":"Vendas","a":"AD03 - Você não precisa atravessar essa jornada sozinha","l":"https://www.instagram.com/p/DchMSpzMZNa/","s":1.38,"i":5,"r":5,"k":1,"v":1,"st":"CAMPAIGN_PAUSED"},{"d":"2026-08-29","c":"[VENDAS] [WHATS] 260826","t":"Vendas","a":"AD01 - Puerpério não precisa ser solitário","l":"https://www.instagram.com/p/DchMPjmMgNR/","s":0.1,"i":3,"r":3,"k":0,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-08-29","c":"[VENDAS] [WHATS] 260826","t":"Vendas","a":"AD02 - Existe um lugar para cuidar dessa dor com respeito","l":"https://www.instagram.com/p/DchMPbKsuFV/","s":12.15,"i":328,"r":285,"k":3,"v":2,"st":"PAUSED"},{"d":"2026-08-29","c":"[VENDAS] [WHATS] 260826","t":"Vendas","a":"AD03 - Você não precisa atravessar essa jornada sozinha","l":"https://www.instagram.com/p/DchMSpzMZNa/","s":0.01,"i":1,"r":1,"k":0,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-08-30","c":"[VENDAS] [WHATS] 260826","t":"Vendas","a":"AD01 - Puerpério não precisa ser solitário","l":"https://www.instagram.com/p/DchMPjmMgNR/","s":1.57,"i":9,"r":8,"k":0,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-08-30","c":"[VENDAS] [WHATS] 260826","t":"Vendas","a":"AD02 - Existe um lugar para cuidar dessa dor com respeito","l":"https://www.instagram.com/p/DchMPbKsuFV/","s":7.55,"i":330,"r":323,"k":2,"v":1,"st":"PAUSED"},{"d":"2026-08-31","c":"[VENDAS] [WHATS] 260826","t":"Vendas","a":"AD02 - Existe um lugar para cuidar dessa dor com respeito","l":"https://www.instagram.com/p/DchMPbKsuFV/","s":15.1,"i":647,"r":615,"k":0,"v":0,"st":"PAUSED"},{"d":"2026-08-31","c":"[VENDAS] [WHATS] 260826","t":"Vendas","a":"AD03 - Você não precisa atravessar essa jornada sozinha","l":"https://www.instagram.com/p/DchMSpzMZNa/","s":0.05,"i":4,"r":4,"k":0,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-01","c":"[VENDAS] [WHATS] 260826","t":"Vendas","a":"AD01 - Puerpério não precisa ser solitário","l":"https://www.instagram.com/p/DchMPjmMgNR/","s":1.36,"i":22,"r":21,"k":0,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-01","c":"[VENDAS] [WHATS] 260826","t":"Vendas","a":"AD02 - Existe um lugar para cuidar dessa dor com respeito","l":"https://www.instagram.com/p/DchMPbKsuFV/","s":12.76,"i":357,"r":326,"k":1,"v":0,"st":"PAUSED"},{"d":"2026-09-01","c":"[VENDAS] [WHATS] 260826","t":"Vendas","a":"AD03 - Você não precisa atravessar essa jornada sozinha","l":"https://www.instagram.com/p/DchMSpzMZNa/","s":0.2,"i":10,"r":8,"k":0,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-02","c":"[VENDAS] [WHATS] 020926 A+","t":"Vendas","a":"AD01 - Puerpério não precisa ser solitário","l":"https://www.instagram.com/p/DczJ-MQsiA-/","s":1.85,"i":66,"r":62,"k":1,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-02","c":"[VENDAS] [WHATS] 020926 A+","t":"Vendas","a":"AD02 - Existe um lugar para cuidar dessa dor com respeito","l":"https://www.instagram.com/p/DczKBw0se-E/","s":3.71,"i":103,"r":93,"k":0,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-02","c":"[VENDAS] [WHATS] 020926 A+","t":"Vendas","a":"AD03 - Você não precisa atravessar essa jornada sozinha","l":"https://www.instagram.com/p/DczKE5yMVR4/","s":0.6,"i":12,"r":10,"k":0,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-02","c":"[VENDAS] [WHATS] 260826","t":"Vendas","a":"AD01 - Puerpério não precisa ser solitário","l":"https://www.instagram.com/p/DchMPjmMgNR/","s":6.3,"i":174,"r":155,"k":0,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-03","c":"[VENDAS] [WHATS] 020926 A+","t":"Vendas","a":"AD01 - Puerpério não precisa ser solitário","l":"https://www.instagram.com/p/DczJ-MQsiA-/","s":2.01,"i":50,"r":46,"k":0,"v":2,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-03","c":"[VENDAS] [WHATS] 020926 A+","t":"Vendas","a":"AD02 - Existe um lugar para cuidar dessa dor com respeito","l":"https://www.instagram.com/p/DczKBw0se-E/","s":12.77,"i":286,"r":211,"k":3,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-03","c":"[VENDAS] [WHATS] 020926 A+","t":"Vendas","a":"AD03 - Você não precisa atravessar essa jornada sozinha","l":"https://www.instagram.com/p/DczKE5yMVR4/","s":1.56,"i":27,"r":27,"k":0,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-04","c":"[VENDAS] [WHATS] 020926 A+","t":"Vendas","a":"AD01 - Puerpério não precisa ser solitário","l":"https://www.instagram.com/p/DczJ-MQsiA-/","s":0.0,"i":2,"r":2,"k":0,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-04","c":"[VENDAS] [WHATS] 020926 A+","t":"Vendas","a":"AD02 - Existe um lugar para cuidar dessa dor com respeito","l":"https://www.instagram.com/p/DczKBw0se-E/","s":3.34,"i":135,"r":109,"k":1,"v":1,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-04","c":"[VENDAS] [WHATS] 020926 A+","t":"Vendas","a":"AD03 - Você não precisa atravessar essa jornada sozinha","l":"https://www.instagram.com/p/DczKE5yMVR4/","s":0.0,"i":1,"r":1,"k":0,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-07","c":"[VENDAS] [WHATS] 020926 A+","t":"Vendas","a":"AD01 - Puerpério não precisa ser solitário","l":"https://www.instagram.com/p/DczJ-MQsiA-/","s":0.57,"i":34,"r":32,"k":0,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-07","c":"[VENDAS] [WHATS] 020926 A+","t":"Vendas","a":"AD03 - Você não precisa atravessar essa jornada sozinha","l":"https://www.instagram.com/p/DczKE5yMVR4/","s":9.93,"i":414,"r":389,"k":1,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-08","c":"[VENDAS] [WHATS] 020926 A+","t":"Vendas","a":"AD01 - Puerpério não precisa ser solitário","l":"https://www.instagram.com/p/DczJ-MQsiA-/","s":1.35,"i":20,"r":18,"k":0,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-08","c":"[VENDAS] [WHATS] 020926 A+","t":"Vendas","a":"AD02 - Existe um lugar para cuidar dessa dor com respeito","l":"https://www.instagram.com/p/DczKBw0se-E/","s":4.93,"i":133,"r":121,"k":0,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-08","c":"[VENDAS] [WHATS] 020926 A+","t":"Vendas","a":"AD03 - Você não precisa atravessar essa jornada sozinha","l":"https://www.instagram.com/p/DczKE5yMVR4/","s":13.06,"i":319,"r":272,"k":4,"v":3,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-09","c":"[VENDAS] [WHATS] 020926 A+","t":"Vendas","a":"AD01 - Puerpério não precisa ser solitário","l":"https://www.instagram.com/p/DczJ-MQsiA-/","s":1.23,"i":30,"r":28,"k":0,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-09","c":"[VENDAS] [WHATS] 020926 A+","t":"Vendas","a":"AD02 - Existe um lugar para cuidar dessa dor com respeito","l":"https://www.instagram.com/p/DczKBw0se-E/","s":2.46,"i":91,"r":90,"k":0,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-09","c":"[VENDAS] [WHATS] 020926 A+","t":"Vendas","a":"AD03 - Você não precisa atravessar essa jornada sozinha","l":"https://www.instagram.com/p/DczKE5yMVR4/","s":17.4,"i":464,"r":404,"k":3,"v":3,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-10","c":"[VENDAS] [WHATS] 020926 A+","t":"Vendas","a":"AD01 - Puerpério não precisa ser solitário","l":"https://www.instagram.com/p/DczJ-MQsiA-/","s":0.44,"i":12,"r":12,"k":0,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-10","c":"[VENDAS] [WHATS] 020926 A+","t":"Vendas","a":"AD02 - Existe um lugar para cuidar dessa dor com respeito","l":"https://www.instagram.com/p/DczKBw0se-E/","s":11.28,"i":304,"r":255,"k":3,"v":3,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-10","c":"[VENDAS] [WHATS] 020926 A+","t":"Vendas","a":"AD03 - Você não precisa atravessar essa jornada sozinha","l":"https://www.instagram.com/p/DczKE5yMVR4/","s":6.28,"i":171,"r":159,"k":1,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-11","c":"[VENDAS] [WHATS] 020926 A+","t":"Vendas","a":"AD01 - Puerpério não precisa ser solitário","l":"https://www.instagram.com/p/DczJ-MQsiA-/","s":0.43,"i":12,"r":11,"k":0,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-11","c":"[VENDAS] [WHATS] 020926 A+","t":"Vendas","a":"AD02 - Existe um lugar para cuidar dessa dor com respeito","l":"https://www.instagram.com/p/DczKBw0se-E/","s":1.4,"i":39,"r":37,"k":0,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-11","c":"[VENDAS] [WHATS] 020926 A+","t":"Vendas","a":"AD03 - Você não precisa atravessar essa jornada sozinha","l":"https://www.instagram.com/p/DczKE5yMVR4/","s":14.91,"i":370,"r":302,"k":1,"v":1,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-12","c":"[VENDAS] [WHATS] 020926 A+","t":"Vendas","a":"AD01 - Puerpério não precisa ser solitário","l":"https://www.instagram.com/p/DczJ-MQsiA-/","s":0.26,"i":7,"r":7,"k":0,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-12","c":"[VENDAS] [WHATS] 020926 A+","t":"Vendas","a":"AD02 - Existe um lugar para cuidar dessa dor com respeito","l":"https://www.instagram.com/p/DczKBw0se-E/","s":0.15,"i":13,"r":13,"k":0,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-12","c":"[VENDAS] [WHATS] 020926 A+","t":"Vendas","a":"AD03 - Você não precisa atravessar essa jornada sozinha","l":"https://www.instagram.com/p/DczKE5yMVR4/","s":13.77,"i":318,"r":275,"k":2,"v":1,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-13","c":"[VENDAS] [WHATS] 020926 A+","t":"Vendas","a":"AD01 - Puerpério não precisa ser solitário","l":"https://www.instagram.com/p/DczJ-MQsiA-/","s":0.94,"i":8,"r":8,"k":0,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-13","c":"[VENDAS] [WHATS] 020926 A+","t":"Vendas","a":"AD02 - Existe um lugar para cuidar dessa dor com respeito","l":"https://www.instagram.com/p/DczKBw0se-E/","s":0.6,"i":11,"r":10,"k":0,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-13","c":"[VENDAS] [WHATS] 020926 A+","t":"Vendas","a":"AD03 - Você não precisa atravessar essa jornada sozinha","l":"https://www.instagram.com/p/DczKE5yMVR4/","s":16.14,"i":301,"r":276,"k":0,"v":0,"st":"CAMPAIGN_PAUSED"},{"d":"2026-09-14","c":"[ENG][WHATS] 140926","t":"Engajamento","a":"AD01 - Puerpério não precisa ser solitário","l":"https://www.instagram.com/p/DdPuSNQswxP/","s":3.54,"i":133,"r":121,"k":0,"v":0,"st":"ACTIVE"},{"d":"2026-09-14","c":"[ENG][WHATS] 140926","t":"Engajamento","a":"AD02 - Existe um lugar para cuidar dessa dor com respeito","l":"https://www.instagram.com/p/DdPuUGSs5XR/","s":3.83,"i":77,"r":70,"k":0,"v":0,"st":"ACTIVE"},{"d":"2026-09-14","c":"[VEN][WHATS] 140926","t":"Vendas","a":"AD01 - Puerpério não precisa ser solitário","l":"https://www.instagram.com/p/DdPvqYzsWAB/","s":2.11,"i":59,"r":58,"k":0,"v":0,"st":"ACTIVE"},{"d":"2026-09-14","c":"[VEN][WHATS] 140926","t":"Vendas","a":"AD02 - Existe um lugar para cuidar dessa dor com respeito","l":"https://www.instagram.com/p/DdPvol6MHs8/","s":7.11,"i":254,"r":231,"k":1,"v":1,"st":"ACTIVE"},{"d":"2026-09-14","c":"[VEN][WHATS] 140926","t":"Vendas","a":"AD03 - Você não precisa atravessar essa jornada sozinha","l":"","s":0,"i":0,"r":0,"k":0,"v":0,"st":"WITH_ISSUES"},{"d":"2026-09-14","c":"[ENG][WHATS] 140926","t":"Engajamento","a":"AD03 - Você não precisa atravessar essa jornada sozinha","l":"","s":0,"i":0,"r":0,"k":0,"v":0,"st":"WITH_ISSUES"}];
+
+// ---------- helpers ----------
+const fmtBR = (v,dec=2) => (v||0).toLocaleString('pt-BR',{minimumFractionDigits:dec,maximumFractionDigits:dec});
+const BRL = v => 'R$ ' + fmtBR(v||0,2);
+const PCT = v => fmtBR(v||0,2) + '%';
+const INT = v => Math.round(v||0).toLocaleString('pt-BR');
+const safeDiv = (a,b) => b ? a/b : 0;
+const dataBR = iso => { const [y,m,d]=iso.split('-'); return d+'/'+m; };
+
+// ---------- tabs ----------
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ---------- aggregations ----------
+function agg(rows){
+  const o = {spend:0, impr:0, reach:0, clicks:0, conv:0};
+  rows.forEach(r=>{ o.spend+=r.s; o.impr+=r.i; o.reach+=r.r; o.clicks+=r.k; o.conv+=r.v; });
+  return o;
+}
+function metrics(o){
+  return {
+    ctr: safeDiv(o.clicks,o.impr)*100,
+    cpc: safeDiv(o.spend,o.clicks),
+    cpm: safeDiv(o.spend,o.impr)*1000,
+    cpconv: safeDiv(o.spend,o.conv),
+    tx: safeDiv(o.conv,o.clicks)*100,
+  };
+}
+
+const TOTAL = agg(DATA);
+const M = metrics(TOTAL);
+
+document.getElementById('kpi-spend').textContent = BRL(TOTAL.spend);
+document.getElementById('kpi-cpconv').textContent = TOTAL.conv ? BRL(M.cpconv) : '—';
+document.getElementById('kpi-ctr').textContent = PCT(M.ctr);
+document.getElementById('kpi-cpm').textContent = BRL(M.cpm);
+
+document.getElementById('fb-impr').textContent = INT(TOTAL.impr);
+document.getElementById('fb-clicks').textContent = INT(TOTAL.clicks);
+document.getElementById('fb-conv').textContent = INT(TOTAL.conv);
+document.getElementById('fb-impr-fill').style.width = '100%';
+document.getElementById('fb-clicks-fill').style.width = safeDiv(TOTAL.clicks, TOTAL.impr)*100 + '%';
+document.getElementById('fb-conv-fill').style.width = safeDiv(TOTAL.conv, TOTAL.impr)*100 + '%';
+document.getElementById('f-cpc').textContent = BRL(M.cpc);
+document.getElementById('f-cpm').textContent = BRL(M.cpm);
+document.getElementById('f-tx2').textContent = PCT(M.tx);
+
+// frentes (tipo)
+const tipos = ['Vendas','Engajamento'];
+const byTipo = {};
+tipos.forEach(t=> byTipo[t] = agg(DATA.filter(r=>r.t===t)));
+
+const ven = byTipo['Vendas'], eng = byTipo['Engajamento'];
+const mVen = metrics(ven), mEng = metrics(eng);
+document.getElementById('ven-spend').textContent = BRL(ven.spend);
+document.getElementById('ven-cpconv').textContent = ven.conv ? BRL(mVen.cpconv) : '—';
+document.getElementById('ven-conv').textContent = INT(ven.conv);
+document.getElementById('ven-impr').textContent = INT(ven.impr);
+document.getElementById('ven-ctr').textContent = PCT(mVen.ctr);
+
+document.getElementById('eng-spend').textContent = BRL(eng.spend);
+document.getElementById('eng-cpconv').textContent = eng.conv ? BRL(mEng.cpconv) : '—';
+document.getElementById('eng-conv').textContent = INT(eng.conv);
+document.getElementById('eng-impr').textContent = INT(eng.impr);
+document.getElementById('eng-ctr').textContent = PCT(mEng.ctr);
+
+document.getElementById('cmp-share-ven').textContent = PCT(safeDiv(ven.spend, TOTAL.spend)*100);
+document.getElementById('cmp-conv-ven').textContent = INT(ven.conv) + ' de ' + INT(TOTAL.conv);
+
+// ---------- daily aggregation ----------
+const dates = [...new Set(DATA.map(r=>r.d))].sort();
+const dailyAgg = dates.map(d => ({date:d, ...agg(DATA.filter(r=>r.d===d))}));
+
+// combo chart: bars = conversas, line = investimento
+new Chart(document.getElementById('chartCombo'), {
+  type:'bar',
+  data:{
+    labels: dailyAgg.map(d=>dataBR(d.date)),
+    datasets:[
+      {type:'bar', label:'Conversas', data:dailyAgg.map(d=>d.conv), backgroundColor:'#ff6b35', yAxisID:'y', borderRadius:4, maxBarThickness:26},
+      {type:'line', label:'Investimento (R$)', data:dailyAgg.map(d=>d.spend), borderColor:'#ff9500', backgroundColor:'#ff9500', yAxisID:'y1', tension:.3, pointRadius:3}
+    ]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:'#b8b8b8', boxWidth:12, font:{size:10.5}}}},
+    scales:{
+      x:{ticks:{color:'#999', font:{size:10}}, grid:{color:'#2a2a2a'}},
+      y:{position:'left', ticks:{color:'#999', font:{size:10}, precision:0}, grid:{color:'#2a2a2a'}, title:{display:true,text:'Conversas',color:'#999',font:{size:10}}},
+      y1:{position:'right', ticks:{color:'#999', font:{size:10}}, grid:{display:false}, title:{display:true,text:'R$',color:'#999',font:{size:10}}}
+    }
+  }
+});
+
+// CPL chart with spanGaps
+new Chart(document.getElementById('chartCpl'), {
+  type:'line',
+  data:{
+    labels: dailyAgg.map(d=>dataBR(d.date)),
+    datasets:[{
+      label:'Custo por Conversa',
+      data: dailyAgg.map(d=> d.conv ? d.spend/d.conv : null),
+      borderColor:'#ff6b35', backgroundColor:'rgba(255,107,53,.15)', fill:true, spanGaps:true, tension:.3, pointRadius:3
+    }]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{ticks:{color:'#999', font:{size:10}}, grid:{color:'#2a2a2a'}},
+      y:{ticks:{color:'#999', font:{size:10}, callback:v=>'R$'+v}, grid:{color:'#2a2a2a'}}
+    }
+  }
+});
+
+// ---------- criativos: grid único, com status real de entrega + filtros ----------
+const creativeMap = new Map();
+DATA.forEach(r=>{
+  const key = r.c+'␟'+r.a;
+  if(!creativeMap.has(key)) creativeMap.set(key, {campaign:r.c, ad:r.a, tipo:r.t, rows:[]});
+  creativeMap.get(key).rows.push(r);
+});
+const creatives = [...creativeMap.values()].map(g=>{
+  const o = agg(g.rows);
+  const link = g.rows.slice().reverse().find(r=>r.l)?.l || '';
+  const status = g.rows[g.rows.length-1]?.st || '';
+  const isActive = status === 'ACTIVE';
+  return {campaign:g.campaign, ad:g.ad, tipo:g.tipo, link, status, isActive, ...o};
+});
+
+function statusInfo(status){
+  if(status==='ACTIVE') return {cls:'ativo', label:'ATIVO'};
+  if(status==='WITH_ISSUES') return {cls:'problema', label:'DESATIVADO'};
+  if(status==='CAMPAIGN_PAUSED') return {cls:'inativo', label:'CAMP. PAUSADA'};
+  if(status==='PAUSED') return {cls:'inativo', label:'PAUSADO'};
+  return {cls:'inativo', label: status || '—'};
+}
+
+let filterStatus = 'todos';
+let filterFrente = 'todos';
+let sortBy = 'spend';
+
+function renderCreatives(){
+  let rows = creatives.map(r=>({...r, m:metrics(r)}));
+  if(filterStatus==='ativos') rows = rows.filter(r=>r.isActive);
+  if(filterStatus==='inativos') rows = rows.filter(r=>!r.isActive);
+  if(filterFrente!=='todos') rows = rows.filter(r=>r.tipo===filterFrente);
+
+  if(sortBy==='spend') rows.sort((a,b)=>b.spend-a.spend);
+  if(sortBy==='ctr') rows.sort((a,b)=>b.m.ctr-a.m.ctr);
+  if(sortBy==='cpconv') rows.sort((a,b)=>{
+    if(a.conv===0 && b.conv===0) return b.spend-a.spend;
+    if(a.conv===0) return 1; if(b.conv===0) return -1;
+    return a.m.cpconv-b.m.cpconv;
+  });
+  if(sortBy==='conv') rows.sort((a,b)=>b.conv-a.conv);
+
+  const grid = document.getElementById('creative-grid');
+  if(!rows.length){ grid.innerHTML = '<div class="info-banner">Nenhum criativo encontrado com esses filtros.</div>'; return; }
+  grid.innerHTML = rows.map(r=>{
+    const st = statusInfo(r.status);
+    return `<div class="ccard ${r.isActive?'':'inactive'}">
+      <div class="ccard-head">
+        <h4>${r.ad.replace(/^AD0\d - /,'')}</h4>
+        <span class="status-chip ${st.cls}">${st.label}</span>
+      </div>
+      <span class="frente-pill">${r.tipo}</span>
+      <div class="ccard-metrics">
+        <div><span class="l">Investimento</span><span class="v">${BRL(r.spend)}</span></div>
+        <div><span class="l">Conversas</span><span class="v ${r.conv?'hl':''}">${INT(r.conv)}</span></div>
+        <div><span class="l">CTR</span><span class="v">${PCT(r.m.ctr)}</span></div>
+        <div><span class="l">CPC</span><span class="v">${r.clicks?BRL(r.m.cpc):'—'}</span></div>
+        <div><span class="l">CPM</span><span class="v">${r.impr?BRL(r.m.cpm):'—'}</span></div>
+        <div><span class="l">Custo/Conv.</span><span class="v ${r.conv?'hl':''}">${r.conv?BRL(r.m.cpconv):'—'}</span></div>
+      </div>
+      <div class="ccard-foot">
+        <span>${INT(r.impr)} impr. · ${INT(r.clicks)} cliques</span>
+        ${r.link?`<a class="ver" href="${r.link}" target="_blank" rel="noopener">Ver anúncio →</a>`:'<span>sem link</span>'}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+document.querySelectorAll('[data-filter-status]').forEach(btn=>btn.addEventListener('click',()=>{
+  document.querySelectorAll('[data-filter-status]').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active'); filterStatus = btn.dataset.filterStatus; renderCreatives();
+}));
+document.querySelectorAll('[data-filter-frente]').forEach(btn=>btn.addEventListener('click',()=>{
+  document.querySelectorAll('[data-filter-frente]').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active'); filterFrente = btn.dataset.filterFrente; renderCreatives();
+}));
+document.querySelectorAll('[data-sort]').forEach(btn=>btn.addEventListener('click',()=>{
+  document.querySelectorAll('[data-sort]').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active'); sortBy = btn.dataset.sort; renderCreatives();
+}));
+renderCreatives();
+
+// ---------- tipos (frentes) ----------
+const medalCls = i => i===0?'g':i===1?'s':i===2?'b':'n';
+const tblTipos = document.getElementById('tbl-tipos');
+const tipoRows = tipos.map(t=>({tipo:t, ...byTipo[t]})).sort((a,b)=>b.spend-a.spend);
+tipoRows.forEach((r,i)=>{
+  const m = metrics(r);
+  const status = r.spend>0 ? (r.conv>0?'Ativa · convertendo':'Ativa · sem conversas ainda') : 'Sem investimento no período';
+  tblTipos.insertAdjacentHTML('beforeend', `<tr>
+    <td class="left"><span class="medal ${medalCls(i)}">${i+1}</span></td>
+    <td class="left"><span class="tipo-txt tipo-${r.tipo}">${r.tipo}</span></td>
+    <td>${BRL(r.spend)}</td><td>${INT(r.impr)}</td><td>${INT(r.clicks)}</td><td>${INT(r.conv)}</td>
+    <td>${PCT(m.ctr)}</td><td>${BRL(m.cpc)}</td><td>${BRL(m.cpm)}</td>
+    <td>${r.conv?BRL(m.cpconv):'—'}</td><td>${PCT(m.tx)}</td>
+    <td class="left">${status}</td>
+  </tr>`);
+});
+
+new Chart(document.getElementById('chartDoughSpend'), {
+  type:'doughnut',
+  data:{ labels:tipoRows.map(r=>r.tipo), datasets:[{ data:tipoRows.map(r=>r.spend), backgroundColor:['#ff6b35','#3a3a3a'], borderColor:'#151515', borderWidth:2 }] },
+  options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{color:'#b8b8b8', boxWidth:10, font:{size:10.5}}}}}
+});
+new Chart(document.getElementById('chartDoughConv'), {
+  type:'doughnut',
+  data:{ labels:tipoRows.map(r=>r.tipo), datasets:[{ data:tipoRows.map(r=>r.conv), backgroundColor:['#ff8c42','#3a3a3a'], borderColor:'#151515', borderWidth:2 }] },
+  options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{color:'#b8b8b8', boxWidth:10, font:{size:10.5}}}}}
+});
+
+// ---------- análise diária granular ----------
+const granular = DATA.slice().sort((a,b)=> a.d.localeCompare(b.d) || a.c.localeCompare(b.c) || a.a.localeCompare(b.a));
+const tblGranular = document.getElementById('tbl-granular');
+granular.forEach(r=>{
+  const m = metrics({spend:r.s, impr:r.i, clicks:r.k, conv:r.v});
+  const convCell = r.v ? `<b style="color:var(--orange)">${r.v}</b>` : '0';
+  tblGranular.insertAdjacentHTML('beforeend', `<tr>
+    <td class="left">${dataBR(r.d)}</td>
+    <td class="left"><span class="tipo-txt tipo-${r.t}">${r.t}</span></td>
+    <td class="left">${r.a.replace(/^AD0\d - /,'')}</td>
+    <td>${BRL(r.s)}</td><td>${INT(r.i)}</td><td>${INT(r.k)}</td><td>${convCell}</td>
+    <td>${PCT(m.ctr)}</td><td>${BRL(m.cpc)}</td><td>${BRL(m.cpm)}</td><td>${r.v?BRL(r.s/r.v):'—'}</td>
+  </tr>`);
+});
+</script>
+</body>
+</html>
