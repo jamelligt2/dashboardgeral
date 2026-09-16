@@ -1100,7 +1100,9 @@ function buildPaginas(from, to){
     const ctr = o.imp>0 ? o.clicks/o.imp*100 : 0;
     const cpc = o.clicks>0 ? o.inv/o.clicks : NaN;
     const roas = o.inv>0 ? o.fat/o.inv : NaN;
-    return {...o, ctr, cpc, roas};
+    // Taxa de venda = (Compras / Page View) * 100, do jeito que a cliente calcula.
+    const taxaVenda = o.pv>0 ? o.vendas/o.pv*100 : NaN;
+    return {...o, ctr, cpc, roas, taxaVenda};
   }).sort((a,b)=>b.inv-a.inv);
 
   const groups = {
@@ -1121,6 +1123,8 @@ function buildPaginas(from, to){
     g.ticket = g.vendas>0 ? g.fat/g.vendas : NaN;
     g.pvPct = g.clicks>0 ? g.pv/g.clicks*100 : 0;
     g.ckPct = g.pv>0 ? g.ck/g.pv*100 : 0;
+    // Taxa de venda = (Compras / Page View) * 100, do jeito que a cliente calcula.
+    g.taxaVenda = g.pv>0 ? g.vendas/g.pv*100 : NaN;
   }
   return {groups, campaigns};
 }
@@ -1137,6 +1141,7 @@ function renderPaginasTab(from, to){
         <div class="pub-metric"><div class="pub-metric-val">${fmtBRL(g.inv)}</div><div class="pub-metric-lbl">Invest.</div></div>
         <div class="pub-metric"><div class="pub-metric-val neutral">${fmtNum(g.vendas)}</div><div class="pub-metric-lbl">Vendas</div></div>
         <div class="pub-metric"><div class="pub-metric-val neutral">${fmtRoas(g.roas)}</div><div class="pub-metric-lbl">ROAS</div></div>
+        <div class="pub-metric"><div class="pub-metric-val hl">${fmtPct(g.taxaVenda)}</div><div class="pub-metric-lbl">Taxa de Venda</div></div>
       </div>
       <div style="font-size:11px;color:rgba(255,255,255,.5);margin-bottom:8px">CTR ${fmtPct(g.ctr)} · CPC ${fmtBRL(g.cpc)} · Fat. ${fmtBRL(g.fat)}</div>
       <div style="font-size:11px;color:rgba(255,255,255,.5)">CAC ${fmtBRL(g.cac)} · Ticket Médio ${fmtBRL(g.ticket)} · PV→Checkout ${fmtPct(g.ckPct)}</div>
@@ -1146,7 +1151,7 @@ function renderPaginasTab(from, to){
     <td>${c.campaign}</td>
     <td><span class="cri-badge ${c.pagina==='B'?'ativo':'inativo'}">Página ${c.pagina}</span></td>
     <td>${fmtBRL(c.inv)}</td><td>${fmtNum(c.clicks)}</td><td>${fmtPct(c.ctr)}</td><td>${fmtBRL(c.cpc)}</td>
-    <td>${fmtNum(c.pv)}</td><td>${fmtNum(c.ck)}</td><td>${fmtNum(c.vendas)}</td><td>${fmtBRL(c.fat)}</td><td>${fmtRoas(c.roas)}</td>
+    <td>${fmtNum(c.pv)}</td><td>${fmtNum(c.ck)}</td><td>${fmtNum(c.vendas)}</td><td>${fmtPct(c.taxaVenda)}</td><td>${fmtBRL(c.fat)}</td><td>${fmtRoas(c.roas)}</td>
   </tr>`).join('');
 
   document.getElementById('tab-paginas').innerHTML = `
@@ -1157,8 +1162,8 @@ function renderPaginasTab(from, to){
   </div>
   <div class="sec-title">Detalhe por campanha</div>
   <div class="tbl-wrap"><table>
-    <thead><tr><th>Campanha</th><th>Página</th><th>Invest.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>PV</th><th>Checkout</th><th>Vendas</th><th>Fat.</th><th>ROAS</th></tr></thead>
-    <tbody>${rowsTbl || '<tr><td colspan="11" style="text-align:center;color:rgba(255,255,255,.4)">Sem campanhas no período.</td></tr>'}</tbody>
+    <thead><tr><th>Campanha</th><th>Página</th><th>Invest.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>PV</th><th>Checkout</th><th>Vendas</th><th>Taxa de Venda</th><th>Fat.</th><th>ROAS</th></tr></thead>
+    <tbody>${rowsTbl || '<tr><td colspan="12" style="text-align:center;color:rgba(255,255,255,.4)">Sem campanhas no período.</td></tr>'}</tbody>
   </table></div>
   `;
 }
