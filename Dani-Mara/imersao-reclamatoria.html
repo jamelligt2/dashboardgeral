@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Imersão Reclamatória Trabalhista · Daniela Mara — Jamelli GT</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#1a1a2e;color:#e8e6f0;font-family:'DM Sans',Arial,sans-serif;min-height:100vh}
@@ -173,6 +172,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
   <div class="tab" onclick="showTab('visao',this)">🌐 Visão Geral</div>
   <div class="tab" onclick="showTab('criativos',this)">Criativos</div>
   <div class="tab" onclick="showTab('publicos',this)">Públicos</div>
+  <div class="tab" onclick="showTab('paginas',this)">Página A/B</div>
   <div class="tab" onclick="showTab('compradores',this)">👤 Compradores</div>
 </div>
 
@@ -180,6 +180,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
 <div class="content" id="tab-visao"></div>
 <div class="content" id="tab-criativos"></div>
 <div class="content" id="tab-publicos"></div>
+<div class="content" id="tab-paginas"></div>
 <div class="content" id="tab-compradores"></div>
 
 <script>
@@ -224,6 +225,45 @@ const CONFIG = {
     date: 0, campaign: 1, adset: 2, ad: 3, adId: 4, link: 5, status: 6,
     inv: 7, imp: 8, reach: 9, clicks: 10, pv: 11, ck: 12,
   },
+
+  // A partir de 03/09/2026 um webhook real da Eduzz passou a postar direto
+  // na aba Webhook, num formato bruto (payload cru, ~185 colunas) diferente
+  // do formato limpo digitado manualmente (W acima). As duas linhagens
+  // convivem na mesma aba — parseWebhook() detecta cada linha pelo formato
+  // (ver isRawWebhookRow) e usa o mapa de colunas abaixo para as brutas.
+  PRODUCT_COD: 3093544,
+  WRAW: {
+    transCod: 8, transValue: 10, transStatus: 12, transPayMethod: 13,
+    transCreateDate: 15, transPaidDate: 16,
+    productCod: 31, productName: 32,
+    discountCoupon: 39,
+    cusName: 42, cusEmail: 43, cusCel: 46, cusCity: 53, cusState: 54,
+    utmSource: 73, utmContent: 74, utmMedium: 75, utmCampaign: 76,
+    eventName: 116,
+  },
+
+  // Reconciliação manual — vendas que chegaram na aba Webhook sem o campo
+  // UTM Content preenchido (buraco de digitação nas linhas antigas, não um
+  // problema na Eduzz), mas que a cliente conseguiu atribuir a um criativo
+  // específico cruzando manualmente com o Gerenciador de Anúncios em
+  // 14/09/2026. Mapeia fatura → ID do anúncio (mesmo ID da coluna "ID do
+  // anúncio" da aba Gerenciador). Só usado quando a venda não trouxe
+  // utm_content nenhum — nunca sobrescreve um valor já existente.
+  UTM_CONTENT_OVERRIDE: {
+    '102033941': '120253399124440057', // ADE05 · Contabilidade · 28/08
+    '102060645': '120253399124440057', // ADE05 · Contabilidade · 29/08
+    '102096395': '120253399124440057', // ADE05 · Contabilidade · 31/08
+    '102146818': '120253399124410057', // ADE10 · Contabilidade · 02/09
+    '102056496': '120253397286860057', // ADE03 · Advocacia · 29/08
+    '102141298': '120253399027680057', // ADE10 · Advocacia · 02/09
+    '102137692': '120253399027680057', // ADE10 · Advocacia · 02/09
+  },
+
+  // Quando a cliente testa uma segunda versão da página de vendas, o padrão
+  // combinado é marcar as campanhas dessa versão com "[2]" no nome da
+  // campanha no Gerenciador (ex.: "...[VENDAS] [2] ADVANTAGE 040926"). A aba
+  // "Página A/B" agrupa por esse marcador — trocar aqui se o padrão mudar.
+  PAGINA_B_MARKER: '[2]',
 };
 
 document.addEventListener('DOMContentLoaded', ()=>{
@@ -414,11 +454,28 @@ function parseGerenciador(rows){
   return out;
 }
 
-function parseWebhook(rows){
+// A partir de 03/09/2026 a aba Webhook passou a receber, além das linhas
+// limpas digitadas à mão (formato W), linhas cruas de um webhook real da
+// Eduzz (formato WRAW, ~185 colunas). isRawWebhookRow() diferencia as duas
+// pela presença de event_name (coluna 116), que só existe no formato bruto.
+function isRawWebhookRow(r){
+  return !!(r[CONFIG.WRAW.eventName] && String(r[CONFIG.WRAW.eventName]).trim() !== '');
+}
+
+// Códigos numéricos de método de pagamento do payload bruto da Eduzz ainda
+// não têm mapeamento confirmado (só vimos "32" e "15" até agora) — em vez de
+// arriscar um nome errado, mostramos o código de forma transparente.
+function rawPaymentMethodLabel(code){
+  const c = String(code||'').trim();
+  return c ? `Método #${c}` : '';
+}
+
+function parseWebhookClean(rows){
   const W = CONFIG.W;
   const out = [];
   for(let i=1;i<rows.length;i++){
     const r = rows[i];
+    if(isRawWebhookRow(r)) continue;
     if(!r[W.fatura]) continue;
     const fatura = String(r[W.fatura]).split('.')[0].trim();
     if(!fatura) continue;
@@ -455,6 +512,78 @@ function parseWebhook(rows){
       utmContent: (r[W.utmContent]||'').trim(),
       utmTerm: (r[W.utmTerm]||'').trim(),
     });
+  }
+  return out;
+}
+
+function parseWebhookRaw(rows){
+  const R = CONFIG.WRAW;
+  const out = [];
+  for(let i=1;i<rows.length;i++){
+    const r = rows[i];
+    if(!isRawWebhookRow(r)) continue;
+
+    // Só vendas efetivamente pagas (trans_status "3" = paga na Eduzz).
+    const status = String(r[R.transStatus]||'').trim();
+    if(status !== '3') continue;
+
+    const fatura = String(r[R.transCod]||'').split('.')[0].trim();
+    if(!fatura) continue;
+
+    // Defesa de produto: se vier product_cod, confere; se vier só o nome,
+    // confere pelo texto (mesma lógica leve do formato limpo).
+    const productCod = String(r[R.productCod]||'').split('.')[0].trim();
+    const productName = (r[R.productName]||'').toLowerCase();
+    if(productCod && CONFIG.PRODUCT_COD && Number(productCod) !== CONFIG.PRODUCT_COD){
+      if(productName && !productName.includes(CONFIG.PRODUTO_NOME.toLowerCase())) continue;
+    }
+
+    // Data no formato bruto vem como YYYYMMDD numérico (paga, com fallback
+    // pra criação se a data de pagamento estiver vazia).
+    const dataRaw = String(r[R.transPaidDate] || r[R.transCreateDate] || '').trim();
+    const md = dataRaw.match(/^(\d{4})(\d{2})(\d{2})/);
+    if(!md) continue;
+    const dataISO = `${md[1]}-${md[2]}-${md[3]}`;
+    if(dataISO < CONFIG.DATA_MINIMA) continue;
+
+    out.push({
+      fatura,
+      data: dataISO,
+      nome: (r[R.cusName]||'').trim(),
+      email: (r[R.cusEmail]||'').trim(),
+      telefone: (r[R.cusCel]||'').trim(),
+      cidade: (r[R.cusCity]||'').trim(),
+      uf: (r[R.cusState]||'').trim(),
+      metodoPagamento: rawPaymentMethodLabel(r[R.transPayMethod]),
+      cupom: (r[R.discountCoupon]||'').trim(),
+      fatTotal: round2(parseNumBR(r[R.transValue])),
+      utmSource: (r[R.utmSource]||'').trim(),
+      utmMedium: (r[R.utmMedium]||'').trim(),
+      utmCampaign: (r[R.utmCampaign]||'').trim(),
+      utmContent: (r[R.utmContent]||'').trim(),
+      utmTerm: '',
+    });
+  }
+  return out;
+}
+
+function parseWebhook(rows){
+  const combined = [...parseWebhookClean(rows), ...parseWebhookRaw(rows)];
+  // Dedup por fatura como rede de segurança contra webhook disparando mais
+  // de uma vez para a mesma venda.
+  const seen = new Set();
+  const out = [];
+  for(const s of combined){
+    if(seen.has(s.fatura)) continue;
+    seen.add(s.fatura);
+    out.push(s);
+  }
+  // Aplica a reconciliação manual (ver CONFIG.UTM_CONTENT_OVERRIDE) só nas
+  // vendas que vieram sem utm_content — nunca sobrescreve um valor real.
+  for(const s of out){
+    if(!s.utmContent && CONFIG.UTM_CONTENT_OVERRIDE[s.fatura]){
+      s.utmContent = CONFIG.UTM_CONTENT_OVERRIDE[s.fatura];
+    }
   }
   return out;
 }
@@ -543,6 +672,7 @@ function applyFilters(){
   renderVisaoGeral(from, to);
   renderCriativosTab(from, to);
   renderPublicosTab(from, to);
+  renderPaginasTab(from, to);
   renderCompradores(from, to);
 }
 function showTab(id, el){
@@ -639,37 +769,6 @@ function renderSaleCards(salesR){
 }
 
 /* ── ABA VISÃO GERAL ──────────────────────────────────────────────── */
-let chartUF = null;
-function buildUFBuckets(salesR){
-  const map = new Map();
-  for(const s of salesR){
-    const uf = (s.uf||'').trim().toUpperCase() || 'N/D';
-    if(!map.has(uf)) map.set(uf, {uf, count:0, fat:0});
-    const o = map.get(uf); o.count++; o.fat += s.fatTotal;
-  }
-  return [...map.values()].sort((a,b)=> b.count-a.count);
-}
-function renderUFChart(salesR, prevChart){
-  if(prevChart) prevChart.destroy();
-  const ctx = document.getElementById('chartUF');
-  if(!ctx || typeof Chart === 'undefined') return null;
-  const buckets = buildUFBuckets(salesR);
-  return new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: buckets.map(b=>b.uf),
-      datasets: [{ label: 'Vendas', data: buckets.map(b=>b.count), backgroundColor: 'rgba(255,107,43,0.85)' }],
-    },
-    options: {
-      responsive:true, maintainAspectRatio:false,
-      scales:{
-        y:{ beginAtZero:true, ticks:{color:'rgba(255,255,255,.5)', precision:0}, grid:{color:'rgba(255,255,255,.05)'} },
-        x:{ ticks:{color:'rgba(255,255,255,.5)'}, grid:{display:false} },
-      },
-      plugins:{ legend:{ display:false } },
-    },
-  });
-}
 function renderVisaoGeral(from, to){
   const salesR = SALES.filter(s => inRange(s.data, from, to));
   const growsR = GROWS.filter(r => inRange(r.data, from, to));
@@ -709,17 +808,12 @@ function renderVisaoGeral(from, to){
     <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value">${fmtBRL(ticket)}</div></div>
     <div class="kpi-card"><div class="kpi-label">CAC Total</div><div class="kpi-value">${fmtBRL(cacTotal)}<span class="kpi-sub"> (sobre vendas de tráfego)</span></div></div>
   </div>
-  <div class="sec-title">Vendas por Estado</div>
-  <div class="chart-grid-2x2" style="grid-template-columns:1fr">
-    <div class="chart-card"><h4>Número de vendas por UF</h4><canvas id="chartUF"></canvas></div>
-  </div>
   <div class="sec-title">Dia a Dia</div>
   <div class="tbl-wrap"><table>
     <thead><tr><th>Data</th><th>Invest.</th><th>Fat. Total</th><th>ROAS</th><th>Compras Total</th><th>Tráfego</th><th>Orgânicas</th><th>Ticket Médio</th><th>CAC</th></tr></thead>
     <tbody>${rows || '<tr><td colspan="9" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados no período.</td></tr>'}</tbody>
   </table></div>
   `;
-  chartUF = renderUFChart(salesR, chartUF);
 }
 
 /* ── ATRIBUIÇÃO DE VENDAS A CRIATIVO / PÚBLICO ───────────────────── */
@@ -747,7 +841,32 @@ function latestStatusByKey(rows, keyFn){
 }
 
 /* ── ABA CRIATIVOS ────────────────────────────────────────────────── */
-let criFilter = 'todos', criSort = 'inv', criPublico = 'todos';
+/* Página A/B por venda: a fonte de verdade é o UTM Campaign da própria
+   venda (não uma referência cruzada com o Gerenciador) — o padrão da
+   agência marca a campanha da segunda versão de página com um "2" no
+   final do utm_campaign (ex.: "imersao_reclamatoria" = Página A,
+   "imersao_reclamatoria2" = Página B). Conferido em 14/09/2026 contra o
+   nome da campanha no Gerenciador (marcador CONFIG.PAGINA_B_MARKER) para
+   todas as vendas que tinham os dois dados — bateu 100% dos casos.
+   Quando a venda não trouxe utm_campaign (caso das poucas reconciliadas
+   manualmente via CONFIG.UTM_CONTENT_OVERRIDE), cai no fallback do nome
+   da campanha do anúncio no Gerenciador. */
+function paginaFromUtmCampaign(utmCampaign){
+  const c = String(utmCampaign||'').trim();
+  if(!c) return null;
+  return /2$/.test(c) ? 'B' : 'A';
+}
+function paginaOfSale(s, fallbackCampaign){
+  const viaUtm = paginaFromUtmCampaign(s.utmCampaign);
+  if(viaUtm) return viaUtm;
+  if(fallbackCampaign) return paginaOf(fallbackCampaign);
+  if(s.utmContent){
+    const found = GROWS.find(r => r.adId === String(s.utmContent).trim());
+    if(found) return paginaOf(found.campaign);
+  }
+  return null;
+}
+let criFilter = 'todos', criSort = 'inv', criPublico = 'todos', criPagina = 'todos';
 function buildCriativos(from, to){
   const growsR = GROWS.filter(r => inRange(r.data, from, to));
   const trafego = SALES.filter(s => inRange(s.data, from, to) && isTrafego(s));
@@ -755,7 +874,7 @@ function buildCriativos(from, to){
   for(const r of growsR){
     const key = r.adId || (r.campaign + '|' + r.adset + '|' + r.ad);
     if(!map.has(key)) map.set(key, {campaign:r.campaign, adset:r.adset, ad:r.ad, adId:r.adId, link:r.link,
-      inv:0, reach:0, imp:0, clicks:0, pv:0, ck:0, vendas:0, fat:0});
+      inv:0, reach:0, imp:0, clicks:0, pv:0, ck:0, vendas:0, fat:0, vendasPagina:{A:0,B:0}});
     const o = map.get(key);
     o.inv += r.inv; o.reach = Math.max(o.reach, r.reach); o.imp += r.imp; o.clicks += r.clicks;
     o.pv += r.pv; o.ck += r.ck;
@@ -764,7 +883,11 @@ function buildCriativos(from, to){
   const unmapped = [];
   for(const s of trafego){
     const found = s.utmContent ? map.get(String(s.utmContent).trim()) : null;
-    if(found){ found.vendas++; found.fat += s.fatTotal; }
+    if(found){
+      found.vendas++; found.fat += s.fatTotal;
+      const pg = paginaOfSale(s, found.campaign);
+      if(pg==='A' || pg==='B') found.vendasPagina[pg]++;
+    }
     else unmapped.push(s);
   }
   const latestByAd = latestStatusByKey(GROWS, r => r.adId || (r.campaign+'|'+r.adset+'|'+r.ad));
@@ -774,7 +897,10 @@ function buildCriativos(from, to){
     const ctr = o.imp>0 ? o.clicks/o.imp*100 : 0;
     const cpc = o.clicks>0 ? o.inv/o.clicks : NaN;
     const roas = o.inv>0 ? o.fat/o.inv : NaN;
-    return {...o, ativo, ctr, cpc, roas};
+    // Página do criativo = página da campanha em que ele roda (Gerenciador);
+    // fica sempre definida, mesmo sem venda ainda.
+    const pagina = paginaOf(o.campaign);
+    return {...o, ativo, ctr, cpc, roas, pagina};
   });
   return {list, unmapped};
 }
@@ -786,6 +912,7 @@ function renderCriativosTab(from, to){
   if(criFilter==='ativos') filtered = filtered.filter(c=>c.ativo);
   if(criFilter==='inativos') filtered = filtered.filter(c=>!c.ativo);
   if(criPublico !== 'todos') filtered = filtered.filter(c=>c.adset === criPublico);
+  if(criPagina !== 'todos') filtered = filtered.filter(c=>c.pagina === criPagina);
   const sortFn = {
     inv:(a,b)=>b.inv-a.inv, ctr:(a,b)=>b.ctr-a.ctr, cpc:(a,b)=>(a.cpc||1e9)-(b.cpc||1e9),
     roas:(a,b)=>(b.roas||-1)-(a.roas||-1), vendas:(a,b)=>b.vendas-a.vendas,
@@ -795,7 +922,7 @@ function renderCriativosTab(from, to){
   const cards = filtered.map(c=>`
     <div class="cri-card ${c.ativo?'ativo':''}">
       <div class="cri-card-header">
-        <div class="cri-name">${c.ad || '(sem nome)'}<br><span style="color:rgba(255,255,255,.4);font-size:9px;font-weight:400">${c.adset || '—'}</span></div>
+        <div class="cri-name">${c.ad || '(sem nome)'}<br><span style="color:rgba(255,255,255,.4);font-size:9px;font-weight:400">${c.adset || '—'} · Página ${c.pagina}</span></div>
         <div class="cri-badge ${c.ativo?'ativo':'inativo'}">${c.ativo?'Ativo':'Inativo'}</div>
       </div>
       <div class="cri-metrics">
@@ -809,22 +936,32 @@ function renderCriativosTab(from, to){
       ${c.link ? `<a class="cri-link" href="${c.link.trim()}" target="_blank">${c.link.trim()}</a>` : ''}
     </div>`).join('');
 
-  const rowsTbl = filtered.map(c=>`<tr><td>${c.ad}</td><td>${c.adset}</td><td>${fmtBRL(c.inv)}</td><td>${fmtNum(c.clicks)}</td>
+  const rowsTbl = filtered.map(c=>`<tr><td>${c.ad}</td><td>${c.adset}</td><td><span class="cri-badge ${c.pagina==='B'?'ativo':'inativo'}">Página ${c.pagina}</span></td><td>${fmtBRL(c.inv)}</td><td>${fmtNum(c.clicks)}</td>
     <td>${fmtPct(c.ctr)}</td><td>${fmtBRL(c.cpc)}</td><td>${fmtNum(c.pv)}</td><td>${fmtNum(c.ck)}</td>
     <td>${fmtNum(c.vendas)}</td><td>${fmtBRL(c.fat)}</td><td>${fmtRoas(c.roas)}</td><td>${c.ativo?'Ativo':'Inativo'}</td></tr>`).join('');
 
   let unmappedHtml = '';
   if(unmapped.length){
+    const semUtm = unmapped.filter(s => !s.utmContent);
+    const idNaoEncontrado = unmapped.filter(s => s.utmContent);
     const byId = new Map();
-    for(const s of unmapped){
-      const id = s.utmContent || '(sem utm_content)';
-      if(!byId.has(id)) byId.set(id, {id, medium:s.utmMedium, count:0, fat:0});
+    for(const s of idNaoEncontrado){
+      const id = s.utmContent;
+      if(!byId.has(id)) byId.set(id, {id, medium:s.utmMedium, pagina:paginaOfSale(s), count:0, fat:0});
       const o = byId.get(id); o.count++; o.fat += s.fatTotal;
     }
-    const rows = [...byId.values()].map(o=>`<div>• ID <b>${o.id}</b> (público: ${o.medium||'—'}) — ${o.count} venda(s), ${fmtBRL(o.fat)}</div>`).join('');
-    unmappedHtml = `<div class="unmapped-box"><strong>⚠️ ${unmapped.length} venda(s) de tráfego não atribuída(s) a um criativo.</strong>
-      O ID do anúncio dessa venda não apareceu em nenhuma linha do Gerenciador no período selecionado
-      (o anúncio pode ter saído do ar antes da data mínima, ou o ID mudou). Confira no Ads Manager.<br>${rows}</div>`;
+    const rows = [...byId.values()].map(o=>`<div>• ID <b>${o.id}</b> (público: ${o.medium||'—'}${o.pagina?', página '+o.pagina:''}) — ${o.count} venda(s), ${fmtBRL(o.fat)}</div>`).join('');
+    let blocks = '';
+    if(semUtm.length){
+      const fat = semUtm.reduce((s,v)=>s+v.fatTotal,0);
+      blocks += `<div><strong>${semUtm.length} venda(s)</strong> vieram sem o campo UTM Content preenchido na planilha
+        (${fmtBRL(fat)}) — não tem como saber de qual anúncio vieram até que a planilha traga esse dado.</div>`;
+    }
+    if(idNaoEncontrado.length){
+      blocks += `<div style="margin-top:${semUtm.length?'8px':'0'}"><strong>${idNaoEncontrado.length} venda(s)</strong> trazem um ID de anúncio que não aparece
+        em nenhuma linha do Gerenciador no período (o anúncio pode ter saído do ar antes da data mínima, ou o ID mudou):<br>${rows}</div>`;
+    }
+    unmappedHtml = `<div class="unmapped-box"><strong>⚠️ ${unmapped.length} venda(s) de tráfego não atribuída(s) a um criativo.</strong><br>${blocks}</div>`;
   }
 
   document.getElementById('tab-criativos').innerHTML = `
@@ -836,6 +973,11 @@ function renderCriativosTab(from, to){
       <option value="todos">Todos os públicos</option>
       ${publicos.map(p=>`<option value="${p}" ${criPublico===p?'selected':''}>${p}</option>`).join('')}
     </select>
+    <select class="buyers-search" style="min-width:140px" onchange="criPagina=this.value;renderCriativosTab('${from}','${to}')">
+      <option value="todos" ${criPagina==='todos'?'selected':''}>Todas as páginas</option>
+      <option value="A" ${criPagina==='A'?'selected':''}>Página A</option>
+      <option value="B" ${criPagina==='B'?'selected':''}>Página B</option>
+    </select>
     <span class="cri-sort-label">Ordenar por:</span>
     <button class="cri-sort-btn ${criSort==='inv'?'active':''}" onclick="criSort='inv';renderCriativosTab('${from}','${to}')">Investimento</button>
     <button class="cri-sort-btn ${criSort==='ctr'?'active':''}" onclick="criSort='ctr';renderCriativosTab('${from}','${to}')">CTR</button>
@@ -846,7 +988,7 @@ function renderCriativosTab(from, to){
   ${unmappedHtml}
   <div class="cri-grid">${cards || '<div style="color:rgba(255,255,255,.4);font-size:12px">Sem criativos no período.</div>'}</div>
   <div class="tbl-wrap"><table>
-    <thead><tr><th>Anúncio</th><th>Conjunto</th><th>Invest.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>PV</th><th>Checkout</th><th>Vendas</th><th>Fat.</th><th>ROAS</th><th>Status</th></tr></thead>
+    <thead><tr><th>Anúncio</th><th>Conjunto</th><th>Página</th><th>Invest.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>PV</th><th>Checkout</th><th>Vendas</th><th>Fat.</th><th>ROAS</th><th>Status</th></tr></thead>
     <tbody>${rowsTbl}</tbody>
   </table></div>
   `;
@@ -922,6 +1064,102 @@ function renderPublicosTab(from, to){
     <button class="pub-sort-btn ${pubSort==='vendas'?'active':''}" onclick="pubSort='vendas';renderPublicosTab('${from}','${to}')">Vendas</button>
   </div>
   <div class="pub-grid">${cards || '<div style="color:rgba(255,255,255,.4);font-size:12px">Sem públicos no período.</div>'}</div>
+  `;
+}
+
+/* ── ABA PÁGINA A/B ───────────────────────────────────────────────────
+   Algumas campanhas do lançamento testam uma segunda versão da página de
+   vendas; por convenção elas trazem "[2]" no nome da campanha (ver
+   CONFIG.PAGINA_B_MARKER). Esta aba agrupa investimento/funil/vendas por
+   campanha e depois soma cada campanha na sua página (A = sem o marcador,
+   B = com o marcador), pra comparar as duas versões lado a lado. */
+function paginaOf(campaignName){
+  return String(campaignName||'').includes(CONFIG.PAGINA_B_MARKER) ? 'B' : 'A';
+}
+function buildPaginas(from, to){
+  const growsR = GROWS.filter(r => inRange(r.data, from, to));
+  const trafego = SALES.filter(s => inRange(s.data, from, to) && isTrafego(s));
+
+  const adToCampaign = new Map();
+  const byCampaign = new Map();
+  for(const r of growsR){
+    if(!byCampaign.has(r.campaign)) byCampaign.set(r.campaign, {
+      campaign: r.campaign, pagina: paginaOf(r.campaign),
+      inv:0, imp:0, reach:0, clicks:0, pv:0, ck:0, vendas:0, fat:0,
+    });
+    const o = byCampaign.get(r.campaign);
+    o.inv += r.inv; o.imp += r.imp; o.reach = Math.max(o.reach, r.reach); o.clicks += r.clicks;
+    o.pv += r.pv; o.ck += r.ck;
+    if(r.adId) adToCampaign.set(r.adId, r.campaign);
+  }
+  for(const s of trafego){
+    const camp = s.utmContent ? adToCampaign.get(String(s.utmContent).trim()) : null;
+    if(camp && byCampaign.has(camp)){ const o = byCampaign.get(camp); o.vendas++; o.fat += s.fatTotal; }
+  }
+  const campaigns = [...byCampaign.values()].map(o=>{
+    const ctr = o.imp>0 ? o.clicks/o.imp*100 : 0;
+    const cpc = o.clicks>0 ? o.inv/o.clicks : NaN;
+    const roas = o.inv>0 ? o.fat/o.inv : NaN;
+    return {...o, ctr, cpc, roas};
+  }).sort((a,b)=>b.inv-a.inv);
+
+  const groups = {
+    A: {pagina:'A', inv:0, imp:0, clicks:0, pv:0, ck:0, vendas:0, fat:0},
+    B: {pagina:'B', inv:0, imp:0, clicks:0, pv:0, ck:0, vendas:0, fat:0},
+  };
+  for(const c of campaigns){
+    const g = groups[c.pagina];
+    g.inv += c.inv; g.imp += c.imp; g.clicks += c.clicks; g.pv += c.pv; g.ck += c.ck;
+    g.vendas += c.vendas; g.fat += c.fat;
+  }
+  for(const k of ['A','B']){
+    const g = groups[k];
+    g.ctr = g.imp>0 ? g.clicks/g.imp*100 : 0;
+    g.cpc = g.clicks>0 ? g.inv/g.clicks : NaN;
+    g.roas = g.inv>0 ? g.fat/g.inv : NaN;
+    g.cac = g.vendas>0 ? g.inv/g.vendas : NaN;
+    g.ticket = g.vendas>0 ? g.fat/g.vendas : NaN;
+    g.pvPct = g.clicks>0 ? g.pv/g.clicks*100 : 0;
+    g.ckPct = g.pv>0 ? g.ck/g.pv*100 : 0;
+  }
+  return {groups, campaigns};
+}
+function renderPaginasTab(from, to){
+  const {groups, campaigns} = buildPaginas(from, to);
+
+  const groupCard = (g, titulo) => `
+    <div class="pub-card">
+      <div class="pub-card-header">
+        <div class="pub-name">${titulo}<br><span style="color:rgba(255,255,255,.4);font-size:10px">${
+          campaigns.filter(c=>c.pagina===g.pagina).length} campanha(s)</span></div>
+      </div>
+      <div class="pub-metrics">
+        <div class="pub-metric"><div class="pub-metric-val">${fmtBRL(g.inv)}</div><div class="pub-metric-lbl">Invest.</div></div>
+        <div class="pub-metric"><div class="pub-metric-val neutral">${fmtNum(g.vendas)}</div><div class="pub-metric-lbl">Vendas</div></div>
+        <div class="pub-metric"><div class="pub-metric-val neutral">${fmtRoas(g.roas)}</div><div class="pub-metric-lbl">ROAS</div></div>
+      </div>
+      <div style="font-size:11px;color:rgba(255,255,255,.5);margin-bottom:8px">CTR ${fmtPct(g.ctr)} · CPC ${fmtBRL(g.cpc)} · Fat. ${fmtBRL(g.fat)}</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.5)">CAC ${fmtBRL(g.cac)} · Ticket Médio ${fmtBRL(g.ticket)} · PV→Checkout ${fmtPct(g.ckPct)}</div>
+    </div>`;
+
+  const rowsTbl = campaigns.map(c=>`<tr>
+    <td>${c.campaign}</td>
+    <td><span class="cri-badge ${c.pagina==='B'?'ativo':'inativo'}">Página ${c.pagina}</span></td>
+    <td>${fmtBRL(c.inv)}</td><td>${fmtNum(c.clicks)}</td><td>${fmtPct(c.ctr)}</td><td>${fmtBRL(c.cpc)}</td>
+    <td>${fmtNum(c.pv)}</td><td>${fmtNum(c.ck)}</td><td>${fmtNum(c.vendas)}</td><td>${fmtBRL(c.fat)}</td><td>${fmtRoas(c.roas)}</td>
+  </tr>`).join('');
+
+  document.getElementById('tab-paginas').innerHTML = `
+  <div class="sec-title">Comparativo Página A vs Página B</div>
+  <div class="pub-grid">
+    ${groupCard(groups.A, 'Página A')}
+    ${groupCard(groups.B, 'Página B')}
+  </div>
+  <div class="sec-title">Detalhe por campanha</div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Campanha</th><th>Página</th><th>Invest.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>PV</th><th>Checkout</th><th>Vendas</th><th>Fat.</th><th>ROAS</th></tr></thead>
+    <tbody>${rowsTbl || '<tr><td colspan="11" style="text-align:center;color:rgba(255,255,255,.4)">Sem campanhas no período.</td></tr>'}</tbody>
+  </table></div>
   `;
 }
 
