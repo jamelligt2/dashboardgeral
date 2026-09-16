@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Livro Psi de Negócio · Bianca Amorim — Jamelli GT</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.0/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#1a1a2e;color:#e8e6f0;font-family:'DM Sans',Arial,sans-serif;min-height:100vh}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:#12121f}::-webkit-scrollbar-thumb{background:#ff6b2b55;border-radius:3px}
+.topbar{background:#12121f;padding:12px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.07);position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:10px}
+.brand{font-size:17px;font-weight:700;color:#ff6b2b}
+.subtitle{font-size:11px;color:rgba(255,255,255,0.4);margin-top:2px}
+.logo-jgt{display:flex;align-items:center;gap:10px}
+.logo-jgt svg{width:36px;height:36px;flex-shrink:0}
+.logo-text{display:flex;flex-direction:column}
+.logo-text strong{font-size:13px;font-weight:700;color:#ff6b2b;letter-spacing:.3px}
+.logo-text span{font-size:10px;color:rgba(255,255,255,.35);margin-top:1px}
+.period-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.period-bar label{font-size:11px;color:rgba(255,255,255,.45);white-space:nowrap}
+.date-input{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:#e8e6f0;padding:5px 10px;border-radius:6px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;outline:none;min-width:118px}
+.date-input:focus{border-color:#ff6b2b}
+.date-input::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;cursor:pointer}
+.period-sep{color:rgba(255,255,255,.2);font-size:13px;padding:0 2px}
+.preset-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;transition:all .2s;white-space:nowrap}
+.preset-btn:hover,.preset-btn.active{background:rgba(255,107,43,.2);border-color:#ff6b2b;color:#ff6b2b;font-weight:600}
+.range-info{font-size:11px;color:rgba(255,107,43,.75);font-family:'DM Mono',monospace;white-space:nowrap;padding-left:4px}
+.tabs{display:flex;border-bottom:1px solid rgba(255,255,255,0.07);background:#12121f;padding:0 28px;overflow-x:auto}
+.tab{padding:12px 20px;cursor:pointer;font-size:13px;color:rgba(255,255,255,0.5);border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap;font-weight:500}
+.tab:hover{color:#e8e6f0}.tab.active{color:#ff6b2b;border-bottom-color:#ff6b2b;font-weight:700}
+.subtabs{display:flex;gap:6px;margin:0 0 18px;flex-wrap:wrap}
+.subtab{padding:7px 14px;cursor:pointer;font-size:12px;color:rgba(255,255,255,.55);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:7px;transition:all .2s}
+.subtab:hover{color:#e8e6f0}.subtab.active{color:#ff6b2b;border-color:#ff6b2b;background:rgba(255,107,43,.12);font-weight:600}
+.content{padding:24px 28px;display:none}.content.active{display:block}
+.subcontent{display:none}.subcontent.active{display:block}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+.kpi-card{background:#12121f;border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:14px 16px}
+.kpi-label{font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.kpi-value{font-size:19px;font-weight:700;font-family:'DM Mono',monospace}
+.kpi-sub{font-size:10px;color:rgba(255,255,255,.35);margin-top:4px}
+.orange{color:#ff6b2b}.green{color:#2ecc71}.red{color:#e74c3c}.yellow{color:#f1c40f}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#12121f;color:rgba(255,255,255,.45);padding:8px 10px;text-align:right;font-weight:500;border-bottom:1px solid rgba(255,255,255,.07);white-space:nowrap;position:sticky;top:0}
+th:first-child{text-align:left}
+td{padding:7px 10px;text-align:right;border-bottom:1px solid rgba(255,255,255,.04);font-family:'DM Mono',monospace;font-size:11px;color:#e8e6f0}
+td:first-child{text-align:left;font-family:'DM Sans',sans-serif;font-size:12px}
+tr:hover td{background:rgba(255,255,255,.025)}
+.chart-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:16px;margin-bottom:20px}
+.chart-card h4{font-size:11px;color:rgba(255,255,255,.45);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
+.chart-card canvas{max-height:230px}
+.sec-title{font-size:13px;font-weight:600;color:rgba(255,255,255,.65);margin:20px 0 10px;border-left:3px solid #ff6b2b;padding-left:10px;display:flex;align-items:center;gap:8px}
+.funil-section{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:16px 0}
+.funil-bar-wrap{margin-bottom:12px}
+.funil-label{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;color:rgba(255,255,255,.7)}
+.funil-bar-bg{background:rgba(255,255,255,.05);border-radius:4px;height:14px;overflow:hidden}
+.funil-bar-fill{background:linear-gradient(90deg,#ff6b2b,#ff9a3c);height:100%;border-radius:4px;transition:width .4s}
+.taxa-grid{display:grid;gap:8px}
+.taxa-item{background:rgba(255,255,255,.04);border-radius:8px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;font-size:12px;color:rgba(255,255,255,.7)}
+.taxa-val{font-family:'DM Mono',monospace;font-size:15px;font-weight:600;color:#ff6b2b}
+.cri-filterbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.cri-filter-btn,.cri-sort-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 12px;border-radius:5px;cursor:pointer;font-size:12px;transition:all .2s;font-family:'DM Sans',sans-serif}
+.cri-filter-btn.active,.cri-sort-btn.active{background:rgba(255,107,43,.2);border-color:#ff6b2b;color:#ff6b2b}
+.cri-sort-label{font-size:11px;color:rgba(255,255,255,.4);white-space:nowrap}
+.cri-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
+.cri-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:14px}
+.cri-card.ativo{border-color:rgba(46,204,113,.25)}
+.cri-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.cri-name{font-size:11px;font-weight:600;word-break:break-all;flex:1;margin-right:6px;color:#e8e6f0}
+.cri-badge{font-size:10px;padding:2px 6px;border-radius:4px;white-space:nowrap}
+.cri-badge.ativo{background:rgba(46,204,113,.15);color:#2ecc71}
+.cri-badge.inativo{background:rgba(255,255,255,.08);color:rgba(255,255,255,.4)}
+.cri-metrics{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.cri-metric{display:flex;flex-direction:column}
+.cri-metric-label{color:rgba(255,255,255,.4);font-size:9px;margin-bottom:2px;text-transform:uppercase}
+.cri-metric-val{font-family:'DM Mono',monospace;font-size:12px;font-weight:600;color:#e8e6f0}
+.cri-metric-val.hl{color:#ff6b2b;font-size:14px}
+.cri-link{display:block;margin-top:8px;font-size:10px;color:rgba(255,107,43,.7);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tbl-wrap{overflow-x:auto;border-radius:8px;border:1px solid rgba(255,255,255,.07);max-height:420px;overflow-y:auto}
+.pub-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:24px}
+.pub-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:16px}
+.pub-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+.pub-name{font-size:12px;font-weight:600;flex:1;margin-right:8px;color:#e8e6f0;line-height:1.4}
+.pub-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pub-metric{text-align:center;padding:8px 6px;background:rgba(255,255,255,.03);border-radius:6px}
+.pub-metric-val{font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:#ff6b2b}
+.pub-metric-val.neutral{color:#e8e6f0}
+.pub-metric-lbl{font-size:9px;color:rgba(255,255,255,.35);margin-top:2px;text-transform:uppercase;letter-spacing:.4px}
+.sales-scroll{display:flex;gap:10px;overflow-x:auto;padding-bottom:8px}
+.sale-card{flex:0 0 220px;background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:12px 14px}
+.sale-card.trafego{border-left:3px solid #2ecc71}
+.sale-card.organico{border-left:3px solid #f1c40f}
+.sale-card.flag{border-color:rgba(231,76,60,.5)}
+.sale-name{font-size:12px;font-weight:600;color:#e8e6f0;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sale-val{font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:#ff6b2b;margin-bottom:4px}
+.sale-meta{font-size:10px;color:rgba(255,255,255,.4);line-height:1.5}
+.banner{background:rgba(241,196,15,.08);border:1px solid rgba(241,196,15,.35);border-radius:10px;padding:12px 16px;font-size:12px;color:rgba(255,255,255,.75);margin-bottom:18px;line-height:1.6}
+.banner.crit{background:rgba(231,76,60,.08);border-color:rgba(231,76,60,.4)}
+.banner strong{color:#f1c40f}
+.banner.crit strong{color:#e74c3c}
+.notes-block{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:18px 20px;margin-bottom:16px}
+.notes-block h3{font-size:13px;color:#ff6b2b;margin-bottom:10px}
+.notes-block p{font-size:12px;color:rgba(255,255,255,.7);line-height:1.7;margin-bottom:8px}
+.notes-block code{background:rgba(255,255,255,.08);padding:1px 5px;border-radius:4px;font-size:11px}
+.notes-block ul{margin:6px 0 6px 18px;font-size:12px;color:rgba(255,255,255,.7);line-height:1.8}
+.chip{display:inline-block;background:rgba(255,107,43,.15);color:#ff6b2b;padding:2px 8px;border-radius:20px;font-size:11px;font-family:'DM Mono',monospace;margin:2px 4px 2px 0}
+.chip.bad{background:rgba(231,76,60,.15);color:#e74c3c}
+.empty-msg{color:rgba(255,255,255,.35);font-size:12px;padding:20px;text-align:center}
+@media(max-width:900px){.cri-grid{grid-template-columns:repeat(2,1fr)}.funil-section{grid-template-columns:1fr}}
+@media(max-width:600px){.cri-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div id="loading-overlay" style="position:fixed;inset:0;background:#1a1a2e;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px">
+  <div style="width:40px;height:40px;border:3px solid rgba(255,107,43,.2);border-top-color:#ff6b2b;border-radius:50%;animation:spin 1s linear infinite"></div>
+  <div style="color:rgba(255,255,255,.5);font-size:13px" id="loading-msg">Conectando com a planilha...</div>
+  <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+</div>
+
+<div class="topbar">
+  <div class="logo-jgt">
+    <svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+      <rect width="36" height="36" rx="8" fill="#ff6b2b" fill-opacity="0.9"/>
+      <text x="18" y="25" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="13" fill="white">JGT</text>
+    </svg>
+    <div class="logo-text">
+      <strong>Jamelli GT</strong>
+      <span>Tráfego Pago</span>
+    </div>
+  </div>
+  <div class="period-bar">
+    <label>De</label>
+    <input type="date" id="dateFrom" class="date-input" onchange="onDateChange()">
+    <span class="period-sep">→</span>
+    <input type="date" id="dateTo" class="date-input" onchange="onDateChange()">
+    <button class="preset-btn" onclick="setPreset(7,this)">7d</button>
+    <button class="preset-btn" onclick="setPreset(14,this)">14d</button>
+    <button class="preset-btn" onclick="setPreset(30,this)">30d</button>
+    <button class="preset-btn active" id="btn-all" onclick="setPreset('all',this)">Tudo</button>
+    <span class="range-info" id="range-info"></span>
+    <button class="preset-btn" onclick="loadData()" style="margin-left:4px">🔄 Atualizar</button>
+  </div>
+  <div>
+    <div class="brand">📚 Livro Psi de Negócio · Bianca Amorim</div>
+    <div class="subtitle">Dashboard de Performance · Jamelli GT · 2026</div>
+  </div>
+</div>
+
+<div class="tabs" id="main-tabs">
+  <div class="tab active" data-seg="fisico" onclick="showSegment('fisico')">📦 Livro Físico [COMBO]</div>
+  <div class="tab" data-seg="digital" onclick="showSegment('digital')">📱 Livro Digital</div>
+  <div class="tab" data-seg="exterior" onclick="showSegment('exterior')">🌍 Campanha Exterior</div>
+  <div class="tab" data-seg="notas" onclick="showSegment('notas')">🔎 Qualidade de Dados</div>
+</div>
+
+<div class="content active" id="content-fisico"></div>
+<div class="content" id="content-digital"></div>
+<div class="content" id="content-exterior"></div>
+<div class="content" id="content-notas"></div>
+
+<script>
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  CONFIG                                                          ║
+// ╚══════════════════════════════════════════════════════════════════╝
+const CONFIG = {
+  SHEET_ID: '1EH2PnFL976htvnoniczN9bCTg6Yp8C0HO_OaD4heCmM',
+  SHEETS: {
+    g1: 'Gerenciador',
+    g2: 'Gerenciador conta 2',
+    wh: 'WebhooK',
+    resumo: 'Resumo',
+    resumoCorreto: 'Resumo_correto'
+  },
+  STATUS_APROVADO: ['APPROVED','COMPLETED','COMPLETE','CONFIRMED','PAGO'],
+  VALOR_MAX: { digital: 150, fisico: 300, exterior: 400, bump: 100 },
+};
+
+const SEGMENTS = {
+  fisico:   { label: 'Livro Físico [COMBO]', icon:'📦', color:'#ff6b2b' },
+  digital:  { label: 'Livro Digital',        icon:'📱', color:'#2ecc71' },
+  exterior: { label: 'Campanha Exterior',    icon:'🌍', color:'#3498db' },
+};
+
+let CUR_SEG = 'fisico';
+let AD_ROWS = [];      // linhas brutas do Gerenciador (contas 1 e 2)
+let SALES = [];        // vendas deduplicadas e aprovadas (WebhooK)
+let SALES_ALL_RAW = []; // todas as linhas brutas do webhook (para aba de qualidade de dados)
+let RESUMO_ROWS = [];
+let RESUMO_CORRETO_ROWS = [];
+let RESUMO_STATUS = { resumo: false, resumoCorreto: false };
+let CHARTS = {};
+let SUB_TAB = { fisico:'geral', digital:'geral', exterior:'geral' };
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  UTILS                                                           ║
+// ╚══════════════════════════════════════════════════════════════════╝
+function parseCSV(text){
+  const rows = []; let row = [], field = '', inQuotes = false;
+  for (let i=0;i<text.length;i++){
+    const c = text[i];
+    if (inQuotes){
+      if (c === '"'){ if (text[i+1] === '"'){ field+='"'; i++; } else inQuotes = false; }
+      else field += c;
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { row.push(field); field=''; }
+      else if (c === '\n'){ row.push(field); rows.push(row); row=[]; field=''; }
+      else if (c === '\r'){ /* skip */ }
+      else field += c;
+    }
+  }
+  if (field.length || row.length){ row.push(field); rows.push(row); }
+  return rows.filter(r => r.length>1 || (r[0]||'').trim()!=='');
+}
+
+function parseDateStr(s){
+  if (!s) return null;
+  s = String(s).trim();
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  return null;
+}
+
+function brNum(s){
+  if (s === undefined || s === null) return NaN;
+  s = String(s).trim();
+  if (s === '') return NaN;
+  s = s.replace(/^R\$\s*/,'').replace(/\s/g,'');
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) return NaN; // data disfarçada de valor
+  if (s.includes(',') && s.includes('.')) s = s.replace(/\./g,'').replace(',', '.');
+  else if (s.includes(',')) s = s.replace(',', '.');
+  const n = parseFloat(s);
+  return isNaN(n) ? NaN : n;
+}
+
+function fmtBRL(n){ if(!isFinite(n)) return '—'; return 'R$ ' + n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtPct(n){ if(!isFinite(n)) return '—'; return n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%'; }
+function fmtInt(n){ if(!isFinite(n)) return '—'; return Math.round(n).toLocaleString('pt-BR'); }
+function fmtDateBR(iso){ if(!iso) return '—'; const [y,m,d]=iso.split('-'); return `${d}/${m}/${y}`; }
+function isPaused(s){ return (s||'').toUpperCase().includes('PAUSED'); }
+function isTrafego(src){ return (src||'').toLowerCase().replace(/[\s_-]/g,'').startsWith('metaads'); }
+
+async function fetchSheetCSV(sheetName){
+  const url = `https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(()=>controller.abort(), 20000);
+  try{
+    const resp = await fetch(url, {signal:controller.signal});
+    clearTimeout(timeout);
+    if (!resp.ok) throw new Error(`Planilha "${sheetName}": HTTP ${resp.status}. Verifique se está pública.`);
+    const text = await resp.text();
+    if (text.includes('Signin') || text.includes('accounts.google')) throw new Error(`Planilha "${sheetName}" requer login. Defina como pública.`);
+    return text;
+  } catch(e){
+    clearTimeout(timeout);
+    if (e.name === 'AbortError') throw new Error(`Timeout ao carregar "${sheetName}".`);
+    throw e;
+  }
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  CARGA E PROCESSAMENTO                                           ║
+// ╚══════════════════════════════════════════════════════════════════╝
+function parseAdSheet(csvText, conta){
+  const rows = parseCSV(csvText);
+  const out = [];
+  for (let i=1;i<rows.length;i++){
+    const r = rows[i];
+    if (!r[0]) continue;
+    const data = parseDateStr(r[0]);
+    if (!data) continue;
+    out.push({
+      data, campanha: r[1]||'', conjunto: r[2]||'', anuncio: r[3]||'', link: r[4]||'',
+      invest: brNum(r[5])||0, alcance: brNum(r[6])||0, imp: brNum(r[7])||0,
+      clicks: brNum(r[8])||0, pv: brNum(r[9])||0, ck: brNum(r[10])||0,
+      sCamp: r[11]||'', sAdset: r[12]||'', sAd: r[13]||'', conta
+    });
+  }
+  return out;
+}
+
+function parseWebhookSheet(csvText){
+  const rows = parseCSV(csvText);
+  const out = [];
+  for (let i=1;i<rows.length;i++){
+    const r = rows[i];
+    if (!r[1]) continue;
+    const data = parseDateStr(r[0]);
+    out.push({
+      data, produto: (r[1]||'').trim(), status: (r[2]||'').trim().toUpperCase(),
+      cliente: r[3]||'', email: r[4]||'', valorRaw: r[5]||'', valor: brNum(r[5]),
+      txId: r[6]||'', txPai: r[7]||'', isOB: (r[8]||'').toUpperCase()==='TRUE',
+      utmSource: r[9]||'', utmMedium: r[10]||'', utmCampaign: r[11]||'', utmContent: r[12]||'',
+      idProduto: r[14]||'', faturamento: brNum(r[16])
+    });
+  }
+  return out;
+}
+
+function csvLooksValid(csvText, mustHave, mustNotHave){
+  if (!csvText) return false;
+  const header = (csvText.split('\n')[0] || '').toUpperCase();
+  if (mustHave.some(k => !header.includes(k.toUpperCase()))) return false;
+  if ((mustNotHave||[]).some(k => header.includes(k.toUpperCase()))) return false;
+  return true;
+}
+
+function parseResumoSheet(csvText, cols){
+  const rows = parseCSV(csvText);
+  const out = [];
+  for (let i=1;i<rows.length;i++){
+    const r = rows[i];
+    const data = parseDateStr(r[0]);
+    if (!data) continue;
+    const o = {data};
+    cols.forEach((name, idx)=>{ o[name] = r[idx]; });
+    out.push(o);
+  }
+  return out;
+}
+
+const STATUS_PRIORITY = {COMPLETED:3, COMPLETE:3, CONFIRMED:3, PAGO:3, APPROVED:2, BILLET_PRINTED:1, PRINTED_BILLET:1};
+
+function dedupSales(rawSales){
+  const byId = new Map();
+  for (const s of rawSales){
+    const key = s.txId || (s.email+'|'+s.data+'|'+s.produto);
+    const prio = STATUS_PRIORITY[s.status] || 0;
+    const cur = byId.get(key);
+    if (!cur || prio > cur._prio){ s._prio = prio; byId.set(key, s); }
+  }
+  return Array.from(byId.values());
+}
+
+function classifyProduct(produto){
+  const p = (produto||'').toUpperCase().trim();
+  if (p.startsWith('[COMBO]')) return 'fisico';
+  if (p.startsWith('PSI DE NEG') || p.startsWith('LIVRO PSI DE NEG')) return 'digital';
+  if (p.startsWith('DESAFIO 30 DIAS')) return 'bump';
+  return null;
+}
+
+async function loadData(){
+  document.getElementById('loading-overlay').style.display = 'flex';
+  const msg = document.getElementById('loading-msg');
+  try{
+    msg.textContent = 'Carregando Gerenciador (conta 1)...';
+    const g1csv = await fetchSheetCSV(CONFIG.SHEETS.g1);
+    if (!csvLooksValid(g1csv, ['Data','Campanha','Investimento'])) throw new Error(`A aba "${CONFIG.SHEETS.g1}" não retornou os dados esperados (pode ter sido renomeada ou ocultada na planilha).`);
+    msg.textContent = 'Carregando Gerenciador conta 2...';
+    const g2csv = await fetchSheetCSV(CONFIG.SHEETS.g2);
+    if (!csvLooksValid(g2csv, ['Data','Campanha','Investimento'])) throw new Error(`A aba "${CONFIG.SHEETS.g2}" não retornou os dados esperados (pode ter sido renomeada ou ocultada na planilha).`);
+    msg.textContent = 'Carregando WebhooK...';
+    const whcsv = await fetchSheetCSV(CONFIG.SHEETS.wh);
+    if (!csvLooksValid(whcsv, ['Data','Produto','Status'])) throw new Error(`A aba "${CONFIG.SHEETS.wh}" não retornou os dados esperados (pode ter sido renomeada ou ocultada na planilha).`);
+    msg.textContent = 'Carregando abas Resumo...';
+    const resumoCsv = await fetchSheetCSV(CONFIG.SHEETS.resumo).catch(()=>null);
+    const resumoCorretoCsv = await fetchSheetCSV(CONFIG.SHEETS.resumoCorreto).catch(()=>null);
+
+    const g1 = parseAdSheet(g1csv, '1');
+    const g2 = parseAdSheet(g2csv, '2');
+    AD_ROWS = g1.concat(g2);
+
+    const whRaw = parseWebhookSheet(whcsv);
+    SALES_ALL_RAW = whRaw;
+    const deduped = dedupSales(whRaw);
+    SALES = deduped.filter(s => CONFIG.STATUS_APROVADO.includes(s.status));
+
+    RESUMO_STATUS.resumo = csvLooksValid(resumoCsv, ['Data','Fat. Trafego'], ['Campanha','Conjunto de anúncios']);
+    RESUMO_STATUS.resumoCorreto = csvLooksValid(resumoCorretoCsv, ['Data','Faturamento','Compras'], ['Campanha','Conjunto de anúncios']);
+    if (RESUMO_STATUS.resumo) RESUMO_ROWS = parseResumoSheet(resumoCsv, ['data','investimento','impressoes','cliques','pageview','checkout','vendasTrafego','fatTrafego','semana','mes']);
+    if (RESUMO_STATUS.resumoCorreto) RESUMO_CORRETO_ROWS = parseResumoSheet(resumoCorretoCsv, ['data','investimento','faturamento','fatTrafego','compras','comprasTrafego','cliques','pageview','checkout','impressoes']);
+
+    initDateInputsIfEmpty();
+    renderAll();
+    document.getElementById('loading-overlay').style.display = 'none';
+  } catch(e){
+    msg.textContent = 'Erro: ' + e.message;
+    console.error(e);
+  }
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  FILTRO DE DATA                                                  ║
+// ╚══════════════════════════════════════════════════════════════════╝
+function allDatesAvailable(){
+  return [...AD_ROWS.map(d=>d.data), ...SALES.map(s=>s.data)].filter(Boolean).sort();
+}
+function initDateInputsIfEmpty(){
+  const from = document.getElementById('dateFrom'), to = document.getElementById('dateTo');
+  if (!from.value || !to.value){
+    const all = allDatesAvailable();
+    if (all.length){ from.value = all[0]; to.value = all[all.length-1]; }
+  }
+  updateRangeInfo();
+}
+function setPreset(days, btn){
+  document.querySelectorAll('.period-bar .preset-btn').forEach(b=>b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const all = allDatesAvailable();
+  if (!all.length) return;
+  const last = all[all.length-1];
+  if (days === 'all'){
+    document.getElementById('dateFrom').value = all[0];
+    document.getElementById('dateTo').value = last;
+  } else {
+    const lastDate = new Date(last+'T00:00:00');
+    const fromDate = new Date(lastDate); fromDate.setDate(fromDate.getDate() - (days-1));
+    const fromIso = fromDate.toISOString().slice(0,10);
+    document.getElementById('dateFrom').value = fromIso < all[0] ? all[0] : fromIso;
+    document.getElementById('dateTo').value = last;
+  }
+  onDateChange();
+}
+function onDateChange(){
+  document.querySelectorAll('.period-bar .preset-btn').forEach(b=>b.classList.remove('active'));
+  updateRangeInfo();
+  renderAll();
+}
+function updateRangeInfo(){
+  const from = document.getElementById('dateFrom').value, to = document.getElementById('dateTo').value;
+  if (from && to){
+    const d1 = new Date(from+'T00:00:00'), d2 = new Date(to+'T00:00:00');
+    const days = Math.round((d2-d1)/86400000)+1;
+    document.getElementById('range-info').textContent = `${days} dia(s)`;
+  }
+}
+function getRange(){ return { from: document.getElementById('dateFrom').value, to: document.getElementById('dateTo').value }; }
+function inRange(d, from, to){ return (!from || d>=from) && (!to || d<=to); }
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  CLASSIFICAÇÃO POR SEGMENTO                                      ║
+// ╚══════════════════════════════════════════════════════════════════╝
+function adBelongsToSegment(row, seg){
+  const camp = (row.campanha||'').toUpperCase();
+  if (seg === 'fisico') return row.conta==='2' && camp.includes('FISICO');
+  if (seg === 'exterior') return row.conta==='2' && camp.includes('EUA');
+  if (seg === 'digital') { if (row.conta==='1') return true; return !camp.includes('FISICO') && !camp.includes('EUA'); }
+  return false;
+}
+
+function saleBelongsToSegment(sale, seg){
+  const cls = classifyProduct(sale.produto);
+  const camp = (sale.utmCampaign||'').toUpperCase();
+  if (seg === 'exterior') return camp.includes('EUA');
+  if (seg === 'fisico') return cls === 'fisico';
+  if (seg === 'digital') return cls === 'digital';
+  return false;
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  CÁLCULO POR SEGMENTO                                            ║
+// ╚══════════════════════════════════════════════════════════════════╝
+function computeSegment(seg, from, to){
+  const ads = AD_ROWS.filter(r => adBelongsToSegment(r, seg) && inRange(r.data, from, to));
+  const sales = SALES.filter(s => saleBelongsToSegment(s, seg) && inRange(s.data, from, to));
+  const bumps = SALES.filter(s => classifyProduct(s.produto)==='bump' && seg==='digital' && inRange(s.data, from, to));
+
+  const valorMax = CONFIG.VALOR_MAX[seg] || 300;
+  const validSales = sales.filter(s => isFinite(s.valor) && s.valor > 0 && s.valor <= valorMax);
+  const invalidSales = sales.filter(s => !(isFinite(s.valor) && s.valor > 0 && s.valor <= valorMax));
+  const validBumps = bumps.filter(s => isFinite(s.valor) && s.valor > 0 && s.valor <= CONFIG.VALOR_MAX.bump);
+
+  let invest=0, imp=0, clicks=0, pv=0, ck=0, alcance=0;
+  ads.forEach(r=>{ invest+=r.invest; imp+=r.imp; clicks+=r.clicks; pv+=r.pv; ck+=r.ck; alcance+=r.alcance; });
+
+  const trafegoSales = validSales.filter(s=>isTrafego(s.utmSource));
+  const organicoSales = validSales.filter(s=>!isTrafego(s.utmSource));
+  const fatTrafego = trafegoSales.reduce((a,s)=>a+s.valor,0);
+  const fatOrganico = organicoSales.reduce((a,s)=>a+s.valor,0);
+  const fatBump = validBumps.reduce((a,s)=>a+s.valor,0);
+  const fatTotal = fatTrafego + fatOrganico;
+
+  const roas = invest>0 ? (fatTrafego/invest) : NaN;
+  const cac = trafegoSales.length>0 ? (invest/trafegoSales.length) : NaN;
+  const ticket = validSales.length>0 ? (fatTotal/validSales.length) : NaN;
+  const cpc = clicks>0 ? invest/clicks : NaN;
+  const cpm = imp>0 ? (invest/imp)*1000 : NaN;
+  const ctr = imp>0 ? (clicks/imp)*100 : NaN;
+
+  // série diária
+  const dailyMap = new Map();
+  ads.forEach(r=>{ const d = dailyMap.get(r.data) || {data:r.data, invest:0, imp:0, clicks:0, pv:0, ck:0, vendas:0, fat:0};
+    d.invest+=r.invest; d.imp+=r.imp; d.clicks+=r.clicks; d.pv+=r.pv; d.ck+=r.ck; dailyMap.set(r.data,d); });
+  validSales.forEach(s=>{ const d = dailyMap.get(s.data) || {data:s.data, invest:0, imp:0, clicks:0, pv:0, ck:0, vendas:0, fat:0};
+    d.vendas+=1; d.fat+=s.valor; dailyMap.set(s.data,d); });
+  const daily = Array.from(dailyMap.values()).sort((a,b)=>a.data.localeCompare(b.data));
+
+  // criativos (por conta+campanha+conjunto+anúncio)
+  const criMap = new Map();
+  ads.forEach(r=>{
+    const key = `${r.conta}::${r.campanha}::${r.conjunto}::${r.anuncio}`;
+    const c = criMap.get(key) || {key, nome:r.anuncio, campanha:r.campanha, conjunto:r.conjunto, conta:r.conta, link:r.link,
+      invest:0, imp:0, clicks:0, pv:0, ck:0, vendas:0, fat:0, ativo:false};
+    c.invest+=r.invest; c.imp+=r.imp; c.clicks+=r.clicks; c.pv+=r.pv; c.ck+=r.ck; c.link = c.link||r.link;
+    if (!isPaused(r.sCamp) && !isPaused(r.sAdset) && !isPaused(r.sAd) && (r.sAd || r.sAdset || r.sCamp)) c.ativo = true;
+    criMap.set(key,c);
+  });
+  validSales.forEach(s=>{
+    for (const c of criMap.values()){
+      if (c.campanha===s.utmCampaign && c.nome===s.utmContent){ c.vendas+=1; c.fat+=s.valor; break; }
+    }
+  });
+
+  // públicos (por conta+campanha+conjunto)
+  const pubMap = new Map();
+  ads.forEach(r=>{
+    const key = `${r.conta}::${r.campanha}::${r.conjunto}`;
+    const p = pubMap.get(key) || {key, nome:r.conjunto, campanha:r.campanha, conta:r.conta, invest:0, imp:0, clicks:0, pv:0, ck:0, vendas:0, fat:0, ativo:false};
+    p.invest+=r.invest; p.imp+=r.imp; p.clicks+=r.clicks; p.pv+=r.pv; p.ck+=r.ck;
+    if (!isPaused(r.sCamp) && !isPaused(r.sAdset) && (r.sAdset || r.sCamp)) p.ativo = true;
+    pubMap.set(key,p);
+  });
+  validSales.forEach(s=>{
+    for (const p of pubMap.values()){
+      if (p.campanha===s.utmCampaign && p.nome===s.utmMedium){ p.vendas+=1; p.fat+=s.valor; break; }
+    }
+  });
+
+  return {
+    seg, from, to, invest, imp, clicks, pv, ck, alcance,
+    vendasTrafego: trafegoSales.length, vendasOrganico: organicoSales.length,
+    fatTrafego, fatOrganico, fatTotal, fatBump, bumpsCount: validBumps.length,
+    roas, cac, ticket, cpc, cpm, ctr,
+    invalidSalesCount: invalidSales.length, invalidSales,
+    daily, criativos: Array.from(criMap.values()), publicos: Array.from(pubMap.values()),
+    vendasList: sales.slice().sort((a,b)=>b.data.localeCompare(a.data))
+  };
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  RENDER — SHELL                                                  ║
+// ╚══════════════════════════════════════════════════════════════════╝
+function segShellHTML(seg){
+  return `
+  <div id="${seg}-banner"></div>
+  <div class="subtabs">
+    <div class="subtab active" data-sub="geral" onclick="showSubTab('${seg}','geral',this)">🌐 Visão Geral</div>
+    <div class="subtab" data-sub="criativos" onclick="showSubTab('${seg}','criativos',this)">🎨 Criativos</div>
+    <div class="subtab" data-sub="publicos" onclick="showSubTab('${seg}','publicos',this)">👥 Públicos</div>
+    <div class="subtab" data-sub="vendas" onclick="showSubTab('${seg}','vendas',this)">🧾 Vendas</div>
+  </div>
+
+  <div class="subcontent active" id="${seg}-sub-geral">
+    <div class="kpi-grid" id="${seg}-kpi"></div>
+    <div class="chart-card"><h4>Investimento × Faturamento por dia</h4><canvas id="${seg}-chart"></canvas></div>
+    <div class="funil-section">
+      <div class="chart-card" style="margin-bottom:0">
+        <h4>Funil</h4>
+        <div class="funil-bar-wrap" id="${seg}-funil"></div>
+      </div>
+      <div class="chart-card" style="margin-bottom:0">
+        <h4>Taxas de conversão</h4>
+        <div class="taxa-grid" id="${seg}-taxas"></div>
+      </div>
+    </div>
+    <div class="sec-title">📅 Dia a dia</div>
+    <div class="tbl-wrap"><table id="${seg}-daily-table"></table></div>
+  </div>
+
+  <div class="subcontent" id="${seg}-sub-criativos">
+    <div class="cri-filterbar">
+      <span class="cri-sort-label">Ordenar por:</span>
+      <button class="cri-sort-btn active" data-sort="invest" onclick="setCriSort('${seg}','invest',this)">Investimento</button>
+      <button class="cri-sort-btn" data-sort="vendas" onclick="setCriSort('${seg}','vendas',this)">Vendas</button>
+      <button class="cri-sort-btn" data-sort="fat" onclick="setCriSort('${seg}','fat',this)">Faturamento</button>
+    </div>
+    <div class="cri-grid" id="${seg}-cri-grid"></div>
+  </div>
+
+  <div class="subcontent" id="${seg}-sub-publicos">
+    <div class="pub-grid" id="${seg}-pub-grid"></div>
+  </div>
+
+  <div class="subcontent" id="${seg}-sub-vendas">
+    <div class="sec-title">🧾 Vendas registradas no período (mais recentes primeiro)</div>
+    <div class="sales-scroll" id="${seg}-vendas-list" style="flex-wrap:wrap;overflow-x:visible"></div>
+  </div>
+  `;
+}
+
+function buildShells(){
+  ['fisico','digital','exterior'].forEach(seg=>{
+    document.getElementById('content-'+seg).innerHTML = segShellHTML(seg);
+  });
+}
+
+function showSegment(seg){
+  document.querySelectorAll('#main-tabs .tab').forEach(t=>t.classList.toggle('active', t.dataset.seg===seg));
+  document.querySelectorAll('.content').forEach(c=>c.classList.remove('active'));
+  document.getElementById('content-'+seg).classList.add('active');
+  CUR_SEG = seg;
+}
+function showSubTab(seg, sub, btn){
+  SUB_TAB[seg] = sub;
+  const root = document.getElementById('content-'+seg);
+  root.querySelectorAll('.subtab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  root.querySelectorAll('.subcontent').forEach(c=>c.classList.remove('active'));
+  document.getElementById(`${seg}-sub-${sub}`).classList.add('active');
+}
+
+let CRI_SORT = { fisico:'invest', digital:'invest', exterior:'invest' };
+function setCriSort(seg, sort, btn){
+  CRI_SORT[seg] = sort;
+  btn.parentElement.querySelectorAll('.cri-sort-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const data = LAST_COMPUTED[seg];
+  if (data) renderCriativos(seg, data);
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  RENDER — CONTEÚDO                                               ║
+// ╚══════════════════════════════════════════════════════════════════╝
+let LAST_COMPUTED = {};
+
+function kpiCard(label, value, cls, sub){
+  return `<div class="kpi-card"><div class="kpi-label">${label}</div><div class="kpi-value ${cls||''}">${value}</div>${sub?`<div class="kpi-sub">${sub}</div>`:''}</div>`;
+}
+
+function renderKPIs(seg, d){
+  const el = document.getElementById(seg+'-kpi');
+  const vendasTotal = d.vendasTrafego + d.vendasOrganico;
+  let html = '';
+  html += kpiCard('Investimento', fmtBRL(d.invest), 'orange');
+  html += kpiCard('Faturamento Total', fmtBRL(d.fatTotal), 'green', d.invalidSalesCount>0 ? `⚠ ${d.invalidSalesCount} venda(s) com valor não somado` : '');
+  html += kpiCard('ROAS Tráfego', isFinite(d.roas)?d.roas.toFixed(2)+'x':'—', d.roas>=1?'green':(isFinite(d.roas)?'red':''));
+  html += kpiCard('Vendas', fmtInt(vendasTotal), 'orange', `Tráfego ${fmtInt(d.vendasTrafego)} · Orgânico ${fmtInt(d.vendasOrganico)}`);
+  html += kpiCard('Ticket Médio', fmtBRL(d.ticket), '');
+  html += kpiCard('CAC (Tráfego)', fmtBRL(d.cac), '');
+  html += kpiCard('Cliques', fmtInt(d.clicks), '');
+  html += kpiCard('Impressões', fmtInt(d.imp), '');
+  html += kpiCard('CPC', fmtBRL(d.cpc), '');
+  html += kpiCard('CPM', fmtBRL(d.cpm), '');
+  html += kpiCard('CTR', fmtPct(d.ctr), '');
+  if (d.bumpsCount>0) html += kpiCard('Order Bump (Desafio 30 dias)', fmtInt(d.bumpsCount)+' vendas', 'yellow', fmtBRL(d.fatBump));
+  el.innerHTML = html;
+}
+
+function renderFunil(seg, d){
+  const steps = [
+    {label:'Cliques', val:d.clicks},
+    {label:'Pageview', val:d.pv},
+    {label:'Checkout', val:d.ck},
+    {label:'Compras', val:d.vendasTrafego+d.vendasOrganico},
+  ];
+  const max = Math.max(...steps.map(s=>s.val), 1);
+  document.getElementById(seg+'-funil').innerHTML = steps.map(s=>`
+    <div class="funil-bar-wrap">
+      <div class="funil-label"><span>${s.label}</span><span>${fmtInt(s.val)}</span></div>
+      <div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${(s.val/max*100).toFixed(1)}%"></div></div>
+    </div>`).join('');
+
+  const taxaCliquePv = d.clicks>0 ? (d.pv/d.clicks*100) : NaN;
+  const taxaPvCk = d.pv>0 ? (d.ck/d.pv*100) : NaN;
+  const taxaCkCompra = d.ck>0 ? ((d.vendasTrafego+d.vendasOrganico)/d.ck*100) : NaN;
+  const taxaCliqueCompra = d.clicks>0 ? ((d.vendasTrafego+d.vendasOrganico)/d.clicks*100) : NaN;
+  document.getElementById(seg+'-taxas').innerHTML = `
+    <div class="taxa-item"><span>Clique → Pageview</span><span class="taxa-val">${fmtPct(taxaCliquePv)}</span></div>
+    <div class="taxa-item"><span>Pageview → Checkout</span><span class="taxa-val">${fmtPct(taxaPvCk)}</span></div>
+    <div class="taxa-item"><span>Checkout → Compra</span><span class="taxa-val">${fmtPct(taxaCkCompra)}</span></div>
+    <div class="taxa-item"><span>Clique → Compra</span><span class="taxa-val">${fmtPct(taxaCliqueCompra)}</span></div>
+  `;
+}
+
+function renderDailyTable(seg, d){
+  const rows = d.daily.map(r=>`
+    <tr>
+      <td>${fmtDateBR(r.data)}</td>
+      <td>${fmtBRL(r.invest)}</td>
+      <td>${fmtBRL(r.fat)}</td>
+      <td>${r.invest>0?(r.fat/r.invest).toFixed(2)+'x':'—'}</td>
+      <td>${fmtInt(r.vendas)}</td>
+      <td>${fmtInt(r.clicks)}</td>
+      <td>${fmtInt(r.pv)}</td>
+      <td>${fmtInt(r.ck)}</td>
+      <td>${fmtInt(r.imp)}</td>
+    </tr>`).join('');
+  document.getElementById(seg+'-daily-table').innerHTML = `
+    <thead><tr><th>Data</th><th>Investimento</th><th>Faturamento</th><th>ROAS</th><th>Vendas</th><th>Cliques</th><th>Pageview</th><th>Checkout</th><th>Impressões</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="9" style="text-align:center;color:rgba(255,255,255,.35)">Sem dados no período</td></tr>'}</tbody>`;
+}
+
+function renderChart(seg, d){
+  const ctx = document.getElementById(seg+'-chart');
+  if (CHARTS[seg]) CHARTS[seg].destroy();
+  CHARTS[seg] = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: d.daily.map(r=>fmtDateBR(r.data)),
+      datasets:[
+        {type:'bar', label:'Investimento', data:d.daily.map(r=>r.invest), backgroundColor:'rgba(255,107,43,0.55)', order:2},
+        {type:'line', label:'Faturamento', data:d.daily.map(r=>r.fat), borderColor:'rgba(255,183,55,0.95)', backgroundColor:'rgba(255,183,55,0.15)', tension:.3, order:1}
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      scales:{ x:{ticks:{color:'rgba(255,255,255,.5)', maxRotation:60, minRotation:60}, grid:{color:'rgba(255,255,255,.05)'}},
+               y:{ticks:{color:'rgba(255,255,255,.5)'}, grid:{color:'rgba(255,255,255,.05)'}} },
+      plugins:{ legend:{labels:{color:'rgba(255,255,255,.7)'}} }
+    }
+  });
+  ctx.style.height='230px';
+}
+
+function renderCriativos(seg, d){
+  const sort = CRI_SORT[seg];
+  const list = d.criativos.filter(c=>c.invest>0 || c.vendas>0).slice().sort((a,b)=>b[sort]-a[sort]).slice(0,30);
+  const el = document.getElementById(seg+'-cri-grid');
+  if (!list.length){ el.innerHTML = '<div class="empty-msg">Sem criativos com investimento no período.</div>'; return; }
+  el.innerHTML = list.map(c=>{
+    const ctr = c.imp>0 ? (c.clicks/c.imp*100) : NaN;
+    const cpc = c.clicks>0 ? c.invest/c.clicks : NaN;
+    const roas = c.invest>0 ? c.fat/c.invest : NaN;
+    return `<div class="cri-card ${c.ativo?'ativo':''}">
+      <div class="cri-card-header">
+        <div class="cri-name">${c.nome || '(sem nome)'}${c.conta==='1'?' <span style="color:rgba(255,255,255,.3)">[conta antiga]</span>':''}</div>
+        <div class="cri-badge ${c.ativo?'ativo':'inativo'}">${c.ativo?'Ativo':'Inativo'}</div>
+      </div>
+      <div class="cri-metrics">
+        <div class="cri-metric"><span class="cri-metric-label">Investimento</span><span class="cri-metric-val hl">${fmtBRL(c.invest)}</span></div>
+        <div class="cri-metric"><span class="cri-metric-label">Vendas</span><span class="cri-metric-val hl">${fmtInt(c.vendas)}</span></div>
+        <div class="cri-metric"><span class="cri-metric-label">Faturamento</span><span class="cri-metric-val">${fmtBRL(c.fat)}</span></div>
+        <div class="cri-metric"><span class="cri-metric-label">ROAS</span><span class="cri-metric-val">${isFinite(roas)?roas.toFixed(2)+'x':'—'}</span></div>
+        <div class="cri-metric"><span class="cri-metric-label">CTR</span><span class="cri-metric-val">${fmtPct(ctr)}</span></div>
+        <div class="cri-metric"><span class="cri-metric-label">CPC</span><span class="cri-metric-val">${fmtBRL(cpc)}</span></div>
+      </div>
+      ${c.link?`<a class="cri-link" href="${c.link}" target="_blank" rel="noopener">${c.link}</a>`:''}
+    </div>`;
+  }).join('');
+}
+
+function renderPublicos(seg, d){
+  const list = d.publicos.filter(p=>p.invest>0 || p.vendas>0).slice().sort((a,b)=>b.invest-a.invest).slice(0,30);
+  const el = document.getElementById(seg+'-pub-grid');
+  if (!list.length){ el.innerHTML = '<div class="empty-msg">Sem públicos com investimento no período.</div>'; return; }
+  el.innerHTML = list.map(p=>{
+    const roas = p.invest>0 ? p.fat/p.invest : NaN;
+    return `<div class="pub-card ${p.ativo?'ativo':''}">
+      <div class="pub-card-header">
+        <div class="pub-name">${p.nome || '(sem nome)'}<br><span style="color:rgba(255,255,255,.35);font-size:10px">${p.campanha}</span></div>
+      </div>
+      <div class="pub-metrics">
+        <div class="pub-metric"><div class="pub-metric-val">${fmtBRL(p.invest)}</div><div class="pub-metric-lbl">Investimento</div></div>
+        <div class="pub-metric"><div class="pub-metric-val neutral">${fmtInt(p.vendas)}</div><div class="pub-metric-lbl">Vendas</div></div>
+        <div class="pub-metric"><div class="pub-metric-val">${isFinite(roas)?roas.toFixed(2)+'x':'—'}</div><div class="pub-metric-lbl">ROAS</div></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderVendas(seg, d){
+  const el = document.getElementById(seg+'-vendas-list');
+  if (!d.vendasList.length){ el.innerHTML = '<div class="empty-msg">Nenhuma venda registrada no período.</div>'; return; }
+  el.innerHTML = d.vendasList.map(s=>{
+    const trafego = isTrafego(s.utmSource);
+    const valido = isFinite(s.valor) && s.valor>0 && s.valor<=(CONFIG.VALOR_MAX[seg]||300);
+    return `<div class="sale-card ${trafego?'trafego':'organico'} ${!valido?'flag':''}">
+      <div class="sale-name">${s.cliente||'—'}</div>
+      <div class="sale-val">${valido?fmtBRL(s.valor):'⚠ valor inválido'}</div>
+      <div class="sale-meta">
+        ${fmtDateBR(s.data)}<br>
+        ${trafego?'✅ Meta Ads':'⭐ Orgânico'}<br>
+        ${s.utmContent?('Criativo: '+s.utmContent+'<br>'):''}
+        ${s.utmMedium?('Público: '+s.utmMedium+'<br>'):''}
+        Status: ${s.status}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderBanner(seg, d){
+  const el = document.getElementById(seg+'-banner');
+  let html = '';
+  if (seg === 'fisico'){
+    const semValor = d.vendasList.filter(s=>!(isFinite(s.valor)&&s.valor>0)).length;
+    if (semValor>0){
+      html += `<div class="banner crit"><strong>⚠ Atenção:</strong> ${semValor} venda(s) aprovada(s) do Combo Físico estão com o campo <code>Valor</code> vazio na aba WebhooK (e também em Vendas_detalhada) — parece que o produto Combo (ID 8361553) ainda não está cadastrado na tabela de preços da planilha. O faturamento abaixo <u>não reflete</u> essas vendas até isso ser corrigido na planilha. Veja detalhes na aba "Qualidade de Dados".</div>`;
+    }
+  }
+  if (seg === 'digital' && d.invalidSalesCount>0){
+    html += `<div class="banner"><strong>⚠ Atenção:</strong> ${d.invalidSalesCount} venda(s) aprovada(s) do livro digital têm valor inconsistente na aba WebhooK (ex: R$ 46.289,00, valor claramente incorreto para este produto) e foram excluídas do cálculo de Faturamento/ROAS/Ticket Médio. Veja a lista completa na aba "Qualidade de Dados".</div>`;
+  }
+  if (seg === 'exterior'){
+    html += `<div class="banner"><strong>ℹ Campanha nova:</strong> "[JGT][VENDAS][LIVRO][EUA]" está ativa desde 04/09/2026, testando públicos em Portugal, Reino Unido e EUA/Canadá. Ainda não há nenhuma venda atribuída a essa campanha no WebhooK — os números abaixo são só de tráfego (cliques, alcance, investimento).</div>`;
+  }
+  el.innerHTML = html;
+}
+
+function renderSegment(seg){
+  const {from, to} = getRange();
+  const d = computeSegment(seg, from, to);
+  LAST_COMPUTED[seg] = d;
+  renderBanner(seg, d);
+  renderKPIs(seg, d);
+  renderChart(seg, d);
+  renderFunil(seg, d);
+  renderDailyTable(seg, d);
+  renderCriativos(seg, d);
+  renderPublicos(seg, d);
+  renderVendas(seg, d);
+}
+
+function renderAll(){
+  ['fisico','digital','exterior'].forEach(renderSegment);
+  renderNotas();
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  ABA — QUALIDADE DE DADOS                                        ║
+// ╚══════════════════════════════════════════════════════════════════╝
+function renderNotas(){
+  const el = document.getElementById('content-notas');
+
+  // dias com investimento no Gerenciador mas sem NENHUMA linha no WebhooK
+  const adDates = new Set(AD_ROWS.map(r=>r.data));
+  const whDates = new Set(SALES_ALL_RAW.map(s=>s.data).filter(Boolean));
+  const missing = Array.from(adDates).filter(d=>!whDates.has(d)).sort();
+
+  const gDatesArr = Array.from(adDates).sort();
+  const whDatesArr = Array.from(whDates).sort();
+
+  // comparação Resumo x Resumo_correto x Webhook real, para os dias faltantes
+  const resumoByDate = new Map(RESUMO_ROWS.map(r=>[r.data,r]));
+  const resumoCorretoByDate = new Map(RESUMO_CORRETO_ROWS.map(r=>[r.data,r]));
+
+  const divergencias = [];
+  let missingRowsHtml = missing.map(d=>{
+    const r = RESUMO_STATUS.resumo ? resumoByDate.get(d) : undefined;
+    const rc = RESUMO_STATUS.resumoCorreto ? resumoCorretoByDate.get(d) : undefined;
+    const resumoVendas = r ? (parseFloat((r.vendasTrafego||'0').toString().replace(',','.'))||0) : null;
+    const rcCompras = rc ? (parseFloat((rc.compras||'0').toString().replace(',','.'))||0) : null;
+    if (resumoVendas>0 && (rcCompras===0 || rcCompras===null)) divergencias.push({data:d, resumoVendas, rcCompras: rcCompras||0});
+    return `<tr>
+      <td>${fmtDateBR(d)}</td>
+      <td>${RESUMO_STATUS.resumo ? (r ? (r.vendasTrafego||'0')+' vendas / '+(r.fatTrafego||'R$ 0,00') : '—') : '<span style="color:rgba(255,255,255,.3)">aba indisponível agora</span>'}</td>
+      <td>${RESUMO_STATUS.resumoCorreto ? (rc ? (rc.compras||'0')+' compras / R$ '+(rc.faturamento||'0') : '—') : '<span style="color:rgba(255,255,255,.3)">aba oculta/indisponível agora</span>'}</td>
+      <td>0 linhas (confirmado agora)</td>
+    </tr>`;
+  }).join('');
+
+  // vendas com valor inconsistente, agregando todos os segmentos
+  const allInvalid = [];
+  ['digital','fisico','exterior'].forEach(seg=>{
+    const d = LAST_COMPUTED[seg];
+    if (d) d.invalidSales.forEach(s=>allInvalid.push({...s, seg}));
+  });
+  const invalidRows = allInvalid.slice(0,60).map(s=>`<tr>
+      <td>${fmtDateBR(s.data)}</td><td>${s.cliente}</td><td>${s.produto.slice(0,40)}</td>
+      <td>${s.valorRaw||'(vazio)'}</td><td>${s.status}</td><td>${SEGMENTS[s.seg].label}</td>
+    </tr>`).join('');
+
+  // colunas vazias na aba Resumo
+  const resumoInvestVazio = RESUMO_STATUS.resumo && RESUMO_ROWS.length>0 && RESUMO_ROWS.every(r=>!r.investimento);
+
+  el.innerHTML = `
+    <div class="notes-block">
+      <h3>1. Datas em que a campanha já rodava mas o WebhooK não tem nenhuma venda registrada</h3>
+      <p>Gerenciador (contas 1+2) tem dados de <strong>${fmtDateBR(gDatesArr[0])}</strong> até <strong>${fmtDateBR(gDatesArr[gDatesArr.length-1])}</strong> (${gDatesArr.length} dias com investimento).
+      O WebhooK tem linhas de <strong>${fmtDateBR(whDatesArr[0])}</strong> até <strong>${fmtDateBR(whDatesArr[whDatesArr.length-1])}</strong> (${whDatesArr.length} dias distintos com pelo menos uma linha).</p>
+      <p>${missing.length} dia(s) têm investimento no Gerenciador mas <strong>zero linhas</strong> no WebhooK (nem venda aprovada, nem boleto gerado, nem nada):</p>
+      ${missing.map(d=>`<span class="chip bad">${fmtDateBR(d)}</span>`).join('') || '<span class="chip">nenhum</span>'}
+      <div class="tbl-wrap" style="margin-top:12px">
+        <table>
+          <thead><tr><th>Data</th><th>Aba "Resumo"</th><th>Aba "Resumo_correto"</th><th>WebhooK (real, recalculado agora)</th></tr></thead>
+          <tbody>${missingRowsHtml || '<tr><td colspan="4" style="text-align:center">—</td></tr>'}</tbody>
+        </table>
+      </div>
+      ${divergencias.length ? `<p style="margin-top:10px"><strong>Achado:</strong> nos dias ${divergencias.map(x=>fmtDateBR(x.data)).join(', ')} a aba <code>Resumo</code> mostra venda(s)/faturamento maior que zero, enquanto a aba <code>Resumo_correto</code> mostra 0 e o WebhooK real (recalculado ao vivo acima) não tem nenhuma linha nesses dias. Ou seja, a aba <code>Resumo</code> está com número divergente/desatualizado nesses dias específicos — use a aba <code>Resumo_correto</code> como referência, não a <code>Resumo</code>.</p>` : ''}
+      ${resumoInvestVazio ? `<p><strong>Além disso:</strong> as colunas Investimento / Impressões / Cliques / Pageview / Checkout da aba <code>Resumo</code> estão <strong>vazias em todas as linhas</strong> (parecem ter uma fórmula quebrada).</p>` : ''}
+      ${!RESUMO_STATUS.resumoCorreto ? `<p><strong>ℹ Nota:</strong> a aba <code>Resumo_correto</code> não pôde ser lida agora (provavelmente está oculta na planilha, o que impede a leitura pública dela) — a comparação acima usa apenas a aba <code>Resumo</code> e o WebhooK recalculado ao vivo. Se ela for reexibida (clique com botão direito na aba → "Reexibir"), o dashboard passa a usá-la automaticamente na próxima atualização.</p>` : ''}
+      ${!RESUMO_STATUS.resumo ? `<p><strong>ℹ Nota:</strong> a aba <code>Resumo</code> não pôde ser lida agora (provavelmente está oculta ou foi renomeada).</p>` : ''}
+    </div>
+
+    <div class="notes-block">
+      <h3>2. Vendas aprovadas com valor inconsistente no WebhooK (excluídas do faturamento nos dashboards)</h3>
+      <p>${allInvalid.length} venda(s) aprovada(s)/completadas encontradas com o campo <code>Valor</code> vazio, com uma data no lugar do valor, ou com um valor implausível para o produto (ex: R$ 46.289,00 para o livro digital de ~R$ 25–30). Essas vendas <strong>foram contabilizadas na contagem de vendas</strong> de cada aba, mas <strong>não entraram na soma de Faturamento/ROAS/Ticket Médio</strong>, para não distorcer os números.</p>
+      <div class="tbl-wrap" style="max-height:320px">
+        <table>
+          <thead><tr><th>Data</th><th>Cliente</th><th>Produto</th><th>Valor bruto</th><th>Status</th><th>Aba</th></tr></thead>
+          <tbody>${invalidRows || '<tr><td colspan="6" style="text-align:center">Nenhuma no período carregado</td></tr>'}</tbody>
+        </table>
+      </div>
+      <p style="margin-top:10px">Recomenda-se revisar a fórmula/lookup da coluna <code>Valor</code> (e <code>Faturamento</code>) na aba WebhooK — em especial os casos com valor fixo repetido muito acima do preço real do produto (ex: R$ 46.289,00 para o livro digital) — e cadastrar o Combo Físico (produto ID <code>8361553</code>) na tabela de preços de referência da planilha, já que hoje ele aparece sem valor.</p>
+    </div>
+
+    <div class="notes-block">
+      <h3>3. Como cada aba do dashboard foi montada</h3>
+      <ul>
+        <li><strong>📱 Livro Digital:</strong> investimento = aba "Gerenciador" (conta antiga, completa) + campanhas da aba "Gerenciador conta 2" que não contêm "FISICO" nem "EUA". Faturamento = vendas do WebhooK cujo produto começa com "PSI DE NEGÓCIO" ou "Livro Psi de Negócio" (excluindo o Combo).</li>
+        <li><strong>📦 Livro Físico [COMBO]:</strong> investimento = campanha "[JGT][VENDAS][LIVRO][FISICO]" na aba "Gerenciador conta 2". Faturamento = vendas do WebhooK cujo produto começa com "[COMBO]" (essas vendas também podem vir de outras campanhas de tráfego, como ADV/DEBOCHE/PQ, já que o checkout oferece a opção Combo dentro do mesmo funil digital).</li>
+        <li><strong>🌍 Campanha Exterior:</strong> investimento = campanha "[JGT][VENDAS][LIVRO][EUA]" na aba "Gerenciador conta 2" (públicos Portugal / Reino Unido / EUA e Canadá). Vendas = linhas do WebhooK cuja UTM Campaign contenha "EUA".</li>
+        <li>Todas as vendas são deduplicadas pelo "ID da transação" (uma mesma transação pode aparecer 2-3 vezes no WebhooK com status diferentes: BILLET_PRINTED → APPROVED → COMPLETED); é mantido sempre o status mais avançado.</li>
+        <li>Tráfego pago = UTM Source contém "meta_ads"; qualquer outra origem (ou vazia) é tratada como orgânico.</li>
+      </ul>
+    </div>
+  `;
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  INIT                                                            ║
+// ╚══════════════════════════════════════════════════════════════════╝
+document.addEventListener('DOMContentLoaded', ()=>{
+  buildShells();
+  loadData();
+});
+</script>
+</body>
+</html>
