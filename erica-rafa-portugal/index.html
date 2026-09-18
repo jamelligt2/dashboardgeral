@@ -236,7 +236,7 @@
       <div class="kpi-card gold" style="border-color:rgba(255,193,7,0.35);">
         <div class="kpi-label">Fechamentos</div>
         <div class="kpi-value" style="color:var(--ouro)" id="kpiFechamentos">—</div>
-        <div class="kpi-sub">Receita: <span id="kpiReceita">—</span> · reportado manualmente</div>
+        <div class="kpi-sub">Receita: <span id="kpiReceita">—</span> · aba Fechamentos</div>
       </div>
       <div class="kpi-card green" style="border-color:rgba(0,200,83,0.35);">
         <div class="kpi-label">ROAS</div>
@@ -298,7 +298,7 @@
     </div>
 
     <div class="section-title">Funil de Conversão</div>
-    <div class="section-note">A etapa <b>Fechamento</b> é reportada manualmente pelo cliente/gestor (venda efetivamente fechada) — não vem do Meta Ads nem da planilha de anúncios. Atualizada em <span id="fechamentosDataRef">—</span>.</div>
+    <div class="section-note">A etapa <b>Fechamento</b> é lida ao vivo da aba <b>Fechamentos</b> desta planilha (atualize as células lá — não precisa mais me pedir para gerar um HTML novo). Última atualização informada: <span id="fechamentosDataRef">—</span>.</div>
     <div class="funnel-wrap">
       <div class="funnel-svg-wrap">
         <svg viewBox="0 0 1200 620" width="100%" xmlns="http://www.w3.org/2000/svg">
@@ -472,17 +472,18 @@
 const SHEET_ID = '1bEYo3GWxZ9_sholVWB7fT6W8FjcgU1EIWnzC3wPuNF8';
 const FETCH_TIMEOUT_MS = 15000;
 
-/* FECHAMENTOS — reportado manualmente pelo cliente/gestor (não vem do Meta Ads
-   nem da planilha). Atualize estes valores sempre que houver números novos. */
-const FECHAMENTOS_MANUAL = {
-  count: 5,                // quantidade de procedimentos fechados até o momento
-  valorPorFechamento: 200, // receita (ticket) por procedimento, em €, conforme reportado
-  atualizadoEm: '2026-09-09' // data em que este número foi informado
+/* FECHAMENTOS — lido ao vivo da aba "Fechamentos" da mesma planilha.
+   Fallback abaixo é usado apenas se essa aba não puder ser lida. */
+const FECHAMENTOS_FALLBACK = {
+  count: 6,
+  valorPorFechamento: 200,
+  atualizadoEm: '2026-09-17'
 };
+let FECHAMENTOS_DATA = null;
 
 let RAW_ROWS = [];
 let fetchTimeoutHandle = null;
-let currentScriptTag = null;
+let currentScriptTags = [];
 
 /* =========================================================================
    HELPERS: parsing / formatting
@@ -548,11 +549,38 @@ function loadData(){
   const refreshBtn = document.getElementById('refreshBtn');
   if (refreshBtn) refreshBtn.classList.add('loading');
 
-  if (currentScriptTag && currentScriptTag.parentNode) currentScriptTag.parentNode.removeChild(currentScriptTag);
+  currentScriptTags.forEach(s => { if (s && s.parentNode) s.parentNode.removeChild(s); });
+  currentScriptTags = [];
   if (fetchTimeoutHandle) clearTimeout(fetchTimeoutHandle);
 
-  window.onSheetData = function(payload){
+  const state = { ads: null, fechamentos: null, adsError: null, fechamentosError: null };
+
+  function finishIfReady(){
+    if (state.ads === null && !state.adsError) return; // ainda esperando dados de anuncios
+    if (state.fechamentos === null && !state.fechamentosError) return; // ainda esperando fechamentos
+
+    // dados de anuncios sao obrigatorios; fechamentos usa fallback se falhar
+    if (state.adsError){
+      showError(state.adsError);
+      if (refreshBtn) refreshBtn.classList.remove('loading');
+      return;
+    }
     clearTimeout(fetchTimeoutHandle);
+    try{
+      RAW_ROWS = state.ads;
+      FECHAMENTOS_DATA = state.fechamentos || FECHAMENTOS_FALLBACK;
+      renderDashboard();
+      document.getElementById('lastUpdate').textContent = new Date().toLocaleString('pt-BR', {hour:'2-digit', minute:'2-digit', day:'2-digit', month:'2-digit'});
+      document.getElementById('loadingOverlay').style.display = 'none';
+      document.getElementById('dashboardRoot').style.display = 'block';
+    }catch(err){
+      showError(err.message);
+    }finally{
+      if (refreshBtn) refreshBtn.classList.remove('loading');
+    }
+  }
+
+  window.onSheetData = function(payload){
     try{
       if (!payload || payload.status === 'error'){
         const msg = (payload && payload.errors && payload.errors[0] && payload.errors[0].detailed_message)
@@ -580,16 +608,36 @@ function loadData(){
         });
       });
       if (parsed.length === 0) throw new Error('Nenhuma linha de dados foi encontrada na planilha.');
-      RAW_ROWS = parsed;
-      renderDashboard();
-      document.getElementById('lastUpdate').textContent = new Date().toLocaleString('pt-BR', {hour:'2-digit', minute:'2-digit', day:'2-digit', month:'2-digit'});
-      document.getElementById('loadingOverlay').style.display = 'none';
-      document.getElementById('dashboardRoot').style.display = 'block';
+      state.ads = parsed;
     }catch(err){
-      showError(err.message);
-    }finally{
-      if (refreshBtn) refreshBtn.classList.remove('loading');
+      state.adsError = err.message;
     }
+    finishIfReady();
+  };
+
+  window.onFechamentosData = function(payload){
+    try{
+      if (!payload || payload.status === 'error') throw new Error('erro ao ler aba Fechamentos');
+      const rows = (payload.table && payload.table.rows) ? payload.table.rows : [];
+      const data = { count: null, valorPorFechamento: null, atualizadoEm: null };
+      rows.forEach(r => {
+        const c = r.c || [];
+        const label = c[0] && c[0].v ? String(c[0].v).trim().toLowerCase() : '';
+        if (!label) return;
+        if (label.startsWith('quantidade')) data.count = toNumber(c[1] ? c[1].v : null);
+        else if (label.startsWith('valor')) data.valorPorFechamento = toNumber(c[1] ? c[1].v : null);
+        else if (label.startsWith('atualizado')) data.atualizadoEm = parseGvizDate(c[1]) || (c[1] ? String(c[1].v) : null);
+      });
+      if (data.count === null || data.valorPorFechamento === null){
+        throw new Error('aba Fechamentos incompleta');
+      }
+      state.fechamentos = data;
+    }catch(err){
+      // nao trava o dashboard inteiro por causa disso: usa fallback
+      state.fechamentosError = 'fallback';
+      state.fechamentos = null;
+    }
+    finishIfReady();
   };
 
   fetchTimeoutHandle = setTimeout(() => {
@@ -597,16 +645,23 @@ function loadData(){
     if (refreshBtn) refreshBtn.classList.remove('loading');
   }, FETCH_TIMEOUT_MS);
 
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:onSheetData&t=${Date.now()}`;
-  const script = document.createElement('script');
-  script.src = url;
-  script.onerror = function(){
-    clearTimeout(fetchTimeoutHandle);
-    showError('Não foi possível conectar à planilha. Confirme se ela continua compartilhada como "Qualquer pessoa com o link pode visualizar".');
-    if (refreshBtn) refreshBtn.classList.remove('loading');
-  };
-  currentScriptTag = script;
-  document.body.appendChild(script);
+  function injectScript(url, onNetworkError){
+    const script = document.createElement('script');
+    script.src = url;
+    script.onerror = onNetworkError;
+    currentScriptTags.push(script);
+    document.body.appendChild(script);
+  }
+
+  const t = Date.now();
+  injectScript(
+    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:onSheetData&t=${t}`,
+    () => { state.adsError = 'Não foi possível conectar à planilha. Confirme se ela continua compartilhada como "Qualquer pessoa com o link pode visualizar".'; finishIfReady(); }
+  );
+  injectScript(
+    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:onFechamentosData&sheet=Fechamentos&t=${t}`,
+    () => { state.fechamentosError = 'fallback'; state.fechamentos = null; finishIfReady(); }
+  );
 }
 
 function showError(msg){
@@ -648,16 +703,18 @@ function renderDashboard(){
   document.getElementById('kpiCPL').textContent = fmtEUR(cpl);
   document.getElementById('kpiLeadsSub').textContent = fmtInt(T.leads);
 
-  // ---- fechamentos + ROAS (dado manual, nao vem da planilha) ----
-  const fechamentos = FECHAMENTOS_MANUAL.count;
-  const valorFechamento = FECHAMENTOS_MANUAL.valorPorFechamento;
+  // ---- fechamentos + ROAS (lido ao vivo da aba "Fechamentos") ----
+  const fechData = FECHAMENTOS_DATA || FECHAMENTOS_FALLBACK;
+  const fechamentos = fechData.count;
+  const valorFechamento = fechData.valorPorFechamento;
   const receitaTotal = fechamentos * valorFechamento;
   const roas = safeDiv(receitaTotal, T.spend);
   const txFechamento = safeDiv(fechamentos, T.leads) * 100;
   document.getElementById('kpiFechamentos').textContent = fmtInt(fechamentos);
   document.getElementById('kpiReceita').textContent = fmtEUR(receitaTotal);
   document.getElementById('kpiROAS').textContent = roas !== null ? roas.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) + 'x' : '—';
-  const [fy,fm,fd] = FECHAMENTOS_MANUAL.atualizadoEm.split('-');
+  const fechDate = fechData.atualizadoEm || FECHAMENTOS_FALLBACK.atualizadoEm;
+  const [fy,fm,fd] = fechDate.split('-');
   document.getElementById('fechamentosDataRef').textContent = `${fd}/${fm}/${fy}`;
 
   // ---- by campaign (GERAL vs MICROLABIAL) ----
