@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Desafio Perfil Que Vende · Bianca Amorim — Jamelli GT</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Crect width='36' height='36' rx='8' fill='%23ff6b2b'/%3E%3Ctext x='18' y='25' text-anchor='middle' font-family='Arial' font-weight='700' font-size='13' fill='white'%3EJGT%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#1a1a2e;color:#e8e6f0;font-family:'DM Sans',sans-serif;min-height:100vh}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:#12121f}::-webkit-scrollbar-thumb{background:#ff6b2b55;border-radius:3px}
+.topbar{background:#12121f;padding:12px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.07);position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:12px}
+.logo-jgt{display:flex;align-items:center;gap:10px}
+.logo-jgt svg{width:36px;height:36px;flex-shrink:0}
+.logo-text{display:flex;flex-direction:column}
+.logo-text strong{font-size:13px;font-weight:700;color:#ff6b2b;letter-spacing:.3px}
+.logo-text span{font-size:10px;color:rgba(255,255,255,.35);margin-top:1px}
+.brand{font-size:16px;font-weight:700;color:#ff6b2b;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.subtitle{font-size:11px;color:rgba(255,255,255,0.45);margin-top:4px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.src-badge{display:inline-flex;align-items:center;gap:4px;border-radius:20px;padding:2px 8px;font-size:10px;font-weight:700}
+.src-badge.snap{background:rgba(255,170,0,.12);color:#ffaa00;border:1px solid rgba(255,170,0,.3)}
+.src-badge.live{background:rgba(46,204,113,.12);color:#2ecc71;border:1px solid rgba(46,204,113,.3)}
+.src-badge.loading{background:rgba(91,141,238,.12);color:#5b8dee;border:1px solid rgba(91,141,238,.3)}
+.refresh-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);padding:2px 10px;border-radius:20px;cursor:pointer;font-size:10.5px;font-family:'DM Sans',sans-serif;transition:all .2s}
+.refresh-btn:hover{background:rgba(255,107,43,.15);border-color:#ff6b2b;color:#ff6b2b}
+.refresh-btn:disabled{opacity:.5;cursor:default}
+.period-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.period-bar label{font-size:11px;color:rgba(255,255,255,.45);white-space:nowrap}
+.date-input{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:#e8e6f0;padding:5px 10px;border-radius:6px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;outline:none;min-width:118px}
+.date-input:focus{border-color:#ff6b2b}
+.date-input::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;cursor:pointer}
+.period-sep{color:rgba(255,255,255,.2);font-size:13px;padding:0 2px}
+.preset-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;transition:all .2s;white-space:nowrap}
+.preset-btn:hover,.preset-btn.active{background:rgba(255,107,43,.2);border-color:#ff6b2b;color:#ff6b2b;font-weight:600}
+.range-info{font-size:11px;color:rgba(255,107,43,.75);font-family:'DM Mono',monospace;white-space:nowrap;padding-left:4px}
+.tabs{display:flex;border-bottom:1px solid rgba(255,255,255,0.07);background:#12121f;padding:0 28px;overflow-x:auto}
+.tab{padding:13px 20px;cursor:pointer;font-size:13px;color:rgba(255,255,255,0.5);border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap;font-weight:500}
+.tab:hover{color:#e8e6f0}.tab.active{color:#ff6b2b;border-bottom-color:#ff6b2b;font-weight:700}
+.content{padding:24px 28px;display:none;max-width:1400px;margin:0 auto}.content.active{display:block}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:12px;margin-bottom:22px}
+.kpi-card{background:#12121f;border:1px solid rgba(255,255,255,0.07);border-top:3px solid #ff6b2b;border-radius:10px;padding:16px 18px}
+.kpi-card.alt{border-top-color:#3366ff}
+.kpi-card.good{border-top-color:#2ecc71}
+.kpi-card.warn{border-top-color:#ffaa00}
+.kpi-label{font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px}
+.kpi-value{font-size:21px;font-weight:700;font-family:'DM Mono',monospace}
+.kpi-sub{font-size:10.5px;color:rgba(255,255,255,.35);margin-top:5px}
+.orange{color:#ff6b2b}.green{color:#2ecc71}.red{color:#e74c3c}.yellow{color:#f1c40f}.blue{color:#5b8dee}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#12121f;color:rgba(255,255,255,.5);padding:9px 10px;text-align:right;font-weight:600;border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap;cursor:pointer;user-select:none}
+th:first-child,th:nth-child(2),th:nth-child(3){text-align:left}
+th:hover{color:#ff6b2b}
+th .arrow{font-size:9px;margin-left:3px;opacity:.5}
+td{padding:8px 10px;text-align:right;border-bottom:1px solid rgba(255,255,255,.04);font-family:'DM Mono',monospace;font-size:11.5px;color:#e8e6f0}
+td:first-child,td:nth-child(2),td:nth-child(3){text-align:left;font-family:'DM Sans',sans-serif;font-size:12px}
+tr:hover td{background:rgba(255,255,255,.025)}
+.tbl-wrap{overflow-x:auto;border-radius:10px;border:1px solid rgba(255,255,255,.07);margin-bottom:20px}
+.sec-title{font-size:13.5px;font-weight:700;color:rgba(255,255,255,.7);margin:22px 0 12px;border-left:3px solid #ff6b2b;padding-left:10px;display:flex;align-items:center;gap:8px}
+.sec-title .count{font-weight:400;color:rgba(255,255,255,.35);font-size:11px}
+.badge{border-radius:20px;font-size:10px;padding:3px 9px;font-weight:700;white-space:nowrap;display:inline-block}
+.badge-green{background:rgba(46,204,113,.15);color:#2ecc71}
+.badge-gray{background:rgba(255,255,255,.07);color:rgba(255,255,255,.4)}
+.badge-orange{background:rgba(255,107,43,.15);color:#ff6b2b}
+.badge-yellow{background:rgba(255,170,0,.15);color:#ffaa00}
+.badge-blue{background:rgba(91,141,238,.15);color:#5b8dee}
+.funil-section{display:grid;grid-template-columns:1.3fr 1fr;gap:24px;margin:16px 0 24px}
+.funil-bar-wrap{margin-bottom:14px}
+.funil-label{display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px;color:rgba(255,255,255,.7)}
+.funil-label b{color:#e8e6f0;font-family:'DM Mono',monospace}
+.funil-bar-bg{background:rgba(255,255,255,.05);border-radius:5px;height:20px;overflow:hidden}
+.funil-bar-fill{background:linear-gradient(90deg,#ff6b2b,#ff9a3c);height:100%;border-radius:5px;transition:width .4s}
+.taxa-grid{display:grid;gap:9px;align-content:start}
+.taxa-item{background:rgba(255,255,255,.04);border-radius:9px;padding:13px 15px;display:flex;justify-content:space-between;align-items:center;font-size:12px;color:rgba(255,255,255,.7)}
+.taxa-val{font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:#ff6b2b}
+.chart-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:18px;margin-bottom:20px}
+.chart-card h4{font-size:11.5px;color:rgba(255,255,255,.45);margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px}
+.chart-card canvas{max-height:280px}
+.foot-note{font-size:11px;color:rgba(255,255,255,.3);text-align:center;padding:18px 0 30px}
+.empty-msg{padding:30px;text-align:center;color:rgba(255,255,255,.35);font-size:13px}
+@media(max-width:900px){.funil-section{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo-jgt">
+    <svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+      <rect width="36" height="36" rx="8" fill="#ff6b2b" fill-opacity="0.9"/>
+      <text x="18" y="25" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="13" fill="white">JGT</text>
+    </svg>
+    <div class="logo-text">
+      <strong>Jamelli GT</strong>
+      <span>Tráfego Pago</span>
+    </div>
+  </div>
+  <div class="period-bar">
+    <label>De</label>
+    <input type="date" id="dateFrom" class="date-input" onchange="onDateChange()">
+    <span class="period-sep">→</span>
+    <input type="date" id="dateTo" class="date-input" onchange="onDateChange()">
+    <button class="preset-btn" onclick="setPreset(7,this)">7d</button>
+    <button class="preset-btn" onclick="setPreset(14,this)">14d</button>
+    <button class="preset-btn" onclick="setPreset(30,this)">30d</button>
+    <button class="preset-btn active" id="btn-all" onclick="setPreset('all',this)">Tudo</button>
+    <span class="range-info" id="range-info"></span>
+  </div>
+  <div>
+    <div class="brand">🔥 Desafio Perfil Que Vende · Bianca Amorim</div>
+    <div class="subtitle">
+      <span>Investimento: <span class="src-badge loading" id="invest-badge">⏳</span></span>
+      <span>Vendas: <span class="src-badge loading" id="vendas-badge">⏳</span></span>
+      <button class="refresh-btn" onclick="refreshAll()">🔄 Atualizar tudo</button>
+    </div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('visao',this)">🌐 Visão Geral</div>
+  <div class="tab" onclick="showTab('campanhas',this)">📊 Campanhas</div>
+  <div class="tab" onclick="showTab('criativos',this)">🎨 Criativos</div>
+  <div class="tab" onclick="showTab('vendas',this)">💰 Vendas (Hotmart)</div>
+</div>
+
+<!-- ===================== VISÃO GERAL ===================== -->
+<div class="content active" id="tab-visao">
+
+  <div class="sec-title">Resumo do período selecionado</div>
+  <div class="kpi-grid">
+    <div class="kpi-card"><div class="kpi-label">Investimento</div><div class="kpi-value orange" id="k-spend">-</div></div>
+    <div class="kpi-card good"><div class="kpi-label">Faturamento (Hotmart)</div><div class="kpi-value green" id="k-revenue">-</div><div class="kpi-sub" id="k-revenue-sub"></div></div>
+    <div class="kpi-card warn"><div class="kpi-label">ROAS</div><div class="kpi-value" id="k-roas">-</div></div>
+    <div class="kpi-card alt"><div class="kpi-label">Vendas Totais</div><div class="kpi-value blue" id="k-sales">-</div><div class="kpi-sub" id="k-sales-sub"></div></div>
+    <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value" id="k-ticket">-</div></div>
+    <div class="kpi-card"><div class="kpi-label">CAC (geral)</div><div class="kpi-value" id="k-cac">-</div><div class="kpi-sub">investimento / vendas totais</div></div>
+    <div class="kpi-card"><div class="kpi-label">Impressões</div><div class="kpi-value" id="k-imp">-</div></div>
+    <div class="kpi-card"><div class="kpi-label">Cliques no link</div><div class="kpi-value" id="k-clicks">-</div></div>
+    <div class="kpi-card"><div class="kpi-label">CPC</div><div class="kpi-value" id="k-cpc">-</div></div>
+    <div class="kpi-card"><div class="kpi-label">CPM</div><div class="kpi-value" id="k-cpm">-</div></div>
+    <div class="kpi-card"><div class="kpi-label">CTR</div><div class="kpi-value" id="k-ctr">-</div></div>
+    <div class="kpi-card"><div class="kpi-label">Compras (pixel Meta)</div><div class="kpi-value" id="k-purchase-meta">-</div><div class="kpi-sub">via evento de conversão, não Hotmart</div></div>
+  </div>
+
+  <div class="sec-title">Funil de tráfego (dados Meta Ads)</div>
+  <div class="funil-section">
+    <div>
+      <div class="funil-bar-wrap">
+        <div class="funil-label"><span>Impressões</span><b id="f-imp">-</b></div>
+        <div class="funil-bar-bg"><div class="funil-bar-fill" style="width:100%"></div></div>
+      </div>
+      <div class="funil-bar-wrap">
+        <div class="funil-label"><span>Cliques no link</span><b id="f-clicks">-</b></div>
+        <div class="funil-bar-bg"><div class="funil-bar-fill" id="f-clicks-bar" style="width:1%"></div></div>
+      </div>
+      <div class="funil-bar-wrap">
+        <div class="funil-label"><span>Visualizações de página</span><b id="f-lpv">-</b></div>
+        <div class="funil-bar-bg"><div class="funil-bar-fill" id="f-lpv-bar" style="width:1%"></div></div>
+      </div>
+      <div class="funil-bar-wrap">
+        <div class="funil-label"><span>Checkouts iniciados</span><b id="f-checkout">-</b></div>
+        <div class="funil-bar-bg"><div class="funil-bar-fill" id="f-checkout-bar" style="width:1%"></div></div>
+      </div>
+      <div class="funil-bar-wrap">
+        <div class="funil-label"><span>Compras (pixel Meta)</span><b id="f-purchase">-</b></div>
+        <div class="funil-bar-bg"><div class="funil-bar-fill" id="f-purchase-bar" style="width:1%;background:linear-gradient(90deg,#2ecc71,#27ae60)"></div></div>
+      </div>
+    </div>
+    <div class="taxa-grid">
+      <div class="taxa-item"><span>CTR (cliques/impressões)</span><span class="taxa-val" id="t-ctr">-</span></div>
+      <div class="taxa-item"><span>Tx. Entrada (LPV/cliques)</span><span class="taxa-val" id="t-entrada">-</span></div>
+      <div class="taxa-item"><span>Tx. Checkout (checkout/LPV)</span><span class="taxa-val" id="t-checkout">-</span></div>
+      <div class="taxa-item"><span>Tx. Compra pixel (compra/checkout)</span><span class="taxa-val" id="t-compra">-</span></div>
+    </div>
+  </div>
+
+  <div class="sec-title">Origem das vendas Hotmart (Código SCK)</div>
+  <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+    <div class="kpi-card good"><div class="kpi-label">Meta Ads (rastreado)</div><div class="kpi-value green" id="o-meta">-</div><div class="kpi-sub" id="o-meta-sub"></div></div>
+    <div class="kpi-card warn"><div class="kpi-label">Não rastreado (SCK vazio)</div><div class="kpi-value yellow" id="o-none">-</div><div class="kpi-sub" id="o-none-sub"></div></div>
+    <div class="kpi-card alt"><div class="kpi-label">Orgânico identificado</div><div class="kpi-value blue" id="o-org">-</div><div class="kpi-sub" id="o-org-sub"></div></div>
+  </div>
+
+  <div class="chart-card">
+    <h4>Evolução Diária — Investimento vs. Faturamento (Hotmart)</h4>
+    <canvas id="chartDaily"></canvas>
+  </div>
+
+</div>
+
+<!-- ===================== CAMPANHAS ===================== -->
+<div class="content" id="tab-campanhas">
+  <div class="sec-title">Campanhas <span class="count" id="camp-count"></span></div>
+  <div class="tbl-wrap">
+    <table id="tblCampanhas">
+      <thead><tr>
+        <th onclick="sortTable('tblCampanhas',0,'text')">Campanha<span class="arrow"></span></th>
+        <th onclick="sortTable('tblCampanhas',1,'text')">Status<span class="arrow"></span></th>
+        <th onclick="sortTable('tblCampanhas',2,'money')">Invest.<span class="arrow"></span></th>
+        <th onclick="sortTable('tblCampanhas',3,'num')">Impressões<span class="arrow"></span></th>
+        <th onclick="sortTable('tblCampanhas',4,'num')">Cliques<span class="arrow"></span></th>
+        <th onclick="sortTable('tblCampanhas',5,'pct')">CTR<span class="arrow"></span></th>
+        <th onclick="sortTable('tblCampanhas',6,'money')">CPC<span class="arrow"></span></th>
+        <th onclick="sortTable('tblCampanhas',7,'num')">LPV<span class="arrow"></span></th>
+        <th onclick="sortTable('tblCampanhas',8,'num')">Checkouts<span class="arrow"></span></th>
+        <th onclick="sortTable('tblCampanhas',9,'num')">Compras (pixel)<span class="arrow"></span></th>
+      </tr></thead>
+      <tbody id="bodyCampanhas"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ===================== CRIATIVOS ===================== -->
+<div class="content" id="tab-criativos">
+  <div class="sec-title">Criativos <span class="count" id="cri-count"></span></div>
+  <div class="tbl-wrap">
+    <table id="tblCriativos">
+      <thead><tr>
+        <th onclick="sortTable('tblCriativos',0,'text')">Criativo<span class="arrow"></span></th>
+        <th onclick="sortTable('tblCriativos',1,'text')">Campanha<span class="arrow"></span></th>
+        <th onclick="sortTable('tblCriativos',2,'text')">Status<span class="arrow"></span></th>
+        <th onclick="sortTable('tblCriativos',3,'money')">Invest.<span class="arrow"></span></th>
+        <th onclick="sortTable('tblCriativos',4,'num')">Impressões<span class="arrow"></span></th>
+        <th onclick="sortTable('tblCriativos',5,'num')">Cliques<span class="arrow"></span></th>
+        <th onclick="sortTable('tblCriativos',6,'pct')">CTR<span class="arrow"></span></th>
+        <th onclick="sortTable('tblCriativos',7,'num')">LPV<span class="arrow"></span></th>
+        <th onclick="sortTable('tblCriativos',8,'num')">Checkouts<span class="arrow"></span></th>
+        <th onclick="sortTable('tblCriativos',9,'num')">Compras (pixel)<span class="arrow"></span></th>
+      </tr></thead>
+      <tbody id="bodyCriativos"></tbody>
+    </table>
+  </div>
+  <div class="foot-note" style="text-align:left;padding:0 0 10px">Ordenado por investimento (maior → menor), recalculado para o período selecionado. "Compras (pixel)" é o evento de conversão do Meta, não substitui o faturamento do Hotmart na aba Vendas.</div>
+</div>
+
+<!-- ===================== VENDAS ===================== -->
+<div class="content" id="tab-vendas">
+  <div class="sec-title">Vendas Hotmart — Desafio Perfil Que Vende <span class="count" id="vendas-count"></span></div>
+  <div class="tbl-wrap">
+    <table id="tblVendas">
+      <thead><tr>
+        <th onclick="sortTable('tblVendas',0,'text')">Data<span class="arrow"></span></th>
+        <th onclick="sortTable('tblVendas',1,'text')">Comprador(a)<span class="arrow"></span></th>
+        <th onclick="sortTable('tblVendas',2,'text')">Status<span class="arrow"></span></th>
+        <th onclick="sortTable('tblVendas',3,'money')">Valor<span class="arrow"></span></th>
+        <th onclick="sortTable('tblVendas',4,'text')">Pagamento<span class="arrow"></span></th>
+        <th onclick="sortTable('tblVendas',5,'text')">Origem<span class="arrow"></span></th>
+        <th onclick="sortTable('tblVendas',6,'text')">Código SCK<span class="arrow"></span></th>
+      </tr></thead>
+      <tbody id="bodyVendas"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="foot-note">Jamelli GT — Gestão de Tráfego · Investimento e Vendas buscam a planilha ao vivo (quando a página está hospedada); em arquivo local, usa o último snapshot salvo</div>
+
+<script>
+const DATA = {"ad_rows": [{"date": "2026-08-12", "ad_id": "120249915808950459", "name": "ADV-07 dias e seu perfil transformado", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 0.07, "impressions": 4, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-12", "ad_id": "120249915672880459", "name": "ADV-Ninguém quer falar isso para a psicóloga", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 2.99, "impressions": 49, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-12", "ad_id": "120249915563960459", "name": "ADV-O QUE ME INCOMODA VER NO PERFIL DA PSICÓLOGA", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 1.31, "impressions": 9, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-12", "ad_id": "120249915896240459", "name": "ADV-Oferta Direta", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 59.91, "impressions": 622, "clicks": 11, "lpv": 10, "checkout": 0, "purchase": 0}, {"date": "2026-08-12", "ad_id": "120249915914270459", "name": "ADV-Oferta Direta 2", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 0.34, "impressions": 10, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-12", "ad_id": "120249915880370459", "name": "ADV-Que loucura", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 0.01, "impressions": 2, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-12", "ad_id": "120249915724560459", "name": "ADV-prova social", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 6.43, "impressions": 46, "clicks": 2, "lpv": 2, "checkout": 0, "purchase": 0}, {"date": "2026-08-13", "ad_id": "120249915808950459", "name": "ADV-07 dias e seu perfil transformado", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 2.55, "impressions": 25, "clicks": 1, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-08-13", "ad_id": "120249915672880459", "name": "ADV-Ninguém quer falar isso para a psicóloga", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 0.36, "impressions": 8, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-13", "ad_id": "120249915563960459", "name": "ADV-O QUE ME INCOMODA VER NO PERFIL DA PSICÓLOGA", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 2.88, "impressions": 31, "clicks": 1, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-13", "ad_id": "120249915896240459", "name": "ADV-Oferta Direta", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 204.75, "impressions": 60873, "clicks": 238, "lpv": 145, "checkout": 0, "purchase": 0}, {"date": "2026-08-13", "ad_id": "120249915914270459", "name": "ADV-Oferta Direta 2", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 31.95, "impressions": 311, "clicks": 3, "lpv": 3, "checkout": 0, "purchase": 0}, {"date": "2026-08-13", "ad_id": "120249915880370459", "name": "ADV-Que loucura", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 3.44, "impressions": 24, "clicks": 1, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-08-13", "ad_id": "120249915724560459", "name": "ADV-prova social", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 17.19, "impressions": 105, "clicks": 1, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-08-14", "ad_id": "120249915808950459", "name": "ADV-07 dias e seu perfil transformado", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 22.93, "impressions": 222, "clicks": 6, "lpv": 3, "checkout": 0, "purchase": 0}, {"date": "2026-08-14", "ad_id": "120249915672880459", "name": "ADV-Ninguém quer falar isso para a psicóloga", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 4.87, "impressions": 150, "clicks": 2, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-08-14", "ad_id": "120249915563960459", "name": "ADV-O QUE ME INCOMODA VER NO PERFIL DA PSICÓLOGA", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 11.64, "impressions": 123, "clicks": 2, "lpv": 2, "checkout": 0, "purchase": 0}, {"date": "2026-08-14", "ad_id": "120249915896240459", "name": "ADV-Oferta Direta", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 88.11, "impressions": 133827, "clicks": 517, "lpv": 379, "checkout": 1, "purchase": 1}, {"date": "2026-08-14", "ad_id": "120249915914270459", "name": "ADV-Oferta Direta 2", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 22.11, "impressions": 439, "clicks": 2, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-08-14", "ad_id": "120249915880370459", "name": "ADV-Que loucura", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 6.74, "impressions": 2368, "clicks": 13, "lpv": 12, "checkout": 0, "purchase": 0}, {"date": "2026-08-14", "ad_id": "120249915724560459", "name": "ADV-prova social", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 11.47, "impressions": 121, "clicks": 2, "lpv": 2, "checkout": 0, "purchase": 0}, {"date": "2026-08-15", "ad_id": "120249915808950459", "name": "ADV-07 dias e seu perfil transformado", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 5.19, "impressions": 49, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-15", "ad_id": "120249915672880459", "name": "ADV-Ninguém quer falar isso para a psicóloga", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 0.47, "impressions": 9, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-15", "ad_id": "120249915563960459", "name": "ADV-O QUE ME INCOMODA VER NO PERFIL DA PSICÓLOGA", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 0.71, "impressions": 9, "clicks": 1, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-08-15", "ad_id": "120249915896240459", "name": "ADV-Oferta Direta", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 113.64, "impressions": 2808, "clicks": 23, "lpv": 17, "checkout": 0, "purchase": 0}, {"date": "2026-08-15", "ad_id": "120249915914270459", "name": "ADV-Oferta Direta 2", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 14.39, "impressions": 127, "clicks": 2, "lpv": 2, "checkout": 0, "purchase": 0}, {"date": "2026-08-15", "ad_id": "120249915880370459", "name": "ADV-Que loucura", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 0.23, "impressions": 1, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-15", "ad_id": "120249915724560459", "name": "ADV-prova social", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 4.04, "impressions": 24, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-16", "ad_id": "120249915808950459", "name": "ADV-07 dias e seu perfil transformado", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 22.89, "impressions": 181, "clicks": 3, "lpv": 3, "checkout": 0, "purchase": 0}, {"date": "2026-08-16", "ad_id": "120249915672880459", "name": "ADV-Ninguém quer falar isso para a psicóloga", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 0.13, "impressions": 1, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-16", "ad_id": "120249915563960459", "name": "ADV-O QUE ME INCOMODA VER NO PERFIL DA PSICÓLOGA", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 11.46, "impressions": 91, "clicks": 3, "lpv": 3, "checkout": 0, "purchase": 0}, {"date": "2026-08-16", "ad_id": "120249915896240459", "name": "ADV-Oferta Direta", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 91.09, "impressions": 11235, "clicks": 58, "lpv": 44, "checkout": 2, "purchase": 0}, {"date": "2026-08-16", "ad_id": "120249915914270459", "name": "ADV-Oferta Direta 2", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 19.5, "impressions": 167, "clicks": 4, "lpv": 4, "checkout": 0, "purchase": 0}, {"date": "2026-08-16", "ad_id": "120249915880370459", "name": "ADV-Que loucura", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 0.44, "impressions": 7, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-16", "ad_id": "120249915724560459", "name": "ADV-prova social", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 4.34, "impressions": 34, "clicks": 1, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-17", "ad_id": "120249915808950459", "name": "ADV-07 dias e seu perfil transformado", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 21.93, "impressions": 212, "clicks": 6, "lpv": 4, "checkout": 0, "purchase": 0}, {"date": "2026-08-17", "ad_id": "120249915672880459", "name": "ADV-Ninguém quer falar isso para a psicóloga", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 5.28, "impressions": 107, "clicks": 1, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-08-17", "ad_id": "120249915563960459", "name": "ADV-O QUE ME INCOMODA VER NO PERFIL DA PSICÓLOGA", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 43.12, "impressions": 451, "clicks": 6, "lpv": 5, "checkout": 0, "purchase": 0}, {"date": "2026-08-17", "ad_id": "120249915896240459", "name": "ADV-Oferta Direta", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 18.49, "impressions": 357, "clicks": 5, "lpv": 6, "checkout": 0, "purchase": 0}, {"date": "2026-08-17", "ad_id": "120249915914270459", "name": "ADV-Oferta Direta 2", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 55.29, "impressions": 14808, "clicks": 57, "lpv": 35, "checkout": 1, "purchase": 0}, {"date": "2026-08-17", "ad_id": "120249915880370459", "name": "ADV-Que loucura", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 2.22, "impressions": 6, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-17", "ad_id": "120249915724560459", "name": "ADV-prova social", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 2.83, "impressions": 12, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-18", "ad_id": "120249915808950459", "name": "ADV-07 dias e seu perfil transformado", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 8.05, "impressions": 26, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-18", "ad_id": "120249915672880459", "name": "ADV-Ninguém quer falar isso para a psicóloga", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 2.04, "impressions": 4, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-18", "ad_id": "120249915563960459", "name": "ADV-O QUE ME INCOMODA VER NO PERFIL DA PSICÓLOGA", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 99.58, "impressions": 539, "clicks": 14, "lpv": 10, "checkout": 0, "purchase": 0}, {"date": "2026-08-18", "ad_id": "120249915914270459", "name": "ADV-Oferta Direta 2", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 15.31, "impressions": 112, "clicks": 3, "lpv": 2, "checkout": 0, "purchase": 0}, {"date": "2026-08-18", "ad_id": "120249915880370459", "name": "ADV-Que loucura", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 0.56, "impressions": 10, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-18", "ad_id": "120249915724560459", "name": "ADV-prova social", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 1.48, "impressions": 13, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-18", "ad_id": "120250056432250459", "name": "ADV-07 dias e seu perfil transformado", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 0.68, "impressions": 79, "clicks": 4, "lpv": 3, "checkout": 0, "purchase": 0}, {"date": "2026-08-18", "ad_id": "120250056462740459", "name": "ADV-Nativo 1", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 2.27, "impressions": 172, "clicks": 7, "lpv": 8, "checkout": 0, "purchase": 0}, {"date": "2026-08-18", "ad_id": "120250056526060459", "name": "ADV-Nativo 2", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 2.64, "impressions": 136, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-18", "ad_id": "120250056533470459", "name": "ADV-Nativo 3", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 60.02, "impressions": 730, "clicks": 8, "lpv": 4, "checkout": 0, "purchase": 0}, {"date": "2026-08-18", "ad_id": "120250056432280459", "name": "ADV-O QUE ME INCOMODA VER NO PERFIL DA PSICÓLOGA", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 0.07, "impressions": 9, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-18", "ad_id": "120250056432240459", "name": "ADV-Oferta Direta 2", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 7.7, "impressions": 254, "clicks": 3, "lpv": 3, "checkout": 0, "purchase": 0}, {"date": "2026-08-18", "ad_id": "120250056432230459", "name": "ADV-Que loucura", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 0.2, "impressions": 16, "clicks": 2, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-08-18", "ad_id": "120250056432260459", "name": "ADV-prova social", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 3.1, "impressions": 88, "clicks": 4, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-08-19", "ad_id": "120250056432250459", "name": "ADV-07 dias e seu perfil transformado", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 4.32, "impressions": 52, "clicks": 1, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-08-19", "ad_id": "120250056462740459", "name": "ADV-Nativo 1", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 78.42, "impressions": 1026, "clicks": 17, "lpv": 17, "checkout": 3, "purchase": 1}, {"date": "2026-08-19", "ad_id": "120250056526060459", "name": "ADV-Nativo 2", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 1.24, "impressions": 12, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-19", "ad_id": "120250056533470459", "name": "ADV-Nativo 3", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 42.7, "impressions": 365, "clicks": 2, "lpv": 2, "checkout": 0, "purchase": 0}, {"date": "2026-08-19", "ad_id": "120250056432270459", "name": "ADV-Ninguém quer falar isso para a psicóloga", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 33.19, "impressions": 280, "clicks": 4, "lpv": 4, "checkout": 0, "purchase": 0}, {"date": "2026-08-19", "ad_id": "120250056432280459", "name": "ADV-O QUE ME INCOMODA VER NO PERFIL DA PSICÓLOGA", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 3.02, "impressions": 28, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-19", "ad_id": "120250056432240459", "name": "ADV-Oferta Direta 2", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 17.82, "impressions": 192, "clicks": 3, "lpv": 2, "checkout": 0, "purchase": 0}, {"date": "2026-08-19", "ad_id": "120250056432230459", "name": "ADV-Que loucura", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 7.18, "impressions": 54, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-19", "ad_id": "120250056432260459", "name": "ADV-prova social", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 74.05, "impressions": 587, "clicks": 12, "lpv": 9, "checkout": 0, "purchase": 0}, {"date": "2026-08-20", "ad_id": "120250056432250459", "name": "ADV-07 dias e seu perfil transformado", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 3.19, "impressions": 2546, "clicks": 12, "lpv": 8, "checkout": 0, "purchase": 0}, {"date": "2026-08-20", "ad_id": "120250056462740459", "name": "ADV-Nativo 1", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 39.1, "impressions": 2238, "clicks": 6, "lpv": 3, "checkout": 0, "purchase": 0}, {"date": "2026-08-20", "ad_id": "120250056526060459", "name": "ADV-Nativo 2", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 1.16, "impressions": 14, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-20", "ad_id": "120250056533470459", "name": "ADV-Nativo 3", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 96.55, "impressions": 791, "clicks": 8, "lpv": 7, "checkout": 0, "purchase": 0}, {"date": "2026-08-20", "ad_id": "120250056432270459", "name": "ADV-Ninguém quer falar isso para a psicóloga", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 26.72, "impressions": 235, "clicks": 3, "lpv": 3, "checkout": 0, "purchase": 0}, {"date": "2026-08-20", "ad_id": "120250056432280459", "name": "ADV-O QUE ME INCOMODA VER NO PERFIL DA PSICÓLOGA", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 1.42, "impressions": 10, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-20", "ad_id": "120250056432240459", "name": "ADV-Oferta Direta 2", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 21.71, "impressions": 151, "clicks": 3, "lpv": 3, "checkout": 0, "purchase": 0}, {"date": "2026-08-20", "ad_id": "120250056432230459", "name": "ADV-Que loucura", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 1.61, "impressions": 16, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-20", "ad_id": "120250056432260459", "name": "ADV-prova social", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 51.84, "impressions": 463, "clicks": 9, "lpv": 9, "checkout": 0, "purchase": 0}, {"date": "2026-08-21", "ad_id": "120250056432250459", "name": "ADV-07 dias e seu perfil transformado", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 0.11, "impressions": 2, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-21", "ad_id": "120250056462740459", "name": "ADV-Nativo 1", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 12.28, "impressions": 567, "clicks": 7, "lpv": 6, "checkout": 0, "purchase": 0}, {"date": "2026-08-21", "ad_id": "120250056526060459", "name": "ADV-Nativo 2", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 3.5, "impressions": 16, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-21", "ad_id": "120250056533470459", "name": "ADV-Nativo 3", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 0.0, "impressions": 0, "clicks": 0, "lpv": 0, "checkout": 1, "purchase": 0}, {"date": "2026-08-21", "ad_id": "120250056432270459", "name": "ADV-Ninguém quer falar isso para a psicóloga", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 38.8, "impressions": 391, "clicks": 3, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-08-21", "ad_id": "120250056432280459", "name": "ADV-O QUE ME INCOMODA VER NO PERFIL DA PSICÓLOGA", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 0.05, "impressions": 1, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-21", "ad_id": "120250056432240459", "name": "ADV-Oferta Direta 2", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 33.67, "impressions": 245, "clicks": 10, "lpv": 5, "checkout": 0, "purchase": 0}, {"date": "2026-08-21", "ad_id": "120250056432230459", "name": "ADV-Que loucura", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 1.38, "impressions": 5, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-21", "ad_id": "120250056432260459", "name": "ADV-prova social", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 148.03, "impressions": 2002, "clicks": 22, "lpv": 15, "checkout": 2, "purchase": 0}, {"date": "2026-08-22", "ad_id": "120250126850140459", "name": "ADV-ONESHOT", "adset": "00 - Page View", "campaign": "[JGT][DESAFIO][OS] LL2408", "status": "CAMPAIGN_PAUSED", "spend": 33.91, "impressions": 400, "clicks": 6, "lpv": 5, "checkout": 5, "purchase": 1}, {"date": "2026-08-22", "ad_id": "120250056432250459", "name": "ADV-07 dias e seu perfil transformado", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 4.14, "impressions": 31, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-22", "ad_id": "120250056462740459", "name": "ADV-Nativo 1", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 4.15, "impressions": 74, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-22", "ad_id": "120250056526060459", "name": "ADV-Nativo 2", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 0.22, "impressions": 1, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-22", "ad_id": "120250056432270459", "name": "ADV-Ninguém quer falar isso para a psicóloga", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 38.29, "impressions": 248, "clicks": 1, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-08-22", "ad_id": "120250126000090459", "name": "ADV-Não é cartão de visitas", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 65.19, "impressions": 770, "clicks": 11, "lpv": 9, "checkout": 0, "purchase": 0}, {"date": "2026-08-22", "ad_id": "120250056432240459", "name": "ADV-Oferta Direta 2", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 32.9, "impressions": 203, "clicks": 1, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-22", "ad_id": "120250056432260459", "name": "ADV-prova social", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 92.04, "impressions": 556, "clicks": 7, "lpv": 5, "checkout": 1, "purchase": 0}, {"date": "2026-08-23", "ad_id": "120250126850140459", "name": "ADV-ONESHOT", "adset": "00 - Page View", "campaign": "[JGT][DESAFIO][OS] LL2408", "status": "CAMPAIGN_PAUSED", "spend": 154.45, "impressions": 1188, "clicks": 15, "lpv": 8, "checkout": 15, "purchase": 2}, {"date": "2026-08-23", "ad_id": "120250056462740459", "name": "ADV-Nativo 1", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 1.51, "impressions": 37, "clicks": 3, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-08-23", "ad_id": "120250056526060459", "name": "ADV-Nativo 2", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 0.32, "impressions": 5, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-23", "ad_id": "120250056432270459", "name": "ADV-Ninguém quer falar isso para a psicóloga", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 4.26, "impressions": 46, "clicks": 1, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-08-23", "ad_id": "120250126000090459", "name": "ADV-Não é cartão de visitas", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 220.59, "impressions": 1682, "clicks": 39, "lpv": 31, "checkout": 5, "purchase": 2}, {"date": "2026-08-23", "ad_id": "120250056432240459", "name": "ADV-Oferta Direta 2", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 6.4, "impressions": 56, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-23", "ad_id": "120250056432230459", "name": "ADV-Que loucura", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 1.91, "impressions": 6, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-24", "ad_id": "120250126850140459", "name": "ADV-ONESHOT", "adset": "00 - Page View", "campaign": "[JGT][DESAFIO][OS] LL2408", "status": "CAMPAIGN_PAUSED", "spend": 89.92, "impressions": 908, "clicks": 18, "lpv": 12, "checkout": 19, "purchase": 1}, {"date": "2026-08-24", "ad_id": "120250056432250459", "name": "ADV-07 dias e seu perfil transformado", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 0.86, "impressions": 8, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-24", "ad_id": "120250056432270459", "name": "ADV-Ninguém quer falar isso para a psicóloga", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 1.09, "impressions": 46, "clicks": 1, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-08-24", "ad_id": "120250126000090459", "name": "ADV-Não é cartão de visitas", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 69.37, "impressions": 501, "clicks": 16, "lpv": 12, "checkout": 3, "purchase": 1}, {"date": "2026-08-24", "ad_id": "120250056432240459", "name": "ADV-Oferta Direta 2", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 3.75, "impressions": 68, "clicks": 2, "lpv": 2, "checkout": 0, "purchase": 0}, {"date": "2026-08-24", "ad_id": "120250056432230459", "name": "ADV-Que loucura", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 0.08, "impressions": 2, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-25", "ad_id": "120250126850140459", "name": "ADV-ONESHOT", "adset": "00 - Page View", "campaign": "[JGT][DESAFIO][OS] LL2408", "status": "CAMPAIGN_PAUSED", "spend": 45.01, "impressions": 361, "clicks": 7, "lpv": 4, "checkout": 6, "purchase": 0}, {"date": "2026-08-30", "ad_id": "120250126000090459", "name": "ADV-Não é cartão de visitas", "adset": "00 - ADV", "campaign": "[JGT][VENDAS][DESAFIO][CP] LL240826", "status": "CAMPAIGN_PAUSED", "spend": 0.0, "impressions": 0, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-08-31", "ad_id": "120250126850140459", "name": "ADV-ONESHOT", "adset": "00 - Page View", "campaign": "[JGT][DESAFIO][OS] LL2408", "status": "CAMPAIGN_PAUSED", "spend": 0.0, "impressions": 0, "clicks": 0, "lpv": 0, "checkout": 1, "purchase": 1}, {"date": "2026-09-04", "ad_id": "120250310933930459", "name": "ADE01", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 2.88, "impressions": 52, "clicks": 1, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-09-04", "ad_id": "120250310947820459", "name": "ADE02", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 2.67, "impressions": 53, "clicks": 1, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-09-04", "ad_id": "120250310953620459", "name": "ADE03", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 3.81, "impressions": 85, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-04", "ad_id": "120250310709490459", "name": "ADV01", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 7.1, "impressions": 24, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-04", "ad_id": "120250310829970459", "name": "ADV02", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 4.24, "impressions": 51, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-04", "ad_id": "120250310875620459", "name": "ADV03", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 0.95, "impressions": 26, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-04", "ad_id": "120250310896710459", "name": "ADV04", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 3.59, "impressions": 56, "clicks": 1, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-04", "ad_id": "120250310909180459", "name": "ADV05", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 1.13, "impressions": 32, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-04", "ad_id": "120250310985920459", "name": "ADE01", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 2.79, "impressions": 29, "clicks": 1, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-09-04", "ad_id": "120250310985910459", "name": "ADE02", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 3.86, "impressions": 105, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-04", "ad_id": "120250310985900459", "name": "ADE03", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 0.53, "impressions": 22, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-04", "ad_id": "120250310985970459", "name": "ADV01", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 0.1, "impressions": 2, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-04", "ad_id": "120250310985960459", "name": "ADV02", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 16.74, "impressions": 119, "clicks": 1, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-09-04", "ad_id": "120250310985950459", "name": "ADV03", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 0.46, "impressions": 14, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-04", "ad_id": "120250310985940459", "name": "ADV04", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 3.86, "impressions": 45, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-04", "ad_id": "120250310985930459", "name": "ADV05", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 6.76, "impressions": 58, "clicks": 1, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-09-05", "ad_id": "120250310933930459", "name": "ADE01", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 18.77, "impressions": 176, "clicks": 4, "lpv": 2, "checkout": 0, "purchase": 0}, {"date": "2026-09-05", "ad_id": "120250310947820459", "name": "ADE02", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 5.32, "impressions": 97, "clicks": 1, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-05", "ad_id": "120250310953620459", "name": "ADE03", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 6.28, "impressions": 82, "clicks": 2, "lpv": 2, "checkout": 0, "purchase": 0}, {"date": "2026-09-05", "ad_id": "120250310709490459", "name": "ADV01", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 83.5, "impressions": 468, "clicks": 9, "lpv": 8, "checkout": 1, "purchase": 0}, {"date": "2026-09-05", "ad_id": "120250310829970459", "name": "ADV02", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 100.69, "impressions": 573, "clicks": 17, "lpv": 15, "checkout": 1, "purchase": 0}, {"date": "2026-09-05", "ad_id": "120250310875620459", "name": "ADV03", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 2.15, "impressions": 30, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-05", "ad_id": "120250310896710459", "name": "ADV04", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 15.4, "impressions": 123, "clicks": 1, "lpv": 2, "checkout": 0, "purchase": 0}, {"date": "2026-09-05", "ad_id": "120250310909180459", "name": "ADV05", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 22.4, "impressions": 93, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-05", "ad_id": "120250310985920459", "name": "ADE01", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 13.4, "impressions": 129, "clicks": 1, "lpv": 1, "checkout": 1, "purchase": 0}, {"date": "2026-09-05", "ad_id": "120250310985910459", "name": "ADE02", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 3.56, "impressions": 57, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-05", "ad_id": "120250310985900459", "name": "ADE03", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 20.5, "impressions": 256, "clicks": 4, "lpv": 3, "checkout": 0, "purchase": 0}, {"date": "2026-09-05", "ad_id": "120250310985970459", "name": "ADV01", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 15.72, "impressions": 130, "clicks": 3, "lpv": 2, "checkout": 0, "purchase": 0}, {"date": "2026-09-05", "ad_id": "120250310985960459", "name": "ADV02", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 169.31, "impressions": 760, "clicks": 15, "lpv": 12, "checkout": 2, "purchase": 0}, {"date": "2026-09-05", "ad_id": "120250310985950459", "name": "ADV03", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 3.22, "impressions": 27, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-05", "ad_id": "120250310985940459", "name": "ADV04", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 6.6, "impressions": 54, "clicks": 1, "lpv": 1, "checkout": 1, "purchase": 0}, {"date": "2026-09-05", "ad_id": "120250310985930459", "name": "ADV05", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 13.1, "impressions": 85, "clicks": 1, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-06", "ad_id": "120250310933930459", "name": "ADE01", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 7.23, "impressions": 87, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-06", "ad_id": "120250310947820459", "name": "ADE02", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 2.93, "impressions": 42, "clicks": 1, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-09-06", "ad_id": "120250310953620459", "name": "ADE03", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 1.87, "impressions": 22, "clicks": 1, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-09-06", "ad_id": "120250310709490459", "name": "ADV01", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 128.09, "impressions": 665, "clicks": 20, "lpv": 19, "checkout": 2, "purchase": 0}, {"date": "2026-09-06", "ad_id": "120250310829970459", "name": "ADV02", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 145.07, "impressions": 799, "clicks": 12, "lpv": 9, "checkout": 0, "purchase": 0}, {"date": "2026-09-06", "ad_id": "120250310875620459", "name": "ADV03", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 1.66, "impressions": 10, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-06", "ad_id": "120250310896710459", "name": "ADV04", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 11.52, "impressions": 49, "clicks": 1, "lpv": 2, "checkout": 0, "purchase": 0}, {"date": "2026-09-06", "ad_id": "120250310909180459", "name": "ADV05", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 0.96, "impressions": 6, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-06", "ad_id": "120250310985920459", "name": "ADE01", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 8.15, "impressions": 74, "clicks": 1, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-09-06", "ad_id": "120250310985910459", "name": "ADE02", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 0.88, "impressions": 19, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-06", "ad_id": "120250310985900459", "name": "ADE03", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 1.98, "impressions": 43, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-06", "ad_id": "120250310985970459", "name": "ADV01", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 181.11, "impressions": 1625, "clicks": 31, "lpv": 27, "checkout": 4, "purchase": 0}, {"date": "2026-09-06", "ad_id": "120250310985960459", "name": "ADV02", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 140.06, "impressions": 612, "clicks": 6, "lpv": 6, "checkout": 0, "purchase": 0}, {"date": "2026-09-06", "ad_id": "120250310985950459", "name": "ADV03", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 1.31, "impressions": 6, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-06", "ad_id": "120250310985940459", "name": "ADV04", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 0.65, "impressions": 11, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-06", "ad_id": "120250310985930459", "name": "ADV05", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 1.63, "impressions": 13, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-07", "ad_id": "120250310933930459", "name": "ADE01", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 1.38, "impressions": 15, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-07", "ad_id": "120250310947820459", "name": "ADE02", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 0.03, "impressions": 1, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-07", "ad_id": "120250310709490459", "name": "ADV01", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 20.89, "impressions": 111, "clicks": 2, "lpv": 2, "checkout": 0, "purchase": 0}, {"date": "2026-09-07", "ad_id": "120250310829970459", "name": "ADV02", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 5.44, "impressions": 16, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-07", "ad_id": "120250310875620459", "name": "ADV03", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 0.29, "impressions": 2, "clicks": 1, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-09-07", "ad_id": "120250310985920459", "name": "ADE01", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 0.39, "impressions": 3, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-07", "ad_id": "120250310985900459", "name": "ADE03", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 0.05, "impressions": 1, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-07", "ad_id": "120250310985970459", "name": "ADV01", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 27.63, "impressions": 173, "clicks": 1, "lpv": 1, "checkout": 1, "purchase": 0}, {"date": "2026-09-07", "ad_id": "120250310985960459", "name": "ADV02", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 3.49, "impressions": 9, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-08", "ad_id": "120250310933930459", "name": "ADE01", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 116.87, "impressions": 1648, "clicks": 14, "lpv": 13, "checkout": 0, "purchase": 0}, {"date": "2026-09-08", "ad_id": "120250310875620459", "name": "ADV03", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 16.01, "impressions": 130, "clicks": 4, "lpv": 5, "checkout": 0, "purchase": 0}, {"date": "2026-09-08", "ad_id": "120250310985920459", "name": "ADE01", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 127.84, "impressions": 1529, "clicks": 6, "lpv": 6, "checkout": 0, "purchase": 0}, {"date": "2026-09-08", "ad_id": "120250310985900459", "name": "ADE03", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 15.78, "impressions": 293, "clicks": 1, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-09-09", "ad_id": "120250310933930459", "name": "ADE01", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 52.23, "impressions": 570, "clicks": 7, "lpv": 7, "checkout": 0, "purchase": 0}, {"date": "2026-09-09", "ad_id": "120250310953620459", "name": "ADE03", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 2.67, "impressions": 7, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-09", "ad_id": "120250310709490459", "name": "ADV01", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 0.0, "impressions": 0, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-09", "ad_id": "120250310875620459", "name": "ADV03", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 192.55, "impressions": 867, "clicks": 24, "lpv": 19, "checkout": 0, "purchase": 0}, {"date": "2026-09-09", "ad_id": "120250310909180459", "name": "ADV05", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGA] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 11.96, "impressions": 71, "clicks": 1, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-09-09", "ad_id": "120250310985920459", "name": "ADE01", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 145.42, "impressions": 1399, "clicks": 12, "lpv": 9, "checkout": 0, "purchase": 0}, {"date": "2026-09-09", "ad_id": "120250310985900459", "name": "ADE03", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 9.83, "impressions": 143, "clicks": 1, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-09-12", "ad_id": "120250310985900459", "name": "ADE03", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][PGB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 0.0, "impressions": 0, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-13", "ad_id": "120250414781140459", "name": "ADV01-copiloto", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "PAUSED", "spend": 3.95, "impressions": 63, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-13", "ad_id": "120250426245670459", "name": "ADV02-Cartão de Visitas-2", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "ACTIVE", "spend": 0.92, "impressions": 12, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-13", "ad_id": "120250426255410459", "name": "ADV03-Cartão de Visitas-1", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "ACTIVE", "spend": 0.53, "impressions": 12, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-13", "ad_id": "120250426265290459", "name": "ADV04-Desafio de 97 reais", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "ACTIVE", "spend": 5.05, "impressions": 85, "clicks": 2, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-09-13", "ad_id": "120250429902950459", "name": "ADV05-Chega de cartãozinho", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "ACTIVE", "spend": 0.27, "impressions": 7, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-13", "ad_id": "120250429949990459", "name": "ADV06-Pare de produzir conteúdo agora", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "ACTIVE", "spend": 11.03, "impressions": 133, "clicks": 4, "lpv": 4, "checkout": 1, "purchase": 0}, {"date": "2026-09-13", "ad_id": "120250429960420459", "name": "ADV06-Seu perfil vaza em 3 camadas", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "ACTIVE", "spend": 1.96, "impressions": 22, "clicks": 1, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-09-14", "ad_id": "120250451647090459", "name": "ADV01-copiloto", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NVB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 27.66, "impressions": 236, "clicks": 7, "lpv": 5, "checkout": 0, "purchase": 0}, {"date": "2026-09-14", "ad_id": "120250451647080459", "name": "ADV02-Cartão de Visitas-2", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NVB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 1.14, "impressions": 19, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-14", "ad_id": "120250451647060459", "name": "ADV03-Cartão de Visitas-1", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NVB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 0.58, "impressions": 6, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-14", "ad_id": "120250451647070459", "name": "ADV04-Desafio de 97 reais", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NVB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 20.75, "impressions": 189, "clicks": 6, "lpv": 4, "checkout": 0, "purchase": 0}, {"date": "2026-09-14", "ad_id": "120250451647050459", "name": "ADV05-Chega de cartãozinho", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NVB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 0.68, "impressions": 7, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-14", "ad_id": "120250451647040459", "name": "ADV06-Pare de produzir conteúdo agora", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NVB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 16.29, "impressions": 163, "clicks": 2, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-09-14", "ad_id": "120250451647030459", "name": "ADV06-Seu perfil vaza em 3 camadas", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NVB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 4.2, "impressions": 48, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-14", "ad_id": "120250426245670459", "name": "ADV02-Cartão de Visitas-2", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "ACTIVE", "spend": 0.19, "impressions": 4, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-14", "ad_id": "120250426255410459", "name": "ADV03-Cartão de Visitas-1", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "ACTIVE", "spend": 0.07, "impressions": 2, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-14", "ad_id": "120250426265290459", "name": "ADV04-Desafio de 97 reais", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "ACTIVE", "spend": 24.9, "impressions": 353, "clicks": 13, "lpv": 8, "checkout": 1, "purchase": 1}, {"date": "2026-09-14", "ad_id": "120250429949990459", "name": "ADV06-Pare de produzir conteúdo agora", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "ACTIVE", "spend": 53.09, "impressions": 552, "clicks": 16, "lpv": 15, "checkout": 0, "purchase": 0}, {"date": "2026-09-14", "ad_id": "120250429960420459", "name": "ADV06-Seu perfil vaza em 3 camadas", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "ACTIVE", "spend": 1.55, "impressions": 18, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-15", "ad_id": "120250451647090459", "name": "ADV01-copiloto", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NVB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 3.71, "impressions": 14, "clicks": 0, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-09-15", "ad_id": "120250451647080459", "name": "ADV02-Cartão de Visitas-2", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NVB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 0.05, "impressions": 3, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-15", "ad_id": "120250451647060459", "name": "ADV03-Cartão de Visitas-1", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NVB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 0.3, "impressions": 7, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-15", "ad_id": "120250451647070459", "name": "ADV04-Desafio de 97 reais", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NVB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 47.34, "impressions": 401, "clicks": 10, "lpv": 9, "checkout": 0, "purchase": 0}, {"date": "2026-09-15", "ad_id": "120250451647040459", "name": "ADV06-Pare de produzir conteúdo agora", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NVB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 6.37, "impressions": 57, "clicks": 1, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-09-15", "ad_id": "120250451647030459", "name": "ADV06-Seu perfil vaza em 3 camadas", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NVB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 0.15, "impressions": 4, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-15", "ad_id": "120250426245670459", "name": "ADV02-Cartão de Visitas-2", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "ACTIVE", "spend": 0.32, "impressions": 1, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-15", "ad_id": "120250426265290459", "name": "ADV04-Desafio de 97 reais", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "ACTIVE", "spend": 8.82, "impressions": 83, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-15", "ad_id": "120250429902950459", "name": "ADV05-Chega de cartãozinho", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "ACTIVE", "spend": 0.03, "impressions": 1, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-15", "ad_id": "120250429949990459", "name": "ADV06-Pare de produzir conteúdo agora", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "ACTIVE", "spend": 221.59, "impressions": 1678, "clicks": 47, "lpv": 36, "checkout": 1, "purchase": 0}, {"date": "2026-09-15", "ad_id": "120250429960420459", "name": "ADV06-Seu perfil vaza em 3 camadas", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "ACTIVE", "spend": 4.71, "impressions": 30, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-16", "ad_id": "120250490758380459", "name": "ONE SINGLE", "adset": "00 - Page View", "campaign": "[JGT][DESAFIO][OS] LL2809", "status": "ACTIVE", "spend": 58.68, "impressions": 586, "clicks": 15, "lpv": 9, "checkout": 11, "purchase": 2}, {"date": "2026-09-16", "ad_id": "120250426245670459", "name": "ADV02-Cartão de Visitas-2", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "ACTIVE", "spend": 1.65, "impressions": 16, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-16", "ad_id": "120250426255410459", "name": "ADV03-Cartão de Visitas-1", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "ACTIVE", "spend": 0.27, "impressions": 1, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-16", "ad_id": "120250426265290459", "name": "ADV04-Desafio de 97 reais", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "ACTIVE", "spend": 106.7, "impressions": 1389, "clicks": 22, "lpv": 21, "checkout": 1, "purchase": 0}, {"date": "2026-09-16", "ad_id": "120250429949990459", "name": "ADV06-Pare de produzir conteúdo agora", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "ACTIVE", "spend": 263.67, "impressions": 2307, "clicks": 52, "lpv": 44, "checkout": 4, "purchase": 2}, {"date": "2026-09-17", "ad_id": "120250490758380459", "name": "ONE SINGLE", "adset": "00 - Page View", "campaign": "[JGT][DESAFIO][OS] LL2809", "status": "ACTIVE", "spend": 80.32, "impressions": 611, "clicks": 10, "lpv": 5, "checkout": 6, "purchase": 0}, {"date": "2026-09-17", "ad_id": "120250451647070459", "name": "ADV04-Desafio de 97 reais", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NVB] LL2809", "status": "CAMPAIGN_PAUSED", "spend": 0.0, "impressions": 0, "clicks": 0, "lpv": 0, "checkout": 1, "purchase": 0}, {"date": "2026-09-17", "ad_id": "120250414781140459", "name": "ADV01-copiloto", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "PAUSED", "spend": 9.21, "impressions": 83, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-17", "ad_id": "120250426265290459", "name": "ADV04-Desafio de 97 reais", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "ACTIVE", "spend": 7.4, "impressions": 54, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-17", "ad_id": "120250429949990459", "name": "ADV06-Pare de produzir conteúdo agora", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "ACTIVE", "spend": 161.88, "impressions": 1422, "clicks": 44, "lpv": 39, "checkout": 3, "purchase": 1}, {"date": "2026-09-17", "ad_id": "120250429960420459", "name": "ADV06-Seu perfil vaza em 3 camadas", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "ACTIVE", "spend": 2.56, "impressions": 19, "clicks": 2, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-09-18", "ad_id": "120250490758380459", "name": "ONE SINGLE", "adset": "00 - Page View", "campaign": "[JGT][DESAFIO][OS] LL2809", "status": "ACTIVE", "spend": 90.74, "impressions": 513, "clicks": 5, "lpv": 4, "checkout": 4, "purchase": 0}, {"date": "2026-09-18", "ad_id": "120250414781140459", "name": "ADV01-copiloto", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "PAUSED", "spend": 249.1, "impressions": 1898, "clicks": 37, "lpv": 38, "checkout": 2, "purchase": 1}, {"date": "2026-09-19", "ad_id": "120250490758380459", "name": "ONE SINGLE", "adset": "00 - Page View", "campaign": "[JGT][DESAFIO][OS] LL2809", "status": "ACTIVE", "spend": 117.85, "impressions": 777, "clicks": 12, "lpv": 8, "checkout": 9, "purchase": 0}, {"date": "2026-09-19", "ad_id": "120250414781140459", "name": "ADV01-copiloto", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "PAUSED", "spend": 296.9, "impressions": 1904, "clicks": 37, "lpv": 31, "checkout": 1, "purchase": 1}, {"date": "2026-09-20", "ad_id": "120250490758380459", "name": "ONE SINGLE", "adset": "00 - Page View", "campaign": "[JGT][DESAFIO][OS] LL2809", "status": "ACTIVE", "spend": 147.49, "impressions": 734, "clicks": 19, "lpv": 12, "checkout": 17, "purchase": 0}, {"date": "2026-09-20", "ad_id": "120250414781140459", "name": "ADV01-copiloto", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "PAUSED", "spend": 308.51, "impressions": 1441, "clicks": 16, "lpv": 13, "checkout": 1, "purchase": 0}, {"date": "2026-09-21", "ad_id": "120250490758380459", "name": "ONE SINGLE", "adset": "00 - Page View", "campaign": "[JGT][DESAFIO][OS] LL2809", "status": "ACTIVE", "spend": 107.49, "impressions": 488, "clicks": 14, "lpv": 7, "checkout": 10, "purchase": 0}, {"date": "2026-09-21", "ad_id": "120250414781140459", "name": "ADV01-copiloto", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "PAUSED", "spend": 257.26, "impressions": 2022, "clicks": 37, "lpv": 34, "checkout": 2, "purchase": 1}, {"date": "2026-09-21", "ad_id": "120250429960420459", "name": "ADV06-Seu perfil vaza em 3 camadas", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "ACTIVE", "spend": 0.0, "impressions": 0, "clicks": 0, "lpv": 0, "checkout": 1, "purchase": 0}, {"date": "2026-09-22", "ad_id": "120250490758380459", "name": "ONE SINGLE", "adset": "00 - Page View", "campaign": "[JGT][DESAFIO][OS] LL2809", "status": "ACTIVE", "spend": 62.51, "impressions": 396, "clicks": 7, "lpv": 4, "checkout": 7, "purchase": 0}, {"date": "2026-09-22", "ad_id": "120250585392340459", "name": "ADV01-copiloto", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][COPILOTO] LL2809", "status": "ACTIVE", "spend": 31.51, "impressions": 312, "clicks": 2, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-09-22", "ad_id": "120250585264950459", "name": "ADV02-Cartão de Visitas-2", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NRODARAM] LL2809", "status": "ACTIVE", "spend": 23.69, "impressions": 112, "clicks": 7, "lpv": 9, "checkout": 2, "purchase": 2}, {"date": "2026-09-22", "ad_id": "120250585332160459", "name": "ADV03-Cartão de Visitas-1", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NRODARAM] LL2809", "status": "ACTIVE", "spend": 9.88, "impressions": 81, "clicks": 1, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-22", "ad_id": "120250585341060459", "name": "ADV05-Chega de cartãozinho", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NRODARAM] LL2809", "status": "ACTIVE", "spend": 29.52, "impressions": 157, "clicks": 4, "lpv": 2, "checkout": 0, "purchase": 0}, {"date": "2026-09-22", "ad_id": "120250585346420459", "name": "ADV06-Seu perfil vaza em 3 camadas", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NRODARAM] LL2809", "status": "ACTIVE", "spend": 4.2, "impressions": 32, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-22", "ad_id": "120250414781140459", "name": "ADV01-copiloto", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NV] LL2809", "status": "PAUSED", "spend": 114.65, "impressions": 465, "clicks": 11, "lpv": 9, "checkout": 1, "purchase": 1}, {"date": "2026-09-23", "ad_id": "120250490758380459", "name": "ONE SINGLE", "adset": "00 - Page View", "campaign": "[JGT][DESAFIO][OS] LL2809", "status": "ACTIVE", "spend": 24.82, "impressions": 178, "clicks": 3, "lpv": 2, "checkout": 3, "purchase": 0}, {"date": "2026-09-23", "ad_id": "120250585392340459", "name": "ADV01-copiloto", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][COPILOTO] LL2809", "status": "ACTIVE", "spend": 25.15, "impressions": 162, "clicks": 1, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-09-23", "ad_id": "120250585264950459", "name": "ADV02-Cartão de Visitas-2", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NRODARAM] LL2809", "status": "ACTIVE", "spend": 13.85, "impressions": 76, "clicks": 1, "lpv": 1, "checkout": 0, "purchase": 0}, {"date": "2026-09-23", "ad_id": "120250585332160459", "name": "ADV03-Cartão de Visitas-1", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NRODARAM] LL2809", "status": "ACTIVE", "spend": 3.02, "impressions": 16, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}, {"date": "2026-09-23", "ad_id": "120250585341060459", "name": "ADV05-Chega de cartãozinho", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NRODARAM] LL2809", "status": "ACTIVE", "spend": 21.3, "impressions": 104, "clicks": 2, "lpv": 2, "checkout": 1, "purchase": 0}, {"date": "2026-09-23", "ad_id": "120250585346420459", "name": "ADV06-Seu perfil vaza em 3 camadas", "adset": "00 - ADV + Interesses", "campaign": "[JGT][VENDAS][DESAFIO][NRODARAM] LL2809", "status": "ACTIVE", "spend": 0.52, "impressions": 9, "clicks": 0, "lpv": 0, "checkout": 0, "purchase": 0}], "sales": [{"data": "2026-08-04", "datahora": "2026-08-04 21:09", "valor": 58.32, "status": "Completo", "comprador": "Estefania Sarubbi", "pagamento": "Cartão de Crédito", "sck": "(none)", "origem": "nao_rastreado"}, {"data": "2026-08-04", "datahora": "2026-08-04 21:10", "valor": 47.0, "status": "Completo", "comprador": "Chislei B", "pagamento": "Cartão de Crédito", "sck": "(none)", "origem": "nao_rastreado"}, {"data": "2026-08-04", "datahora": "2026-08-04 21:14", "valor": 47.0, "status": "Completo", "comprador": "Paula Roberta Sylla Prete", "pagamento": "Cartão de Crédito", "sck": "(none)", "origem": "nao_rastreado"}, {"data": "2026-08-04", "datahora": "2026-08-04 21:14", "valor": 47.0, "status": "Completo", "comprador": "Luana Paula Haubold Neis", "pagamento": "Cartão de Crédito", "sck": "(none)", "origem": "nao_rastreado"}, {"data": "2026-08-04", "datahora": "2026-08-04 21:17", "valor": 58.32, "status": "Completo", "comprador": "Maria do Socorro de Sá Barreto da Cunha", "pagamento": "NuPay", "sck": "(none)", "origem": "nao_rastreado"}, {"data": "2026-08-04", "datahora": "2026-08-04 21:19", "valor": 49.48, "status": "Completo", "comprador": "Geannyne Cintra Assis", "pagamento": "Cartão de Crédito", "sck": "(none)", "origem": "nao_rastreado"}, {"data": "2026-08-04", "datahora": "2026-08-04 21:30", "valor": 47.0, "status": "Completo", "comprador": "Rafaela De Faria", "pagamento": "Cartão de Crédito", "sck": "(none)", "origem": "nao_rastreado"}, {"data": "2026-08-04", "datahora": "2026-08-04 21:34", "valor": 47.0, "status": "Completo", "comprador": "Andresa Magalhaes", "pagamento": "Cartão de Crédito", "sck": "(none)", "origem": "nao_rastreado"}, {"data": "2026-08-04", "datahora": "2026-08-04 22:17", "valor": 47.0, "status": "Completo", "comprador": "THALITA VARGAS LEITE MARTIGNONI", "pagamento": "Cartão de Crédito", "sck": "(none)", "origem": "nao_rastreado"}, {"data": "2026-08-04", "datahora": "2026-08-04 23:42", "valor": 47.0, "status": "Completo", "comprador": "Roberta Queiroz Morais da Nobrega", "pagamento": "Cartão de Crédito", "sck": "(none)", "origem": "nao_rastreado"}, {"data": "2026-08-05", "datahora": "2026-08-05 08:13", "valor": 47.0, "status": "Completo", "comprador": "Kerley cristina Ferreira alves", "pagamento": "Cartão de Crédito", "sck": "(none)", "origem": "nao_rastreado"}, {"data": "2026-08-05", "datahora": "2026-08-05 16:03", "valor": 47.0, "status": "Completo", "comprador": "TAIANA SANTANA SANTOS", "pagamento": "Pix", "sck": "(none)", "origem": "nao_rastreado"}, {"data": "2026-08-05", "datahora": "2026-08-05 16:47", "valor": 47.0, "status": "Completo", "comprador": "Edilaine dos Santos", "pagamento": "Pix", "sck": "(none)", "origem": "nao_rastreado"}, {"data": "2026-08-05", "datahora": "2026-08-05 17:13", "valor": 47.0, "status": "Completo", "comprador": "Sabrina Zeitune Weisz", "pagamento": "Cartão de Crédito", "sck": "(none)", "origem": "nao_rastreado"}, {"data": "2026-08-06", "datahora": "2026-08-06 14:39", "valor": 97.0, "status": "Completo", "comprador": "Luciana Tenório do Prado", "pagamento": "Pix", "sck": "(none)", "origem": "nao_rastreado"}, {"data": "2026-08-12", "datahora": "2026-08-12 08:00", "valor": 120.36, "status": "Completo", "comprador": "Monica Duarte da Silva", "pagamento": "Cartão de Crédito", "sck": "(none)", "origem": "nao_rastreado"}, {"data": "2026-08-15", "datahora": "2026-08-15 10:12", "valor": 97.0, "status": "Completo", "comprador": "Luciane Vargas", "pagamento": "Pix", "sck": "HOTMART_PRODUCT_PAGE", "origem": "organico"}, {"data": "2026-08-16", "datahora": "2026-08-16 21:21", "valor": 107.4, "status": "Completo", "comprador": "Ana Cláudia", "pagamento": "Cartão de Crédito", "sck": "instagram|bio|desafio-pqv-ago26|link-bio", "origem": "organico"}, {"data": "2026-08-19", "datahora": "2026-08-19 20:07", "valor": 97.0, "status": "Completo", "comprador": "Patricia Pillar Vianna", "pagamento": "Pix", "sck": "meta_ads_ADV-Nativo 1", "origem": "meta_ads"}, {"data": "2026-08-21", "datahora": "2026-08-21 20:24", "valor": 120.36, "status": "Completo", "comprador": "Psicóloga Raquel Jacinto", "pagamento": "Cartão de Crédito", "sck": "(none)", "origem": "nao_rastreado"}, {"data": "2026-08-22", "datahora": "2026-08-22 10:55", "valor": 97.0, "status": "Completo", "comprador": "Elaine Cristina", "pagamento": "Pix", "sck": "(none)", "origem": "nao_rastreado"}, {"data": "2026-08-22", "datahora": "2026-08-22 21:04", "valor": 47.0, "status": "Completo", "comprador": "Maria Luzia Faustino", "pagamento": "Pix", "sck": "(none)", "origem": "nao_rastreado"}, {"data": "2026-08-23", "datahora": "2026-08-23 00:27", "valor": 97.0, "status": "Completo", "comprador": "Tammy Câmara", "pagamento": "Pix", "sck": "meta_ads_ADV-Não é cartão de visitas", "origem": "meta_ads"}, {"data": "2026-08-23", "datahora": "2026-08-23 01:15", "valor": 97.0, "status": "Completo", "comprador": "ERIKA APARECIDA REBEQUI", "pagamento": "Pix", "sck": "meta_ads_{{ad.name}}", "origem": "meta_ads"}, {"data": "2026-08-23", "datahora": "2026-08-23 06:19", "valor": 58.32, "status": "Completo", "comprador": "Gisele Bicalho", "pagamento": "Cartão de Crédito", "sck": "(none)", "origem": "nao_rastreado"}, {"data": "2026-08-23", "datahora": "2026-08-23 10:10", "valor": 97.0, "status": "Completo", "comprador": "Eliana Aparecida Conquista", "pagamento": "Cartão de Crédito", "sck": "NEW_CLUB_SALES_PAGE_FROM_SHOWCASE_C", "origem": "organico"}, {"data": "2026-08-23", "datahora": "2026-08-23 12:43", "valor": 47.0, "status": "Completo", "comprador": "Tania Regina Sanches", "pagamento": "Pix", "sck": "(none)", "origem": "nao_rastreado"}, {"data": "2026-08-23", "datahora": "2026-08-23 13:19", "valor": 97.0, "status": "Completo", "comprador": "Aylla Domizio", "pagamento": "Pix", "sck": "whatsapp_comunidade-avisos", "origem": "organico"}, {"data": "2026-09-03", "datahora": "2026-09-03 16:42", "valor": 67.0, "status": "Completo", "comprador": "Solange Nagela Pereira Bezerra", "pagamento": "Pix", "sck": "(none)", "origem": "nao_rastreado"}, {"data": "2026-09-03", "datahora": "2026-09-03 19:06", "valor": 67.0, "status": "Completo", "comprador": "Giselle Alves", "pagamento": "Pix", "sck": "(none)", "origem": "nao_rastreado"}, {"data": "2026-09-10", "datahora": "2026-09-10 13:13", "valor": 67.0, "status": "Completo", "comprador": "Cláudia Siúves C. de Sá", "pagamento": "Cartão de Crédito", "sck": "(none)", "origem": "nao_rastreado"}, {"data": "2026-09-10", "datahora": "2026-09-10 16:55", "valor": 67.0, "status": "Completo", "comprador": "Nicolle Fontanela", "pagamento": "Pix", "sck": "(none)", "origem": "nao_rastreado"}, {"data": "2026-09-14", "datahora": "2026-09-14 08:49", "valor": 97.0, "status": "Aprovado", "comprador": "luiza de menezes bello", "pagamento": "Cartão de Crédito", "sck": "meta_ads_120250426265290459", "origem": "meta_ads"}, {"data": "2026-09-14", "datahora": "2026-09-14 11:15", "valor": 120.36, "status": "Aprovado", "comprador": "Saymon Arajo", "pagamento": "Cartão de Crédito", "sck": "HOTMART_CLUB_TRENDRECOMMENDEROCB", "origem": "organico"}, {"data": "2026-09-16", "datahora": "2026-09-16 03:20", "valor": 97.0, "status": "Aprovado", "comprador": "Wesley Naves Costa", "pagamento": "Cartão de Crédito", "sck": "meta_ads_120250429949990459", "origem": "meta_ads"}, {"data": "2026-09-16", "datahora": "2026-09-16 11:39", "valor": 97.0, "status": "Aprovado", "comprador": "Valquiria devit", "pagamento": "Pix", "sck": "meta_ads_120250429949990459", "origem": "meta_ads"}, {"data": "2026-09-16", "datahora": "2026-09-16 19:08", "valor": 50.31, "status": "Aprovado", "comprador": "Ellen Celina Lima Torres", "pagamento": "Cartão de Crédito", "sck": "(none)", "origem": "nao_rastreado"}, {"data": "2026-09-17", "datahora": "2026-09-17 07:32", "valor": 120.36, "status": "Aprovado", "comprador": "Fabricia de Cássia Marim Costa", "pagamento": "Cartão de Crédito", "sck": "meta_ads_120250429949990459", "origem": "meta_ads"}, {"data": "2026-09-18", "datahora": "2026-09-18 06:24", "valor": 97.0, "status": "Aprovado", "comprador": "Tatiana Alonso", "pagamento": "Cartão de Crédito", "sck": "meta_ads_120250414781140459", "origem": "meta_ads"}, {"data": "2026-09-19", "datahora": "2026-09-19 09:48", "valor": 67.0, "status": "Aprovado", "comprador": "Juliana Nicolau", "pagamento": "Pix", "sck": "(none)", "origem": "nao_rastreado"}, {"data": "2026-09-20", "datahora": "2026-09-20 20:49", "valor": 67.0, "status": "Aprovado", "comprador": "Renata Sayuri Kawauchi", "pagamento": "Cartão de Crédito", "sck": "(none)", "origem": "nao_rastreado"}, {"data": "2026-09-21", "datahora": "2026-09-21 15:06", "valor": 67.0, "status": "Aprovado", "comprador": "Danielle Maciel", "pagamento": "Pix", "sck": "(none)", "origem": "nao_rastreado"}, {"data": "2026-09-22", "datahora": "2026-09-22 06:42", "valor": 107.4, "status": "Aprovado", "comprador": "Patricia Telles Novaes", "pagamento": "Cartão de Crédito", "sck": "meta_ads_120250451647070459", "origem": "meta_ads"}, {"data": "2026-09-22", "datahora": "2026-09-22 20:06", "valor": 97.0, "status": "Aprovado", "comprador": "Juliana Ferreira Boaventura", "pagamento": "Pix", "sck": "meta_ads_120250585264950459", "origem": "meta_ads"}], "bounds": {"min": "2026-08-04", "max": "2026-09-23"}};
+const SHEET_ID = '1yPEXUAkFWmT4PXrqZI7aeLgApEtWkFn5Ch3VFOVNAIY';
+const VENDAS_TAB = 'Webhook 2';
+const GERENCIADOR_TAB = 'Gerenciador conta 2';
+const PRODUTO_ALVO = 'Desafio Perfil Que Vende';
+const CAMPANHA_FILTRO = 'DESAFIO';
+function gvizUrl(tab){ return 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/gviz/tq?tqx=out:csv&sheet=' + encodeURIComponent(tab); }
+
+let chartInstance = null;
+
+function fmtBRL(v){ return 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtNum(v){ return Number(v||0).toLocaleString('pt-BR'); }
+function fmtPct(v){ return (isFinite(v)?Number(v):0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%'; }
+function safeDiv(a,b){ return b ? a/b : 0; }
+
+function showTab(id, el){
+  document.querySelectorAll('.content').forEach(c=>c.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  el.classList.add('active');
+}
+
+function statusBadge(s){
+  const active = s === 'ACTIVE';
+  const cls = active ? 'badge-green' : 'badge-gray';
+  const label = active ? 'Ativo' : (s === 'PAUSED' ? 'Pausado' : (s === 'ADSET_PAUSED' ? 'Conj. pausado' : 'Camp. pausada'));
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+
+function origemBadge(o){
+  if(o === 'meta_ads') return '<span class="badge badge-green">Meta Ads</span>';
+  if(o === 'organico') return '<span class="badge badge-blue">Orgânico</span>';
+  return '<span class="badge badge-yellow">Não rastreado</span>';
+}
+
+function setBadge(id, state, textLive){
+  const el = document.getElementById(id);
+  el.classList.remove('snap','live','loading');
+  if(state==='loading'){ el.classList.add('loading'); el.textContent='⏳ buscando…'; }
+  else if(state==='live'){ el.classList.add('live'); el.textContent='🟢 ao vivo'; }
+  else { el.classList.add('snap'); el.textContent='📸 snapshot'; }
+}
+
+// ---------- Shared parsing helpers ----------
+function parseBRDateTime(s){
+  if(!s) return null;
+  const parts = s.trim().split(' ');
+  const dParts = parts[0].split('/');
+  if(dParts.length !== 3) return null;
+  const [d,m,y] = dParts;
+  const iso = y + '-' + m.padStart(2,'0') + '-' + d.padStart(2,'0');
+  const time = parts[1] ? parts[1].slice(0,5) : '00:00';
+  return { date: iso, datahora: iso + ' ' + time };
+}
+function parseBRDateOnly(s){
+  if(!s) return null;
+  const dParts = s.trim().split('-');
+  if(dParts.length === 3 && dParts[0].length === 4) return s.trim(); // already ISO yyyy-mm-dd
+  const p = s.trim().split('/');
+  if(p.length !== 3) return null;
+  return p[2] + '-' + p[0].padStart(2,'0') + '-' + p[1].padStart(2,'0');
+}
+function parseBRNumber(s){
+  if(!s) return 0;
+  return parseFloat(String(s).replace(/\./g,'').replace(',','.')) || 0;
+}
+function classifyOrigem(sck){
+  const s = (sck||'').toLowerCase();
+  if(s.startsWith('meta_ads')) return 'meta_ads';
+  if(!sck || s === '(none)') return 'nao_rastreado';
+  return 'organico';
+}
+function deriveStatus(adS, adsetS, campS){
+  if(adS==='ACTIVE' && adsetS==='ACTIVE' && campS==='ACTIVE') return 'ACTIVE';
+  if(campS!=='ACTIVE') return 'CAMPAIGN_PAUSED';
+  if(adsetS!=='ACTIVE') return 'ADSET_PAUSED';
+  return 'PAUSED';
+}
+async function fetchCSV(tab){
+  const resp = await fetch(gvizUrl(tab), {cache:'no-store'});
+  if(!resp.ok) throw new Error('HTTP ' + resp.status);
+  const text = await resp.text();
+  const parsed = Papa.parse(text, {header:true, skipEmptyLines:true});
+  if(parsed.errors && parsed.errors.length && !parsed.data.length) throw new Error('CSV vazio/erro de parse');
+  return parsed.data;
+}
+
+// ---------- Live fetch: Investimento (Gerenciador conta 2) ----------
+async function tryLoadLiveInvestment(){
+  setBadge('invest-badge','loading');
+  try {
+    const rows = await fetchCSV(GERENCIADOR_TAB);
+    const filtered = rows.filter(r => (r['Campaign Name']||'').includes(CAMPANHA_FILTRO));
+    if(!filtered.length) throw new Error('planilha retornou 0 linhas de campanha ' + CAMPANHA_FILTRO);
+    const liveAdRows = filtered.map(r => ({
+      date: parseBRDateOnly(r['Date']) || r['Date'],
+      ad_id: r['Ad ID'],
+      name: r['Ad Name'],
+      adset: r['Adset Name'],
+      campaign: r['Campaign Name'],
+      status: deriveStatus(r['Ad Status'], r['Adset Status'], r['Campaign Status']),
+      spend: Math.round(parseBRNumber(r[' Spend (Cost, Amount Spent) '] ?? r['Spend (Cost, Amount Spent)'])*100)/100,
+      impressions: parseInt(r['Impressions'])||0,
+      clicks: parseInt(r['Action Link Clicks'])||0,
+      lpv: parseInt(r['Action Landing Page View'])||0,
+      checkout: parseInt(r['Action Omni Initiated Checkout'])||0,
+      purchase: parseInt(r['Action Omni Purchase'])||0
+    })).filter(r => r.date);
+    DATA.ad_rows = liveAdRows;
+    setBadge('invest-badge','live');
+  } catch(e){
+    console.warn('Live fetch de investimento falhou, mantendo snapshot embutido:', e);
+    setBadge('invest-badge','snap');
+  }
+}
+
+// ---------- Live fetch: Vendas (Webhook 2) ----------
+async function tryLoadLiveSales(){
+  setBadge('vendas-badge','loading');
+  try {
+    const rows = await fetchCSV(VENDAS_TAB);
+    const filtered = rows.filter(r => r['Produto'] === PRODUTO_ALVO && ['Completo','Aprovado'].includes(r['Status da transação']));
+    if(!filtered.length) throw new Error('planilha retornou 0 linhas do produto ' + PRODUTO_ALVO);
+    const liveSales = filtered.map(r => {
+      const dt = parseBRDateTime(r['Data da transação']);
+      const sck = r['Código SCK'] || '(none)';
+      return {
+        data: dt ? dt.date : '',
+        datahora: dt ? dt.datahora : '',
+        valor: Math.round(parseBRNumber(r['Valor de compra com impostos'])*100)/100,
+        status: r['Status da transação'],
+        comprador: r['Comprador(a)'] || '',
+        pagamento: r['Método de pagamento'] || '',
+        sck,
+        origem: classifyOrigem(sck)
+      };
+    }).filter(s => s.data);
+    liveSales.sort((a,b)=>a.datahora.localeCompare(b.datahora));
+    DATA.sales = liveSales;
+    setBadge('vendas-badge','live');
+  } catch(e){
+    console.warn('Live fetch de vendas falhou, mantendo snapshot embutido:', e);
+    setBadge('vendas-badge','snap');
+  }
+}
+
+function recomputeBounds(){
+  const allDates = DATA.ad_rows.map(r=>r.date).concat(DATA.sales.map(s=>s.data)).filter(Boolean);
+  if(!allDates.length) return;
+  const newMin = allDates.reduce((a,b)=> a < b ? a : b);
+  const newMax = allDates.reduce((a,b)=> a > b ? a : b);
+  const wasAtMax = document.getElementById('dateTo').value === DATA.bounds.max;
+  DATA.bounds = {min:newMin, max:newMax};
+  document.getElementById('dateFrom').min = newMin;
+  document.getElementById('dateFrom').max = newMax;
+  document.getElementById('dateTo').min = newMin;
+  document.getElementById('dateTo').max = newMax;
+  if(wasAtMax) document.getElementById('dateTo').value = newMax;
+}
+
+async function refreshAll(){
+  await Promise.all([tryLoadLiveInvestment(), tryLoadLiveSales()]);
+  recomputeBounds();
+  renderAll();
+}
+
+// ---------- Date range / filtering ----------
+function currentRange(){
+  const from = document.getElementById('dateFrom').value || DATA.bounds.min;
+  const to = document.getElementById('dateTo').value || DATA.bounds.max;
+  return {from, to};
+}
+function filterAdRows(from, to){ return DATA.ad_rows.filter(r => r.date >= from && r.date <= to); }
+function filterSales(from, to){ return DATA.sales.filter(s => s.data >= from && s.data <= to); }
+function dateRangeList(from, to){
+  const dates = [];
+  let d = new Date(from+'T00:00:00');
+  const end = new Date(to+'T00:00:00');
+  while(d <= end){ dates.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1); }
+  return dates;
+}
+function setPreset(days, btn){
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const maxD = DATA.bounds.max;
+  let fromD;
+  if(days === 'all'){ fromD = DATA.bounds.min; }
+  else {
+    const d = new Date(maxD+'T00:00:00');
+    d.setDate(d.getDate() - (days-1));
+    fromD = d.toISOString().slice(0,10);
+    if(fromD < DATA.bounds.min) fromD = DATA.bounds.min;
+  }
+  document.getElementById('dateFrom').value = fromD;
+  document.getElementById('dateTo').value = maxD;
+  renderAll();
+}
+function onDateChange(){
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+  renderAll();
+}
+
+// ---------- Aggregation ----------
+function aggregateTotals(rows){
+  const t = {spend:0, impressions:0, clicks:0, lpv:0, checkout:0, purchase:0};
+  rows.forEach(r=>{
+    t.spend += r.spend; t.impressions += r.impressions; t.clicks += r.clicks;
+    t.lpv += r.lpv; t.checkout += r.checkout; t.purchase += r.purchase;
+  });
+  return t;
+}
+function aggregateCampaigns(rows){
+  const map = {};
+  rows.forEach(r=>{
+    if(!map[r.campaign]) map[r.campaign] = {name:r.campaign, status:'PAUSED', spend:0, impressions:0, clicks:0, lpv:0, checkout:0, purchase:0};
+    const c = map[r.campaign];
+    c.spend += r.spend; c.impressions += r.impressions; c.clicks += r.clicks;
+    c.lpv += r.lpv; c.checkout += r.checkout; c.purchase += r.purchase;
+    if(r.status === 'ACTIVE') c.status = 'ACTIVE';
+  });
+  return Object.values(map).sort((a,b)=>b.spend-a.spend);
+}
+function aggregateAds(rows){
+  const map = {};
+  rows.forEach(r=>{
+    if(!map[r.ad_id]) map[r.ad_id] = {id:r.ad_id, name:r.name, campaign:r.campaign, adset:r.adset, status:'PAUSED', spend:0, impressions:0, clicks:0, lpv:0, checkout:0, purchase:0};
+    const a = map[r.ad_id];
+    a.spend += r.spend; a.impressions += r.impressions; a.clicks += r.clicks;
+    a.lpv += r.lpv; a.checkout += r.checkout; a.purchase += r.purchase;
+    if(r.status === 'ACTIVE') a.status = 'ACTIVE';
+  });
+  return Object.values(map).sort((a,b)=>b.spend-a.spend);
+}
+function aggregateAttrib(sales){
+  const map = {meta_ads:{qtd:0,valor:0}, nao_rastreado:{qtd:0,valor:0}, organico:{qtd:0,valor:0}};
+  sales.forEach(s=>{ map[s.origem].qtd++; map[s.origem].valor += s.valor; });
+  return map;
+}
+function aggregateDailySeries(rows, sales, from, to){
+  const dates = dateRangeList(from, to);
+  const byDateSpend = {};
+  rows.forEach(r=>{ byDateSpend[r.date] = (byDateSpend[r.date]||0) + r.spend; });
+  const byDateRev = {};
+  sales.forEach(s=>{ byDateRev[s.data] = (byDateRev[s.data]||0) + s.valor; });
+  return dates.map(d => ({ date: d, spend: byDateSpend[d]||0, revenue: byDateRev[d]||0 }));
+}
+
+// ---------- Render ----------
+function renderKPIs(totals, sales, attrib){
+  document.getElementById('k-spend').textContent = fmtBRL(totals.spend);
+  const revenue = sales.reduce((s,x)=>s+x.valor,0);
+  document.getElementById('k-revenue').textContent = fmtBRL(revenue);
+  document.getElementById('k-revenue-sub').textContent = 'Hotmart, status Completo/Aprovado';
+  const roas = safeDiv(revenue, totals.spend);
+  document.getElementById('k-roas').textContent = roas.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) + 'x';
+  document.getElementById('k-roas').className = 'kpi-value ' + (roas >= 1 ? 'green' : (roas >= 0.7 ? 'yellow' : 'red'));
+  document.getElementById('k-sales').textContent = sales.length;
+  document.getElementById('k-sales-sub').textContent = attrib.meta_ads.qtd + ' via Meta Ads · ' + attrib.nao_rastreado.qtd + ' sem rastreio · ' + attrib.organico.qtd + ' orgânico';
+  document.getElementById('k-ticket').textContent = fmtBRL(safeDiv(revenue, sales.length));
+  document.getElementById('k-cac').textContent = fmtBRL(safeDiv(totals.spend, sales.length));
+  document.getElementById('k-imp').textContent = fmtNum(totals.impressions);
+  document.getElementById('k-clicks').textContent = fmtNum(totals.clicks);
+  document.getElementById('k-cpc').textContent = fmtBRL(safeDiv(totals.spend, totals.clicks));
+  document.getElementById('k-cpm').textContent = fmtBRL(safeDiv(totals.spend, totals.impressions) * 1000);
+  document.getElementById('k-ctr').textContent = fmtPct(safeDiv(totals.clicks, totals.impressions) * 100);
+  document.getElementById('k-purchase-meta').textContent = totals.purchase;
+
+  document.getElementById('f-imp').textContent = fmtNum(totals.impressions);
+  document.getElementById('f-clicks').textContent = fmtNum(totals.clicks);
+  document.getElementById('f-lpv').textContent = fmtNum(totals.lpv);
+  document.getElementById('f-checkout').textContent = fmtNum(totals.checkout);
+  document.getElementById('f-purchase').textContent = fmtNum(totals.purchase);
+  document.getElementById('f-clicks-bar').style.width = Math.max(1, safeDiv(totals.clicks,totals.impressions)*100) + '%';
+  document.getElementById('f-lpv-bar').style.width = Math.max(1, safeDiv(totals.lpv,totals.impressions)*100) + '%';
+  document.getElementById('f-checkout-bar').style.width = Math.max(1, safeDiv(totals.checkout,totals.impressions)*100*8) + '%';
+  document.getElementById('f-purchase-bar').style.width = Math.max(1, safeDiv(totals.purchase,totals.impressions)*100*30) + '%';
+
+  document.getElementById('t-ctr').textContent = fmtPct(safeDiv(totals.clicks,totals.impressions)*100);
+  document.getElementById('t-entrada').textContent = fmtPct(safeDiv(totals.lpv,totals.clicks)*100);
+  document.getElementById('t-checkout').textContent = fmtPct(safeDiv(totals.checkout,totals.lpv)*100);
+  document.getElementById('t-compra').textContent = fmtPct(safeDiv(totals.purchase,totals.checkout)*100);
+
+  const a = attrib;
+  document.getElementById('o-meta').textContent = a.meta_ads.qtd + ' vendas';
+  document.getElementById('o-meta-sub').textContent = fmtBRL(a.meta_ads.valor);
+  document.getElementById('o-none').textContent = a.nao_rastreado.qtd + ' vendas';
+  document.getElementById('o-none-sub').textContent = fmtBRL(a.nao_rastreado.valor) + ' · SCK "(none)"';
+  document.getElementById('o-org').textContent = a.organico.qtd + ' vendas';
+  document.getElementById('o-org-sub').textContent = fmtBRL(a.organico.valor) + ' · bio, WhatsApp, Hotmart';
+}
+function renderCampanhas(campaigns){
+  const tb = document.getElementById('bodyCampanhas');
+  document.getElementById('camp-count').textContent = '(' + campaigns.length + ')';
+  if(!campaigns.length){ tb.innerHTML = '<tr><td colspan="10" class="empty-msg">Sem dados no período selecionado</td></tr>'; return; }
+  tb.innerHTML = campaigns.map(c => {
+    const ctr = safeDiv(c.clicks,c.impressions)*100;
+    const cpc = safeDiv(c.spend,c.clicks);
+    return `<tr>
+      <td>${c.name}</td>
+      <td data-v="${c.status}">${statusBadge(c.status)}</td>
+      <td data-v="${c.spend}">${fmtBRL(c.spend)}</td>
+      <td data-v="${c.impressions}">${fmtNum(c.impressions)}</td>
+      <td data-v="${c.clicks}">${fmtNum(c.clicks)}</td>
+      <td data-v="${ctr}">${fmtPct(ctr)}</td>
+      <td data-v="${cpc}">${fmtBRL(cpc)}</td>
+      <td data-v="${c.lpv}">${fmtNum(c.lpv)}</td>
+      <td data-v="${c.checkout}">${fmtNum(c.checkout)}</td>
+      <td data-v="${c.purchase}">${fmtNum(c.purchase)}</td>
+    </tr>`;
+  }).join('');
+}
+function renderCriativos(ads){
+  const tb = document.getElementById('bodyCriativos');
+  document.getElementById('cri-count').textContent = '(' + ads.length + ')';
+  if(!ads.length){ tb.innerHTML = '<tr><td colspan="10" class="empty-msg">Sem dados no período selecionado</td></tr>'; return; }
+  tb.innerHTML = ads.map(a => {
+    const ctr = safeDiv(a.clicks,a.impressions)*100;
+    return `<tr>
+      <td>${a.name}</td>
+      <td>${a.campaign}</td>
+      <td data-v="${a.status}">${statusBadge(a.status)}</td>
+      <td data-v="${a.spend}">${fmtBRL(a.spend)}</td>
+      <td data-v="${a.impressions}">${fmtNum(a.impressions)}</td>
+      <td data-v="${a.clicks}">${fmtNum(a.clicks)}</td>
+      <td data-v="${ctr}">${fmtPct(ctr)}</td>
+      <td data-v="${a.lpv}">${fmtNum(a.lpv)}</td>
+      <td data-v="${a.checkout}">${fmtNum(a.checkout)}</td>
+      <td data-v="${a.purchase}">${fmtNum(a.purchase)}</td>
+    </tr>`;
+  }).join('');
+}
+function renderVendas(sales){
+  const tb = document.getElementById('bodyVendas');
+  document.getElementById('vendas-count').textContent = '(' + sales.length + ')';
+  if(!sales.length){ tb.innerHTML = '<tr><td colspan="7" class="empty-msg">Sem vendas no período selecionado</td></tr>'; return; }
+  const sorted = [...sales].sort((x,y)=> y.datahora.localeCompare(x.datahora));
+  tb.innerHTML = sorted.map(s => `<tr>
+      <td data-v="${s.datahora}">${s.datahora.replace('T',' ')}</td>
+      <td>${s.comprador}</td>
+      <td>${s.status}</td>
+      <td data-v="${s.valor}">${fmtBRL(s.valor)}</td>
+      <td>${s.pagamento}</td>
+      <td data-v="${s.origem}">${origemBadge(s.origem)}</td>
+      <td style="font-size:10.5px;color:rgba(255,255,255,.4)">${s.sck}</td>
+    </tr>`).join('');
+}
+function sortTable(tableId, colIdx, type){
+  const table = document.getElementById(tableId);
+  const tbody = table.tBodies[0];
+  const rows = Array.from(tbody.rows).filter(r=>!r.classList.contains('empty-row'));
+  if(!rows.length || rows[0].cells.length < 2) return;
+  const th = table.tHead.rows[0].cells[colIdx];
+  const asc = th.dataset.dir !== 'asc';
+  Array.from(table.tHead.rows[0].cells).forEach(c=>{c.dataset.dir='';c.querySelector('.arrow').textContent='';});
+  th.dataset.dir = asc ? 'asc' : 'desc';
+  th.querySelector('.arrow').textContent = asc ? '▲' : '▼';
+  rows.sort((r1,r2)=>{
+    let v1 = r1.cells[colIdx].dataset.v ?? r1.cells[colIdx].textContent;
+    let v2 = r2.cells[colIdx].dataset.v ?? r2.cells[colIdx].textContent;
+    if(type==='num'||type==='money'||type==='pct'){ v1=parseFloat(v1)||0; v2=parseFloat(v2)||0; return asc? v1-v2 : v2-v1; }
+    return asc ? String(v1).localeCompare(String(v2)) : String(v2).localeCompare(String(v1));
+  });
+  rows.forEach(r=>tbody.appendChild(r));
+}
+function renderChart(daily){
+  const ctx = document.getElementById('chartDaily');
+  const labels = daily.map(d => d.date.slice(8,10)+'/'+d.date.slice(5,7));
+  if(chartInstance) chartInstance.destroy();
+  chartInstance = new Chart(ctx, {
+    data: {
+      labels,
+      datasets: [
+        { type:'bar', label:'Investimento (R$)', data: daily.map(d=>d.spend), backgroundColor:'rgba(255,107,43,0.75)', borderRadius:3, yAxisID:'y' },
+        { type:'line', label:'Faturamento Hotmart (R$)', data: daily.map(d=>d.revenue), borderColor:'#2ecc71', backgroundColor:'#2ecc71', tension:.3, yAxisID:'y', pointRadius:3 }
+      ]
+    },
+    options: {
+      responsive:true,
+      interaction:{mode:'index',intersect:false},
+      plugins:{ legend:{labels:{color:'rgba(255,255,255,.7)'}} },
+      scales:{
+        x:{ ticks:{color:'rgba(255,255,255,.4)'}, grid:{color:'rgba(255,255,255,.04)'} },
+        y:{ ticks:{color:'rgba(255,255,255,.4)'}, grid:{color:'rgba(255,255,255,.05)'} }
+      }
+    }
+  });
+}
+function renderAll(){
+  const {from, to} = currentRange();
+  document.getElementById('range-info').textContent = from + ' → ' + to;
+  const rows = filterAdRows(from, to);
+  const sales = filterSales(from, to);
+  const totals = aggregateTotals(rows);
+  const campaigns = aggregateCampaigns(rows);
+  const ads = aggregateAds(rows);
+  const attrib = aggregateAttrib(sales);
+  const daily = aggregateDailySeries(rows, sales, from, to);
+  renderKPIs(totals, sales, attrib);
+  renderCampanhas(campaigns);
+  renderCriativos(ads);
+  renderVendas(sales);
+  renderChart(daily);
+}
+
+// init
+(async function init(){
+  document.getElementById('dateFrom').value = DATA.bounds.min;
+  document.getElementById('dateFrom').min = DATA.bounds.min;
+  document.getElementById('dateFrom').max = DATA.bounds.max;
+  document.getElementById('dateTo').value = DATA.bounds.max;
+  document.getElementById('dateTo').min = DATA.bounds.min;
+  document.getElementById('dateTo').max = DATA.bounds.max;
+  renderAll();
+  await refreshAll();
+})();
+</script>
+</body>
+</html>
