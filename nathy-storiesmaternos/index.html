@@ -266,11 +266,29 @@ const CONFIG = {
   DATA_MINIMA:      '2026-09-22',   // vale para vendas E gerenciador (mesma janela = ROAS coerente)
 
   // ── Identificação do produto principal ────────────────────────────
-  // Nome do produto na coluna data.items[N].name (ajuste se o checkout usar outro nome)
+  // Stories Maternos = produto 2741811 no Eduzz
   // A linha só vira venda se algum item bater com estas palavras (sem acento, sem maiúsculas).
   // Os demais itens da mesma linha viram Order Bump.
+  PRODUTO_IDS:               ["2741811"],   // ID do produto no Eduzz (o mais confiável)
   PRODUTO_KEYWORDS:          ["stories maternos"],
-  PRODUTO_KEYWORDS_FALLBACK: ["stories"],   // só usado se nenhum item bater com o nome exato
+  PRODUTO_KEYWORDS_FALLBACK: [],   // só usado se nenhum item bater com ID/nome
+  IGNORAR_VALOR_ZERO: true,
+
+  // ── Vendas lançadas manualmente (PROVISÓRIO) ──────────────────────
+  // Copiadas de Eduzz > Minhas Vendas (só status "Paga", valor da coluna "Ganho", que pode ser líquido de taxas)
+  // porque o webhook foi criado depois dessas vendas. Nomes abreviados de propósito (arquivo público).
+  // Se o webhook gravar a mesma venda (mesmo primeiro nome + data), a linha manual é ignorada.
+  // Pode APAGAR esta lista quando o webhook estiver alimentando a planilha.
+  VENDAS_MANUAIS: [
+    {
+        "fatura": "102565571",
+        "data": "2026-09-23",
+        "nome": "Raphaela H.",
+        "valor": 119.66,
+        "temOB": true,
+        "utmSource": "meta_ads"
+    }
+],  // vendas de R$ 0 (ebook gratuito / lead magnet) não contam
   PRODUTO_PRECO_MINIMO: 0,   // 0 = aceita qualquer valor
 
   // ── Agrupamento por transação ─────────────────────────────────────
@@ -470,21 +488,25 @@ function processGerenciador(rows){
 
 // ── processa Vendas (webhook) ───────────────────────────────────────
 const RX_NEG  = /(refund|reembols|estorn|chargeback|cancel|expir|declin|recus|refus|fail|falh|abandon|disput)/;
-const RX_POS  = /(approv|aprovad|\bpaid\b|pago|\bpaga\b|complet|confirm|succe|captur|finaliz)/;
+const RX_POS  = /(approv|aprovad|\bpaid\b|\bpago\b|\bpaga\b|complet|confirm|succe|captur|finaliz)/;
+const RX_IGN  = /(commission|contract|\bping\b|nutror|blinket)/;   // eventos que não são fatura (comissão, contrato, teste)
 const RX_PEND = /(pend|waiting|aguard|gerad|generated|created|criad)/;
 
 function isTrafego(s){ return CONFIG.TRAFEGO_SOURCES.includes(normKey(s.utmSource)); }
+const hasOB=s=>!!(s.temOB||s.fatOB>0);
+const firstName=n=>norm(String(n||'').split(/\s+/)[0]);
 
 function processSales(rows){
-  const diag={linhas:0,vendas:0,reembolsadas:0,semProduto:0,antesDataMin:0,naoAprovadas:0,semData:0,eventos:{},produtos:{},fontes:{}};
+  const diag={linhas:0,vendas:0,reembolsadas:0,semProduto:0,antesDataMin:0,naoAprovadas:0,semData:0,valorZero:0,ignoradas:0,eventos:{},produtos:{},fontes:{}};
   if(!rows.length||rows.length<2) return {sales:[],diag};
   const hdr=rows[0]; const W={};
   for(const [k,n] of Object.entries(CONFIG.W)) W[k]=findCol(hdr,n);
   if(W.evento<0 && W.paidAt<0) throw new Error(`Aba "${WEBHOOK_SHEET}": não encontrei as colunas de evento/pagamento. Confira o nome da aba.`);
   const items=[]; hdr.forEach((h,i)=>{ const m=String(h).match(/^data\.items\[(\d+)\]\.name$/); if(m) items.push(+m[1]); });
   items.sort((a,b)=>a-b);
-  const iName=n=>findCol(hdr,`data.items[${n}].name`), iVal=n=>findCol(hdr,`data.items[${n}].price.value`);
-  const itemCols=items.map(n=>({n,name:iName(n),val:iVal(n)}));
+  const iName=n=>findCol(hdr,`data.items[${n}].name`), iVal=n=>findCol(hdr,`data.items[${n}].price.value`), iId=n=>findCol(hdr,`data.items[${n}].productId`);
+  const itemCols=items.map(n=>({n,name:iName(n),val:iVal(n),id:iId(n)}));
+  const ids=(CONFIG.PRODUTO_IDS||[]).map(x=>String(x).replace(/\D/g,''));
   const kw=(list,name)=>list.some(k=>norm(name).includes(norm(k)));
 
   const tx=new Map();
@@ -492,8 +514,9 @@ function processSales(rows){
     const r=rows[i]; if(!r.some(x=>String(x).trim())) continue;
     diag.linhas++;
     const g=k=>W[k]>=0?String(r[W[k]]==null?'':r[W[k]]).trim():'';
-    const evt=g('evento'), txt=norm(evt+' '+g('mensagem'));
+    const evt=g('evento'), txt=norm(evt+' '+g('mensagem')).replace(/[_.\-]+/g,' ');
     diag.eventos[evt||'(vazio)']=(diag.eventos[evt||'(vazio)']||0)+1;
+    if(RX_IGN.test(txt)){ diag.ignoradas++; continue; }
     const paidAt=g('paidAt');
     const data=parseDate(paidAt||g('createdAt')||g('sentDate'));
     const key=g('txId')||g('id')||(norm(g('email'))+'|'+data);
@@ -513,18 +536,19 @@ function processSales(rows){
     if(!data){ diag.semData++; continue; }
     if(CONFIG.DATA_MINIMA && data<CONFIG.DATA_MINIMA){ diag.antesDataMin++; continue; }
     const g=k=>W[k]>=0?String(r[W[k]]==null?'':r[W[k]]).trim():'';
-    const its=itemCols.map(c=>({name:String(r[c.name]||'').trim(), val:c.val>=0?money(r[c.val]):0})).filter(x=>x.name||x.val);
+    const its=itemCols.map(c=>({name:String(r[c.name]||'').trim(), val:c.val>=0?money(r[c.val]):0, id:c.id>=0?String(r[c.id]||'').replace(/\D/g,''):''})).filter(x=>x.name||x.val);
     its.forEach(x=>{ if(x.name) diag.produtos[x.name]=(diag.produtos[x.name]||0)+1; });
-    let mains=its.filter(x=>kw(CONFIG.PRODUTO_KEYWORDS,x.name));
-    if(!mains.length) mains=its.filter(x=>kw(CONFIG.PRODUTO_KEYWORDS_FALLBACK,x.name));
+    let mains=its.filter(x=>(x.id&&ids.includes(x.id))||kw(CONFIG.PRODUTO_KEYWORDS,x.name));
+    if(!mains.length&&CONFIG.PRODUTO_KEYWORDS_FALLBACK.length) mains=its.filter(x=>kw(CONFIG.PRODUTO_KEYWORDS_FALLBACK,x.name));
     if(!mains.length){ diag.semProduto++; continue; }
     const total=money(g('fatTotal'))||money(g('fatTotalAlt'))||its.reduce((a,x)=>a+x.val,0);
+    if(CONFIG.IGNORAR_VALOR_ZERO && total<=0){ diag.valorZero++; continue; }   // gratuitos / lead magnets não são venda
     if(CONFIG.PRODUTO_PRECO_MINIMO && total<CONFIG.PRODUTO_PRECO_MINIMO){ diag.semProduto++; continue; }
     const obListed=its.filter(x=>!mains.includes(x)).reduce((a,x)=>a+x.val,0);
     const fatOB=Math.max(0,Math.min(obListed,total));
     const s={
       data, nome:g('cliente'), email:g('email'),
-      fatTotal:total, fatPrincipal:total-fatOB, fatOB,
+      fatTotal:total, fatPrincipal:total-fatOB, fatOB, temOB:(fatOB>0||its.some(x=>!mains.includes(x))),
       utmSource:g('utmSource'), utmMedium:g('utmMedium'), utmCampaign:g('utmCampaign'), utmContent:g('utmContent'),
       pagamento:g('pagamento')
     };
@@ -536,6 +560,24 @@ function processSales(rows){
   return {sales,diag};
 }
 
+// ── vendas lançadas manualmente (provisório, enquanto o webhook não grava) ──
+// Se o webhook gravar a mesma venda (mesmo primeiro nome + mesma data), a manual é ignorada.
+function buildManualSales(real){
+  const keys=new Set(real.map(s=>firstName(s.nome)+'|'+s.data));
+  const list=[]; let dup=0;
+  for(const m of (CONFIG.VENDAS_MANUAIS||[])){
+    const data=parseDate(m.data); if(!data) continue;
+    if(CONFIG.DATA_MINIMA && data<CONFIG.DATA_MINIMA) continue;
+    if(keys.has(firstName(m.nome)+'|'+data)){ dup++; continue; }
+    const ob=m.valorOB||0;
+    const s={data,nome:m.nome,email:'',fatTotal:m.valor,fatOB:ob,fatPrincipal:m.valor-ob,temOB:!!m.temOB||ob>0,
+      utmSource:m.utmSource||'',utmMedium:m.utmMedium||'',utmCampaign:m.utmCampaign||'',utmContent:m.utmContent||'',
+      pagamento:'',manual:true,fatura:m.fatura||''};
+    s.trafego=isTrafego(s); list.push(s);
+  }
+  return {list,dup};
+}
+
 // ── agregações ──────────────────────────────────────────────────────
 const inRange=(d,from,to)=>(!from||d>=from)&&(!to||d<=to);
 const zeroDay=d=>({data:d,inv:0,imp:0,clicks:0,pv:0,ck:0,pur:0,vv:0,vendas:0,vT:0,vO:0,fat:0,fatT:0,fatO:0,obT:0,obO:0,nObT:0,nObO:0});
@@ -543,8 +585,8 @@ const zeroDay=d=>({data:d,inv:0,imp:0,clicks:0,pv:0,ck:0,pur:0,vv:0,vendas:0,vT:
 function addG(t,g){ t.inv+=g.inv; t.imp+=g.imp; t.clicks+=g.clicks; t.pv+=g.pv; t.ck+=g.ck; t.pur+=g.pur; t.vv+=g.vv; }
 function addS(t,s){
   t.vendas++; t.fat+=s.fatTotal;
-  if(s.trafego){ t.vT++; t.fatT+=s.fatTotal; t.obT+=s.fatOB; if(s.fatOB>0) t.nObT++; }
-  else         { t.vO++; t.fatO+=s.fatTotal; t.obO+=s.fatOB; if(s.fatOB>0) t.nObO++; }
+  if(s.trafego){ t.vT++; t.fatT+=s.fatTotal; t.obT+=s.fatOB; if(hasOB(s)) t.nObT++; }
+  else         { t.vO++; t.fatO+=s.fatTotal; t.obO+=s.fatOB; if(hasOB(s)) t.nObO++; }
 }
 function dayTable(from,to){
   const map=new Map(); const get=d=>{ if(!map.has(d)) map.set(d,zeroDay(d)); return map.get(d); };
@@ -594,10 +636,10 @@ function buildCriPubMaps(from,to){
     if(!s.trafego) continue;                        // só vendas de tráfego pago entram em criativo/público
     const uc=norm(s.utmContent), um=norm(s.utmMedium);
     const c=uc && criL.find(x=>(x.key.length>=5&&uc.includes(norm(x.key))) || (x.name && uc===norm(x.name)));
-    if(c){ c.vendas++; c.fat+=s.fatTotal; if(s.fatOB>0) c.nOB++; }
+    if(c){ c.vendas++; c.fat+=s.fatTotal; if(hasOB(s)) c.nOB++; }
     else { unC.vendas++; unC.fat+=s.fatTotal; unC.vals.add(s.utmContent||'(vazio)'); }
     const p=um && pubL.find(x=>{ const a=norm(x.name); return a===um||a.includes(um)||um.includes(a); });
-    if(p){ p.vendas++; p.fat+=s.fatTotal; if(s.fatOB>0) p.nOB++; }
+    if(p){ p.vendas++; p.fat+=s.fatTotal; if(hasOB(s)) p.nOB++; }
     else { unP.vendas++; unP.fat+=s.fatTotal; unP.vals.add(s.utmMedium||'(vazio)'); }
   }
   criL.forEach(x=>{ x.ativo=ACTIVE_CRI.has(x.key); derive(x); });
@@ -687,17 +729,18 @@ function renderAll(){
 
 function renderAlerts(t){
   const a=[];
-  if(DIAG.linhas===0) a.push(['info',`<b>Aba "${esc(WEBHOOK_SHEET)}" ainda sem vendas.</b> Investimento e métricas de anúncio já aparecem; faturamento, ROAS, CAC e ticket médio serão preenchidos assim que o webhook começar a gravar as vendas.`]);
-  else if(DIAG.vendas===0) a.push(['warn',`<b>${DIAG.linhas} linha(s) na aba "${esc(WEBHOOK_SHEET)}", mas nenhuma venda válida.</b> Sem produto correspondente: ${DIAG.semProduto} · não aprovadas: ${DIAG.naoAprovadas} · reembolsadas: ${DIAG.reembolsadas} · anteriores à data mínima: ${DIAG.antesDataMin}. Veja o Diagnóstico no fim da aba Tráfego.`]);
-  else if(!SALES.some(s=>s.trafego)) a.push(['warn',`<b>Nenhuma venda com origem de tráfego pago.</b> O dashboard considera tráfego quando utm_source = ${TRAF_LABEL}. Origens encontradas: ${Object.keys(DIAG.fontes).map(esc).join(', ')}.`]);
+  if(DIAG.manual) a.push(['info',`<b>✍️ ${DIAG.manual} venda(s) paga(s) lançada(s) manualmente</b> a partir do Eduzz${DIAG.linhas===0?`, porque a aba "${esc(WEBHOOK_SHEET)}" ainda não recebeu nada do webhook`:''}. Quando o webhook gravar a mesma venda (mesmo primeiro nome + data), a lançada manualmente é ignorada automaticamente${DIAG.manualDup?` (${DIAG.manualDup} já ignorada(s))`:''}. Valores = coluna "Ganho" do Eduzz.`]);
+  if(DIAG.linhas===0 && !DIAG.manual) a.push(['info',`<b>Aba "${esc(WEBHOOK_SHEET)}" ainda sem vendas.</b> Investimento e métricas de anúncio já aparecem; faturamento, ROAS, CAC e ticket médio serão preenchidos assim que o webhook começar a gravar as vendas.`]);
+  else if(DIAG.linhas>0 && DIAG.vendas===0 && !DIAG.manual) a.push(['warn',`<b>${DIAG.linhas} linha(s) na aba "${esc(WEBHOOK_SHEET)}", mas nenhuma venda válida.</b> Sem produto correspondente: ${DIAG.semProduto} · valor R$ 0: ${DIAG.valorZero} · não aprovadas: ${DIAG.naoAprovadas} · reembolsadas: ${DIAG.reembolsadas} · anteriores à data mínima: ${DIAG.antesDataMin}. Veja o Diagnóstico no fim da aba Tráfego.`]);
+  else if(SALES.length && !SALES.some(s=>s.trafego)) a.push(['warn',`<b>Nenhuma venda com origem de tráfego pago.</b> O dashboard considera tráfego quando utm_source = ${TRAF_LABEL}. Origens encontradas: ${Object.keys(DIAG.fontes).map(esc).join(', ')}.`]);
   if(t.pur>0 && t.vT<t.pur) a.push(['info',`<b>Pixel × webhook:</b> o pixel da Meta registrou ${t.pur} compra(s) no período e o webhook registrou ${t.vT} venda(s) de tráfego. A diferença pode ser atraso/atribuição do pixel ou vendas sem UTM de tráfego.`]);
   $('alerts').innerHTML=a.map(([c,m])=>`<div class="alert ${c==='info'?'info':''}">${m}</div>`).join('');
 }
 
 function saleCard(s){
   return `<div class="sale-card ${s.trafego?'tr':''}">
-    <div class="sale-top"><span>${s.trafego?'✅':'⭐'} ${esc(s.nome||'—')}</span><strong>${fBRL(s.fatTotal)}</strong></div>
-    <div class="sale-meta">${fDate(s.data)}${s.fatOB>0?` · 🛒 OB: ${fBRL(s.fatOB)}`:''}</div>
+    <div class="sale-top"><span>${s.trafego?'✅':'⭐'} ${esc(s.nome||'—')}${s.manual?' <span title="Lançada manualmente a partir do Eduzz (webhook ainda não gravou)">✍️</span>':''}</span><strong>${fBRL(s.fatTotal)}</strong></div>
+    <div class="sale-meta">${fDate(s.data)}${hasOB(s)?` · 🛒 OB${s.fatOB>0?': '+fBRL(s.fatOB):''}`:''}${s.fatura?` · #${esc(s.fatura)}`:''}</div>
     <div class="sale-meta" title="${esc(s.utmContent)}">Criativo: ${esc(s.utmContent||'—')}</div>
     <div class="sale-meta" title="${esc(s.utmMedium)}">Público: ${esc(s.utmMedium||'—')}</div>
     <div class="sale-meta">Origem: ${esc(s.utmSource||'—')}</div></div>`;
@@ -759,11 +802,11 @@ function renderDiag(){
   const d=DIAG;
   $('diag-body').innerHTML=`
     <div><h5>Gerenciador · "${esc(GERENCIADOR_SHEET)}"</h5><ul><li>Linhas lidas: ${GROWS.length}</li><li>Período: ${fDate(GROWS.length?GROWS.map(g=>g.date).sort()[0]:'')} → ${fDate(GLAST)}</li><li>Criativos (posts) distintos: ${new Set(GROWS.map(g=>g.key)).size}</li><li>Conjuntos distintos: ${new Set(GROWS.map(g=>g.adset)).size}</li><li>Ativo = teve gasto em ${fDate(GLAST)} (a planilha não traz coluna de status)</li></ul></div>
-    <div><h5>Vendas · "${esc(WEBHOOK_SHEET)}"</h5><ul><li>Linhas na aba: ${d.linhas||0}</li><li>Vendas válidas: ${d.vendas||0}</li><li>Reembolsadas/canceladas: ${d.reembolsadas||0}</li><li>Não aprovadas: ${d.naoAprovadas||0}</li><li>Sem produto correspondente: ${d.semProduto||0}</li><li>Antes da data mínima (${fDate(CONFIG.DATA_MINIMA)}): ${d.antesDataMin||0}</li></ul></div>
+    <div><h5>Vendas · "${esc(WEBHOOK_SHEET)}"</h5><ul><li>Linhas na aba: ${d.linhas||0}</li><li>Vendas válidas (webhook): ${d.vendas||0}</li><li>Vendas lançadas manualmente: ${d.manual||0}</li><li>Reembolsadas/canceladas: ${d.reembolsadas||0}</li><li>Não aprovadas: ${d.naoAprovadas||0}</li><li>Sem produto correspondente: ${d.semProduto||0}</li><li>Valor R$ 0 (gratuitos): ${d.valorZero||0}</li><li>Eventos ignorados (comissão/contrato/teste): ${d.ignoradas||0}</li><li>Antes da data mínima (${fDate(CONFIG.DATA_MINIMA)}): ${d.antesDataMin||0}</li></ul></div>
     <div><h5>Eventos vistos</h5><ul>${li(d.eventos||{})}</ul></div>
     <div><h5>Produtos vistos</h5><ul>${li(d.produtos||{})}</ul></div>
     <div><h5>Origens (utm_source) das vendas</h5><ul>${li(d.fontes||{})}</ul></div>
-    <div><h5>Regras em uso</h5><ul><li>Produto (exato): ${esc(CONFIG.PRODUTO_KEYWORDS.join(' | '))}</li><li>Produto (alternativo): ${esc(CONFIG.PRODUTO_KEYWORDS_FALLBACK.join(' | '))}</li><li>Tráfego: utm_source = ${TRAF_LABEL}</li><li>Valores em centavos: ${CONFIG.VALORES_EM_CENTAVOS?'sim':'não'}</li></ul></div>`;
+    <div><h5>Regras em uso</h5><ul><li>Produto (ID Eduzz): ${esc((CONFIG.PRODUTO_IDS||[]).join(' | ')||'—')}</li><li>Produto (nome): ${esc(CONFIG.PRODUTO_KEYWORDS.join(' | '))}</li><li>Produto (alternativo): ${esc(CONFIG.PRODUTO_KEYWORDS_FALLBACK.join(' | ')||'—')}</li><li>Tráfego: utm_source = ${TRAF_LABEL}</li><li>Valores em centavos: ${CONFIG.VALORES_EM_CENTAVOS?'sim':'não'}</li></ul></div>`;
 }
 
 function renderVisao(days,t){
@@ -861,7 +904,8 @@ async function loadData(){
     $('loading-msg').textContent='Processando dados...';
     GROWS=processGerenciador(parseCSV(gCsv));
     const r=processSales(parseCSV(wCsv));
-    SALES=r.sales.sort((a,b)=>b.data.localeCompare(a.data)); DIAG=r.diag;
+    const man=buildManualSales(r.sales);
+    SALES=r.sales.concat(man.list).sort((a,b)=>b.data.localeCompare(a.data)); DIAG=r.diag; DIAG.manual=man.list.length; DIAG.manualDup=man.dup;
     GLAST=GROWS.length?GROWS.map(g=>g.date).sort().pop():'';
     ACTIVE_CRI=new Set(); ACTIVE_PUB=new Set();
     GROWS.forEach(g=>{ if(g.date===GLAST && g.inv>0){ ACTIVE_CRI.add(g.key); ACTIVE_PUB.add(g.adset); } });
