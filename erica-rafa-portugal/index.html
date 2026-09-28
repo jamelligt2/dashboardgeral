@@ -80,7 +80,7 @@
   .section-title::before{ content:""; width:4px; height:16px; background:var(--laranja); border-radius:2px; }
   .section-note{ font-size:12.5px; color:var(--apagado); margin-bottom:16px; line-height:1.5; }
 
-  .comp-grid{ display:grid; grid-template-columns:1fr 1fr 0.9fr; gap:18px; margin-bottom:38px; }
+  .comp-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(250px, 1fr)); gap:18px; margin-bottom:38px; }
   .comp-card{ border-radius:16px; padding:24px; border:2px solid; }
   .comp-card.geral{ border-color:var(--vermelho); background:#2a0a0a; }
   .comp-card.microlabial{ border-color:var(--azul); background:#061428; }
@@ -245,13 +245,13 @@
       </div>
     </div>
 
-    <div class="section-title">Comparativo de Campanhas — Geral vs Microlabial</div>
-    <div class="section-note">Obs.: as duas campanhas rodam para o mesmo público (<b>00 - Feminino - 30+</b>) — a planilha não traz outra segmentação (lookalike, interesse, retargeting) nem breakdown de posicionamento (Feed/Stories), por isso o comparativo abaixo é por linha de produto.</div>
+    <div class="section-title">Comparativo de Campanhas — Microblading vs Microlabial</div>
+    <div class="section-note">Obs.: as duas campanhas rodam para o mesmo público (<b>00 - Feminino - 30+</b>) — a planilha não traz outra segmentação (lookalike, interesse, retargeting) nem breakdown de posicionamento (Feed/Stories), por isso o comparativo abaixo é por linha de produto. A nova campanha <b>[Erica &amp; Rafa]</b> está contabilizada dentro de Microlabial.</div>
 
     <div class="comp-grid">
       <div class="comp-card geral">
-        <span class="comp-tag">Campanha Geral</span>
-        <h3>Microblading + Henna</h3>
+        <span class="comp-tag">Campanha Microblading</span>
+        <h3>Microblading</h3>
         <div class="comp-sub"><span id="campACount">—</span> criativos ativos no período</div>
         <div class="comp-metrics">
           <div><div class="comp-metric-label">Investimento</div><div class="comp-metric-value" id="campASpend">—</div></div>
@@ -277,7 +277,7 @@
 
       <div class="comp-card compare">
         <div class="compare-row">
-          <div class="lbl">% Leads — Geral</div>
+          <div class="lbl">% Leads — Microblading</div>
           <div class="val" style="color:var(--vermelho)" id="cmpPctA">—</div>
         </div>
         <div class="compare-row">
@@ -288,7 +288,7 @@
           <div class="bar-fill-a" id="cmpBarA" style="width:0%"></div>
           <div class="bar-fill-b" id="cmpBarB" style="width:0%"></div>
         </div>
-        <div class="bar-caption"><span>Geral</span><span>Microlabial</span></div>
+        <div class="bar-caption"><span>Microblading</span><span>Microlabial</span></div>
         <div class="compare-row" style="margin-top:10px;">
           <div class="lbl">Diferença de CPL</div>
           <div class="val" style="color:var(--amarelo)" id="cmpCPLDiff">—</div>
@@ -532,7 +532,16 @@ function fmtDateFullBR(iso){
   return `${d}/${m}/${y}`;
 }
 function classifyCampaign(name){
-  return /microlabial/i.test(name || '') ? 'MICROLABIAL' : 'GERAL';
+  const n = name || '';
+  // "microlabial" no nome, OU a nova campanha conjunta [Erica & Rafa] (contabilizada como Microlabial)
+  if (/microlabial/i.test(n) || (/erica/i.test(n) && /rafa/i.test(n))) return 'MICROLABIAL';
+  return 'GERAL';
+}
+function campTagClass(k){
+  return k === 'GERAL' ? 'geral' : 'microlabial';
+}
+function campDisplayName(k){
+  return k === 'GERAL' ? 'MICROBLADING' : 'MICROLABIAL';
 }
 
 /* =========================================================================
@@ -717,8 +726,11 @@ function renderDashboard(){
   const [fy,fm,fd] = fechDate.split('-');
   document.getElementById('fechamentosDataRef').textContent = `${fd}/${fm}/${fy}`;
 
-  // ---- by campaign (GERAL vs MICROLABIAL) ----
-  const camps = {GERAL:{imp:0,spend:0,clicks:0,pv:0,leads:0,creatives:new Set()}, MICROLABIAL:{imp:0,spend:0,clicks:0,pv:0,leads:0,creatives:new Set()}};
+  // ---- by campaign (GERAL/Microblading vs MICROLABIAL) ----
+  const camps = {
+    GERAL:{imp:0,spend:0,clicks:0,pv:0,leads:0,creatives:new Set()},
+    MICROLABIAL:{imp:0,spend:0,clicks:0,pv:0,leads:0,creatives:new Set()}
+  };
   rows.forEach(r => {
     const k = classifyCampaign(r.campaign);
     camps[k].imp += r.imp; camps[k].spend += r.spend; camps[k].clicks += r.clicks;
@@ -781,8 +793,8 @@ function renderDashboard(){
 
   if (mA.cpl && mB.cpl){
     const diffPct = (mB.cpl - mA.cpl) / mA.cpl * 100;
-    const cheaper = diffPct >= 0 ? 'Microlabial' : 'Geral';
-    const pricier = diffPct >= 0 ? 'Geral' : 'Microlabial';
+    const cheaper = diffPct >= 0 ? 'Microlabial' : 'Microblading';
+    const pricier = diffPct >= 0 ? 'Microblading' : 'Microlabial';
     document.getElementById('cmpCPLDiff').textContent = (diffPct>=0?'+':'') + fmtPct(diffPct);
     document.getElementById('cmpDetail').innerHTML = `${cheaper} custa ~${fmtPct(Math.abs(diffPct),1)} a mais por lead do que a campanha ${pricier} (${fmtEUR(mB.cpl)} vs ${fmtEUR(mA.cpl)}).`;
   } else {
@@ -871,11 +883,11 @@ function renderDashboard(){
 
   let criHtml = '';
   creativeList.forEach((c, i) => {
-    const tagClass = c.campaign === 'GERAL' ? 'geral' : 'microlabial';
+    const tagClass = campTagClass(c.campaign);
     const status = getStatus(c);
     criHtml += `<tr>
       <td>${i+1}</td>
-      <td>${escapeHtml(c.name)} <span class="tag ${tagClass}">${c.campaign}</span></td>
+      <td>${escapeHtml(c.name)} <span class="tag ${tagClass}">${campDisplayName(c.campaign)}</span></td>
       <td class="num">${fmtEUR(c.spend)}</td>
       <td class="num">${fmtInt(c.imp)}</td>
       <td class="num">${fmtInt(c.clicks)}</td>
@@ -901,11 +913,11 @@ function renderDashboard(){
 
   let pubHtml = '';
   pubRows.forEach((p, i) => {
-    const tagClass = p.campaign === 'GERAL' ? 'geral' : 'microlabial';
-    const c = p.campaign === 'GERAL' ? camps.GERAL : camps.MICROLABIAL;
+    const tagClass = campTagClass(p.campaign);
+    const c = camps[p.campaign];
     const status = p.m.cpl !== null ? (p.m.cpl <= avgCPL ? 'escalar' : (p.m.cpl <= avgCPL*1.5 ? 'manter' : 'avaliar')) : 'avaliar';
     pubHtml += `<tr>
-      <td>${i+1}</td><td>${p.label}</td><td><span class="tag ${tagClass}">${p.campaign}</span></td>
+      <td>${i+1}</td><td>${p.label}</td><td><span class="tag ${tagClass}">${campDisplayName(p.campaign)}</span></td>
       <td class="num">${fmtEUR(c.spend)}</td><td class="num">${fmtInt(c.imp)}</td><td class="num">${fmtInt(c.clicks)}</td>
       <td class="num">${fmtInt(c.pv)}</td><td class="num">${fmtInt(c.leads)}</td>
       <td class="num">${fmtPct(p.m.ctr)}</td><td class="num">${p.m.cpl!==null?'<b>'+fmtEUR(p.m.cpl)+'</b>':'—'}</td>
@@ -937,9 +949,9 @@ function renderDashboard(){
     const dCpl = safeDiv(v.spend, v.leads);
     let rowsHtml = '';
     dayRows.forEach(r => {
-      const tagClass = classifyCampaign(r.campaign) === 'GERAL' ? 'geral' : 'microlabial';
+      const tagClass = campTagClass(classifyCampaign(r.campaign));
       const rCpl = safeDiv(r.spend, r.leads);
-      rowsHtml += `<tr><td>${escapeHtml(r.name)}</td><td><span class="tag ${tagClass}">${classifyCampaign(r.campaign)}</span></td><td class="num">${fmtEUR(r.spend)}</td><td class="num">${fmtInt(r.imp)}</td><td class="num">${fmtInt(r.clicks)}</td><td class="num">${fmtInt(r.pv)}</td><td class="num">${fmtInt(r.leads)}</td><td class="num">${rCpl!==null?fmtEUR(rCpl):'<span class="muted">—</span>'}</td></tr>`;
+      rowsHtml += `<tr><td>${escapeHtml(r.name)}</td><td><span class="tag ${tagClass}">${campDisplayName(classifyCampaign(r.campaign))}</span></td><td class="num">${fmtEUR(r.spend)}</td><td class="num">${fmtInt(r.imp)}</td><td class="num">${fmtInt(r.clicks)}</td><td class="num">${fmtInt(r.pv)}</td><td class="num">${fmtInt(r.leads)}</td><td class="num">${rCpl!==null?fmtEUR(rCpl):'<span class="muted">—</span>'}</td></tr>`;
     });
     rowsHtml += `<tr class="day-total-row"><td>TOTAL DIA</td><td></td><td class="num">${fmtEUR(v.spend)}</td><td class="num">${fmtInt(v.imp)}</td><td class="num">${fmtInt(v.clicks)}</td><td class="num">${fmtInt(v.pv)}</td><td class="num">${fmtInt(v.leads)}</td><td class="num">${dCpl!==null?fmtEUR(dCpl):'—'}</td></tr>`;
     detailHtml += `<div class="day-block">
