@@ -314,11 +314,23 @@ function parseWebhook(csv){
   const t=parseCSV(csv); if(t.length<2) return [];
   const H=t[0].map(h=>String(h||'').trim().toLowerCase());
   const ix=n=>H.indexOf(n), pick=(...ns)=>{for(const n of ns){const i=ix(n);if(i>=0)return i;}return -1;};
-  const iId=pick('data.id','data.transaction.id','id'), iSt=pick('data.status'), iDt=pick('data.paidat','data.createdat','sentdate'),
-        iNm=pick('data.buyer.name','data.student.name'), iEm=pick('data.buyer.email','data.student.email'),
-        iVal=pick('data.price.paid.value','data.paid.value','data.price.value'),
-        uS=pick('data.utm.source'),uM=pick('data.utm.medium'),uC=pick('data.utm.campaign'),uT=pick('data.utm.content');
+  // Aceita tanto o formato reformatado pelo Stract (order_*, customer.*, commissions.*, trackingparameters.*) quanto o nativo da Kiwify (data.*).
+  // IMPORTANTE: a planilha do Stract é um esquema híbrido — ela traz as colunas novas (com dados) E as colunas antigas "data.*"
+  // (sempre vazias, mantidas só por compatibilidade). Por isso o formato Stract vem PRIMEIRO em cada pick(): se checássemos
+  // "data.paidAt" antes de "approved_date", por exemplo, a coluna antiga vazia venceria e a venda seria descartada por engano.
+  const iId=pick('order_id','order_ref','data.id','data.transaction.id','id'),
+        iSt=pick('order_status','data.status'),
+        iDt=pick('approved_date','created_at','data.paidat','data.createdat','sentdate'),
+        iNm=pick('customer.full_name','data.buyer.name','data.student.name'),
+        iEm=pick('customer.email','data.buyer.email','data.student.email'),
+        iVal=pick('commissions.charge_amount','data.price.paid.value','data.paid.value','data.price.value'),
+        uS=pick('trackingparameters.utm_source','data.utm.source','utm_source'),
+        uM=pick('trackingparameters.utm_medium','data.utm.medium','utm_medium'),
+        uC=pick('trackingparameters.utm_campaign','data.utm.campaign','utm_campaign'),
+        uT=pick('trackingparameters.utm_content','data.utm.content','utm_content'),
+        iProdNome=pick('product.product_name','product_name');
   const bumpIdx=[], nameIdx=[];
+  if(iProdNome>=0) nameIdx.push(iProdNome);
   H.forEach((h,i)=>{ let m=h.match(/^data\.items\[(\d+)\]\.isbump$/); if(m){ bumpIdx.push([i,H.indexOf(`data.items[${m[1]}].price.value`)]); }
                      m=h.match(/^data\.items\[(\d+)\]\.name$/); if(m) nameIdx.push(i); });
   const g=(r,i)=>i>=0?(r[i]||''):'';
