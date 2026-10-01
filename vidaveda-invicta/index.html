@@ -190,12 +190,14 @@ const CONFIG = {
 
   // Venda da campanha (tráfego) = utm com este público. As demais entram no total (muitas vêm da captação do tráfego).
   PUBLICO_CAMPANHA: '00 - Inscritos e Compradores',
+  // ...ou qualquer campanha JGT do Invicta no UTM (ex.: [JGT][VENDAS][INVICTA][ENGAJAMENTO])
+  CAMPANHA_REGEX: /\[JGT\]\s*\[VENDAS\]\s*\[INVICTA\]/i,
 
   STATUS_APROVADO: ['APROVADA','APPROVED','COMPLETE','CONFIRMED','PAGO'],
 
   // Colunas por NOME de cabeçalho (o export do Guru tem 83 colunas — nome é mais seguro que índice)
   VENDAS_COLS: {           // aba "Vendas até agora"
-    id:'id transação', status:'status', produto:'nome produto', oferta:'nome oferta',
+    id:'id transação', status:'status', produto:'nome produto', oferta:'nome oferta', checkout:'rppc checkout',
     nome:'nome contato', email:'email contato', valor:'valor venda',
     data:['data aprovacao','data pedido'],
     utmSource:['utm_source','rppc utm term'],      // no Guru o source de tracking mora em "rppc utm term"
@@ -204,10 +206,10 @@ const CONFIG = {
     utmContent:['rppc utm content','utm_content'],
   },
   WEBHOOK_COLS: {          // aba "Webhook" (Apps Script)
-    id:'transacao_id', status:'status', produto:'produto', oferta:'oferta',
+    id:'transacao_id', status:'status', produto:'produto', oferta:'oferta', checkout:'checkout_name',
     nome:'nome', email:'email', valor:'valor',
     data:['data_venda','recebido_em'],
-    utmSource:['utm_source'], utmMedium:['utm_medium'],
+    utmSource:['utm_source','utm_term'], utmMedium:['utm_medium'],   // no Webhook o source de anúncio chega em utm_term (meta_ads)
     utmCampaign:['utm_campaign'], utmContent:['utm_content'],
   },
   // Assinaturas: coluna que só aquela aba tem (gviz devolve OUTRA aba com status ok se o nome não existir)
@@ -222,6 +224,9 @@ const CONFIG = {
        imp:'Impressions', reach:'Reach (Estimated)', cliques:'Action Link Clicks', pv:'Action Landing Page View',
        ck:'Action Omni Initiated Checkout', sAdset:'Adset Status', sCamp:'Campaign Status', sAd:'Ad Status',
        link:'Instagram Permalink URL' },
+
+  // Plano: venda é ANUAL se produto/oferta/checkout contém "anual"; senão MENSAL
+  PLANO_ANUAL: /anual/i,
 
   IGNORAR_EMAIL: /@jamelligt\.com\.br$/i,
   IGNORAR_NOME:  /^teste|\(apagar\)/i,
@@ -359,7 +364,7 @@ function buildSales(vRows, wRows, prodNome, dataMin, doStat){
     if(val<CONFIG.PRODUTO_PRECO_MINIMO) return;
     let src=pick(r,c.utmSource); const alt=c.utmSource.map(k=>String(r[k]||'').trim()).find(isMetaAds); if(alt) src=alt;
     out.push({ id:(r[c.id]||'').trim(), fonte, data:dt.dia, hora:dt.hora, k:dt.k, nome, email,
-      oferta:r[c.oferta]||'', fatTotal:val, fatPrincipal:val, fatOB:0,
+      oferta:r[c.oferta]||'', plano: CONFIG.PLANO_ANUAL.test([r[c.produto],r[c.oferta],r[c.checkout]].join(' ')) ? 'anual' : 'mensal', fatTotal:val, fatPrincipal:val, fatOB:0,
       utmSource:src, utmMedium:pick(r,c.utmMedium), utmCampaign:pick(r,c.utmCampaign), utmContent:pick(r,c.utmContent) });
   };
   // 1) antes do corte → "Vendas até agora"
@@ -398,10 +403,16 @@ function buildGer(rows){
 function classify(){
   const ads=new Set(GROWS.map(g=>g.ad.toLowerCase())), sets=new Set(GROWS.map(g=>g.adset.toLowerCase()));
   for(const s of SALES){
-    s.cri = ads.has(s.utmContent.toLowerCase()) ? s.utmContent : '';
+    const camps=new Set(GROWS.map(g=>g.camp.toLowerCase()));
+    const p0=[s.utmCampaign,s.utmMedium].find(x=>x&&sets.has(x.toLowerCase()));
+    const c0=[s.utmCampaign,s.utmMedium].find(x=>x&&camps.has(x.toLowerCase()));
+    // nomes de anúncio se repetem entre campanhas (ADV01...) → só liga ao anúncio se a campanha/conjunto também bate com o Gerenciador
+    s.cri = ads.has(s.utmContent.toLowerCase()) && (p0||c0) ? s.utmContent : '';
     const p=[s.utmCampaign,s.utmMedium].find(x=>x&&sets.has(x.toLowerCase())); s.pub=p||'';
     const alvo=CONFIG.PUBLICO_CAMPANHA.toLowerCase();
-    s.pago=[s.utmCampaign,s.utmMedium,s.utmSource,s.utmContent].some(x=>String(x||'').trim().toLowerCase()===alvo);
+    const campos=[s.utmCampaign,s.utmMedium,s.utmSource,s.utmContent].map(x=>String(x||'').trim());
+    s.pago=campos.some(x=>x.toLowerCase()===alvo||CONFIG.CAMPANHA_REGEX.test(x));
+    s.campJGT=campos.find(x=>CONFIG.CAMPANHA_REGEX.test(x))||'';
   }
 }
 
@@ -502,24 +513,33 @@ function mkChart(id,cfg){ if(CHARTS[id]) CHARTS[id].destroy(); const el=$(id); i
 const axis={ticks:{color:'rgba(255,255,255,.4)',font:{size:10}},grid:{color:'rgba(255,255,255,.05)'}};
 const chartOpts=(extra)=>Object.assign({responsive:true,maintainAspectRatio:true,plugins:{legend:{labels:{boxWidth:10,font:{size:10}}}},scales:{x:axis,y:axis}},extra||{});
 
+function avisoCampanhaSemGasto(){
+  const camps=new Set(GROWS.map(g=>g.camp.toLowerCase())); const faltam={};
+  SALES.filter(x=>x.pago&&inR(x.data)).forEach(x=>{ const c=x.campJGT||''; if(c&&!camps.has(c.toLowerCase())){ faltam[c]=(faltam[c]||0)+1; } });
+  const k=Object.keys(faltam); if(!k.length) return '';
+  return `<div class="ob-info" style="border-color:rgba(241,196,15,.4)"><b style="color:#f1c40f">Atenção:</b> há vendas de campanha sem investimento no Gerenciador — ${k.map(c=>esc(c)+' ('+faltam[c]+')').join(', ')}. O investimento exibido <b>não inclui</b> essas campanhas, então ROAS e CAC de tráfego ficam acima do real até a campanha entrar na aba GERENCIADOR.</div>`;
+}
 function bannerFonte(){
   const st=META.stat||{}; const c=CONFIG.CORTE.slice(8,10)+'/'+CONFIG.CORTE.slice(5,7)+' às '+CONFIG.CORTE.slice(11,16);
   const wh = META.webhookOk===false ? `<b style="color:#f1c40f">aba Webhook não lida (${esc(META.webhookMotivo)})</b>` :
     `<b>${st.wh||0}</b> venda(s) do Webhook` + (st.whUltimo?` (última: ${fDY(st.whUltimo.slice(0,10))} ${st.whUltimo.slice(11,16)})`:' — nenhuma ainda');
   return `<div class="ob-info"><b>Fonte das vendas ${esc(CONFIG.PRODUTO)}:</b> até <b>${c}</b> → aba “${esc(CONFIG.VENDAS_SHEET)}” (Guru) · <b>${st.guru||0}</b> venda(s) &nbsp;|&nbsp; a partir de <b>${c}</b> → aba “${esc(CONFIG.WEBHOOK_SHEET)}” · ${wh}.<br>
-  Só vendas aprovadas de qualquer oferta Invicta, a partir de ${fDY(CONFIG.DATA_MINIMA)}. Tráfego = venda com o público “${esc(CONFIG.PUBLICO_CAMPANHA)}” no UTM; as demais vendas entram no Total (muitas vieram da captação do tráfego). O investimento do dia corrente do Gerenciador costuma fechar só no dia seguinte.</div>`;
+  Só vendas aprovadas de qualquer oferta Invicta, a partir de ${fDY(CONFIG.DATA_MINIMA)}. Tráfego = venda com o público “${esc(CONFIG.PUBLICO_CAMPANHA)}” ou campanha [JGT][VENDAS][INVICTA] no UTM; as demais vendas entram no Total (muitas vieram da captação do tráfego). O investimento do dia corrente do Gerenciador costuma fechar só no dia seguinte.</div>`;
 }
 
+function planos(s){ const o={mensal:{n:0,f:0,nc:0,fc:0},anual:{n:0,f:0,nc:0,fc:0}};
+  s.forEach(x=>{const r=o[x.plano]; r.n++; r.f+=x.fatTotal; if(x.pago){r.nc++; r.fc+=x.fatTotal;}}); return o; }
 // ───────────────────────── Aba Tráfego ─────────────────────────
 function renderTrafego(){
   const {t,s}=totals(RANGE.from,RANGE.to);
-  const roas=div(t.fatT,t.inv), cac=div(t.inv,t.vT), tk=div(t.fat,t.v);
+  const roas=div(t.fatT,t.inv), cac=div(t.inv,t.vT), tk=div(t.fat,t.v); const pl=planos(s);
   const obT=t.nOBT?` <span style="font-size:11px">+${t.nOBT} OB</span>`:'', obO=t.nOBO?` <span style="font-size:11px">+${t.nOBO} OB</span>`:'';
-  let h=bannerFonte()+'<div class="kpi-grid">'+
+  let h=bannerFonte()+avisoCampanhaSemGasto()+'<div class="kpi-grid">'+
     kpi('Investimento (Meta Ads)',fR(t.inv),'orange')+
     kpi('Fat. Total',fR(t.fat),'green')+kpi('Fat. Tráfego (campanha)',fR(t.fatT),'orange')+
     kpi('ROAS Total',fX(div(t.fat,t.inv)),div(t.fat,t.inv)>=1?'green':'red')+kpi('ROAS Tráfego',fX(roas),roas>=1?'green':'red')+
     kpi('Vendas Total',fN(t.v)+(t.nOBT+t.nOBO?` <span style="font-size:11px">+${t.nOBT+t.nOBO} OB</span>`:''),'green')+kpi('Vendas Tráfego (campanha)',fN(t.vT)+obT,'orange')+
+    kpi('Vendas Mensais',fN(pl.mensal.n),'yellow',fR(pl.mensal.f)+' · '+fP(div(pl.mensal.n,t.v)*100))+kpi('Vendas Anuais',fN(pl.anual.n),'yellow',fR(pl.anual.f)+' · '+fP(div(pl.anual.n,t.v)*100))+
     kpi('Fat. OB Total',fR(t.obT+t.obO))+
     kpi('CAC Total',fR(div(t.inv,t.v)))+kpi('CAC Tráfego',fR(cac))+kpi('Ticket Médio',fR(tk))+
     kpi('Cliques',fN(t.cliques))+kpi('Impressões',fN(t.imp))+
@@ -548,7 +568,7 @@ function renderTrafego(){
   const lim=80;
   h+=`<div class="sec-title">Compradores (${s.length}) — ✅ campanha (tráfego) · ⭐ demais vendas (contam no total)</div><div class="buyers">`+
     (s.length? s.slice(0,lim).map(x=>`<div class="buyer ${x.pago?'pago':'org'}"><div class="b-top"><span class="b-name">${x.pago?'✅':'⭐'} ${esc(x.nome||'—')}</span><span class="b-val">${fR(x.fatTotal)}</span></div>
-      <div class="b-meta">${fD(x.data)} ${x.hora}${x.oferta?' · '+esc(x.oferta):''}</div>
+      <div class="b-meta">${fD(x.data)} ${x.hora}${x.oferta?' · '+esc(x.oferta):''} · <b>${x.plano==='anual'?'Anual':'Mensal'}</b></div>
       ${x.fatOB>0?`<div class="b-ob">🛒 OB: ${fR(x.fatOB)}</div>`:''}
       <div class="b-meta">Criativo: ${esc(x.utmContent||'—')}</div><div class="b-meta">Público: ${esc(x.pub||x.utmMedium||'—')}</div><div class="b-meta">Origem: ${esc(x.utmSource||'direto')}</div></div>`).join('')
      : '<div class="b-meta" style="padding:12px">Nenhuma venda no período.</div>')+'</div>'+(s.length>lim?`<div class="b-meta" style="font-size:11px;color:rgba(255,255,255,.35)">Mostrando as ${lim} mais recentes de ${s.length}.</div>`:'');
@@ -588,6 +608,10 @@ function renderVisao(){
   h+='<div class="sec-title">Dia a dia</div><div class="tbl-wrap"><table><thead><tr><th>Data</th><th>Invest.</th><th>Fat. Total</th><th>ROAS</th><th>Compras Total</th><th>Campanha</th><th>Demais</th><th>Ticket Médio</th><th>CAC</th></tr></thead><tbody>'+rows+
     `</tbody><tfoot><tr><td>Total</td><td>${fR(T.inv)}</td><td>${fR(T.fat)}</td><td>${fX(div(T.fat,T.inv))}</td><td>${fN(T.v)}</td><td>${fN(T.vT)}</td><td>${fN(T.vO)}</td><td>${fR(div(T.fat,T.v))}</td><td>${fR(div(T.inv,T.v))}</td></tr></tfoot></table></div>`;
 
+  const pv=planos(s);
+  h+='<div class="sec-title">Vendas por plano (mensal × anual)</div><div class="tbl-wrap"><table><thead><tr><th>Plano</th><th>Vendas</th><th>% vendas</th><th>Faturamento</th><th>Ticket</th><th>Vendas da campanha</th><th>Fat. campanha</th></tr></thead><tbody>'+
+    [['Mensal',pv.mensal],['Anual',pv.anual]].map(([l,r])=>`<tr><td>${l}</td><td>${fN(r.n)}</td><td>${fP(div(r.n,s.length)*100)}</td><td>${fR(r.f)}</td><td>${fR(div(r.f,r.n))}</td><td>${fN(r.nc)}</td><td>${fR(r.fc)}</td></tr>`).join('')+
+    `</tbody><tfoot><tr><td>Total</td><td>${fN(s.length)}</td><td>${s.length?'100,00%':'—'}</td><td>${fR(t.fat)}</td><td>${fR(div(t.fat,s.length))}</td><td>${fN(t.vT)}</td><td>${fR(t.fatT)}</td></tr></tfoot></table></div>`;
   // por origem
   const o={}; s.forEach(x=>{const k=(x.utmSource||'direto / sem utm').toLowerCase(); const r=o[k]||(o[k]={v:0,f:0}); r.v++; r.f+=x.fatTotal;});
   const ok=Object.entries(o).sort((a,b)=>b[1].f-a[1].f);
@@ -739,7 +763,7 @@ function renderOrigem(){
   let h=bannerFonte();
   if(META.leadsOk===false) h+=`<div class="err" style="margin:0 0 16px">Aba “${esc(CONFIG.LEADS_SHEET)}” não lida (${esc(META.leadsMotivo)}). Os números de leads abaixo estão incompletos.</div>`;
   h+=`<div class="ob-info"><b>Como o cruzamento é feito:</b> cada venda ${esc(CONFIG.PRODUTO)} é ligada pelo <b>e-mail</b> a (1) uma inscrição na aba “${esc(CONFIG.LEADS_SHEET)}” (lead gratuito do lançamento) e (2) a um <b>ingresso ${esc(CONFIG.INGRESSO_NOME)}</b> comprado — as duas compras seguem a mesma regra de fonte (Vendas até agora antes do corte, Webhook depois). O vínculo só conta se o lead/ingresso é <b>anterior</b> à compra.
-  <b>Influência do tráfego</b> = a venda é da campanha (público “${esc(CONFIG.PUBLICO_CAMPANHA)}”) <b>ou</b> o lead se inscreveu por anúncio (utm meta_ads) <b>ou</b> o ingresso foi comprado por anúncio (utm meta_ads).<br>
+  <b>Influência do tráfego</b> = a venda é da campanha (público “${esc(CONFIG.PUBLICO_CAMPANHA)}” ou campanha [JGT][VENDAS][INVICTA]) <b>ou</b> o lead se inscreveu por anúncio (utm meta_ads) <b>ou</b> o ingresso foi comprado por anúncio (utm meta_ads).<br>
   Base de leads: <b>${fN(LEADSTAT.linhas)}</b> inscrições · <b>${fN(LEADSTAT.unicos)}</b> e-mails únicos (${fN(LEADSTAT.meta)} vindos de anúncio) · ${fN(LEADSTAT.semEmail)} sem e-mail (não cruzam) · última em ${LEADSTAT.ultimo?fDY(LEADSTAT.ultimo.slice(0,10))+' '+LEADSTAT.ultimo.slice(11,16):'—'}. Ingressos aprovados: <b>${fN(INGRESSOS.length)}</b> (${fN(Object.keys(TICKETS).length)} e-mails).</div>`;
   h+='<div class="kpi-grid">'+
     kpi('Vendas '+esc(CONFIG.PRODUTO)+' (total)',fN(n),'green',fR(fat))+
@@ -755,7 +779,7 @@ function renderOrigem(){
 
   const r1=G(x=>x.pago), r2=G(x=>x.leadMeta), r3=G(x=>x.tickMeta), r4=G(x=>!x.pago&&isMetaAds(x.utmSource));
   h+=`<div class="sec-title">Influência do tráfego — de onde vem</div><div class="tbl-wrap"><table><thead><tr><th>Sinal de tráfego (uma venda pode ter mais de um)</th><th>Vendas</th><th>% vendas</th><th>Faturamento</th></tr></thead><tbody>
-   <tr><td>Venda direta da campanha (público “${esc(CONFIG.PUBLICO_CAMPANHA)}”)</td><td>${fN(r1.n)}</td><td>${pc(r1.n)}</td><td>${fR(r1.f)}</td></tr>
+   <tr><td>Venda direta da campanha (UTM de campanha JGT)</td><td>${fN(r1.n)}</td><td>${pc(r1.n)}</td><td>${fR(r1.f)}</td></tr>
    <tr><td>Lead que se inscreveu por anúncio (utm meta_ads)</td><td>${fN(r2.n)}</td><td>${pc(r2.n)}</td><td>${fR(r2.f)}</td></tr>
    <tr><td>Ingresso comprado por anúncio (utm meta_ads)</td><td>${fN(r3.n)}</td><td>${pc(r3.n)}</td><td>${fR(r3.f)}</td></tr>
    </tbody><tfoot><tr><td>Com influência do tráfego (união, sem contar duas vezes)</td><td>${fN(infl.n)}</td><td>${pc(infl.n)}</td><td>${fR(infl.f)}</td></tr></tfoot></table></div>
@@ -770,13 +794,16 @@ function renderOrigem(){
    <tr><td>Compradores do ingresso Semana do Ayurveda</td><td>${fN(Object.keys(TICKETS).length)}</td><td>${fN(tickQueCompraram)}</td><td>${fP(div(tickQueCompraram,Object.keys(TICKETS).length)*100)}</td></tr>
    </tbody></table></div>`;
 
+  const pg=(pl,f)=>s.filter(x=>x.plano===pl&&f(x)).length;
+  h+=`<div class="sec-title">Mensal × anual por origem</div><div class="tbl-wrap"><table><thead><tr><th>Plano</th><th>Vendas</th><th>Fat.</th><th>De leads gratuitos</th><th>De ingresso</th><th>Influência do tráfego</th><th>Sem vínculo</th></tr></thead><tbody>`+
+    ['mensal','anual'].map(pl=>`<tr><td>${pl==='anual'?'Anual':'Mensal'}</td><td>${fN(pg(pl,()=>true))}</td><td>${fR(sum(s.filter(x=>x.plano===pl),'fatTotal'))}</td><td>${fN(pg(pl,x=>x.lead))}</td><td>${fN(pg(pl,x=>x.tick))}</td><td>${fN(pg(pl,x=>x.infl))}</td><td>${fN(pg(pl,x=>x.seg==='nenhum'))}</td></tr>`).join('')+`</tbody></table></div>`;
   // por dia
   h+='<div class="chart-grid-2x2"><div class="chart-card"><h4>Vendas por dia — por grupo</h4><canvas id="o-dia"></canvas></div><div class="chart-card"><h4>Vendas por dia — influência do tráfego</h4><canvas id="o-infl"></canvas></div></div>';
 
   // auditoria
   const lim=150;
-  h+=`<div class="sec-title">Vendas (${n}) — vínculos por comprador</div><div class="tbl-wrap"><table><thead><tr><th>Comprador</th><th>Data</th><th>Oferta</th><th>Valor</th><th>Lead gratuito</th><th>Ingresso</th><th>Tráfego</th></tr></thead><tbody>`+
-   s.slice(0,lim).map(x=>`<tr><td>${esc(x.nome||'—')}</td><td>${fD(x.data)} ${x.hora}</td><td>${esc(x.oferta||'')}</td><td>${fR(x.fatTotal)}</td><td>${x.lead?(x.leadMeta?'✅ via anúncio':'✅'):'—'}</td><td>${x.tick?(x.tickMeta?'✅ via anúncio':'✅'):'—'}</td><td>${x.infl?'✅':'—'}</td></tr>`).join('')+
+  h+=`<div class="sec-title">Vendas (${n}) — vínculos por comprador</div><div class="tbl-wrap"><table><thead><tr><th>Comprador</th><th>Data</th><th>Oferta</th><th>Plano</th><th>Valor</th><th>Lead gratuito</th><th>Ingresso</th><th>Tráfego</th></tr></thead><tbody>`+
+   s.slice(0,lim).map(x=>`<tr><td>${esc(x.nome||'—')}</td><td>${fD(x.data)} ${x.hora}</td><td>${esc(x.oferta||'')}</td><td>${x.plano==='anual'?'Anual':'Mensal'}</td><td>${fR(x.fatTotal)}</td><td>${x.lead?(x.leadMeta?'✅ via anúncio':'✅'):'—'}</td><td>${x.tick?(x.tickMeta?'✅ via anúncio':'✅'):'—'}</td><td>${x.infl?'✅':'—'}</td></tr>`).join('')+
    `</tbody></table></div>`+(n>lim?`<div class="b-meta" style="font-size:11px;color:rgba(255,255,255,.35);margin-top:6px">Mostrando as ${lim} mais recentes de ${n}.</div>`:'');
   $('tab-origem').innerHTML=h;
 
