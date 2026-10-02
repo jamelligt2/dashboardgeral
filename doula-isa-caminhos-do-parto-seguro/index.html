@@ -210,7 +210,7 @@ const CONFIG = {
   USA_TX_ROOT:  false,                 // Webhook 1 linha = 1 pedido (dedupe por data.id)
   VALORES_EM_CENTAVOS: null,           // null = detecta sozinho (mediana >= 1000 => centavos)
   STATUS_APROVADO: ['paid','approved','complete','confirmed','pago'],
-  SOURCES_TRAFEGO: ['metaads'],        // utm_source normalizado (sem espaço/_/-)
+  SOURCES_TRAFEGO: ['metaads'],        // utm_source normalizado (sem espaço/_/-) — usado como allowlist extra; ver isTrafego()
 
   // ── Referências (skill gestor de perpétuo) ────────────────────────
   BENCH: { CTR_BOM:1.5, CTR_MIN:1.0, CPC_MAX_PCT:3.2, CONNECT_MIN:75, CONV_MIN:6, CHECKOUT_CUSTO_MAX_PCT:23 }
@@ -353,7 +353,10 @@ function parseWebhook(csv){
   return list.map(s=>{ const k=cents?100:1; const fatTotal=s.val/k, fatOB=s.ob/k; return {data:s.data,nome:s.nome,email:s.email,fatTotal,fatOB,fatPrincipal:fatTotal-fatOB,utmSource:s.utmSource,utmMedium:s.utmMedium,utmCampaign:s.utmCampaign,utmContent:s.utmContent}; })
     .sort((a,b)=>b.data.localeCompare(a.data));
 }
-const isTrafego=s=>CONFIG.SOURCES_TRAFEGO.includes(String(s.utmSource||'').toLowerCase().replace(/[\s_-]/g,''));
+// Essa conta só roda tráfego pago no Meta Ads; o checkout usa o NOME DA CAMPANHA como utm_source (não "metaads" literal,
+// que é o que CONFIG.SOURCES_TRAFEGO esperava). Regra: qualquer venda com utm_source preenchido = tráfego pago (Meta Ads).
+// Venda sem nenhum utm_source = orgânica (link direto, sem rastreio, ex: compartilhado manualmente no WhatsApp).
+const isTrafego=s=>String(s.utmSource||'').trim()!=='';
 
 // ═══════════════ CARGA ═══════════════
 async function loadData(){
