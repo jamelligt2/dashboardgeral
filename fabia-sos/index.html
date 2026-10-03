@@ -182,7 +182,13 @@ const CONFIG = {
   // Venda com horário <= CORTE  → lida da aba "Vendas até agora"
   // Venda com horário  > CORTE  → lida da aba "Webhook"
   // (horário de Brasília, mesmo formato das planilhas)
-  CORTE_VENDAS: '2026-09-30 22:13:00',
+  CORTE_VENDAS: '2026-10-03 10:15:00',
+
+  // Os horários gravados na aba Webhook estão 4h ATRÁS do horário de Brasília
+  // (conferido em 43 vendas presentes nas duas abas: diferença sempre = 4,0h).
+  // Soma-se essa diferença aos horários do webhook antes de aplicar o corte.
+  // Se o fuso da planilha for corrigido, volte este valor para 0.
+  WEBHOOK_AJUSTE_HORAS: 4,
 
   // ── Produto principal x order bumps ───────────────────────────────
   PRODUTO_NOME:         'SOS Desinflamação',
@@ -340,6 +346,12 @@ function resolveUtm(u, ent){
   const origem = isTrafego ? 'meta_ads' : ([u.src||u.term, u.med].map(clean).filter(Boolean).join(' · ') || 'direto');
   return {isTrafego, criativo:cri, publico:pub, campanha:camp, origem};
 }
+function shiftDT(dt, horas){
+  if(!dt || !horas) return dt;
+  const ms=Date.parse(dt.ts.replace(' ','T')+'Z')+horas*3600000;
+  const iso=new Date(ms).toISOString();
+  return {d:iso.slice(0,10), ts:iso.slice(0,10)+' '+iso.slice(11,19)};
+}
 function readSheetRows(text, MAP, fonte){
   const rows=Array.isArray(text)?text:parseCSV(text); if(!rows.length) return [];
   const m=hmap(rows[0]); const ix={};
@@ -348,8 +360,9 @@ function readSheetRows(text, MAP, fonte){
   const out=[];
   rows.slice(1).forEach(r=>{
     if(!r || r.every(c=>clean(c)==='')) return;
-    const pedido=parseDT(val(r,'pedido'));
-    const aprov =parseDT(val(r,'aprov')) || pedido;
+    const aj = fonte==='webhook' ? (CONFIG.WEBHOOK_AJUSTE_HORAS||0) : 0;
+    const pedido=shiftDT(parseDT(val(r,'pedido')), aj);
+    const aprov =shiftDT(parseDT(val(r,'aprov')), aj) || pedido;
     let valor=parseBR(val(r,'valor')); if(CONFIG.VALORES_EM_CENTAVOS) valor/=100;
     out.push({
       fonte, status:clean(val(r,'status')), moeda:clean(val(r,'moeda')).toUpperCase(),
