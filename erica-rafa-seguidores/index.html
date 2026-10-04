@@ -323,7 +323,11 @@
   var plotW = W-M.l-M.r, plotH = H-M.t-M.b;
 
   function setPeriods(list){
-    DATA = list.slice();
+    // O banco entrega os documentos CONGELADOS (não aceitam campo novo nem alteração). Trabalhe sempre
+    // em cópias: marcar "current" direto no documento lançava erro, o redesenho era interrompido e o
+    // topo do painel (cabeçalho, KPIs, tabela por criativo, histórico e gráfico) ficava preso no
+    // retrato embutido, enquanto os alertas já usavam o banco.
+    DATA = list.map(function(d){ var o = {}; Object.keys(d || {}).forEach(function(k){ o[k] = d[k]; }); return o; });
     if (DATA.length) DATA[DATA.length-1].current = true;
     n = DATA.length;
     BREAK_INDEX = -1;
@@ -354,7 +358,7 @@
         "<td class=\"name\">" + d.l + (d.current ? " (atual)" : "") + "</td>" +
         "<td class=\"num\">" + fmtBRL(d.inv) + "</td>" +
         "<td class=\"num\">" + fmtInt(d.vis) + "</td>" +
-        "<td class=\"num\">" + fmtBRL(d.vis > 0 ? d.inv/d.vis : 0) + "</td>" +
+        "<td class=\"num\">" + (d.vis > 0 ? fmtBRL(d.inv/d.vis) : "—") + "</td>" +
         "<td class=\"num\">" + fmtInt(d.seg) + "</td>" +
         "<td class=\"num hl\">" + (d.seg>0 ? fmtBRL(d.cs) : "—") + "</td>" +
         "<td class=\"num\">" + fmtPct(d.ad) + "</td>";
@@ -408,9 +412,9 @@
     var cpvCur = Math.round((cur.vis > 0 ? cur.inv / cur.vis : 0) * 100) / 100;
     setKpiValue("kpi-inv-value", fmtBRL(cur.inv));
     setKpiValue("kpi-vis-value", fmtInt(cur.vis));
-    setKpiValue("kpi-cpv-value", fmtBRL(cpvCur));
+    setKpiValue("kpi-cpv-value", cur.vis > 0 ? fmtBRL(cpvCur) : "—");
     setKpiValue("kpi-seg-value", fmtInt(cur.seg));
-    setKpiValue("kpi-cps-value", fmtBRL(cur.cs));
+    setKpiValue("kpi-cps-value", cur.seg > 0 ? fmtBRL(cur.cs) : "—");
     setKpiValue("kpi-ad-value", fmtPct(cur.ad));
     if (!prev){
       ["kpi-inv-delta","kpi-vis-delta","kpi-cpv-delta","kpi-seg-delta","kpi-cps-delta","kpi-ad-delta"].forEach(function(id){ setKpiDelta(id, "", "flat"); });
@@ -421,15 +425,29 @@
     var visPct = prev.vis > 0 ? (cur.vis - prev.vis) / prev.vis * 100 : 0;
     setKpiDelta("kpi-vis-delta", (visPct >= 0 ? "▲ " : "▼ ") + fmtSignedPct1(visPct) + " vs. período anterior (" + fmtInt(prev.vis) + ")", visPct >= 0 ? "up" : "down");
 
+    // Custo por visita/seguidor só existe quando houve visita/seguidor. Sem isso o valor é "—":
+    // um zero aqui apareceria como "−100%" em verde, quando na verdade a campanha não veiculou.
     var cpvPrev = Math.round((prev.vis > 0 ? prev.inv / prev.vis : 0) * 100) / 100;
-    var cpvPct = cpvPrev > 0 ? (cpvCur - cpvPrev) / cpvPrev * 100 : 0;
-    setKpiDelta("kpi-cpv-delta", (cpvPct >= 0 ? "▲ " : "▼ ") + fmtSignedPct1(cpvPct) + " vs. período anterior (" + fmtBRL(cpvPrev) + ")", cpvPct <= 0 ? "up" : "down");
+    if (!(cur.vis > 0)){
+      setKpiDelta("kpi-cpv-delta", "sem visitas no período", "flat");
+    } else if (!(prev.vis > 0) || !(cpvPrev > 0)){
+      setKpiDelta("kpi-cpv-delta", "período anterior sem visitas", "flat");
+    } else {
+      var cpvPct = (cpvCur - cpvPrev) / cpvPrev * 100;
+      setKpiDelta("kpi-cpv-delta", (cpvPct >= 0 ? "▲ " : "▼ ") + fmtSignedPct1(cpvPct) + " vs. período anterior (" + fmtBRL(cpvPrev) + ")", cpvPct <= 0 ? "up" : "down");
+    }
 
     var segDiff = cur.seg - prev.seg;
     setKpiDelta("kpi-seg-delta", (segDiff >= 0 ? "▲ " : "▼ ") + fmtSignedInt(segDiff) + " vs. período anterior (" + fmtInt(prev.seg) + ")", segDiff >= 0 ? "up" : "down");
 
-    var cpsPct = prev.cs > 0 ? (cur.cs - prev.cs) / prev.cs * 100 : 0;
-    setKpiDelta("kpi-cps-delta", (cpsPct >= 0 ? "▲ " : "▼ ") + fmtSignedPct1(cpsPct) + " vs. período anterior (" + fmtBRL(prev.cs) + ")", cpsPct <= 0 ? "up" : "down");
+    if (!(cur.seg > 0)){
+      setKpiDelta("kpi-cps-delta", "sem seguidores no período", "flat");
+    } else if (!(prev.seg > 0) || !(prev.cs > 0)){
+      setKpiDelta("kpi-cps-delta", "período anterior sem seguidores", "flat");
+    } else {
+      var cpsPct = (cur.cs - prev.cs) / prev.cs * 100;
+      setKpiDelta("kpi-cps-delta", (cpsPct >= 0 ? "▲ " : "▼ ") + fmtSignedPct1(cpsPct) + " vs. período anterior (" + fmtBRL(prev.cs) + ")", cpsPct <= 0 ? "up" : "down");
+    }
 
     var adDiff = cur.ad - prev.ad;
     setKpiDelta("kpi-ad-delta", (adDiff >= 0 ? "▲ " : "▼ ") + fmtSignedPP(adDiff) + " vs. período anterior (" + fmtPct(prev.ad) + ")", adDiff >= 0 ? "up" : "down");
@@ -513,7 +531,7 @@
     totalTd(typeof cur.ctr === "number" ? fmtPct(cur.ctr) : "—", "num");
     totalTd(fmtInt(cur.vis), "num");
     totalTd(fmtBRL(cur.inv), "num");
-    totalTd(fmtBRL(cur.vis > 0 ? cur.inv/cur.vis : 0), "num");
+    totalTd(cur.vis > 0 ? fmtBRL(cur.inv/cur.vis) : "—", "num");
     totalTd(cur.seg > 0 ? fmtBRL(cur.cs) : "—", "num");
     totalTd(fmtPct(cur.ad), "num");
     totalTd(fmtInt(cur.seg), "num");
