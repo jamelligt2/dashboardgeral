@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel Yogalaya</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: barra de marca no topo, abas Seguidores/Lives, filtros, KPIs primeiro, gráficos em seguida, tabelas por último. Identidade Jamelli GT: preto, laranja, verde só para o que é bom. */
+:root{
+  --bg:#0a0a0a; --bar:#101010; --panel:#141414; --panel2:#1e1e1e;
+  --line:#2a2a2a; --line2:#444444;
+  --fg:#ffffff; --fg2:#cccccc; --fg3:#8f8f8f;
+  --accent:#ff6b2b; --accent-d:#cc4a00; --ser-a:#9b9b9b; --good:#2ecc71;
+  --f-display:"Arial Black","Arial",sans-serif;
+  --f-body:"DM Sans","Arial",sans-serif;
+  --f-mono:"DM Mono","Courier New",monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.45;margin:0}
+button,input{font:inherit;color:inherit}
+.top{background:var(--bar);border-bottom:3px solid var(--accent)}
+.top-in{max-width:1180px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.top img{height:36px;width:auto;display:block;max-width:100%}
+.ttl{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1 1 220px}
+.ttl h1{font-family:var(--f-display);font-size:22px;line-height:1.15;margin:0;font-weight:900;text-wrap:balance}
+.ttl p{margin:0;color:var(--fg3);font-size:13px}
+.tabs{display:flex;gap:8px}
+.tab{background:var(--panel2);border:1px solid var(--line2);border-radius:999px;padding:8px 18px;cursor:pointer;font-weight:700;font-size:14px;color:var(--fg2)}
+.tab:hover{border-color:var(--accent)}
+.tab[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:#0a0a0a}
+.tab:focus-visible,.chip:focus-visible,input:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:20px;padding-block:24px 56px;display:flex;flex-direction:column;gap:20px}
+section[hidden]{display:none}
+.sec{display:flex;flex-direction:column;gap:20px}
+.filters{background:var(--panel);border:1px solid var(--line2);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+.bar-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.bar-row .lbl{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--fg3);font-weight:700;min-width:64px}
+.chip{background:transparent;border:1px solid var(--line2);border-radius:999px;padding:6px 14px;cursor:pointer;font-size:14px;color:var(--fg2)}
+.chip:hover{border-color:var(--accent)}
+.chip[aria-pressed="true"]{border-color:var(--accent);background:rgba(255,107,43,.14);color:var(--fg);font-weight:700}
+.dl{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--fg2)}
+input[type="date"]{background:var(--panel2);border:1px solid var(--line2);border-radius:6px;padding:5px 8px;font-family:var(--f-mono);font-size:13px;color:var(--fg);color-scheme:dark;min-width:0}
+.sum{font-size:13px;color:var(--fg3);margin:0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.kpi{background:var(--panel);border-top:3px solid var(--accent);padding:14px 16px 14px;min-width:0;display:flex;flex-direction:column;gap:4px}
+.kpi .k{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--fg3);font-weight:700}
+.kpi .v{font-family:var(--f-mono);font-weight:500;font-size:28px;line-height:1.15;color:var(--accent);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.kpi .v.good{color:var(--good)}
+.kpi .v.na{color:var(--fg3)}
+.kpi .s{font-size:13px;color:var(--fg2)}
+.panel{background:var(--panel);border:1px solid var(--line2);border-radius:8px;padding:18px;min-width:0;display:flex;flex-direction:column;gap:14px}
+.ph{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.ph h2{margin:0;font-family:var(--f-display);font-size:17px;font-weight:900;line-height:1.2}
+.ph p{margin:2px 0 0;color:var(--fg3);font-size:13px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--fg2)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:20px}
+/* gráfico de barras diárias */
+.chart{display:flex;flex-direction:column;gap:6px}
+.plot{position:relative;height:250px;margin-left:34px}
+.plot.short{height:190px}
+.gl{position:absolute;left:0;right:0;border-top:1px solid var(--line)}
+.gl span{position:absolute;left:-34px;width:28px;text-align:right;transform:translateY(-50%);font-family:var(--f-mono);font-size:11px;color:var(--fg3)}
+.gl.base{border-top-color:var(--line2)}
+.bars,.hits{position:absolute;inset:0;display:flex;align-items:flex-end;gap:3px}
+.col{flex:1;height:100%;min-width:0;display:flex;align-items:flex-end;justify-content:center;border-radius:3px}
+.col.on{background:rgba(255,255,255,.06)}
+.stack{width:72%;max-width:34px;display:flex;flex-direction:column-reverse;gap:2px}
+.stack>div{min-height:0}
+.stack>div:last-child{border-radius:3px 3px 0 0}
+.stack.part{opacity:.55}
+.sa{background:var(--ser-a)}
+.sb{background:var(--accent)}
+.xax{display:flex;gap:3px;margin-left:34px}
+.xax span{flex:1;min-width:0;text-align:center;font-family:var(--f-mono);font-size:11px;color:var(--fg3);white-space:nowrap;overflow:visible;height:16px}
+.lsvg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.ln{fill:none;stroke:var(--accent);stroke-width:2.5;vector-effect:non-scaling-stroke;stroke-linejoin:round;stroke-linecap:round}
+.ar{fill:rgba(255,107,43,.12);stroke:none}
+.dot{position:absolute;width:8px;height:8px;border-radius:50%;background:var(--accent);transform:translate(-50%,50%);box-shadow:0 0 0 2px var(--panel);pointer-events:none}
+.dot.end{width:12px;height:12px;box-shadow:0 0 0 3px var(--panel)}
+.avg{position:absolute;left:0;right:0;border-top:1.5px dashed var(--fg3);pointer-events:none}
+.avg span{position:absolute;right:0;top:-20px;font-size:12px;color:var(--fg2);background:var(--panel);padding:0 4px;font-family:var(--f-mono)}
+/* barras por live */
+.vb{display:flex;gap:8px;align-items:flex-end;height:210px;border-bottom:1px solid var(--line2)}
+.it{flex:1;min-width:0;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px;cursor:default;border-radius:3px}
+.it.on{background:rgba(255,255,255,.06)}
+.it .val{font-family:var(--f-mono);font-size:12px;color:var(--fg);white-space:nowrap;font-variant-numeric:tabular-nums}
+.it .bar{width:68%;max-width:46px;border-radius:3px 3px 0 0;min-height:2px;background:var(--accent)}
+.it .bar.good{background:var(--good)}
+.it .bar.grey{background:var(--ser-a)}
+.vx{display:flex;gap:8px}
+.vx span{flex:1;min-width:0;text-align:center;font-family:var(--f-mono);font-size:11px;color:var(--fg3);white-space:nowrap}
+.note{font-size:13px;color:var(--fg3);margin:0}
+.empty{color:var(--fg3);font-size:14px;padding:24px 0;text-align:center;margin:0}
+/* leituras */
+.reads{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:12px}
+.read{background:var(--panel);border:1px solid var(--line2);border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.read h3{margin:0;font-size:16px;line-height:1.25;font-weight:700;text-wrap:balance}
+.read p{margin:0;color:var(--fg2);font-size:14px}
+/* tabelas */
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:640px;font-variant-numeric:tabular-nums}
+th,td{padding:10px 12px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:700;border-bottom:1px solid var(--line2)}
+td{font-family:var(--f-mono);font-size:14px;color:var(--fg)}
+td:first-child{font-family:var(--f-body);font-weight:700}
+tr.tot td{font-weight:500;border-top:1px solid var(--line2);color:var(--fg)}
+td.good{color:var(--good);font-weight:500}
+td.warn{color:var(--accent);font-weight:500}
+td.muted{color:var(--fg3)}
+.tip{position:fixed;z-index:10;background:#000;border:1px solid var(--line2);border-radius:6px;padding:10px 12px;font-size:13px;line-height:1.5;pointer-events:none;max-width:260px;box-shadow:0 6px 20px rgba(0,0,0,.6)}
+.tip b{display:block;font-size:13px;margin-bottom:2px}
+.tip .r{display:flex;justify-content:space-between;gap:16px;color:var(--fg2)}
+.tip .r span:last-child{font-family:var(--f-mono);color:var(--fg)}
+.foot{color:var(--fg3);font-size:13px;display:flex;flex-direction:column;gap:4px;border-top:1px solid var(--line);padding-top:16px}
+.foot p{margin:0}
+@media (max-width:560px){
+  .ttl h1{font-size:19px}
+  .kpi .v{font-size:23px}
+  .plot{height:210px}
+  .vb{gap:5px}
+  .bar-row .lbl{min-width:100%}
+}
+@media (prefers-reduced-motion:no-preference){
+  .stack>div,.it .bar{transition:flex .25s ease,height .25s ease}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <img src="logo.png" alt="Jamelli GT">
+    <div class="ttl">
+      <h1>Yogalaya · Seguidores e Lives</h1>
+      <p>Impulsionamento no Instagram, julho a outubro de 2026 · dados até 07/10/2026</p>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Seções">
+      <button class="tab" role="tab" id="tab-seg" aria-selected="true" aria-controls="seg" type="button">Seguidores</button>
+      <button class="tab" role="tab" id="tab-lives" aria-selected="false" aria-controls="lives" type="button">Lives</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="seg" class="sec" role="tabpanel" aria-labelledby="tab-seg">
+    <div class="filters">
+      <div class="bar-row">
+        <span class="lbl">Criativo</span>
+        <button class="chip" type="button" data-f="all" aria-pressed="true">Todos</button>
+        <button class="chip" type="button" data-f="A" aria-pressed="false">ADE2208</button>
+        <button class="chip" type="button" data-f="B" aria-pressed="false">ADE2608</button>
+      </div>
+      <div class="bar-row">
+        <span class="lbl">Período</span>
+        <button class="chip" type="button" data-p="all" aria-pressed="true">Tudo</button>
+        <button class="chip" type="button" data-p="14" aria-pressed="false">Últimos 14 dias</button>
+        <button class="chip" type="button" data-p="7" aria-pressed="false">Últimos 7 dias</button>
+        <label class="dl" for="s-from">De <input type="date" id="s-from"></label>
+        <label class="dl" for="s-to">até <input type="date" id="s-to"></label>
+      </div>
+      <p class="sum" id="seg-range"></p>
+    </div>
+    <div class="kpis" id="seg-kpis"></div>
+
+    <div class="panel">
+      <div class="ph">
+        <div><h2>Visitas ao perfil por dia</h2><p>Passe o mouse ou toque nas barras para ver o detalhe do dia.</p></div>
+        <div class="legend" id="leg1"></div>
+      </div>
+      <div class="chart" id="ch-visits"></div>
+    </div>
+
+    <div class="panel">
+      <div class="ph">
+        <div><h2>Custo por visita ao perfil</h2><p>Investimento do dia ÷ visitas do dia. Dias com menos de 10 visitas ficam fora da linha.</p></div>
+      </div>
+      <div class="chart" id="ch-cpv"></div>
+    </div>
+
+    <div class="reads" id="seg-reads"></div>
+
+    <div class="panel">
+      <div class="ph"><div><h2>Criativos lado a lado</h2><p>Verde marca o melhor valor de cada coluna de custo e de conversão.</p></div></div>
+      <div class="tw"><table id="tb-cri"></table></div>
+      <p class="note" id="cri-note">Conversão = seguidores ÷ visitas ao perfil. Seguidores por criativo vêm da aba "numero de seguidores" da planilha.</p>
+    </div>
+
+    <div class="panel">
+      <div class="ph"><div><h2>Referência: posts impulsionados em julho</h2><p>17/07 a 21/07 · antes da campanha atual</p></div></div>
+      <div class="tw"><table id="tb-jul"></table></div>
+    </div>
+  </section>
+
+  <section id="lives" class="sec" role="tabpanel" aria-labelledby="tab-lives" hidden>
+    <div class="filters">
+      <div class="bar-row">
+        <span class="lbl">Período</span>
+        <button class="chip" type="button" data-lp="all" aria-pressed="true">Todas</button>
+        <button class="chip" type="button" data-lp="jul" aria-pressed="false">Julho</button>
+        <button class="chip" type="button" data-lp="aug" aria-pressed="false">Agosto e setembro</button>
+        <label class="dl" for="l-from">De <input type="date" id="l-from"></label>
+        <label class="dl" for="l-to">até <input type="date" id="l-to"></label>
+      </div>
+      <p class="sum" id="lv-range"></p>
+    </div>
+    <div class="kpis" id="lv-kpis"></div>
+
+    <div class="grid3">
+      <div class="panel">
+        <div class="ph"><div><h2>Custo por visualização (R$)</h2><p>Menor em verde.</p></div></div>
+        <div id="lv-cost"></div>
+      </div>
+      <div class="panel">
+        <div class="ph"><div><h2>Alcance por live</h2><p>Pessoas alcançadas em cada transmissão.</p></div></div>
+        <div id="lv-reach"></div>
+      </div>
+      <div class="panel">
+        <div class="ph"><div><h2>Visitas ao perfil por live</h2><p>Quem foi ao perfil depois de ver o anúncio.</p></div></div>
+        <div id="lv-visits"></div>
+      </div>
+    </div>
+
+    <div class="reads" id="lv-reads"></div>
+
+    <div class="panel">
+      <div class="ph"><div><h2>Resultado de cada live</h2><p>Data da live, público e métricas do anúncio.</p></div></div>
+      <div class="tw"><table id="tb-lives"></table></div>
+      <p class="note">Visualização = vídeo assistido por 15 segundos ou mais (thruplay). Custo por visualização = investimento ÷ visualizações.</p>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <p>Fonte: planilha "JGTCL0045 - Yogalaya - Impulsionamento e Lives", abas Seguidores, numero de seguidores e Live.</p>
+    <p>O alcance das lives é a soma do alcance de cada transmissão, então a mesma pessoa pode ser contada mais de uma vez. 07/10 é um dia parcial. Seguidores são contados por criativo no período todo, por isso aparecem só quando o período completo está selecionado.</p>
+  </footer>
+</main>
+
+<div class="tip" id="tip" hidden></div>
+
+<script>
+(function(){
+  // ---------- dados ----------
+  var NAMES={A:'ADE2208',B:'ADE2608'};
+  var FOLL={A:327,B:248};
+  // [data, criativo, investimento, impressões, visitas ao perfil]
+  var SEG=[
+    ['2026-09-17','A',11.63,947,51],['2026-09-18','A',18.93,1458,66],['2026-09-19','A',15.75,1351,55],
+    ['2026-09-20','A',19.87,1609,66],['2026-09-21','A',23.69,2664,78],['2026-09-22','A',18.73,2222,48],
+    ['2026-09-23','A',19.62,1940,53],['2026-09-24','A',17.26,1557,47],['2026-09-25','A',18.94,2115,67],
+    ['2026-09-26','A',21.62,2126,58],['2026-09-27','A',24.02,2496,82],['2026-09-28','A',19.59,1744,68],
+    ['2026-09-29','A',8.24,556,28],['2026-09-29','B',13.18,1205,62],
+    ['2026-09-30','A',0.57,61,2],['2026-09-30','B',22.20,1648,107],
+    ['2026-10-01','A',0.01,1,0],['2026-10-01','B',17.48,1364,75],
+    ['2026-10-02','A',0.12,15,1],['2026-10-02','B',20.05,2130,97],
+    ['2026-10-03','B',14.39,1655,73],
+    ['2026-10-04','A',0.04,5,0],['2026-10-04','B',25.17,5574,107],
+    ['2026-10-05','A',0.25,17,2],['2026-10-05','B',15.63,2765,86],
+    ['2026-10-06','B',19.08,2153,84],
+    ['2026-10-07','B',3.60,337,22]
+  ];
+  var JULY=[
+    {n:'Chegou a sua hora',s:45.11,i:10081,v:202,f:7},
+    {n:'Dharma não é escolha',s:14.23,i:1153,v:48,f:null}
+  ];
+  var LIVES=[
+    {iso:'2026-07-12',d:'12/07',s:330.31,r:51434,i:54464,v:217,t:1721,a:'Engajamento 365 dias'},
+    {iso:'2026-07-20',d:'20/07',s:219.12,r:32036,i:36403,v:123,t:846,a:'Engajamento 365 dias'},
+    {iso:'2026-07-27',d:'27/07',s:99.99,r:12494,i:13702,v:51,t:527,a:'Engajamento 365 dias'},
+    {iso:'2026-08-03',d:'03/08',s:99.60,r:4275,i:5797,v:58,t:345,a:'Engajamento Yogalaya'},
+    {iso:'2026-08-10',d:'10/08',s:98.86,r:4415,i:6196,v:37,t:373,a:'Engajamento Yogalaya'},
+    {iso:'2026-08-17',d:'17/08',s:98.56,r:2007,i:2827,v:33,t:163,a:'Engajamento Yogalaya'},
+    {iso:'2026-09-21',d:'21/09',s:38.07,r:11071,i:11071,v:9,t:160,a:'Público frio'}
+  ];
+
+  // ---------- formatação ----------
+  function nf(n,d){return n.toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d});}
+  function brl(n){return 'R$ '+nf(n,2);}
+  function int(n){return nf(n,0);}
+  function pct(n){return nf(n,1)+'%';}
+  function dm(iso){return iso.slice(8,10)+'/'+iso.slice(5,7);}
+  function short(n){
+    if(n>=10000)return nf(Math.round(n/1000),0)+' mil';
+    if(n>=1000)return nf(n/1000,1)+' mil';
+    return int(n);
+  }
+  function nz(x,fn){return x===null?'-':fn(x);}
+  function $(id){return document.getElementById(id);}
+  function plural(n,a,b){return n===1?a:b;}
+
+  // ---------- período (Seguidores) ----------
+  var DATES=[];
+  SEG.forEach(function(r){if(DATES.indexOf(r[0])<0)DATES.push(r[0]);});
+  DATES.sort();
+  var FIRST=DATES[0],LAST=DATES[DATES.length-1];
+  var range={from:FIRST,to:LAST};
+  var filter='all';
+  function inR(d){return d>=range.from&&d<=range.to;}
+  function isFull(){return range.from===FIRST&&range.to===LAST;}
+  function rLabel(){return range.from===range.to?dm(range.from):dm(range.from)+' a '+dm(range.to);}
+
+  function days(f,full){
+    var keys=f==='all'?['A','B']:[f];
+    return DATES.filter(function(d){return full||inR(d);}).map(function(d){
+      var o={d:d,A:{s:0,v:0,i:0},B:{s:0,v:0,i:0},s:0,v:0,i:0,part:d===LAST};
+      SEG.forEach(function(r){if(r[0]===d){var k=r[1];o[k].s+=r[2];o[k].i+=r[3];o[k].v+=r[4];}});
+      keys.forEach(function(k){o.s+=o[k].s;o.v+=o[k].v;o.i+=o[k].i;});
+      return o;
+    });
+  }
+  function totals(f){
+    var keys=f==='all'?['A','B']:[f],t={s:0,v:0,i:0,f:0};
+    SEG.forEach(function(r){if(keys.indexOf(r[1])>=0&&inR(r[0])){t.s+=r[2];t.i+=r[3];t.v+=r[4];}});
+    if(isFull()){keys.forEach(function(k){t.f+=FOLL[k];});}else{t.f=null;}
+    return t;
+  }
+
+  // ---------- tooltip ----------
+  var tip=$('tip');
+  function showTip(html,x,y){
+    tip.innerHTML=html;tip.hidden=false;
+    var w=tip.offsetWidth,h=tip.offsetHeight,vw=window.innerWidth,vh=window.innerHeight;
+    var left=x+16,top=y+16;
+    if(left+w>vw-8)left=x-w-16;
+    if(left<8)left=8;
+    if(top+h>vh-8)top=vh-h-8;
+    tip.style.left=left+'px';tip.style.top=top+'px';
+  }
+  function hideTip(){tip.hidden=true;}
+  function bind(el,sel,fn){
+    var last=null;
+    function move(e){
+      var t=e.target.closest?e.target.closest(sel):null;
+      if(last&&last!==t)last.classList.remove('on');
+      if(!t||!el.contains(t)){hideTip();last=null;return;}
+      t.classList.add('on');last=t;
+      showTip(fn(+t.getAttribute('data-i')),e.clientX,e.clientY);
+    }
+    el.addEventListener('pointermove',move);
+    el.addEventListener('pointerdown',move);
+    el.addEventListener('pointerleave',function(){if(last)last.classList.remove('on');last=null;hideTip();});
+  }
+  function row(a,b){return '<div class="r"><span>'+a+'</span><span>'+b+'</span></div>';}
+
+  // ---------- aba Seguidores ----------
+  function renderKpis(){
+    var t=totals(filter),na=t.f===null;
+    var cpv=t.v>0?t.s/t.v:null;
+    var nd='disponível só no período completo';
+    var cards=[
+      ['Investimento',brl(t.s),int(t.i)+' impressões','',''],
+      ['Visitas ao perfil',int(t.v),rLabel(),'',''],
+      ['Custo por visita',cpv===null?'-':brl(cpv),'média do período',cpv===null?'na':'good'],
+      ['Novos seguidores',na?'-':int(t.f),na?nd:pct(t.f/t.v*100)+' das visitas',na?'na':''],
+      ['Custo por seguidor',na?'-':brl(t.s/t.f),na?nd:'a cada R$ 100: '+int(Math.round(100/(t.s/t.f)))+' seguidores',na?'na':'good']
+    ];
+    $('seg-kpis').innerHTML=cards.map(function(c){
+      return '<div class="kpi"><span class="k">'+c[0]+'</span><span class="v '+c[3]+'">'+c[1]+'</span><span class="s">'+c[2]+'</span></div>';
+    }).join('');
+  }
+
+  function renderLegend(){
+    $('leg1').innerHTML=filter==='all'
+      ?'<span><i class="sa"></i>ADE2208</span><span><i class="sb"></i>ADE2608</span>'
+      :'<span><i class="'+(filter==='A'?'sa':'sb')+'"></i>'+NAMES[filter]+'</span>';
+  }
+
+  function ticksFor(max){
+    var step=max<=60?10:(max<=125?25:50);
+    var nice=Math.max(step,Math.ceil(max/step)*step),t=[];
+    for(var v=0;v<=nice;v+=step)t.push(v);
+    return {nice:nice,ticks:t};
+  }
+
+  function xaxis(n,ds){
+    var step=n>14?4:(n>8?2:1);
+    var h='<div class="xax">';
+    for(var i=0;i<n;i++){h+='<span>'+(i%step===0?dm(ds[i].d):'')+'</span>';}
+    return h+'</div>';
+  }
+
+  function renderVisits(){
+    var ds=days(filter),keys=filter==='all'?['A','B']:[filter];
+    var max=Math.max.apply(null,ds.map(function(x){return x.v;}));
+    var sc=ticksFor(max),h='<div class="plot">';
+    sc.ticks.forEach(function(t){
+      h+='<div class="gl'+(t===0?' base':'')+'" style="bottom:'+(t/sc.nice*100)+'%"><span>'+t+'</span></div>';
+    });
+    h+='<div class="bars">';
+    ds.forEach(function(x){
+      h+='<div class="col">';
+      if(x.v>0){
+        h+='<div class="stack'+(x.part?' part':'')+'" style="height:'+(x.v/sc.nice*100)+'%">';
+        keys.forEach(function(k){
+          if(x[k].v>0)h+='<div class="'+(k==='A'?'sa':'sb')+'" style="flex:'+x[k].v+' 1 0"></div>';
+        });
+        h+='</div>';
+      }
+      h+='</div>';
+    });
+    h+='</div><div class="hits">';
+    ds.forEach(function(x,i){h+='<div class="col" data-i="'+i+'"></div>';});
+    h+='</div></div>'+xaxis(ds.length,ds);
+    $('ch-visits').innerHTML=h;
+  }
+
+  function renderCpv(){
+    var ds=days(filter),n=ds.length,t=totals(filter);
+    var pts=ds.map(function(x){return x.v>=10?x.s/x.v:null;});
+    var vals=pts.filter(function(p){return p!==null;});
+    if(!vals.length){
+      $('ch-cpv').innerHTML='<p class="empty">Nenhum dia do período tem 10 visitas ou mais para este criativo.</p>';
+      return;
+    }
+    var maxv=Math.max.apply(null,vals);
+    var nice=Math.max(0.3,Math.ceil((maxv+0.005)*10)/10);
+    var avg=t.s/t.v;
+    var h='<div class="plot short">';
+    for(var v=0;v<=nice+1e-9;v+=0.1){
+      h+='<div class="gl'+(v<0.05?' base':'')+'" style="bottom:'+(v/nice*100)+'%"><span>'+nf(v,2)+'</span></div>';
+    }
+    h+='<div class="avg" style="bottom:'+(Math.min(avg,nice)/nice*100)+'%"><span>média '+brl(avg)+'</span></div>';
+    var segs=[],cur=[];
+    pts.forEach(function(p,i){
+      if(p===null){if(cur.length)segs.push(cur);cur=[];}
+      else cur.push([(i+0.5)/n*100,100-p/nice*100]);
+    });
+    if(cur.length)segs.push(cur);
+    h+='<svg class="lsvg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">';
+    segs.forEach(function(s){
+      if(s.length>1){
+        var pl=s.map(function(p){return p[0]+','+p[1];}).join(' ');
+        h+='<polygon class="ar" points="'+pl+' '+s[s.length-1][0]+',100 '+s[0][0]+',100"/>';
+        h+='<polyline class="ln" points="'+pl+'"/>';
+      }
+    });
+    h+='</svg>';
+    var lastIdx=-1;
+    pts.forEach(function(p,i){if(p!==null)lastIdx=i;});
+    pts.forEach(function(p,i){
+      if(p===null)return;
+      h+='<div class="dot'+(i===lastIdx?' end':'')+'" style="left:'+((i+0.5)/n*100)+'%;bottom:'+(p/nice*100)+'%"></div>';
+    });
+    h+='<div class="hits">';
+    ds.forEach(function(x,i){h+='<div class="col" data-i="'+i+'"></div>';});
+    h+='</div></div>'+xaxis(n,ds);
+    $('ch-cpv').innerHTML=h;
+  }
+
+  function dayTip(i){
+    var ds=days(filter),x=ds[i],keys=filter==='all'?['A','B']:[filter];
+    if(!x)return '';
+    var h='<b>'+dm(x.d)+(x.part?' · dia parcial':'')+'</b>';
+    keys.forEach(function(k){
+      if(x[k].v>0||x[k].s>=0.5){
+        h+=row(NAMES[k]+' · visitas',int(x[k].v));
+        h+=row(NAMES[k]+' · invest.',brl(x[k].s));
+      }
+    });
+    if(keys.length>1)h+=row('Total de visitas',int(x.v));
+    h+=row('Investimento',brl(x.s));
+    h+=row('Custo por visita',x.v>0?brl(x.s/x.v):'-');
+    return h;
+  }
+
+  function renderTables(){
+    var info={};
+    ['A','B'].forEach(function(k){
+      var t=totals(k),na=t.f===null;
+      info[k]={s:t.s,i:t.i,v:t.v,f:t.f,cpv:t.v>0?t.s/t.v:null,cpf:na?null:t.s/t.f,cv:na||t.v===0?null:t.f/t.v*100};
+    });
+    var tt=totals('all'),na=tt.f===null;
+    function best(key,dir){
+      var a=info.A[key],b=info.B[key];
+      if(a===null||b===null)return null;
+      return dir==='min'?Math.min(a,b):Math.max(a,b);
+    }
+    var minCpv=best('cpv','min'),minCpf=best('cpf','min'),maxCv=best('cv','max');
+    var rows='';
+    ['A','B'].forEach(function(k){
+      var o=info[k];
+      rows+='<tr><td>'+NAMES[k]+'</td><td>'+brl(o.s)+'</td><td>'+int(o.i)+'</td><td>'+int(o.v)+'</td>'+
+        '<td class="'+(o.cpv!==null&&o.cpv===minCpv?'good':'')+'">'+nz(o.cpv,brl)+'</td><td>'+nz(o.f,int)+'</td>'+
+        '<td class="'+(o.cpf!==null&&o.cpf===minCpf?'good':'')+'">'+nz(o.cpf,brl)+'</td>'+
+        '<td class="'+(o.cv!==null&&o.cv===maxCv?'good':'')+'">'+nz(o.cv,pct)+'</td></tr>';
+    });
+    rows+='<tr class="tot"><td>Total</td><td>'+brl(tt.s)+'</td><td>'+int(tt.i)+'</td><td>'+int(tt.v)+'</td><td>'+(tt.v>0?brl(tt.s/tt.v):'-')+'</td><td>'+nz(tt.f,int)+'</td><td>'+(na?'-':brl(tt.s/tt.f))+'</td><td>'+(na||tt.v===0?'-':pct(tt.f/tt.v*100))+'</td></tr>';
+    $('tb-cri').innerHTML='<thead><tr><th>Criativo</th><th>Investimento</th><th>Impressões</th><th>Visitas</th><th>Custo/visita</th><th>Seguidores</th><th>Custo/seguidor</th><th>Conversão</th></tr></thead><tbody>'+rows+'</tbody>';
+    $('cri-note').textContent='Conversão = seguidores ÷ visitas ao perfil. Seguidores por criativo vêm da aba "numero de seguidores" da planilha'+(na?' e só existem para o período completo.':'.');
+
+    var jr='',js=0,ji=0,jv=0;
+    JULY.forEach(function(p){
+      js+=p.s;ji+=p.i;jv+=p.v;
+      jr+='<tr><td>'+p.n+'</td><td>'+brl(p.s)+'</td><td>'+int(p.i)+'</td><td>'+int(p.v)+'</td><td>'+brl(p.s/p.v)+'</td><td'+(p.f===null?' class="muted"':'')+'>'+(p.f===null?'sem dado':int(p.f))+'</td></tr>';
+    });
+    jr+='<tr class="tot"><td>Total</td><td>'+brl(js)+'</td><td>'+int(ji)+'</td><td>'+int(jv)+'</td><td>'+brl(js/jv)+'</td><td class="muted">-</td></tr>';
+    $('tb-jul').innerHTML='<thead><tr><th>Post</th><th>Investimento</th><th>Impressões</th><th>Visitas</th><th>Custo/visita</th><th>Seguidores</th></tr></thead><tbody>'+jr+'</tbody>';
+  }
+
+  // leituras da campanha inteira (não dependem do filtro)
+  function renderSegReads(){
+    var all=days('all',true);
+    var before=all.filter(function(x){return x.d<'2026-09-29';});
+    var after=all.filter(function(x){return x.d>='2026-09-29'&&!x.part;});
+    function agg(a){return a.reduce(function(o,x){o.s+=x.s;o.v+=x.v;return o;},{s:0,v:0});}
+    var b=agg(before),a=agg(after);
+    var perB=b.v/before.length,perA=a.v/after.length;
+    var cB=b.s/b.v,cA=a.s/a.v;
+    var queda=(1-cA/cB)*100,alta=(perA/perB-1)*100;
+    var S=0,F=FOLL.A+FOLL.B;
+    SEG.forEach(function(r){S+=r[2];});
+    var cards=[
+      ['Custo por visita caiu '+int(Math.round(queda))+'% depois de 29/09',
+       'De '+brl(cB)+' (17 a 28/09) para '+brl(cA)+' (29/09 a 06/10), com o ADE2608 assumindo a entrega. As visitas por dia passaram de '+int(Math.round(perB))+' para '+int(Math.round(perA))+', alta de '+int(Math.round(alta))+'%.'],
+      ['ADE2608 custa menos, ADE2208 converte mais',
+       'O ADE2608 trouxe a visita por R$ 0,21 e o seguidor por R$ 0,61. No ADE2208, 42,4% das visitas viraram seguidores, contra 34,8%.'],
+      ['Cerca de '+int(Math.round(F/S*100))+' seguidores a cada R$ 100',
+       'Foram '+int(F)+' novos seguidores com '+brl(S)+' investidos, ou '+brl(S/F)+' por seguidor (campanha inteira).']
+    ];
+    $('seg-reads').innerHTML=cards.map(function(c){return '<div class="read"><h3>'+c[0]+'</h3><p>'+c[1]+'</p></div>';}).join('');
+  }
+
+  // sincroniza campos de data e chips de período
+  function syncSegControls(){
+    $('s-from').value=range.from;$('s-to').value=range.to;
+    var n=DATES.length,p14=DATES[Math.max(0,n-14)],p7=DATES[Math.max(0,n-7)];
+    var cur=isFull()?'all':(range.to===LAST&&range.from===p14?'14':(range.to===LAST&&range.from===p7?'7':''));
+    document.querySelectorAll('.chip[data-p]').forEach(function(c){c.setAttribute('aria-pressed',c.getAttribute('data-p')===cur?'true':'false');});
+    var nd=days(filter).length;
+    $('seg-range').textContent=(filter==='all'?'Todos os criativos':NAMES[filter])+' · '+rLabel()+' · '+nd+' '+plural(nd,'dia','dias');
+  }
+  function renderSeg(){
+    syncSegControls();
+    renderKpis();renderLegend();renderVisits();renderCpv();renderTables();
+  }
+
+  document.querySelectorAll('.chip[data-f]').forEach(function(b){
+    b.addEventListener('click',function(){
+      filter=b.getAttribute('data-f');
+      document.querySelectorAll('.chip[data-f]').forEach(function(c){c.setAttribute('aria-pressed',c===b?'true':'false');});
+      hideTip();renderSeg();
+    });
+  });
+  document.querySelectorAll('.chip[data-p]').forEach(function(b){
+    b.addEventListener('click',function(){
+      var p=b.getAttribute('data-p'),n=DATES.length;
+      range={from:p==='all'?FIRST:DATES[Math.max(0,n-(+p))],to:LAST};
+      hideTip();renderSeg();
+    });
+  });
+  function onSegDate(){
+    var f=$('s-from').value||range.from,t=$('s-to').value||range.to;
+    if(f>t){var x=f;f=t;t=x;}
+    range={from:f<FIRST?FIRST:(f>LAST?LAST:f),to:t>LAST?LAST:(t<FIRST?FIRST:t)};
+    hideTip();renderSeg();
+  }
+  $('s-from').min=FIRST;$('s-from').max=LAST;$('s-to').min=FIRST;$('s-to').max=LAST;
+  $('s-from').addEventListener('change',onSegDate);
+  $('s-to').addEventListener('change',onSegDate);
+  bind($('ch-visits'),'.hits .col',dayTip);
+  bind($('ch-cpv'),'.hits .col',dayTip);
+
+  // ---------- aba Lives ----------
+  var LFIRST=LIVES[0].iso,LLAST=LIVES[LIVES.length-1].iso;
+  var lr={from:LFIRST,to:LLAST};
+  var CUR=[];
+  function liveTip(i){
+    var l=CUR[i];
+    if(!l)return '';
+    return '<b>Live '+l.d+'</b>'+row('Público',l.a)+row('Investimento',brl(l.s))+row('Alcance',int(l.r))+row('Visitas ao perfil',int(l.v))+row('Visualizações',int(l.t))+row('Custo/visualização',brl(l.s/l.t));
+  }
+  function liveBars(el,vals,fmt,kind){
+    var max=Math.max.apply(null,vals),min=Math.min.apply(null,vals);
+    var h='<div class="vb">';
+    vals.forEach(function(v,i){
+      var cls='';
+      if(kind==='cost'&&max!==min)cls=v===min?'good':'grey';
+      h+='<div class="it" data-i="'+i+'"><span class="val">'+fmt(v)+'</span><div class="bar '+cls+'" style="height:'+Math.max(1,v/max*82)+'%"></div></div>';
+    });
+    h+='</div><div class="vx">'+CUR.map(function(l){return '<span>'+l.d+'</span>';}).join('')+'</div>';
+    el.innerHTML=h;
+  }
+  function renderLives(){
+    CUR=LIVES.filter(function(l){return l.iso>=lr.from&&l.iso<=lr.to;});
+    $('l-from').value=lr.from;$('l-to').value=lr.to;
+    var key=lr.from===LFIRST&&lr.to===LLAST?'all':(lr.to<='2026-07-31'&&lr.from===LFIRST?'jul':(lr.from>='2026-08-01'&&lr.to===LLAST?'aug':''));
+    document.querySelectorAll('.chip[data-lp]').forEach(function(c){c.setAttribute('aria-pressed',c.getAttribute('data-lp')===key?'true':'false');});
+    var L=CUR;
+    $('lv-range').textContent=L.length+' '+plural(L.length,'live','lives')+' no período · '+dm(lr.from)+' a '+dm(lr.to);
+    var msg='<p class="empty">Nenhuma live neste período. Ajuste as datas.</p>';
+    if(!L.length){
+      ['lv-kpis','lv-cost','lv-reach','lv-visits','lv-reads'].forEach(function(id){$(id).innerHTML=id==='lv-kpis'||id==='lv-reads'?'':msg;});
+      $('tb-lives').innerHTML='';
+      return;
+    }
+    var T=L.reduce(function(o,l){o.s+=l.s;o.r+=l.r;o.i+=l.i;o.v+=l.v;o.t+=l.t;return o;},{s:0,r:0,i:0,v:0,t:0});
+    var cards=[
+      ['Investimento',brl(T.s),L.length>1?'média de '+brl(T.s/L.length)+' por live':'1 live',''],
+      ['Alcance (soma)',int(T.r),int(T.i)+' impressões',''],
+      ['Visitas ao perfil',int(T.v),brl(T.s/T.v)+' por visita',''],
+      ['Visualizações',int(T.t),'vídeo assistido por 15s ou mais',''],
+      ['Custo por visualização',brl(T.s/T.t),L.length>1?'média das '+L.length+' lives':'desta live','good']
+    ];
+    $('lv-kpis').innerHTML=cards.map(function(c){
+      return '<div class="kpi"><span class="k">'+c[0]+'</span><span class="v '+c[3]+'">'+c[1]+'</span><span class="s">'+c[2]+'</span></div>';
+    }).join('');
+
+    liveBars($('lv-cost'),L.map(function(l){return l.s/l.t;}),function(v){return nf(v,2);},'cost');
+    liveBars($('lv-reach'),L.map(function(l){return l.r;}),short,'');
+    liveBars($('lv-visits'),L.map(function(l){return l.v;}),int,'');
+
+    var costs=L.map(function(l){return l.s/l.t;});
+    var mn=Math.min.apply(null,costs),mx=Math.max.apply(null,costs);
+    var cheap=L.filter(function(l){return Math.abs(l.s/l.t-mn)<0.005;}).map(function(l){return l.d;});
+    var worst=L.reduce(function(a,l){return l.s/l.t>a.s/a.t?l:a;},L[0]);
+    var top=L.reduce(function(a,l){return l.r>a.r?l:a;},L[0]);
+    var vis=L.reduce(function(a,l){return l.s/l.v<a.s/a.v?l:a;},L[0]);
+    var reads=[
+      ['A live de '+top.d+' teve o maior alcance',
+       'Com '+brl(top.s)+', alcançou '+int(top.r)+' pessoas'+(L.length>1?', '+int(Math.round(top.r/T.r*100))+'% do alcance somado e '+int(Math.round(top.t/T.t*100))+'% das visualizações.':'.')],
+      [mx-mn<0.005?'Custo por visualização: '+brl(mn):'Menor custo por visualização: '+brl(mn),
+       mx-mn<0.005?'Live de '+L[0].d+'.':(cheap.length>1?'Nas lives de ':'Na live de ')+cheap.join(' e ')+'. O maior foi em '+worst.d+', com '+brl(worst.s/worst.t)+' por visualização.'],
+      ['Melhor custo por visita ao perfil: '+brl(vis.s/vis.v),
+       'Live de '+vis.d+', com '+int(vis.v)+' visitas ao perfil ('+vis.a.toLowerCase()+').']
+    ];
+    var cold=L.filter(function(l){return l.a==='Público frio';})[0];
+    if(cold)reads.push(['Público frio alcança, mas leva pouco ao perfil','Em '+cold.d+', '+brl(cold.s)+' alcançaram '+int(cold.r)+' pessoas, com '+int(cold.v)+' visitas ao perfil.']);
+    $('lv-reads').innerHTML=reads.map(function(c){return '<div class="read"><h3>'+c[0]+'</h3><p>'+c[1]+'</p></div>';}).join('');
+
+    var rows=L.map(function(l){
+      var c=l.s/l.t;
+      return '<tr><td>'+l.d+'</td><td style="text-align:left;font-family:var(--f-body)">'+l.a+'</td><td>'+brl(l.s)+'</td><td>'+int(l.r)+'</td><td>'+int(l.v)+'</td><td>'+brl(l.s/l.v)+'</td><td>'+int(l.t)+'</td><td class="'+(mx-mn>=0.005&&c===mn?'good':(mx-mn>=0.005&&c===mx?'warn':''))+'">'+brl(c)+'</td></tr>';
+    }).join('');
+    rows+='<tr class="tot"><td>Total</td><td></td><td>'+brl(T.s)+'</td><td>'+int(T.r)+'</td><td>'+int(T.v)+'</td><td>'+brl(T.s/T.v)+'</td><td>'+int(T.t)+'</td><td>'+brl(T.s/T.t)+'</td></tr>';
+    $('tb-lives').innerHTML='<thead><tr><th>Live</th><th style="text-align:left">Público</th><th>Investimento</th><th>Alcance</th><th>Visitas</th><th>Custo/visita</th><th>Visualizações</th><th>Custo/visualização</th></tr></thead><tbody>'+rows+'</tbody>';
+  }
+  ['lv-cost','lv-reach','lv-visits'].forEach(function(id){bind($(id),'.it',liveTip);});
+
+  $('l-from').min=LFIRST;$('l-from').max=LLAST;$('l-to').min=LFIRST;$('l-to').max=LLAST;
+  function onLiveDate(){
+    var f=$('l-from').value||lr.from,t=$('l-to').value||lr.to;
+    if(f>t){var x=f;f=t;t=x;}
+    lr={from:f,to:t};
+    hideTip();renderLives();
+  }
+  $('l-from').addEventListener('change',onLiveDate);
+  $('l-to').addEventListener('change',onLiveDate);
+  document.querySelectorAll('.chip[data-lp]').forEach(function(b){
+    b.addEventListener('click',function(){
+      var p=b.getAttribute('data-lp');
+      if(p==='all')lr={from:LFIRST,to:LLAST};
+      else if(p==='jul')lr={from:LFIRST,to:'2026-07-31'};
+      else lr={from:'2026-08-01',to:LLAST};
+      hideTip();renderLives();
+    });
+  });
+
+  // ---------- abas ----------
+  function setTab(name){
+    var isSeg=name!=='lives';
+    $('seg').hidden=!isSeg;$('lives').hidden=isSeg;
+    $('tab-seg').setAttribute('aria-selected',isSeg?'true':'false');
+    $('tab-lives').setAttribute('aria-selected',isSeg?'false':'true');
+    hideTip();
+    try{history.replaceState(null,'',isSeg?'#seguidores':'#lives');}catch(e){}
+  }
+  $('tab-seg').addEventListener('click',function(){setTab('seg');});
+  $('tab-lives').addEventListener('click',function(){setTab('lives');});
+
+  renderSeg();renderSegReads();renderLives();
+  setTab(location.hash==='#lives'?'lives':'seg');
+})();
+</script>
+
+</body>
+</html>
