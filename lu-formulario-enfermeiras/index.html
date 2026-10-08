@@ -209,7 +209,7 @@
   .temp-tag.quente { background: rgba(255,23,68,.18); color: #ff5c7a; }
   .temp-tag.frio { background: rgba(66,165,245,.18); color: var(--azul); }
 
-  .profile-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .profile-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
   .profile-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
   .profile-card h4 { margin: 0 0 12px; font-size: 12.5px; color: var(--apagado); text-transform: uppercase; letter-spacing: .5px; }
   .profile-item { margin-bottom: 10px; }
@@ -230,6 +230,9 @@
 
   .skeleton { color: var(--apagado); font-size: 13px; padding: 30px; text-align: center; }
 
+  @media (max-width: 1150px) {
+    .profile-grid { grid-template-columns: repeat(2, 1fr); }
+  }
   @media (max-width: 900px) {
     .kpi-grid { grid-template-columns: repeat(2, 1fr); }
     .temp-grid { grid-template-columns: 1fr; }
@@ -306,6 +309,14 @@
     { v: 'tenho_disponível_e_pronta_pra_decidir_agora', label: 'Pronta pra decidir agora' },
     { v: 'estou_me_organizando,_mas_é_questão_de_tempo_curto', label: 'Se organizando (curto prazo)' },
     { v: 'ainda_não_tenho_previsão', label: 'Ainda sem previsão' }
+  ];
+  // Pergunta nova do formulário reestruturado (aba "LD COMPLETO REVISÃO", a partir de 16/09/2026) —
+  // substituiu a antiga pergunta de "Prontidão para Investir" (P3), que não existe mais.
+  var P4_ORDER = [
+    { v: 'até_r$_3.000', label: 'Até R$ 3.000' },
+    { v: 'de_r$_3.001_a_r$_6.000', label: 'R$ 3.001 a R$ 6.000' },
+    { v: 'de_r$_6.001_a_r$_10.000', label: 'R$ 6.001 a R$ 10.000' },
+    { v: 'acima_de_r$_10.000', label: 'Acima de R$ 10.000' }
   ];
 
   // ============================= STATE =============================
@@ -433,8 +444,46 @@
       out.push({
         dataISO: dataISO, dateOnly: dateOnly, hhmm: hhmm, nome: nome,
         telefone: (r[2] || '').trim(),
-        p1: (r[3] || '').trim(), p2: (r[4] || '').trim(), p3: (r[5] || '').trim()
+        p1: (r[3] || '').trim(), p2: (r[4] || '').trim(), p3: (r[5] || '').trim(), p4: ''
       });
+    }
+    return out;
+  }
+  // Aba "LD COMPLETO REVISÃO" — o formulário foi reestruturado em 16/09/2026 (a aba "LD COMPLETO"
+  // parou de receber respostas nesse dia e esta passou a ser a fonte real dos leads). As 2 primeiras
+  // perguntas (tempo de atuação / situação de trabalho) continuam com os mesmos valores de P1/P2.
+  // A antiga pergunta "Prontidão para Investir" (P3) não existe mais nesse novo formulário — foi
+  // substituída pela pergunta "Qual o seu faturamento atual como enfermeira?" (P4), que não é
+  // equivalente — por isso leads desta aba ficam sem p3 (não entram no card "Prontidão para
+  // Investir") e passam a alimentar o novo card "Faturamento Atual" (p4) em vez disso.
+  function parseLeadRowsRevisao(csvRows) {
+    var out = [];
+    for (var i = 0; i < csvRows.length; i++) {
+      var r = csvRows[i];
+      if (!r || !r[0]) continue;
+      var nome = (r[1] || '').trim();
+      if (nome.toLowerCase().indexOf('<test lead') === 0) continue;
+      var dataISO = r[0];
+      var dateOnly = dataISO.slice(0, 10);
+      var hhmm = dataISO.length >= 16 ? dataISO.slice(11, 16) : '';
+      out.push({
+        dataISO: dataISO, dateOnly: dateOnly, hhmm: hhmm, nome: nome,
+        telefone: (r[2] || '').trim(),
+        p1: (r[3] || '').trim(), p2: (r[4] || '').trim(), p3: '', p4: (r[5] || '').trim()
+      });
+    }
+    return out;
+  }
+  // Junta as duas abas de leads num único array, removendo qualquer duplicata (mesma
+  // data/hora + telefone) para o caso de uma linha acabar presente nas duas abas.
+  function mergeLeadRows(a, b) {
+    var seen = {}, out = [];
+    var all = a.concat(b);
+    for (var i = 0; i < all.length; i++) {
+      var k = all[i].dataISO + '|' + all[i].telefone;
+      if (seen[k]) continue;
+      seen[k] = true;
+      out.push(all[i]);
     }
     return out;
   }
@@ -523,9 +572,9 @@
   function loadData() {
     setLive('loading', 'atualizando…');
     document.getElementById('btnRefresh').disabled = true;
-    return Promise.all([loadTable('Meta_Ads'), loadTable('LD COMPLETO')]).then(function (r) {
+    return Promise.all([loadTable('Meta_Ads'), loadTable('LD COMPLETO'), loadTable('LD COMPLETO REVISÃO')]).then(function (r) {
       var metaRows = parseMetaRows(r[0]);
-      var leadRows = parseLeadRows(r[1]);
+      var leadRows = mergeLeadRows(parseLeadRows(r[1]), parseLeadRowsRevisao(r[2]));
       if (metaRows.length === 0) throw new Error('planilha vazia');
       state.metaRows = metaRows;
       state.leadRows = leadRows;
@@ -686,14 +735,15 @@
       metricCard('TX Conversão (Cliques → Leads)', fmtPct(realTxconv), '#ffd600') +
       metricCard('CPL — Custo por Lead', fmtCPL(realLeads, realCpl), '#00c853') +
       '</div></div>';
-    html += '<div class="info-note">Investimento, CTR, CPM e o funil acima usam o leads real do formulário (' + realLeads + ' no período, aba de respostas) — a fonte confiável aqui, já que a campanha é 100% formulário instantâneo, sem captação orgânica. Os rankings de Criativos, Públicos e a comparação Quente/Frio abaixo usam a contagem de leads do próprio Meta Ads por anúncio (que pode diferir por alguns leads devido à forma como o Meta atribui a data do evento), pois é a única fonte com esse nível de detalhe.</div>';
+    html += '<div class="info-note">Investimento, CTR, CPM e o funil acima usam o leads real do formulário (' + realLeads + ' no período, somando as abas "LD COMPLETO" e "LD COMPLETO REVISÃO") — a fonte confiável aqui, já que a campanha é 100% formulário instantâneo, sem captação orgânica. Os rankings de Criativos, Públicos e a comparação Quente/Frio abaixo usam a contagem de leads do próprio Meta Ads por anúncio (que pode diferir por alguns leads devido à forma como o Meta atribui a data do evento), pois é a única fonte com esse nível de detalhe.</div>';
 
     html += '<div class="section-title">Perfil dos Leads (Formulário)</div>';
-    html += '<div class="info-note">' + leadsF.length + ' respostas completas registradas no formulário no período selecionado.</div>';
+    html += '<div class="info-note">' + leadsF.length + ' respostas completas registradas no formulário no período selecionado. O formulário foi reestruturado em 16/09/2026: "Tempo de Atuação" e "Situação Atual de Trabalho" continuam iguais nos dois formulários (contam todos os leads). "Prontidão para Investir" só existia no formulário antigo (leads até 15/09) e "Faturamento Atual" é a pergunta nova que a substituiu no formulário atual (leads a partir de 16/09) — por isso, juntos, esses dois cards somam o total de leads do período, mas cada um sozinho não.</div>';
     html += '<div class="profile-grid" style="margin-top:14px">' +
       profileCard('Tempo de Atuação', leadsF, 'p1', P1_ORDER) +
       profileCard('Situação Atual de Trabalho', leadsF, 'p2', P2_ORDER) +
-      profileCard('Prontidão para Investir', leadsF, 'p3', P3_ORDER) +
+      profileCard('Prontidão para Investir (form. antigo, até 15/09)', leadsF, 'p3', P3_ORDER) +
+      profileCard('Faturamento Atual (form. novo, a partir de 16/09)', leadsF, 'p4', P4_ORDER) +
       '</div>';
 
     var daily = buildDaily(meta);
