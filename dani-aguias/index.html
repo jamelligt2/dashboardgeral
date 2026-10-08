@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Dashboard Captação — Águias Londres e Lisboa</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%231a1a2e'/%3E%3Ctext x='32' y='41' font-family='Arial' font-weight='800' font-size='24' text-anchor='middle' fill='%23ff6b35'%3EJGT%3C/text%3E%3C/svg%3E">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0f0f1a;color:#fff;font-family:'Segoe UI',Arial,sans-serif;font-size:14px}
+.header{background:#16213e;border-bottom:2px solid #ff6b35;padding:16px 28px;display:flex;align-items:center;gap:18px}
+.logo-badge{background:linear-gradient(135deg,#ff6b35,#e04e1c);color:#fff;font-weight:800;font-size:20px;padding:10px 14px;border-radius:10px;letter-spacing:1px}
+.header-divider{width:1px;height:42px;background:#262640}
+.header-text h1{font-size:18px;letter-spacing:.5px}
+.header-text p{color:#777;font-size:12px;margin-top:3px}
+.prodbar{background:#12122a;padding:12px 28px;display:flex;gap:10px;border-bottom:1px solid #262640}
+.prodbtn{background:#1e1e35;border:1px solid #262640;color:#aaa;padding:9px 22px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;letter-spacing:.5px}
+.prodbtn.active{background:#ff6b35;color:#fff;border-color:#ff6b35}
+.tabs{background:#16213e;display:flex;padding:0 28px;overflow-x:auto}
+.tab{padding:14px 22px;cursor:pointer;color:#777;font-weight:700;font-size:13px;letter-spacing:.5px;border-bottom:3px solid transparent;white-space:nowrap}
+.tab.active{color:#ff6b35;border-bottom:3px solid #ff6b35}
+.content{padding:24px 28px;max-width:1500px;margin:0 auto}
+.pane{display:none}.pane.active{display:block}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:26px}
+.kpi{background:#1e1e35;border:1px solid #262640;border-radius:12px;padding:18px 20px;position:relative;overflow:hidden}
+.kpi .l{color:#777;font-size:11px;text-transform:uppercase;letter-spacing:1px}
+.kpi .v{font-size:28px;font-weight:800;margin-top:6px}
+.kpi .s{color:#777;font-size:12px;margin-top:4px}
+.kpi:after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:#ff6b35}
+h2.sec{font-size:15px;color:#ff6b35;letter-spacing:1px;text-transform:uppercase;margin:28px 0 14px}
+.tf{display:grid;grid-template-columns:1fr 1fr 0.8fr;gap:16px}
+.tcard{border-radius:12px;padding:20px;border:2px solid}
+.tcard.q{border-color:#ff1744;background:#2a0a0a}
+.tcard.f{border-color:#42a5f5;background:#061428}
+.tcard h3{font-size:14px;letter-spacing:1px;margin-bottom:2px}
+.tcard .sub{color:#999;font-size:12px;margin-bottom:14px}
+.tcard .row3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.tcard .row3 div span{display:block;color:#999;font-size:11px;text-transform:uppercase}
+.tcard .row3 div b{font-size:20px}
+.tcard table{width:100%;font-size:12px;border-collapse:collapse}
+.tcard td,.tcard th{padding:5px 6px;text-align:right;border-top:1px solid rgba(255,255,255,.08)}
+.tcard td:first-child,.tcard th:first-child{text-align:left}
+.tcard th{color:#999;font-weight:600}
+.cmp{background:#1e1e35;border:1px solid #262640;border-radius:12px;padding:20px}
+.cmp h3{font-size:14px;letter-spacing:1px;margin-bottom:14px}
+.bar{height:14px;border-radius:7px;background:#ff1744;overflow:hidden;margin:6px 0 4px}
+.bar i{display:block;height:100%;background:#42a5f5}
+.cmp p{color:#aaa;font-size:12px;margin-top:8px}
+.funnel{display:flex;gap:20px;align-items:stretch}
+.funnel-svg-wrap{flex:0 0 52%;max-width:52%;background:#1e1e35;border:1px solid #262640;border-radius:12px;padding:12px}
+.funnel-metrics-row{flex:1;display:flex;flex-direction:column;gap:12px}
+.mcard{flex:1;background:#1e1e35;border:1px solid #262640;border-radius:12px;padding:18px 22px;position:relative;display:flex;flex-direction:column;justify-content:center}
+.mcard .l{color:#777;font-size:11px;text-transform:uppercase;letter-spacing:1px}
+.mcard .v{font-size:34px;font-weight:800;margin-top:4px}
+.mcard .s{color:#777;font-size:12px;margin-top:2px}
+.mcard:after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;border-radius:0 0 12px 12px;background:var(--c)}
+.tw{overflow-x:auto;background:#1e1e35;border:1px solid #262640;border-radius:12px}
+table.t{width:100%;border-collapse:collapse;font-size:12.5px}
+table.t th{background:#16213e;color:#aaa;text-transform:uppercase;font-size:10.5px;letter-spacing:.6px;padding:10px 9px;text-align:right;white-space:nowrap;position:sticky;top:0}
+table.t td{padding:9px;text-align:right;border-top:1px solid #262640;white-space:nowrap}
+table.t th:first-child,table.t td:first-child{text-align:left}
+table.t td.nm,table.t th.nm{text-align:left;white-space:normal;min-width:220px}
+table.t tr.tot td{background:rgba(255,107,53,.15);color:#ff6b35;font-weight:800}
+table.t tr.sub td{background:#18182d;color:#bbb}
+table.t tr.grp td{background:#16213e;color:#ff6b35;font-weight:700;text-align:left}
+table.t tr:hover td{background:#23233f}
+.badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:10.5px;font-weight:800;letter-spacing:.5px}
+.b-esc{background:rgba(0,200,83,.18);color:#00c853}.b-man{background:rgba(255,107,53,.18);color:#ff6b35}.b-ava{background:rgba(255,214,0,.16);color:#ffd600}.b-pau{background:rgba(255,23,68,.18);color:#ff1744}
+.pos{color:#00c853}.neg{color:#ff1744}.warn{color:#ffd600}.mut{color:#777}
+.chartbox{background:#1e1e35;border:1px solid #262640;border-radius:12px;padding:16px;margin-top:16px;height:320px}
+.note{color:#777;font-size:11.5px;margin-top:10px}
+select{background:#1e1e35;color:#fff;border:1px solid #262640;border-radius:8px;padding:8px 12px;margin-bottom:12px}
+@media(max-width:900px){.kpis{grid-template-columns:1fr 1fr}.tf{grid-template-columns:1fr}.funnel{flex-direction:column}.funnel-svg-wrap{flex:none;max-width:100%}.content{padding:16px}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="logo-badge">JGT</div>
+  <div class="header-divider"></div>
+  <div class="header-text">
+    <h1 id="h1">DASHBOARD CAPTACAO — ÁGUIAS</h1>
+    <p id="hsub"></p>
+  </div>
+</div>
+<div class="prodbar">
+  <button class="prodbtn" data-p="lisboa">ÁGUIAS LISBOA</button>
+  <button class="prodbtn" data-p="londres">ÁGUIAS LONDRES</button>
+</div>
+<div class="tabs">
+  <div class="tab active" data-t="geral">VISÃO GERAL</div>
+  <div class="tab" data-t="criativos">CRIATIVOS</div>
+  <div class="tab" data-t="publicos">PÚBLICOS</div>
+  <div class="tab" data-t="diaria">ANÁLISE DIÁRIA</div>
+</div>
+<div class="content">
+  <div class="pane active" id="p-geral"></div>
+  <div class="pane" id="p-criativos"></div>
+  <div class="pane" id="p-publicos"></div>
+  <div class="pane" id="p-diaria"></div>
+</div>
+
+<script>
+// ===== DADOS (Meta Ads · conta 1149990590072002) =====
+const CAMPS={
+ LIS:'[JGT][LEAD][AGUIAS][LISBOA]',
+ LON:'[JGT][LEAD][AGUIAS][LONDRES]',
+ LONADV:'[JGT][LEAD][AGUIAS][LONDRES][ADV]',
+ LONC:'[JGT][LEAD][AGUIAS][LONDRES] — Contato',
+ LONADVC:'[JGT][LEAD][AGUIAS][LONDRES][ADV] — Contato'
+};
+const ADSETS={
+ '509128810466':{prod:'lisboa',name:'00 - Lisboa',camp:'LIS'},
+ '210208430466':{prod:'londres',name:'00 - Londres',camp:'LON'},
+ '214269990466':{prod:'londres',name:'00 - Londres (2)',camp:'LON'},
+ '214324010466':{prod:'londres',name:'00 - Adv + Londres',camp:'LONADV'},
+ '261351470466':{prod:'londres',name:'00 - Londres',camp:'LONC'},
+ '261351480466':{prod:'londres',name:'00 - Londres (2)',camp:'LONC'},
+ '261351440466':{prod:'londres',name:'00 - Adv + Londres',camp:'LONADVC'}
+};
+// k, nome, adset, invest, impr, cliques(link), PV, leads
+const ADS=[
+ ['L1','ADV01','509128810466',396.39,8539,749,504,34],
+ ['L2','ADV02','509128810466',159.98,4648,551,389,11],
+ ['L3','ADV03','509128810466',136.92,4077,261,182,5],
+ ['L4','ADV04','509128810466',25.24,660,76,54,1],
+ ['L5','ADV05','509128810466',57.88,983,97,71,4],
+ ['A','ade01','210208430466',38.5,587,7,5,2],
+ ['B','ade02','210208430466',79.46,1625,23,21,0],
+ ['C','ade03','214269990466',21.1,194,9,7,1],
+ ['D','ADV01','214269990466',98.4,1706,41,40,0],
+ ['E','ADV01','214324010466',157.73,3339,38,34,0],
+ ['F','ade02','261351470466',195.4,2086,49,44,2],
+ ['I','ade01','261351470466',132.45,1401,30,24,0],
+ ['G','ADV01','261351480466',59.86,613,11,8,0],
+ ['H','ade03','261351480466',262.51,2697,59,54,5],
+ ['J','ADV01','261351440466',319.07,5513,228,159,3],
+ ['K','ADE01','261351440466',87.75,742,25,19,3]
+].map(a=>({k:a[0],name:a[1],adset:a[2],spend:a[3],impr:a[4],link:a[5],lpv:a[6],lead:a[7],prod:ADSETS[a[2]].prod}));
+// data, ad, invest, impr, cliques, PV, leads
+const RAW=`
+09-04 A 2.35 17 0 0 0|09-04 B 3.77 39 0 0 0|09-04 C 3.36 19 2 2 0|09-04 D 2.34 20 1 1 0
+09-05 A 9.92 85 3 3 2|09-05 B 7.46 89 1 1 0|09-05 C 15.06 147 7 5 1|09-05 D 2.85 19 0 0 0|09-05 E 26.5 181 1 2 0
+09-06 A 13.1 113 1 0 0|09-06 B 21.86 272 4 3 0|09-06 C 2.64 27 0 0 0|09-06 D 32.36 356 6 5 0|09-06 E 43.73 527 9 7 0
+09-07 A 6.52 83 1 1 0|09-07 B 28.38 503 7 6 0|09-07 D 35 691 11 10 0|09-07 E 43.75 863 11 11 0
+09-08 A 6.61 289 2 1 0|09-08 B 17.99 722 11 11 0|09-08 C 0.04 1 0 0 0|09-08 D 25.85 620 23 24 0|09-08 E 43.75 1768 17 14 0
+09-09 J 24.2 1944 21 17 0|09-09 F 10.34 214 6 6 0|09-09 H 7.64 178 7 6 0|09-09 G 11.53 211 2 2 0|09-09 I 9.25 208 7 7 0
+09-10 J 6.28 387 5 6 0|09-10 F 9.63 179 3 2 0|09-10 H 2 38 0 0 0|09-10 G 6.53 70 2 1 0|09-10 I 2.34 21 1 1 0
+09-11 J 17.43 340 16 15 0|09-11 F 21.99 241 4 4 1|09-11 H 0.16 2 0 0 0|09-11 G 20.17 171 4 4 0|09-11 I 0.02 1 0 0 0
+09-12 J 40.68 982 25 21 0|09-12 F 25.72 260 7 6 0|09-12 H 5.71 66 1 1 0|09-12 G 21.63 161 3 1 0
+09-13 J 16.08 95 5 6 2|09-13 F 18.7 206 1 1 0|09-13 H 30.71 213 4 4 1
+09-14 J 38.26 265 27 20 1|09-14 F 26.14 253 11 9 0|09-14 H 26.89 224 6 4 1
+09-15 J 32.02 340 54 32 0|09-15 F 27.97 224 5 5 0|09-15 H 23.28 220 3 2 0
+09-16 J 25.12 246 5 3 0|09-16 F 20.8 228 4 3 1|09-16 H 19.61 170 2 2 0|09-16 I 1.08 20 0 0 0
+09-17 J 26.99 204 7 5 0|09-17 F 20.86 175 4 5 0|09-17 H 20.2 272 11 9 1
+09-18 J 31.38 138 5 3 0|09-18 F 13.25 106 4 3 0|09-18 H 13.62 127 1 0 0|09-18 I 2.28 19 0 0 0
+09-19 J 4.46 36 0 0 0|09-19 H 5.54 80 2 0 0|09-19 I 8.75 114 5 2 0
+09-20 J 27.31 317 22 8 0|09-20 H 29.56 291 4 4 0|09-20 I 27.9 249 5 4 0
+09-21 J 28.86 219 36 23 0|09-21 H 21.5 185 4 7 0|09-21 I 25.11 248 7 5 0|09-21 K 12.62 97 4 4 0
+09-22 H 18.03 198 3 2 0|09-22 I 17.88 188 2 2 0|09-22 K 31.57 237 12 11 3
+09-23 H 23.25 251 5 7 2|09-23 I 23.92 198 2 3 0|09-23 K 27.22 269 7 3 0
+09-24 H 14.81 182 6 6 0|09-24 I 13.92 135 1 0 0|09-24 K 16.34 139 2 1 0|09-24 L1 6.31 125 8 6 0|09-24 L2 6.33 347 16 13 2|09-24 L3 19.53 787 22 18 3|09-24 L4 4.17 139 7 5 0|09-24 L5 5.62 203 9 6 2
+09-25 L1 23.49 327 33 25 8|09-25 L2 20.35 516 92 66 2|09-25 L3 4.46 213 29 15 0|09-25 L4 9.54 233 35 25 0|09-25 L5 23.06 389 53 40 0
+09-26 L1 43.05 586 14 13 4|09-26 L2 15.72 459 36 26 1|09-26 L3 30.42 790 59 44 2|09-26 L4 7.27 117 17 12 1|09-26 L5 20.88 239 14 10 2
+09-27 L1 57.73 685 43 27 6|09-27 L2 47.82 1390 183 129 1|09-27 L3 58.21 1682 106 79 0|09-27 L4 2.98 125 12 9 0|09-27 L5 6.62 111 14 10 0
+09-28 L1 60.75 1180 47 44 5|09-28 L2 43.1 959 81 61 5|09-28 L3 20.92 492 40 22 0|09-28 L4 0.73 37 5 3 0|09-28 L5 1.2 38 5 4 0
+09-29 L1 80.34 2100 158 108 5|09-29 L2 20.27 829 125 81 0|09-29 L3 2.1 77 1 1 0|09-29 L4 0.12 1 0 0 0
+09-30 L1 84.1 2350 300 200 6|09-30 L2 6.23 140 17 13 0|09-30 L3 1.21 28 4 3 0|09-30 L5 0.5 3 2 1 0
+10-01 L1 40.62 1186 146 81 0|10-01 L2 0.16 8 1 0 0|10-01 L3 0.07 8 0 0 0|10-01 L4 0.43 8 0 0 0`;
+const ADMAP={};ADS.forEach(a=>ADMAP[a.k]=a);
+const DAILY=RAW.replace(/\n/g,'|').split('|').filter(Boolean).map(r=>{const p=r.trim().split(' ');
+ return {date:'2026-'+p[0],k:p[1],spend:+p[2],impr:+p[3],link:+p[4],lpv:+p[5],lead:+p[6],prod:ADMAP[p[1]].prod}});
+// Placements por conjunto: [invest, impr, cliques, PV, leads]
+const PL={
+ '509128810466':{Feed:[301.08,5277,218,194,18],Stories:[110.09,1014,70,66,16],Reels:[295.33,6808,181,159,16],Outros:[69.92,5808,1265,781,5]},
+ '210208430466':{Feed:[57.34,922,12,10,2],Stories:[28.01,327,6,5,0],Reels:[32.0,735,12,11,0],Outros:[0.61,228,0,0,0]},
+ '214269990466':{Feed:[63.44,1250,28,27,1],Stories:[18.82,163,6,7,0],Reels:[32.16,431,14,12,0],Outros:[5.08,56,2,1,0]},
+ '214324010466':{Feed:[78.82,1926,32,30,0],Stories:[31.32,235,2,1,0],Reels:[33.65,995,1,1,0],Outros:[13.94,183,3,2,0]},
+ '261351470466':{Feed:[198.62,2158,34,28,1],Stories:[68.32,617,12,13,0],Reels:[60.25,699,33,27,1],Outros:[0.66,13,0,0,0]},
+ '261351480466':{Feed:[196.7,2053,38,35,4],Stories:[62.93,494,17,14,0],Reels:[58.22,635,13,11,1],Outros:[4.51,128,2,2,0]},
+ '261351440466':{Feed:[208.03,1492,42,32,4],Stories:[48.49,259,11,7,0],Reels:[120.05,3727,56,48,2],Outros:[30.25,777,144,91,0]}
+};
+
+// ===== HELPERS =====
+const $=s=>document.querySelector(s);
+const nf=(n,d=0)=>Number(n).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const R=n=>'R$ '+nf(n,2);
+const P=n=>nf(n,2)+'%';
+const dv=(a,b)=>b>0?a/b:null;
+const fR=n=>n==null?'<span class="mut">—</span>':R(n);
+const fP=n=>n==null?'<span class="mut">—</span>':P(n);
+const dl=d=>d.slice(8,10)+'/'+d.slice(5,7);
+function sum(arr){const t={spend:0,impr:0,link:0,lpv:0,lead:0};arr.forEach(x=>{t.spend+=x.spend;t.impr+=x.impr;t.link+=x.link;t.lpv+=x.lpv;t.lead+=x.lead});return t}
+function mets(t){return {ctr:dv(t.link,t.impr)*100,cpc:dv(t.spend,t.link),cpm:dv(t.spend,t.impr)*1000,cpl:dv(t.spend,t.lead),tx_ent:dv(t.lpv,t.link)*100,tx_cad:dv(t.lpv>0?t.lead:0,t.lpv)*100}}
+function status(cpl,lead,spend,avg){
+ if(lead===0)return spend>=50?'PAUSAR':'AVALIAR';
+ if(cpl<=avg*0.8&&lead>=3)return 'ESCALAR';
+ if(cpl<=avg*1.2)return 'MANTER';
+ if(cpl<=avg*1.6)return 'AVALIAR';
+ return 'PAUSAR'}
+const bcls={ESCALAR:'b-esc',MANTER:'b-man',AVALIAR:'b-ava',PAUSAR:'b-pau'};
+const badge=s=>`<span class="badge ${bcls[s]}">${s}</span>`;
+const campName=k=>CAMPS[k];
+
+let prod='lisboa',charts=[];
+function data(){return {ads:ADS.filter(a=>a.prod===prod),daily:DAILY.filter(d=>d.prod===prod),adsets:Object.keys(ADSETS).filter(k=>ADSETS[k].prod===prod)}}
+
+// ===== ABA 1 =====
+function funnelSVG(t){
+ const m=mets(t);
+ const st=[
+  {lb:'IMPRESSÕES',v:t.impr,tw:1100,bw:900,c1:'#0d2a5c',c2:'#1d4f9e',fs:56},
+  {lb:'CLIQUES NO LINK',v:t.link,tw:860,bw:680,c1:'#1565a8',c2:'#42a5f5',fs:56},
+  {lb:'PAGE VIEWS',v:t.lpv,tw:640,bw:480,c1:'#8a3000',c2:'#ff6b35',fs:56},
+  {lb:'LEADS',v:t.lead,tw:440,bw:320,c1:'#00692b',c2:'#00c853',fs:68}];
+ const conn=[`CTR ${P(m.ctr)}`,`TX ENTRADA ${P(m.tx_ent)}`+(m.tx_ent<70?'  ⚠ abaixo de 70%':''),`TX CADASTRO ${P(m.tx_cad)}`];
+ let defs='',body='';const H=105,G=40,cx=600;
+ st.forEach((s,i)=>{
+  const y=i*(H+G);
+  defs+=`<linearGradient id="g${i}" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="${s.c1}"/><stop offset=".5" stop-color="${s.c2}"/><stop offset="1" stop-color="${s.c1}"/></linearGradient>`;
+  const pts=`${cx-s.tw/2},${y} ${cx+s.tw/2},${y} ${cx+s.bw/2},${y+H} ${cx-s.bw/2},${y+H}`;
+  body+=`<polygon points="${pts}" fill="url(#g${i})" ${i===3?'filter="url(#glow)"':''}/>`;
+  body+=`<text x="${cx}" y="${y+28}" text-anchor="middle" fill="rgba(255,255,255,.75)" font-size="17" font-weight="700" letter-spacing="3">${s.lb}</text>`;
+  body+=`<text x="${cx}" y="${y+H-20}" text-anchor="middle" fill="#fff" font-size="${s.fs}" font-weight="800">${nf(s.v)}</text>`;
+  if(i<3)body+=`<text x="${cx}" y="${y+H+27}" text-anchor="middle" fill="${i===1&&m.tx_ent<70?'#ffd600':'#ff6b35'}" font-size="21" font-weight="800">▼ ${conn[i]}</text>`});
+ return `<svg viewBox="0 0 1200 540" width="100%" preserveAspectRatio="xMidYMid meet"><defs>${defs}<filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>${body}</svg>`}
+
+function renderGeral(){
+ const {ads,daily,adsets}=data();const t=sum(ads);const m=mets(t);
+ const rowsAdset=adsets.map(k=>{const s=sum(ads.filter(a=>a.adset===k));const mm=mets(s);return `<tr><td>${ADSETS[k].name}<br><span class="mut">${campName(ADSETS[k].camp)}</span></td><td>${R(s.spend)}</td><td>${fR(mm.cpl)}</td><td>${s.lead}</td></tr>`}).join('');
+ const plAgg={Feed:[0,0,0,0,0],Stories:[0,0,0,0,0]};
+ const dias=daily.reduce((o,d)=>(o[d.date]=1,o),{});
+ const nd=Object.keys(dias).length;
+ let h=`<div class="kpis">
+  <div class="kpi"><div class="l">Investimento total</div><div class="v">${R(t.spend)}</div><div class="s">${nd} dias com veiculação</div></div>
+  <div class="kpi"><div class="l">CTR médio (link)</div><div class="v">${P(m.ctr)}</div><div class="s">${nf(t.link)} cliques no link</div></div>
+  <div class="kpi"><div class="l">CPM médio</div><div class="v">${R(m.cpm)}</div><div class="s">${nf(t.impr)} impressões</div></div>
+  <div class="kpi"><div class="l">CPL médio</div><div class="v">${fR(m.cpl)}</div><div class="s">${nf(t.lead)} leads</div></div>
+ </div>
+ <h2 class="sec">Público Quente vs Público Frio</h2>
+ <div class="tf">
+  <div class="tcard q"><h3 style="color:#ff1744">PÚBLICO QUENTE</h3><div class="sub">Engajamento / remarketing</div>
+   <div class="row3"><div><span>Investimento</span><b>${R(0)}</b></div><div><span>CPL</span><b>—</b></div><div><span>Leads</span><b>0</b></div></div>
+   <div class="sub" style="margin:0">Nenhum conjunto de público quente nestas campanhas: todos os conjuntos são abertos (${prod==='lisboa'?'Lisboa':'Londres'} / Advantage+).</div>
+  </div>
+  <div class="tcard f"><h3 style="color:#42a5f5">PÚBLICO FRIO</h3><div class="sub">Públicos abertos / Advantage+</div>
+   <div class="row3"><div><span>Investimento</span><b>${R(t.spend)}</b></div><div><span>CPL</span><b>${fR(m.cpl)}</b></div><div><span>Leads</span><b>${t.lead}</b></div></div>
+   <table><tr><th>Conjunto</th><th>Invest.</th><th>CPL</th><th>Leads</th></tr>${rowsAdset}</table>
+  </div>
+  <div class="cmp"><h3>COMPARATIVO</h3>
+   <div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:#ff1744">Quente 0%</span><span style="color:#42a5f5">Frio 100%</span></div>
+   <div class="bar"><i style="width:100%"></i></div>
+   <p>% de leads por temperatura: <b>0%</b> quente · <b>100%</b> frio.</p>
+   <p>Diferença de CPL quente × frio: <b>n/d</b> (sem investimento em público quente).</p>
+  </div>
+ </div>
+ <h2 class="sec">Funil de Conversão</h2>
+ <div class="funnel">
+  <div class="funnel-svg-wrap">${funnelSVG(t)}</div>
+  <div class="funnel-metrics-row">
+   <div class="mcard" style="--c:#ff6b35"><div class="l">CPC — Custo por clique no link</div><div class="v" style="color:#ff6b35">${fR(m.cpc)}</div><div class="s">${nf(t.link)} cliques</div></div>
+   <div class="mcard" style="--c:#ffd600"><div class="l">TX Entrada — cliques que chegam à página</div><div class="v" style="color:#ffd600">${fP(m.tx_ent)}</div><div class="s">${nf(t.lpv)} page views${m.tx_ent<70?' · abaixo de 70%':''}</div></div>
+   <div class="mcard" style="--c:#00c853"><div class="l">TX Cadastro — page views que viram lead</div><div class="v" style="color:#00c853">${fP(m.tx_cad)}</div><div class="s">${nf(t.lead)} leads</div></div>
+  </div>
+ </div>
+ <h2 class="sec">Evolução Diária</h2>
+ <div class="tw"><table class="t"><thead><tr><th>Dia</th><th>Investimento</th><th>Impressões</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th><th>TX Cadastro</th></tr></thead><tbody>`;
+ const dates=Object.keys(dias).sort();
+ dates.forEach(d=>{const s=sum(daily.filter(x=>x.date===d));const mm=mets(s);
+  h+=`<tr><td>${dl(d)}</td><td>${R(s.spend)}</td><td>${nf(s.impr)}</td><td>${nf(s.link)}</td><td>${nf(s.lpv)}</td><td>${s.lead}</td><td>${fP(mm.ctr)}</td><td>${fR(mm.cpc)}</td><td>${fR(mm.cpl)}</td><td>${fP(s.lpv>0?mm.tx_cad:null)}</td></tr>`});
+ h+=`<tr class="tot"><td>TOTAL</td><td>${R(t.spend)}</td><td>${nf(t.impr)}</td><td>${nf(t.link)}</td><td>${nf(t.lpv)}</td><td>${t.lead}</td><td>${P(m.ctr)}</td><td>${R(m.cpc)}</td><td>${fR(m.cpl)}</td><td>${P(m.tx_cad)}</td></tr></tbody></table></div>
+ <div class="chartbox"><canvas id="cd"></canvas></div>
+ <p class="note">Cliques = cliques no link. Leads = evento Lead do pixel. Dados Meta Ads, conta 1149990590072002.</p>`;
+ $('#p-geral').innerHTML=h;
+ const ld=dates.map(d=>sum(daily.filter(x=>x.date===d)));
+ charts.push(new Chart($('#cd'),{data:{labels:dates.map(dl),datasets:[
+  {type:'bar',label:'Leads',data:ld.map(x=>x.lead),backgroundColor:'#00c853',yAxisID:'y',order:2},
+  {type:'line',label:'CPL (R$)',data:ld.map(x=>x.lead>0?+(x.spend/x.lead).toFixed(2):null),borderColor:'#ff6b35',backgroundColor:'#ff6b35',yAxisID:'y1',order:1,spanGaps:true,tension:.25}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#ccc'}}},scales:{x:{ticks:{color:'#777'},grid:{color:'#262640'}},y:{ticks:{color:'#00c853'},grid:{color:'#262640'},title:{display:true,text:'Leads',color:'#777'}},y1:{position:'right',ticks:{color:'#ff6b35'},grid:{display:false},title:{display:true,text:'CPL',color:'#777'}}}}}))
+}
+
+// ===== ABA 2 =====
+function renderCriativos(){
+ const {ads}=data();const t=sum(ads);const avg=mets(t).cpl;
+ const rows=ads.map(a=>({a,m:mets(a),st:null}));
+ rows.sort((x,y)=>{if(x.a.lead===0&&y.a.lead===0)return y.a.spend-x.a.spend;if(x.a.lead===0)return 1;if(y.a.lead===0)return -1;return x.m.cpl-y.m.cpl});
+ let h=`<div class="tw"><table class="t"><thead><tr><th>#</th><th class="nm">Criativo</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th><th>TX Entrada</th><th>TX Cadastro</th><th>Hook Rate</th><th>Link</th><th>Status</th></tr></thead><tbody>`;
+ rows.forEach((r,i)=>{const a=r.a,m=r.m;const s=status(m.cpl,a.lead,a.spend,avg);
+  h+=`<tr><td>${i+1}</td><td class="nm"><b>${a.name}</b><br><span class="mut">${campName(ADSETS[a.adset].camp)} · ${ADSETS[a.adset].name}</span></td><td>${R(a.spend)}</td><td>${nf(a.impr)}</td><td>${nf(a.link)}</td><td>${nf(a.lpv)}</td><td>${a.lead}</td><td>${fP(m.ctr)}</td><td>${fR(m.cpc)}</td><td>${fR(m.cpl)}</td><td class="${m.tx_ent<70?'warn':''}">${fP(m.tx_ent)}</td><td>${a.lpv>0?P(m.tx_cad):'<span class="mut">—</span>'}</td><td class="mut">—</td><td class="mut">—</td><td>${badge(s)}</td></tr>`});
+ const m=mets(t);
+ h+=`<tr class="tot"><td></td><td class="nm">TOTAL</td><td>${R(t.spend)}</td><td>${nf(t.impr)}</td><td>${nf(t.link)}</td><td>${nf(t.lpv)}</td><td>${t.lead}</td><td>${P(m.ctr)}</td><td>${R(m.cpc)}</td><td>${fR(m.cpl)}</td><td>${P(m.tx_ent)}</td><td>${P(m.tx_cad)}</td><td>—</td><td>—</td><td></td></tr></tbody></table></div>
+ <p class="note">Status relativo ao CPL médio do produto (${fR(avg).replace(/<[^>]+>/g,'')}): ESCALAR ≤ 80% com 3+ leads · MANTER ≤ 120% · AVALIAR ≤ 160% ou sem leads com menos de R$ 50 · PAUSAR acima disso ou sem leads com R$ 50+. Hook Rate e link do anúncio não vieram da API.</p>`;
+ $('#p-criativos').innerHTML=h}
+
+// ===== ABA 3 =====
+function renderPublicos(){
+ const {ads,adsets}=data();const t=sum(ads);const avg=mets(t).cpl;
+ const rows=adsets.map(k=>{const s=sum(ads.filter(a=>a.adset===k));return {k,s,m:mets(s)}});
+ rows.sort((x,y)=>{if(x.s.lead===0&&y.s.lead===0)return y.s.spend-x.s.spend;if(x.s.lead===0)return 1;if(y.s.lead===0)return -1;return x.m.cpl-y.m.cpl});
+ let h=`<div class="tw"><table class="t"><thead><tr><th>#</th><th class="nm">Conjunto</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPM</th><th>CPL</th><th>TX Entrada</th><th>TX Cadastro</th><th>Status</th></tr></thead><tbody>`;
+ rows.forEach((r,i)=>{const s=r.s,m=r.m;
+  h+=`<tr><td>${i+1}</td><td class="nm"><b>${ADSETS[r.k].name}</b><br><span class="mut">${campName(ADSETS[r.k].camp)}</span></td><td>${R(s.spend)}</td><td>${nf(s.impr)}</td><td>${nf(s.link)}</td><td>${nf(s.lpv)}</td><td>${s.lead}</td><td>${fP(m.ctr)}</td><td>${fR(m.cpc)}</td><td>${fR(m.cpm)}</td><td>${fR(m.cpl)}</td><td class="${m.tx_ent<70?'warn':''}">${fP(m.tx_ent)}</td><td>${s.lpv>0?P(m.tx_cad):'<span class="mut">—</span>'}</td><td>${badge(status(m.cpl,s.lead,s.spend,avg))}</td></tr>`});
+ h+=`</tbody></table></div>
+ <h2 class="sec">Feed vs Stories por conjunto</h2>
+ <div class="tw"><table class="t"><thead><tr><th class="nm">Conjunto / Posicionamento</th><th>Invest.</th><th>% Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CPL</th><th>Status</th></tr></thead><tbody>`;
+ const pos=['Feed','Stories','Reels','Outros'];
+ const tot={Feed:[0,0,0,0,0],Stories:[0,0,0,0,0],Reels:[0,0,0,0,0],Outros:[0,0,0,0,0]};
+ const line=(lb,v,sp,cls)=>{const cpl=dv(v[0],v[4]);return `<tr class="${cls||''}"><td class="nm">${lb}</td><td>${R(v[0])}</td><td>${sp?P(v[0]/sp*100):''}</td><td>${nf(v[1])}</td><td>${nf(v[2])}</td><td>${nf(v[3])}</td><td>${v[4]}</td><td>${fR(cpl)}</td><td>${cls==='tot'?'':badge(status(cpl,v[4],v[0],avg))}</td></tr>`};
+ adsets.forEach(k=>{
+  const sp=pos.reduce((a,p)=>a+PL[k][p][0],0);
+  h+=`<tr class="grp"><td colspan="9">${ADSETS[k].name} — ${campName(ADSETS[k].camp)}</td></tr>`;
+  pos.forEach(p=>{h+=line(p,PL[k][p],sp);PL[k][p].forEach((x,i)=>tot[p][i]+=x)})});
+ const spT=pos.reduce((a,p)=>a+tot[p][0],0);
+ h+=`<tr class="grp"><td colspan="9">TOTAL ${prod==='lisboa'?'LISBOA':'LONDRES'}</td></tr>`;
+ pos.forEach(p=>h+=line(p,tot[p],spT,'tot'));
+ h+=`</tbody></table></div><p class="note">Feed = Facebook/Instagram Feed, perfil, Threads, Marketplace · Stories = Facebook e Instagram Stories · Reels = Reels e overlay · Outros = Audience Network, Instream, notificações.</p>`;
+ $('#p-publicos').innerHTML=h}
+
+// ===== ABA 4 =====
+function renderDiaria(){
+ const {daily}=data();
+ const dates=[...new Set(daily.map(d=>d.date))].sort();
+ let h=`<h2 class="sec" style="margin-top:0">Comparativo dia a dia</h2><div class="tw"><table class="t"><thead><tr><th>Dia</th><th>Invest.</th><th>Δ Invest.</th><th>Leads</th><th>Δ Leads</th><th>CPL</th><th>Δ CPL</th><th>CTR</th><th>CPC</th><th>TX Entrada</th><th>TX Cadastro</th></tr></thead><tbody>`;
+ let prev=null;
+ const dlt=(a,b,inv)=>{if(b==null||a==null||b===0)return '<span class="mut">—</span>';const p=(a-b)/b*100;const good=inv?p<0:p>0;return `<span class="${Math.abs(p)<0.5?'mut':good?'pos':'neg'}">${p>0?'+':''}${nf(p,1)}%</span>`};
+ dates.forEach(d=>{const s=sum(daily.filter(x=>x.date===d));const m=mets(s);
+  h+=`<tr><td>${dl(d)}</td><td>${R(s.spend)}</td><td>${prev?dlt(s.spend,prev.s.spend,false):'<span class="mut">—</span>'}</td><td>${s.lead}</td><td>${prev?dlt(s.lead,prev.s.lead,false):'<span class="mut">—</span>'}</td><td>${fR(m.cpl)}</td><td>${prev?dlt(m.cpl,prev.m.cpl,true):'<span class="mut">—</span>'}</td><td>${fP(m.ctr)}</td><td>${fR(m.cpc)}</td><td class="${m.tx_ent<70?'warn':''}">${fP(m.tx_ent)}</td><td>${s.lpv>0?P(m.tx_cad):'<span class="mut">—</span>'}</td></tr>`;prev={s,m}});
+ h+=`</tbody></table></div>
+ <h2 class="sec">Detalhe por dia e criativo</h2>
+ <select id="fd"><option value="">Todos os dias</option>${[...dates].reverse().map(d=>`<option value="${d}">${dl(d)}</option>`).join('')}</select>
+ <div class="tw"><table class="t"><thead><tr><th>Dia</th><th class="nm">Conjunto / Criativo</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th><th>TX Cadastro</th></tr></thead><tbody id="dbody"></tbody></table></div>`;
+ $('#p-diaria').innerHTML=h;
+ const draw=()=>{const f=$('#fd').value;let b='';
+  [...daily].sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:b.spend-a.spend).filter(r=>!f||r.date===f).forEach(r=>{const m=mets(r);const a=ADMAP[r.k];
+   b+=`<tr><td>${dl(r.date)}</td><td class="nm"><b>${a.name}</b> <span class="mut">· ${ADSETS[a.adset].name} · ${campName(ADSETS[a.adset].camp)}</span></td><td>${R(r.spend)}</td><td>${nf(r.impr)}</td><td>${nf(r.link)}</td><td>${nf(r.lpv)}</td><td>${r.lead}</td><td>${fP(m.ctr)}</td><td>${fR(m.cpc)}</td><td>${fR(m.cpl)}</td><td>${r.lpv>0?P(m.tx_cad):'<span class="mut">—</span>'}</td></tr>`});
+  $('#dbody').innerHTML=b};
+ $('#fd').onchange=draw;draw()}
+
+// ===== CONTROLE =====
+function render(){
+ charts.forEach(c=>c.destroy());charts=[];
+ const {daily}=data();const ds=[...new Set(daily.map(d=>d.date))].sort();
+ const nome=prod==='lisboa'?'LISBOA':'LONDRES';
+ $('#h1').textContent='DASHBOARD CAPTACAO — ÁGUIAS '+nome;
+ $('#hsub').textContent=(prod==='lisboa'?'[JGT][LEAD][AGUIAS][LISBOA]':'[JGT][LEAD][AGUIAS][LONDRES] · 4 campanhas')+' · '+dl(ds[0])+' a '+dl(ds[ds.length-1])+'/2026';
+ document.querySelectorAll('.prodbtn').forEach(b=>b.classList.toggle('active',b.dataset.p===prod));
+ renderGeral();renderCriativos();renderPublicos();renderDiaria()}
+document.querySelectorAll('.prodbtn').forEach(b=>b.onclick=()=>{prod=b.dataset.p;render()});
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+ document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===t));
+ document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active',p.id==='p-'+t.dataset.t))});
+render();
+</script>
+</body>
+</html>
