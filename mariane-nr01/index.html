@@ -514,10 +514,6 @@ function rTrafego(){
   const noPix = T.clicks>0 && T.pv===0 && T.ck===0;
   const semOrigem = A.sales.filter(s=>!s.origem).length;
   let h='';
-  h+=`<div class="ob-info">Tráfego pago = vendas com origem <b>meta_ads</b> (parâmetro sck/src do link de compra). Qualquer outra origem, ou sem origem, é orgânica. Faturamento vem do webhook da Hotmart; investimento, cliques e impressões vêm do Gerenciador.</div>`;
-  if(semOrigem) h+=`<div class="warn-info">⚠️ ${semOrigem} venda(s) no período sem origem registrada — contadas como orgânicas. Para atribuir ao tráfego, o link de compra precisa levar <b>sck=meta_ads</b>.</div>`;
-  if(noPix) h+=`<div class="warn-info">⚠️ O Gerenciador não registra Visualização de página nem Checkout no período (tudo zerado). O funil abaixo mostra só cliques e compras. Confira o pixel e o mapeamento no Stract.</div>`;
-  if(T.pvEst>0) h+=`<div class="ob-info">ℹ️ <b>${intf(T.pvEst,true)}</b> de ${intf(T.pv,true)} pessoas que chegaram na página foram contadas pelo <b>Microsoft Clarity</b> (sessões vindas desta campanha), nos dias em que o pixel da Meta ainda não registrava visualização de página. A partir do dia em que o pixel passa a registrar, o dashboard usa o número da Meta.</div>`;
   h+=`<div class="kpi-grid">`+
     kpi('Investimento',brl(K.inv),'orange')+
     kpi('Fat. Tráfego',brl(K.fatT),'green')+
@@ -536,7 +532,7 @@ function rTrafego(){
   `</div>`;
 
   // Funil: Cliques → PV → Checkouts → Compras (tráfego)
-  const steps=[['Cliques',T.clicks],['Chegaram na página'+(T.pvEst>0?' (inclui Clarity)':''),T.pv],['Checkouts',T.ck],['Compras (tráfego)',K.nT]];
+  const steps=[['Cliques',T.clicks],['Chegaram na página',T.pv],['Checkouts',T.ck],['Compras (tráfego)',K.nT]];
   const base=T.clicks||1;
   h+=`<div class="sec-title">Funil</div><div class="funil-section"><div>`+
     steps.map(([l,v])=>`<div class="funil-bar-wrap"><div class="funil-label"><span>${l}</span><span>${intf(v,true)}</span></div><div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${Math.min(100,v/base*100)}%"></div></div></div>`).join('')+
@@ -636,13 +632,12 @@ function groupTable(arr,label){
   const body=arr.map(g=>`<tr><td>${esc(g.name)}</td><td>${g.ativo?'<span class="green">Ativo</span>':'<span style="color:rgba(255,255,255,.4)">Inativo</span>'}</td><td>${brl(g.inv)}</td><td>${intf(g.imp)}</td><td>${intf(g.clicks)}</td><td>${pct(g.ctr)}</td><td>${brl(g.cpc)}</td><td>${brl(g.cpm)}</td><td>${intf(g.vendas)}</td><td>${brl(g.fat)}</td><td class="${roasCls(g.roas)}">${roasf(g.roas)}</td></tr>`).join('');
   return tableWrap([label,'Status','Invest.','Impr.','Cliques','CTR','CPC','CPM','Vendas','Fat.','ROAS'],body);
 }
-const semNote=n=>n?`<div class="ob-info">${n} venda(s) de tráfego sem criativo/público identificado (a origem da compra não traz essa informação).</div>`:'';
 
 function rCriativos(){
   const A=aggregate(FROM,TO);
   const {arr,sem}=buildGroups(A,'ad',matchCri,ACTIVE_AD);
   const list=sortGroups(applyFilter(arr,criFilter),criSort);
-  let h=`<div class="ob-info">Ativo = teve investimento nos últimos ${CONFIG.ATIVO_DIAS} dias de dados (a planilha não traz o status do anúncio).</div>`+semNote(sem)+filterBar('cri',criFilter,criSort);
+  let h=filterBar('cri',criFilter,criSort);
   if(!list.length){ $('tab-criativos').innerHTML=h+`<div class="empty">Nenhum criativo no período/filtro.</div>`; return; }
   h+=`<div class="cri-grid">`+list.map(g=>`<div class="cri-card ${g.ativo?'ativo':''}">
     <div class="cri-card-header"><div class="cri-name">${esc(g.name)}</div><span class="cri-badge ${g.ativo?'ativo':'inativo'}">${g.ativo?'Ativo':'Inativo'}</span></div>
@@ -663,7 +658,7 @@ function rPublicos(){
   const A=aggregate(FROM,TO);
   const {arr,sem}=buildGroups(A,'adset',matchPub,ACTIVE_ADSET);
   const list=sortGroups(applyFilter(arr,pubFilter),pubSort);
-  let h=`<div class="ob-info">Ativo = teve investimento nos últimos ${CONFIG.ATIVO_DIAS} dias de dados (a planilha não traz o status do conjunto).</div>`+semNote(sem)+filterBar('pub',pubFilter,pubSort);
+  let h=filterBar('pub',pubFilter,pubSort);
   if(!list.length){ $('tab-publicos').innerHTML=h+`<div class="empty">Nenhum público no período/filtro.</div>`; return; }
   h+=`<div class="pub-grid">`+list.map(g=>`<div class="pub-card ${g.ativo?'ativo':''}">
     <div class="pub-card-header"><div class="pub-name">${esc(g.name)}</div><span class="cri-badge ${g.ativo?'ativo':'inativo'}">${g.ativo?'Ativo':'Inativo'}</span></div>
