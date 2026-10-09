@@ -173,6 +173,11 @@ const CONFIG = {
   SHEET_ID:         '1CuScgfKW3_Fn-62_Eq_3zkjogNR0FXMacftVVwQ0sOI',
   GERENCIADOR_SHEET:'Gerenciador Playbook',
   WEBHOOK_SHEET:    'Webhook Playbook',
+  // Clarity: sessões que chegaram na LP vindas da campanha (filtro URL contém o ID da campanha).
+  // Usado SÓ nos dias em que o pixel da Meta não registrou Visualização de página (valor zero).
+  // Se existir a aba abaixo na planilha (colunas: Data, Sessões), ela vale mais que o fallback.
+  CLARITY_SHEET:    'Clarity Playbook',
+  CLARITY_FALLBACK: {'2026-10-02':4,'2026-10-03':6,'2026-10-04':7,'2026-10-05':0,'2026-10-06':1,'2026-10-07':5,'2026-10-08':5,'2026-10-09':5},
   DATA_MINIMA:      '2026-09-15',
 
   // ── Produto principal (Hotmart) ───────────────────────────────────
@@ -230,6 +235,26 @@ const CONFIG = {
 const SHEET_ID = CONFIG.SHEET_ID;
 const GERENCIADOR_SHEET = CONFIG.GERENCIADOR_SHEET;
 const WEBHOOK_SHEET = CONFIG.WEBHOOK_SHEET;
+let CLARITY=new Map();
+function loadClarityFallback(){ CLARITY=new Map(Object.entries(CONFIG.CLARITY_FALLBACK||{})); }
+function processClarity(rows){
+  if(rows.length<2) return;
+  const H=rows[0].map(norm);
+  const di=H.findIndex(h=>h==='data'||h==='date'||h==='dia');
+  const si=H.findIndex(h=>h==='sessoes'||h==='sessões'||h==='sessions'||h==='sessao');
+  if(di<0||si<0) return;
+  const m=new Map();
+  for(let i=1;i<rows.length;i++){ const d=parseDate(rows[i][di]); if(!d) continue; m.set(d,num(rows[i][si])); }
+  if(m.size) CLARITY=m;
+}
+// Visualização de página por dia: Meta; se zero, usa Clarity (estimado)
+function pvFor(rows){
+  const byDay=new Map();
+  rows.forEach(r=>byDay.set(r.date,(byDay.get(r.date)||0)+r.pv));
+  let pv=0, est=0;
+  byDay.forEach((v,d)=>{ if(v>0) pv+=v; else { const c=CLARITY.get(d)||0; if(c>0){ pv+=c; est+=c; } } });
+  return {pv,est};
+}
 const DATA_MINIMA = CONFIG.DATA_MINIMA;
 
 document.addEventListener('DOMContentLoaded', ()=>{
@@ -423,8 +448,9 @@ const isTrafego = txt => norm(txt).replace(/[\s_\-|.]/g,'').includes('metaads');
 function aggregate(from,to){
   const rows=GROWS.filter(r=>inR(r.date,from,to));
   const sales=SALES.filter(s=>inR(s.data,from,to));
-  const T={inv:0,imp:0,clicks:0,pv:0,ck:0,reach:0};
-  rows.forEach(r=>{ T.inv+=r.inv; T.imp+=r.imp; T.clicks+=r.clicks; T.pv+=r.pv; T.ck+=r.ck; T.reach+=r.reach; });
+  const T={inv:0,imp:0,clicks:0,pv:0,pvEst:0,ck:0,reach:0};
+  rows.forEach(r=>{ T.inv+=r.inv; T.imp+=r.imp; T.clicks+=r.clicks; T.ck+=r.ck; T.reach+=r.reach; });
+  { const p=pvFor(rows); T.pv=p.pv; T.pvEst=p.est; }
   return {rows,sales,T,K:kpis(T,sales)};
 }
 function kpis(T,sales){
@@ -443,9 +469,10 @@ function kpis(T,sales){
 }
 function groupPeriod(A,keyFn){
   const m=new Map();
-  const get=k=>{ if(!m.has(k)) m.set(k,{key:k,T:{inv:0,imp:0,clicks:0,pv:0,ck:0,reach:0},sales:[]}); return m.get(k); };
-  A.rows.forEach(r=>{ const g=get(keyFn(r.date)); g.T.inv+=r.inv; g.T.imp+=r.imp; g.T.clicks+=r.clicks; g.T.pv+=r.pv; g.T.ck+=r.ck; });
+  const get=k=>{ if(!m.has(k)) m.set(k,{key:k,T:{inv:0,imp:0,clicks:0,pv:0,pvEst:0,ck:0,reach:0},sales:[],rows:[]}); return m.get(k); };
+  A.rows.forEach(r=>{ const g=get(keyFn(r.date)); g.T.inv+=r.inv; g.T.imp+=r.imp; g.T.clicks+=r.clicks; g.T.ck+=r.ck; g.rows.push(r); });
   A.sales.forEach(s=>{ get(keyFn(s.data)).sales.push(s); });
+  m.forEach(g=>{ const p=pvFor(g.rows); g.T.pv=p.pv; g.T.pvEst=p.est; });
   return [...m.values()].sort((a,b)=>a.key<b.key?-1:1).map(g=>({...g,K:kpis(g.T,g.sales)}));
 }
 
@@ -490,6 +517,7 @@ function rTrafego(){
   h+=`<div class="ob-info">Tráfego pago = vendas com origem <b>meta_ads</b> (parâmetro sck/src do link de compra). Qualquer outra origem, ou sem origem, é orgânica. Faturamento vem do webhook da Hotmart; investimento, cliques e impressões vêm do Gerenciador.</div>`;
   if(semOrigem) h+=`<div class="warn-info">⚠️ ${semOrigem} venda(s) no período sem origem registrada — contadas como orgânicas. Para atribuir ao tráfego, o link de compra precisa levar <b>sck=meta_ads</b>.</div>`;
   if(noPix) h+=`<div class="warn-info">⚠️ O Gerenciador não registra Visualização de página nem Checkout no período (tudo zerado). O funil abaixo mostra só cliques e compras. Confira o pixel e o mapeamento no Stract.</div>`;
+  if(T.pvEst>0) h+=`<div class="ob-info">ℹ️ <b>${intf(T.pvEst,true)}</b> de ${intf(T.pv,true)} pessoas que chegaram na página foram contadas pelo <b>Microsoft Clarity</b> (sessões vindas desta campanha), nos dias em que o pixel da Meta ainda não registrava visualização de página. A partir do dia em que o pixel passa a registrar, o dashboard usa o número da Meta.</div>`;
   h+=`<div class="kpi-grid">`+
     kpi('Investimento',brl(K.inv),'orange')+
     kpi('Fat. Tráfego',brl(K.fatT),'green')+
@@ -508,12 +536,12 @@ function rTrafego(){
   `</div>`;
 
   // Funil: Cliques → PV → Checkouts → Compras (tráfego)
-  const steps=[['Cliques',T.clicks],['Visualização de página',T.pv],['Checkouts',T.ck],['Compras (tráfego)',K.nT]];
+  const steps=[['Cliques',T.clicks],['Chegaram na página'+(T.pvEst>0?' (inclui Clarity)':''),T.pv],['Checkouts',T.ck],['Compras (tráfego)',K.nT]];
   const base=T.clicks||1;
   h+=`<div class="sec-title">Funil</div><div class="funil-section"><div>`+
     steps.map(([l,v])=>`<div class="funil-bar-wrap"><div class="funil-label"><span>${l}</span><span>${intf(v,true)}</span></div><div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${Math.min(100,v/base*100)}%"></div></div></div>`).join('')+
     `</div><div class="taxa-grid">`+
-    [['Clique → Visualização',div(T.pv,T.clicks)],['Visualização → Checkout',div(T.ck,T.pv)],['Checkout → Compra',div(K.nT,T.ck)],['Clique → Compra',div(K.nT,T.clicks)]]
+    [['Clique → Chegou na página',div(T.pv,T.clicks)],['Página → Checkout',div(T.ck,T.pv)],['Checkout → Compra',div(K.nT,T.ck)],['Clique → Compra',div(K.nT,T.clicks)]]
       .map(([l,v])=>`<div class="taxa-item"><span>${l}</span><span class="taxa-val">${pct(v)}</span></div>`).join('')+
     `</div></div>`;
 
@@ -717,6 +745,8 @@ async function loadData(){
     const [gCsv,wCsv]=await Promise.all([fetchSheetCSV(GERENCIADOR_SHEET),fetchSheetCSV(WEBHOOK_SHEET)]);
     $('loading-msg').textContent='Processando dados...';
     GROWS=processGerenciador(parseCSV(gCsv));
+    loadClarityFallback();
+    try{ processClarity(parseCSV(await fetchSheetCSV(CONFIG.CLARITY_SHEET))); }catch(e){ console.warn('Clarity (aba opcional):',e.message); }
     const res=processSales(parseCSV(wCsv));
     SALES=res.sales.sort((a,b)=>b.data.localeCompare(a.data)); DIAG=res.diag;
     computeActive();
