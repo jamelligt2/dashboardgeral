@@ -369,7 +369,10 @@ function processSalesWebhook(rows){
   const lines=[];
   for(let i=1;i<rows.length;i++){
     const r=rows[i]; if(!r.some(x=>String(x).trim())) continue;
-    const shifted=!!String(r[I.cre]||'').trim()&&!isDate(r[I.cre]);
+    // Pix: colunas deslocadas em +1. O gviz apaga o texto de "sale_type" (coluna de data), então detectamos pelo
+    // evento do webhook (ex.: "order_approved"), que fica em ev (normal) ou ev+1 (deslocada).
+    const evLike=v=>/^[a-z]+_[a-z_]+$/.test(String(v||'').trim());
+    const shifted=I.ev>=0&&!evLike(r[I.ev])&&evLike(r[I.ev+1]);
     const g=k=>{ if(I[k]<0) return ''; const j=I[k]+((shifted&&I[k]>=I.sale)?1:0); return String(r[j]==null?'':r[j]).trim(); };
     const st=norm(g('st')), ev=norm(g('ev'));
     if(st!=='paid'||/refund|chargeback/.test(ev)||(g('refd')&&isDate(g('refd'))&&!g('refd').startsWith('1970'))) continue;
