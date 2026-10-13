@@ -199,6 +199,7 @@ const CONFIG = {
     fatura:      ['data.purchase.transaction'],
     data:        ['data.purchase.approved_date','data.purchase.order_date','creation_date'],
     cliente:     ['data.buyer.name','data.buyer.first_name'],
+    cliente2:    ['data.buyer.first_name'],
     email:       ['data.buyer.email'],
     produto:     ['data.product.name'],
     fatTotal:    ['data.purchase.price.value'],
@@ -320,7 +321,7 @@ function parseCSV(t){
 
 function findCols(hdr,names){
   const H=hdr.map(norm), out=[];
-  for(const n of names){ const i=H.indexOf(norm(n)); if(i>=0) out.push(i); }
+  for(const n of names){ H.forEach((h,i)=>{ if(h===norm(n)) out.push(i); }); }  // inclui cabeçalhos duplicados
   return out;
 }
 
@@ -382,7 +383,30 @@ function processSales(rows){
   for(const [k,names] of Object.entries(CONFIG.W)) W[k]=findCols(hdr,names);
   if(!W.evento.length || !W.fatura.length)
     throw new Error(`Aba "${WEBHOOK_SHEET}": não encontrei as colunas "event" e "data.purchase.transaction". Confira o nome da aba e o cabeçalho.`);
-  const getter=r=>k=>{ for(const i of W[k]){ const v=r[i]; if(v!=null && String(v).trim()!=='') return String(v).trim(); } return ''; };
+  // O Stract às vezes desalinha as colunas de uma linha (campos opcionais do webhook, como afiliado ou CNPJ).
+  // Por isso cada campo-chave é validado pelo conteúdo e, se estiver fora do lugar, é procurado na linha inteira.
+  const RX_EVT=/^(PURCHASE|SUBSCRIPTION|CLUB|SWITCH_PLAN|UPDATE_SUBSCRIPTION)_[A-Z_]+$/;
+  const RX_STAT=/^(APPROVED|COMPLETE|COMPLETED|REFUNDED|CANCELED|CANCELLED|CHARGEBACK|EXPIRED|WAITING_PAYMENT|DELAYED|BILLET_PRINTED|PROTESTED|STARTED|OVERDUE|PARTIALLY_REFUNDED|DISPUTE)$/;
+  const scan=(r,rx)=>{ for(const c of r){ const v=String(c==null?'':c).trim(); if(v && rx.test(v)) return v; } return ''; };
+  const baseGet=r=>k=>{ for(const i of W[k]){ const v=r[i]; if(v!=null && String(v).trim()!=='') return String(v).trim(); } return ''; };
+  const getter=r=>{
+    const b=baseGet(r);
+    return k=>{
+      const v=b(k);
+      switch(k){
+        case 'evento':  return RX_EVT.test(v)? v : scan(r,RX_EVT);
+        case 'status':  return RX_STAT.test(v)? v : scan(r,RX_STAT);
+        case 'fatura':  { if(/^HP\d+/i.test(v)) return v; const hp=scan(r,/^HP\d{6,}$/i); if(hp) return hp;
+                          const ep=scan(r,/^1\d{12}$/); const em=b('email').includes('@')?b('email'):scan(r,/@/);
+                          return v||((ep||b('data')||'')?('LINHA-'+(ep||b('data'))+'-'+em):''); }
+        case 'produto': return v && !/^\d{4}-\d{2}-\d{2}T/.test(v) ? v : scan(r,/playbook/i)||v;
+        case 'email':   return v.includes('@')? v : scan(r,/@/);
+        case 'pagamento': { const RXP=/^(PIX|CREDIT_CARD|BILLET|PAYPAL|GOOGLE_PAY|APPLE_PAY|DEBIT_CARD|BANK_TRANSFER|WALLET|HOTCARD|PICPAY|NUBANK_PAY)$/i; return RXP.test(v)? v : (scan(r,RXP)||''); }
+        case 'cliente': return /^\d+$/.test(v)? (b('cliente2')||v) : v;
+        default: return v;
+      }
+    };
+  };
 
   const groups=new Map();
   const grp=key=>{ if(!groups.has(key)) groups.set(key,{main:null,bumps:new Map(),neg:false,badBumps:new Set()}); return groups.get(key); };
@@ -420,7 +444,7 @@ function processSales(rows){
     const kw=list=>list.some(k=>norm(produto).includes(norm(k)));
     const okProduto = !CONFIG.PRODUTO_KEYWORDS.length || kw(CONFIG.PRODUTO_KEYWORDS) || (CONFIG.PRODUTO_KEYWORDS_FALLBACK.length && kw(CONFIG.PRODUTO_KEYWORDS_FALLBACK));
     if(!okProduto){ diag.semProduto++; continue; }
-    const principal=num(g('fatTotal'));
+    const principal=g('fatTotal')===''&&CONFIG.PRODUTO_PRECO_BASE>0 ? CONFIG.PRODUTO_PRECO_BASE : num(g('fatTotal'));
     if(CONFIG.IGNORAR_VALOR_ZERO && principal<=0){ diag.valorZero++; continue; }
     let obSum=0;
     for(const [btx,br] of gr.bumps){ if(gr.badBumps.has(btx)) continue; obSum+=num(getter(br)('fatTotal')); }
