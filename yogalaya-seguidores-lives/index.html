@@ -136,7 +136,7 @@ td.muted{color:var(--fg3)}
     <img src="logo.png" alt="Jamelli GT">
     <div class="ttl">
       <h1>Yogalaya · Seguidores e Lives</h1>
-      <p>Impulsionamento no Instagram, julho a outubro de 2026 · dados até 07/10/2026</p>
+      <p>Impulsionamento no Instagram, julho a outubro de 2026 · dados até 14/10/2026</p>
     </div>
     <nav class="tabs" role="tablist" aria-label="Seções">
       <button class="tab" role="tab" id="tab-seg" aria-selected="true" aria-controls="seg" type="button">Seguidores</button>
@@ -235,7 +235,7 @@ td.muted{color:var(--fg3)}
 
   <footer class="foot">
     <p>Fonte: planilha "JGTCL0045 - Yogalaya - Impulsionamento e Lives", abas Seguidores, numero de seguidores e Live.</p>
-    <p>O alcance das lives é a soma do alcance de cada transmissão, então a mesma pessoa pode ser contada mais de uma vez. 07/10 é um dia parcial. Seguidores são contados por criativo no período todo, por isso aparecem só quando o período completo está selecionado.</p>
+    <p>O alcance das lives é a soma do alcance de cada transmissão, então a mesma pessoa pode ser contada mais de uma vez. 14/10 é um dia parcial. Seguidores são contados por criativo no período todo, por isso aparecem só quando o período completo está selecionado, com investimento e visitas até 06/10, data da contagem disponível na planilha.</p>
   </footer>
 </main>
 
@@ -246,6 +246,8 @@ td.muted{color:var(--fg3)}
   // ---------- dados ----------
   var NAMES={A:'ADE2208',B:'ADE2608'};
   var FOLL={A:327,B:248};
+  // última contagem de seguidores da aba "numero de seguidores"; vale para os dados até esta data
+  var FOLL_UNTIL='2026-10-06';
   // [data, criativo, investimento, impressões, visitas ao perfil]
   var SEG=[
     ['2026-09-17','A',11.63,947,51],['2026-09-18','A',18.93,1458,66],['2026-09-19','A',15.75,1351,55],
@@ -260,7 +262,14 @@ td.muted{color:var(--fg3)}
     ['2026-10-04','A',0.04,5,0],['2026-10-04','B',25.17,5574,107],
     ['2026-10-05','A',0.25,17,2],['2026-10-05','B',15.63,2765,86],
     ['2026-10-06','B',19.08,2153,84],
-    ['2026-10-07','B',3.60,337,22]
+    ['2026-10-07','A',0.28,31,3],['2026-10-07','B',18.48,2025,80],
+    ['2026-10-08','A',0.02,1,0],['2026-10-08','B',22.13,2125,101],
+    ['2026-10-09','A',0.27,31,1],['2026-10-09','B',18.67,2930,62],
+    ['2026-10-10','A',1.17,153,4],['2026-10-10','B',18.56,2769,61],
+    ['2026-10-11','A',0.36,39,0],['2026-10-11','B',25.12,2899,100],
+    ['2026-10-12','A',1.31,193,4],['2026-10-12','B',19.96,3026,97],
+    ['2026-10-13','A',0.43,42,2],['2026-10-13','B',19.93,2382,104],
+    ['2026-10-14','A',0.38,34,4],['2026-10-14','B',2.73,277,9]
   ];
   var JULY=[
     {n:'Chegou a sua hora',s:45.11,i:10081,v:202,f:7},
@@ -312,9 +321,14 @@ td.muted{color:var(--fg3)}
     });
   }
   function totals(f){
-    var keys=f==='all'?['A','B']:[f],t={s:0,v:0,i:0,f:0};
-    SEG.forEach(function(r){if(keys.indexOf(r[1])>=0&&inR(r[0])){t.s+=r[2];t.i+=r[3];t.v+=r[4];}});
-    if(isFull()){keys.forEach(function(k){t.f+=FOLL[k];});}else{t.f=null;}
+    var keys=f==='all'?['A','B']:[f],t={s:0,v:0,i:0,f:0,fs:0,fv:0};
+    SEG.forEach(function(r){
+      if(keys.indexOf(r[1])<0||!inR(r[0]))return;
+      t.s+=r[2];t.i+=r[3];t.v+=r[4];
+      if(r[0]<=FOLL_UNTIL){t.fs+=r[2];t.fv+=r[4];}
+    });
+    // seguidores só existem como total da campanha: valem quando o período começa no início e cobre a data da contagem
+    if(range.from===FIRST&&range.to>=FOLL_UNTIL){keys.forEach(function(k){t.f+=FOLL[k];});}else{t.f=null;}
     return t;
   }
 
@@ -354,8 +368,8 @@ td.muted{color:var(--fg3)}
       ['Investimento',brl(t.s),int(t.i)+' impressões','',''],
       ['Visitas ao perfil',int(t.v),rLabel(),'',''],
       ['Custo por visita',cpv===null?'-':brl(cpv),'média do período',cpv===null?'na':'good'],
-      ['Novos seguidores',na?'-':int(t.f),na?nd:pct(t.f/t.v*100)+' das visitas',na?'na':''],
-      ['Custo por seguidor',na?'-':brl(t.s/t.f),na?nd:'a cada R$ 100: '+int(Math.round(100/(t.s/t.f)))+' seguidores',na?'na':'good']
+      ['Novos seguidores',na?'-':int(t.f),na?nd:pct(t.f/t.fv*100)+' das visitas · contagem até '+dm(FOLL_UNTIL),na?'na':''],
+      ['Custo por seguidor',na?'-':brl(t.fs/t.f),na?nd:'a cada R$ 100: '+int(Math.round(100/(t.fs/t.f)))+' seguidores · gasto até '+dm(FOLL_UNTIL),na?'na':'good']
     ];
     $('seg-kpis').innerHTML=cards.map(function(c){
       return '<div class="kpi"><span class="k">'+c[0]+'</span><span class="v '+c[3]+'">'+c[1]+'</span><span class="s">'+c[2]+'</span></div>';
@@ -470,7 +484,7 @@ td.muted{color:var(--fg3)}
     var info={};
     ['A','B'].forEach(function(k){
       var t=totals(k),na=t.f===null;
-      info[k]={s:t.s,i:t.i,v:t.v,f:t.f,cpv:t.v>0?t.s/t.v:null,cpf:na?null:t.s/t.f,cv:na||t.v===0?null:t.f/t.v*100};
+      info[k]={s:t.s,i:t.i,v:t.v,f:t.f,cpv:t.v>0?t.s/t.v:null,cpf:na?null:t.fs/t.f,cv:na||t.fv===0?null:t.f/t.fv*100};
     });
     var tt=totals('all'),na=tt.f===null;
     function best(key,dir){
@@ -487,9 +501,9 @@ td.muted{color:var(--fg3)}
         '<td class="'+(o.cpf!==null&&o.cpf===minCpf?'good':'')+'">'+nz(o.cpf,brl)+'</td>'+
         '<td class="'+(o.cv!==null&&o.cv===maxCv?'good':'')+'">'+nz(o.cv,pct)+'</td></tr>';
     });
-    rows+='<tr class="tot"><td>Total</td><td>'+brl(tt.s)+'</td><td>'+int(tt.i)+'</td><td>'+int(tt.v)+'</td><td>'+(tt.v>0?brl(tt.s/tt.v):'-')+'</td><td>'+nz(tt.f,int)+'</td><td>'+(na?'-':brl(tt.s/tt.f))+'</td><td>'+(na||tt.v===0?'-':pct(tt.f/tt.v*100))+'</td></tr>';
+    rows+='<tr class="tot"><td>Total</td><td>'+brl(tt.s)+'</td><td>'+int(tt.i)+'</td><td>'+int(tt.v)+'</td><td>'+(tt.v>0?brl(tt.s/tt.v):'-')+'</td><td>'+nz(tt.f,int)+'</td><td>'+(na?'-':brl(tt.fs/tt.f))+'</td><td>'+(na||tt.fv===0?'-':pct(tt.f/tt.fv*100))+'</td></tr>';
     $('tb-cri').innerHTML='<thead><tr><th>Criativo</th><th>Investimento</th><th>Impressões</th><th>Visitas</th><th>Custo/visita</th><th>Seguidores</th><th>Custo/seguidor</th><th>Conversão</th></tr></thead><tbody>'+rows+'</tbody>';
-    $('cri-note').textContent='Conversão = seguidores ÷ visitas ao perfil. Seguidores por criativo vêm da aba "numero de seguidores" da planilha'+(na?' e só existem para o período completo.':'.');
+    $('cri-note').textContent='Conversão = seguidores ÷ visitas ao perfil. Seguidores por criativo vêm da aba "numero de seguidores" da planilha'+(na?' e só existem para o período completo.':'; custo por seguidor e conversão usam investimento e visitas até '+dm(FOLL_UNTIL)+', data da contagem disponível.');
 
     var jr='',js=0,ji=0,jv=0;
     JULY.forEach(function(p){
@@ -510,16 +524,28 @@ td.muted{color:var(--fg3)}
     var perB=b.v/before.length,perA=a.v/after.length;
     var cB=b.s/b.v,cA=a.s/a.v;
     var queda=(1-cA/cB)*100,alta=(perA/perB-1)*100;
-    var S=0,F=FOLL.A+FOLL.B;
-    SEG.forEach(function(r){S+=r[2];});
+    var lastFull=after[after.length-1].d;
+    // criativos: custo por visita em todo o período; seguidores com os dados até a data da contagem
+    var tA=totals('A'),tB=totals('B'),tAll=totals('all');
+    var F=tAll.f,S=tAll.fs; // renderSegReads roda só na abertura, com o período completo
+    // última semana completa x semana anterior (exclui o dia parcial)
+    var full=all.filter(function(x){return !x.part;});
+    var w2=full.slice(-7),w1=full.slice(-14,-7);
+    var weekCard=null;
+    if(w1.length===7&&w2.length===7){
+      var g1=agg(w1),g2=agg(w2);
+      weekCard=['Semana de '+dm(w2[0].d)+' a '+dm(w2[6].d)+': '+brl(g2.s/g2.v)+' por visita',
+        'Foram '+int(g2.v)+' visitas com '+brl(g2.s)+', contra '+int(g1.v)+' visitas com '+brl(g1.s)+' na semana anterior ('+dm(w1[0].d)+' a '+dm(w1[6].d)+', '+brl(g1.s/g1.v)+' por visita).'];
+    }
     var cards=[
       ['Custo por visita caiu '+int(Math.round(queda))+'% depois de 29/09',
-       'De '+brl(cB)+' (17 a 28/09) para '+brl(cA)+' (29/09 a 06/10), com o ADE2608 assumindo a entrega. As visitas por dia passaram de '+int(Math.round(perB))+' para '+int(Math.round(perA))+', alta de '+int(Math.round(alta))+'%.'],
+       'De '+brl(cB)+' (17 a 28/09) para '+brl(cA)+' (29/09 a '+dm(lastFull)+'), com o ADE2608 assumindo a entrega. As visitas por dia passaram de '+int(Math.round(perB))+' para '+int(Math.round(perA))+', alta de '+int(Math.round(alta))+'%.'],
       ['ADE2608 custa menos, ADE2208 converte mais',
-       'O ADE2608 trouxe a visita por R$ 0,21 e o seguidor por R$ 0,61. No ADE2208, 42,4% das visitas viraram seguidores, contra 34,8%.'],
+       'O ADE2608 trouxe a visita por '+brl(tB.s/tB.v)+' e o seguidor por '+brl(tB.fs/tB.f)+'. No ADE2208, '+pct(tA.f/tA.fv*100)+' das visitas viraram seguidores, contra '+pct(tB.f/tB.fv*100)+' (dados até '+dm(FOLL_UNTIL)+').'],
       ['Cerca de '+int(Math.round(F/S*100))+' seguidores a cada R$ 100',
-       'Foram '+int(F)+' novos seguidores com '+brl(S)+' investidos, ou '+brl(S/F)+' por seguidor (campanha inteira).']
+       'Foram '+int(F)+' novos seguidores com '+brl(S)+' investidos até '+dm(FOLL_UNTIL)+', ou '+brl(S/F)+' por seguidor.']
     ];
+    if(weekCard)cards.push(weekCard);
     $('seg-reads').innerHTML=cards.map(function(c){return '<div class="read"><h3>'+c[0]+'</h3><p>'+c[1]+'</p></div>';}).join('');
   }
 
