@@ -1,1 +1,569 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Workshop - A equipe da UAN · Amanda Chagas — Jamelli GT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#1a1a2e;color:#e8e6f0;font-family:'DM Sans',sans-serif;min-height:100vh}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:#12121f}::-webkit-scrollbar-thumb{background:#ff6b2b55;border-radius:3px}
+.topbar{background:#12121f;padding:12px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.07);position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:10px}
+.brand{font-size:17px;font-weight:700;color:#ff6b2b}
+.subtitle{font-size:11px;color:rgba(255,255,255,0.4);margin-top:2px}
+.logo-jgt{display:flex;align-items:center;gap:10px}
+.logo-jgt svg{width:36px;height:36px;flex-shrink:0}
+.logo-text{display:flex;flex-direction:column}
+.logo-text strong{font-size:13px;font-weight:700;color:#ff6b2b;letter-spacing:.3px}
+.logo-text span{font-size:10px;color:rgba(255,255,255,.35);margin-top:1px}
+.period-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.period-bar label{font-size:11px;color:rgba(255,255,255,.45);white-space:nowrap}
+.date-input{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:#e8e6f0;padding:5px 10px;border-radius:6px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;outline:none;min-width:118px}
+.date-input:focus{border-color:#ff6b2b}
+.date-input::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;cursor:pointer}
+.period-sep{color:rgba(255,255,255,.2);font-size:13px;padding:0 2px}
+.preset-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;transition:all .2s;white-space:nowrap}
+.preset-btn:hover,.preset-btn.active{background:rgba(255,107,43,.2);border-color:#ff6b2b;color:#ff6b2b;font-weight:600}
+.range-info{font-size:11px;color:rgba(255,107,43,.75);font-family:'DM Mono',monospace;white-space:nowrap;padding-left:4px}
+.tabs{display:flex;border-bottom:1px solid rgba(255,255,255,0.07);background:#12121f;padding:0 28px;overflow-x:auto}
+.tab{padding:12px 20px;cursor:pointer;font-size:13px;color:rgba(255,255,255,0.5);border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
+.tab:hover{color:#e8e6f0}.tab.active{color:#ff6b2b;border-bottom-color:#ff6b2b;font-weight:600}
+.content{padding:24px 28px;display:none}.content.active{display:block}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:20px}
+.kpi-card{background:#12121f;border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:16px 18px}
+.kpi-label{font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.kpi-value{font-size:20px;font-weight:700;font-family:'DM Mono',monospace}
+.kpi-sub{font-size:10px;color:rgba(255,255,255,.38);margin-top:5px;line-height:1.35}
+.orange{color:#ff6b2b}.green{color:#2ecc71}.red{color:#e74c3c}.yellow{color:#f1c40f}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#12121f;color:rgba(255,255,255,.45);padding:8px 10px;text-align:right;font-weight:500;border-bottom:1px solid rgba(255,255,255,.07);white-space:nowrap}
+th:first-child{text-align:left}
+td{padding:7px 10px;text-align:right;border-bottom:1px solid rgba(255,255,255,.04);font-family:'DM Mono',monospace;font-size:11px;color:#e8e6f0}
+td:first-child{text-align:left;font-family:'DM Sans',sans-serif;font-size:12px}
+tr:hover td{background:rgba(255,255,255,.025)}
+.funil-section{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:16px 0}
+.funil-bar-wrap{margin-bottom:12px}
+.funil-label{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;color:rgba(255,255,255,.7)}
+.funil-bar-bg{background:rgba(255,255,255,.05);border-radius:4px;height:14px;overflow:hidden}
+.funil-bar-fill{background:linear-gradient(90deg,#ff6b2b,#ff9a3c);height:100%;border-radius:4px;transition:width .4s}
+.taxa-grid{display:grid;gap:8px}
+.taxa-item{background:rgba(255,255,255,.04);border-radius:8px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;font-size:12px;color:rgba(255,255,255,.7)}
+.taxa-val{font-family:'DM Mono',monospace;font-size:15px;font-weight:600;color:#ff6b2b}
+.chart-grid-2x2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0}
+.chart-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:16px}
+.chart-card h4{font-size:11px;color:rgba(255,255,255,.45);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
+.chart-card canvas{max-height:190px}
+.sec-title{font-size:13px;font-weight:600;color:rgba(255,255,255,.65);margin:20px 0 10px;border-left:3px solid #ff6b2b;padding-left:10px}
+.cri-filterbar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.cri-filter-btn,.cri-sort-btn,.pub-filter-btn,.pub-sort-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 12px;border-radius:5px;cursor:pointer;font-size:12px;transition:all .2s;font-family:'DM Sans',sans-serif}
+.cri-filter-btn.active,.cri-sort-btn.active,.pub-filter-btn.active,.pub-sort-btn.active{background:rgba(255,107,43,.2);border-color:#ff6b2b;color:#ff6b2b}
+.cri-sort-label{font-size:11px;color:rgba(255,255,255,.4);white-space:nowrap}
+.cri-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
+.cri-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:14px}
+.cri-card.ativo{border-color:rgba(46,204,113,.25)}
+.cri-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.cri-name{font-size:11px;font-weight:600;word-break:break-all;flex:1;margin-right:6px;color:#e8e6f0}
+.cri-badge{font-size:10px;padding:2px 6px;border-radius:4px;white-space:nowrap}
+.cri-badge.ativo{background:rgba(46,204,113,.15);color:#2ecc71}
+.cri-badge.inativo{background:rgba(255,255,255,.08);color:rgba(255,255,255,.4)}
+.cri-metrics{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.cri-metric{display:flex;flex-direction:column}
+.cri-metric-label{color:rgba(255,255,255,.4);font-size:9px;margin-bottom:2px;text-transform:uppercase}
+.cri-metric-val{font-family:'DM Mono',monospace;font-size:12px;font-weight:600;color:#e8e6f0}
+.cri-metric-val.hl{color:#ff6b2b;font-size:14px}
+.cri-link{display:block;margin-top:8px;font-size:10px;color:rgba(255,107,43,.7);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tbl-wrap{overflow-x:auto;border-radius:8px;border:1px solid rgba(255,255,255,.07)}
+.pub-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-bottom:24px}
+.pub-card{background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:16px}
+.pub-card.ativo{border-color:rgba(46,204,113,.2)}
+.pub-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+.pub-name{font-size:12px;font-weight:600;flex:1;margin-right:8px;color:#e8e6f0;line-height:1.4}
+.pub-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.pub-metric{text-align:center;padding:8px 6px;background:rgba(255,255,255,.03);border-radius:6px}
+.pub-metric-val{font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:#ff6b2b}
+.pub-metric-val.neutral{color:#e8e6f0}
+.pub-metric-lbl{font-size:9px;color:rgba(255,255,255,.35);margin-top:2px;text-transform:uppercase;letter-spacing:.4px}
+.ob-info{background:rgba(255,107,43,.07);border:1px solid rgba(255,107,43,.2);border-radius:8px;padding:10px 14px;font-size:11px;color:rgba(255,255,255,.55);margin-bottom:16px;line-height:1.5}
+.ob-info b{color:rgba(255,255,255,.8)}
+.sales-scroll{display:flex;gap:10px;overflow-x:auto;padding-bottom:10px;margin-bottom:8px}
+.sale-card{flex:0 0 215px;background:#12121f;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:12px 14px}
+.sale-card.traf{border-color:rgba(46,204,113,.35)}
+.sale-top{display:flex;justify-content:space-between;font-size:11px;margin-bottom:6px}
+.sale-name{font-size:12px;font-weight:600;line-height:1.3;margin-bottom:4px;word-break:break-word}
+.sale-val{font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:#ff6b2b}
+.sale-meta{font-size:10px;color:rgba(255,255,255,.4);margin-top:5px;line-height:1.5}
+.tag-meta{font-size:9px;color:#f1c40f;vertical-align:super}
+.ok{color:#2ecc71}.warn{color:#f1c40f}
+@media(max-width:900px){.cri-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.cri-grid{grid-template-columns:1fr}.chart-grid-2x2{grid-template-columns:1fr}.funil-section{grid-template-columns:1fr}.content{padding:16px}.topbar{padding:12px 16px}}
+</style>
+</head>
+<body>
+<div id="loading-overlay" style="position:fixed;inset:0;background:#1a1a2e;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px">
+  <div style="width:40px;height:40px;border:3px solid rgba(255,107,43,.2);border-top-color:#ff6b2b;border-radius:50%;animation:spin 1s linear infinite"></div>
+  <div style="color:rgba(255,255,255,.5);font-size:13px" id="loading-msg">Conectando com a planilha...</div>
+  <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+</div>
 
+<div class="topbar">
+  <div class="logo-jgt">
+    <svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg"><rect width="36" height="36" rx="8" fill="#ff6b2b" fill-opacity="0.9"/><text x="18" y="25" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="13" fill="white">JGT</text></svg>
+    <div class="logo-text"><strong>Jamelli GT</strong><span>Tráfego Pago</span></div>
+  </div>
+  <div class="period-bar">
+    <label>De</label>
+    <input type="date" id="dateFrom" class="date-input" onchange="onDateChange()">
+    <span class="period-sep">→</span>
+    <input type="date" id="dateTo" class="date-input" onchange="onDateChange()">
+    <button class="preset-btn" onclick="setPreset(7,this)">7d</button>
+    <button class="preset-btn" onclick="setPreset(14,this)">14d</button>
+    <button class="preset-btn" onclick="setPreset(30,this)">30d</button>
+    <button class="preset-btn active" id="btn-traf" onclick="setPreset('traf',this)">Desde o tráfego</button>
+    <button class="preset-btn" id="btn-all" onclick="setPreset('all',this)">Tudo</button>
+    <span class="range-info" id="range-info"></span>
+    <button class="preset-btn" onclick="loadData()" style="margin-left:4px">🔄 Atualizar</button>
+  </div>
+  <div>
+    <div class="brand" id="brand-title">📦 Workshop - A equipe da UAN · Amanda Chagas</div>
+    <div class="subtitle" id="brand-subtitle">Dashboard de Performance — Workshop (checkout direto) · Jamelli GT · 2026</div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('trafego',this)">📊 Tráfego</div>
+  <div class="tab" onclick="showTab('visao',this)">🌐 Visão Geral</div>
+  <div class="tab" onclick="showTab('criativos',this)">Criativos</div>
+  <div class="tab" onclick="showTab('publicos',this)">Públicos</div>
+  <div class="tab" onclick="showTab('semanal',this)">Semana a Semana</div>
+  <div class="tab" onclick="showTab('mensal',this)">Mês a Mês</div>
+</div>
+
+<div id="tab-trafego" class="content active"></div>
+<div id="tab-visao" class="content"></div>
+<div id="tab-criativos" class="content"></div>
+<div id="tab-publicos" class="content"></div>
+<div id="tab-semanal" class="content"></div>
+<div id="tab-mensal" class="content"></div>
+
+<script>
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║           CONFIGURAÇÃO DO CLIENTE — EDITE APENAS AQUI           ║
+// ╚══════════════════════════════════════════════════════════════════╝
+const CONFIG = {
+  CLIENTE: 'Amanda Chagas',
+  PRODUTO: 'Workshop - A equipe da UAN',
+  ANO: '2026',
+  SHEET_ID: '1fJ0XDdkEIgfpeTgh7ownWs-VmQrxpM14t94Xg2EvPlI',
+  GERENCIADOR_SHEET: 'Gerenciador',
+  WEBHOOK_SHEET: 'Webhook',
+  DATA_MINIMA: '2026-10-07',      // primeira venda do workshop
+  DATA_INICIO_TRAFEGO: '2026-10-09', // início das campanhas [WKSP UAN]
+  DATA_FIM: '2026-10-29',         // último dia de atualização (workshop encerra em 28/10)
+  DATA_WORKSHOP: '2026-10-28',
+  // Webhook (Hotmart-like) — mapeado por nome de cabeçalho
+  W: { data:'Data de Venda', cod:'Código da transação', produto:'Nome do Produto', preco:'Preço do Produto', status:'Status',
+       cliente:'Nome do comprador', email:'E-mail do comprador', pgto:'Tipo de Pagamento', src:'SRC', sck:'SCK',
+       utmSource:'UTM_Source', utmCampaign:'UTM_Campaign', utmMedium:'UTM_Medium', utmContent:'UTM_Content' },
+  // Gerenciador — mapeado por nome de cabeçalho
+  G: { date:'Data', campaign:'Campanha', adset:'Conjunto', ad:'Anúncio', status:'Status do anúncio', link:'Link do anúncio',
+       inv:'Investimento', imp:'Impressões', cli:'Cliques únicos', ck:'Checkout', buy:'compradores/gerenciador', pub:'Público' },
+};
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  MÉTRICAS DA API DO GERENCIADOR DE ANÚNCIOS (conta 10200783711195285)  ║
+// ║  Atualizado automaticamente todo dia às 10h — alcance não vem na planilha  ║
+// ╚══════════════════════════════════════════════════════════════════╝
+/*META_START*/
+const META = {
+  conta: 'Amanda me Treina (10200783711195285)',
+  since: '2026-10-09', asOf: '2026-10-14',
+  campanhas: {
+    FRIO:   { spend:402.11, reach:9991, imp:15241, freq:1.525473, uclk:142, lpv:120, chk:187, purch:2,  purchVal:357.9 },
+    QUENTE: { spend:412.29, reach:7264, imp:26919, freq:3.705809, uclk:258, lpv:230, chk:343, purch:13, purchVal:1759.92 }
+  },
+  conjuntos: {
+    '00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS': { reach:4700, freq:1.430638, spend:211.46 },
+    '00 - [PF] LAK Leads + LAK Engajamento 30D - VÍDEOS':    { reach:6374, freq:1.33621, spend:190.65 },
+    '00 - [PQ] Engaja 90D + VV 50 e 75% - VÍDEO':            { reach:4550, freq:2.78989, spend:192.4 },
+    '00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS':        { reach:5208, freq:2.664171, spend:215.19 },
+    '00 - [PQ] Engaja 90D + VV 50 e 75% - VÍDEO — 2':        { reach:291, freq:1.202749, spend:4.7 }
+  },
+  anuncios: {
+    'FRIO|ADS01_WKSP_UAN':{reach:1064,freq:1.12688,purchVal:0},'FRIO|ADS02_WKSP_UAN':{reach:3253,freq:1.361512,purchVal:178.95},'FRIO|ADS03_WKSP_UAN':{reach:84,freq:1.035714,purchVal:0},
+    'FRIO|ADS04_WKSP_UAN':{reach:243,freq:1.156379,purchVal:0},'FRIO|ADS05_WKSP_UAN':{reach:504,freq:1.087302,purchVal:0},'FRIO|ADS06_WKSP_UAN':{reach:133,freq:1.12782,purchVal:0},
+    'FRIO|ADS07_WKSP_UAN':{reach:29,freq:1.034483,purchVal:0},'FRIO|ADV01_WKSP_UAN':{reach:731,freq:1.053352,purchVal:0},'FRIO|ADV02_WKSP_UAN':{reach:639,freq:1.073552,purchVal:0},
+    'FRIO|ADV03_WKSP_UAN':{reach:5380,freq:1.312454,purchVal:178.95},
+    'QUENTE|ADS01_WKSP_UAN':{reach:3571,freq:1.768972,purchVal:0},'QUENTE|ADS02_WKSP_UAN':{reach:1655,freq:1.425378,purchVal:0},'QUENTE|ADS03_WKSP_UAN':{reach:375,freq:1.261333,purchVal:0},
+    'QUENTE|ADS04_WKSP_UAN':{reach:460,freq:1.417391,purchVal:0},'QUENTE|ADS05_WKSP_UAN':{reach:1675,freq:1.589254,purchVal:178.95},'QUENTE|ADS06_WKSP_UAN':{reach:738,freq:1.433604,purchVal:0},
+    'QUENTE|ADS07_WKSP_UAN':{reach:269,freq:1.315985,purchVal:0},'QUENTE|ADV01_WKSP_UAN':{reach:1732,freq:1.94746,purchVal:417.39},'QUENTE|ADV02_WKSP_UAN':{reach:639,freq:1.907668,purchVal:179.22},
+    'QUENTE|ADV03_WKSP_UAN':{reach:3972,freq:2.039778,purchVal:984.36}
+  },
+  // Por dia e campanha (Meta): spend, reach, imp, uclk, lpv, chk, purch
+  diario: {
+    '2026-10-09': { QUENTE:{spend:19.99,reach:1048,imp:1753,uclk:30,lpv:20,chk:29,purch:3}, FRIO:{spend:40.02,reach:2061,imp:2226,uclk:18,lpv:11,chk:15,purch:0} },
+    '2026-10-10': { QUENTE:{spend:88.48,reach:2469,imp:5392,uclk:45,lpv:40,chk:69,purch:3}, FRIO:{spend:64.86,reach:1655,imp:2082,uclk:15,lpv:15,chk:23,purch:0} },
+    '2026-10-11': { QUENTE:{spend:110.07,reach:3461,imp:6486,uclk:88,lpv:72,chk:95,purch:1}, FRIO:{spend:112.22,reach:2685,imp:3232,uclk:38,lpv:30,chk:51,purch:0} },
+    '2026-10-12': { QUENTE:{spend:66.04,reach:2437,imp:4397,uclk:46,lpv:42,chk:59,purch:4}, FRIO:{spend:83.2,reach:2412,imp:2871,uclk:34,lpv:26,chk:39,purch:1} },
+    '2026-10-13': { QUENTE:{spend:52.01,reach:2231,imp:4066,uclk:30,lpv:23,chk:42,purch:2}, FRIO:{spend:50.58,reach:2260,imp:2762,uclk:26,lpv:25,chk:33,purch:0} },
+    '2026-10-14': { QUENTE:{spend:75.7,reach:2601,imp:4825,uclk:39,lpv:33,chk:49,purch:0}, FRIO:{spend:51.23,reach:1801,imp:2068,uclk:13,lpv:13,chk:26,purch:1} }
+  }
+};
+/*META_END*/
+
+// Cópia de segurança da planilha (e-mail e telefone removidos). Só é usada se a leitura ao vivo falhar,
+// por exemplo quando o arquivo é aberto direto do computador (o Google bloqueia nesse caso).
+/*SNAP_START*/
+const SNAP = {"at": "15/10 11:05", "gerenciador": "\"Data\",\"Campanha\",\"Conjunto\",\"Anúncio\",\"Status do anúncio\",\"Link do anúncio\",\"Investimento\",\"Impressões\",\"Cliques únicos\",\"Checkout\",\"compradores/gerenciador\",\"Público\"\n\"2026-10-09\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS01_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURKqsr2R/\",\"R$ 3,21\",\"301\",\"3\",\"0\",\"0\",\"FRIO\"\n\"2026-10-09\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS02_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURPbMmJa/\",\"R$ 1,83\",\"44\",\"2\",\"1\",\"0\",\"FRIO\"\n\"2026-10-09\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS03_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefUQ9As8tx/\",\"R$ 0,74\",\"65\",\"1\",\"2\",\"0\",\"FRIO\"\n\"2026-10-09\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS04_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefUQ9ZMo1h/\",\"R$ 1,31\",\"65\",\"0\",\"0\",\"0\",\"FRIO\"\n\"2026-10-09\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS05_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURNfshj4/\",\"R$ 13,12\",\"503\",\"4\",\"4\",\"0\",\"FRIO\"\n\"2026-10-09\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS06_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURQBM2WB/\",\"R$ 0,97\",\"50\",\"0\",\"0\",\"0\",\"FRIO\"\n\"2026-10-09\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS07_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefUQ9hssYc/\",\"R$ 0,25\",\"16\",\"0\",\"0\",\"0\",\"FRIO\"\n\"2026-10-09\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - VÍDEOS\",\"ADV01_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURZSsMUW/\",\"R$ 10,41\",\"581\",\"6\",\"8\",\"0\",\"FRIO\"\n\"2026-10-09\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - VÍDEOS\",\"ADV02_WKSP_UAN\",\"PAUSED\",\"https://www.instagram.com/p/DefURdRMJYK/\",\"R$ 5,21\",\"469\",\"2\",\"0\",\"0\",\"FRIO\"\n\"2026-10-09\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - VÍDEOS\",\"ADV03_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURZfMYaQ/\",\"R$ 2,97\",\"132\",\"0\",\"0\",\"0\",\"FRIO\"\n\"2026-10-09\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS01_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5kBMe3Z/\",\"R$ 2,79\",\"289\",\"6\",\"7\",\"0\",\"QUENTE\"\n\"2026-10-09\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS02_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5ulMFaF/\",\"R$ 1,31\",\"135\",\"0\",\"0\",\"0\",\"QUENTE\"\n\"2026-10-09\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS03_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5lTsJEn/\",\"R$ 4,58\",\"357\",\"4\",\"3\",\"0\",\"QUENTE\"\n\"2026-10-09\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS04_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5ujMiyZ/\",\"R$ 0,08\",\"17\",\"0\",\"0\",\"0\",\"QUENTE\"\n\"2026-10-09\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS05_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT514MeEe/\",\"R$ 0,39\",\"30\",\"0\",\"0\",\"0\",\"QUENTE\"\n\"2026-10-09\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS06_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5nVMqtf/\",\"R$ 0,67\",\"77\",\"3\",\"1\",\"0\",\"QUENTE\"\n\"2026-10-09\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS07_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5nesKa4/\",\"R$ 0,35\",\"6\",\"0\",\"0\",\"0\",\"QUENTE\"\n\"2026-10-09\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - VÍDEO\",\"ADV01_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT6FVMe0y/\",\"R$ 4,37\",\"415\",\"8\",\"8\",\"2\",\"QUENTE\"\n\"2026-10-09\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - VÍDEO\",\"ADV02_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT6EMsTuw/\",\"R$ 3,47\",\"265\",\"6\",\"6\",\"1\",\"QUENTE\"\n\"2026-10-09\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - VÍDEO\",\"ADV03_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT55wshsq/\",\"R$ 1,98\",\"162\",\"3\",\"4\",\"0\",\"QUENTE\"\n\"2026-10-10\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS01_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURKqsr2R/\",\"R$ 20,26\",\"739\",\"6\",\"10\",\"0\",\"FRIO\"\n\"2026-10-10\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS02_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURPbMmJa/\",\"R$ 8,33\",\"226\",\"1\",\"2\",\"0\",\"FRIO\"\n\"2026-10-10\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS03_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefUQ9As8tx/\",\"R$ 0,72\",\"14\",\"0\",\"0\",\"0\",\"FRIO\"\n\"2026-10-10\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS04_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefUQ9ZMo1h/\",\"R$ 0,64\",\"14\",\"0\",\"0\",\"0\",\"FRIO\"\n\"2026-10-10\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS05_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURNfshj4/\",\"R$ 0,34\",\"11\",\"0\",\"1\",\"0\",\"FRIO\"\n\"2026-10-10\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS06_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURQBM2WB/\",\"R$ 3,04\",\"42\",\"0\",\"0\",\"0\",\"FRIO\"\n\"2026-10-10\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS07_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefUQ9hssYc/\",\"R$ 0,28\",\"7\",\"0\",\"0\",\"0\",\"FRIO\"\n\"2026-10-10\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - VÍDEOS\",\"ADV01_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURZSsMUW/\",\"R$ 2,03\",\"73\",\"0\",\"1\",\"0\",\"FRIO\"\n\"2026-10-10\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - VÍDEOS\",\"ADV02_WKSP_UAN\",\"PAUSED\",\"https://www.instagram.com/p/DefURdRMJYK/\",\"R$ 4,93\",\"175\",\"0\",\"0\",\"0\",\"FRIO\"\n\"2026-10-10\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - VÍDEOS\",\"ADV03_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURZfMYaQ/\",\"R$ 24,29\",\"781\",\"8\",\"9\",\"0\",\"FRIO\"\n\"2026-10-10\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS01_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5kBMe3Z/\",\"R$ 7,02\",\"447\",\"5\",\"5\",\"0\",\"QUENTE\"\n\"2026-10-10\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS02_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5ulMFaF/\",\"R$ 13,46\",\"625\",\"1\",\"4\",\"0\",\"QUENTE\"\n\"2026-10-10\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS03_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5lTsJEn/\",\"R$ 0,19\",\"12\",\"0\",\"0\",\"0\",\"QUENTE\"\n\"2026-10-10\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS04_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5ujMiyZ/\",\"R$ 3,04\",\"209\",\"2\",\"1\",\"0\",\"QUENTE\"\n\"2026-10-10\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS05_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT514MeEe/\",\"R$ 8,60\",\"531\",\"6\",\"6\",\"0\",\"QUENTE\"\n\"2026-10-10\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS06_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5nVMqtf/\",\"R$ 10,47\",\"634\",\"4\",\"5\",\"0\",\"QUENTE\"\n\"2026-10-10\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS07_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5nesKa4/\",\"R$ 4,86\",\"257\",\"1\",\"1\",\"0\",\"QUENTE\"\n\"2026-10-10\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - VÍDEO\",\"ADV01_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT6FVMe0y/\",\"R$ 12,68\",\"800\",\"6\",\"8\",\"0\",\"QUENTE\"\n\"2026-10-10\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - VÍDEO\",\"ADV02_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT6EMsTuw/\",\"R$ 3,66\",\"264\",\"4\",\"9\",\"1\",\"QUENTE\"\n\"2026-10-10\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - VÍDEO\",\"ADV03_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT55wshsq/\",\"R$ 24,50\",\"1613\",\"18\",\"30\",\"2\",\"QUENTE\"\n\"2026-10-11\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS01_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURKqsr2R/\",\"R$ 4,40\",\"130\",\"2\",\"5\",\"0\",\"FRIO\"\n\"2026-10-11\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS02_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURPbMmJa/\",\"R$ 51,76\",\"1246\",\"18\",\"29\",\"0\",\"FRIO\"\n\"2026-10-11\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS03_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefUQ9As8tx/\",\"R$ 0,04\",\"2\",\"0\",\"0\",\"0\",\"FRIO\"\n\"2026-10-11\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS04_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefUQ9ZMo1h/\",\"R$ 0,38\",\"13\",\"0\",\"0\",\"0\",\"FRIO\"\n\"2026-10-11\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS05_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURNfshj4/\",\"R$ 0,32\",\"10\",\"0\",\"0\",\"0\",\"FRIO\"\n\"2026-10-11\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS06_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURQBM2WB/\",\"R$ 1,76\",\"57\",\"0\",\"0\",\"0\",\"FRIO\"\n\"2026-10-11\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS07_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefUQ9hssYc/\",\"R$ 0,17\",\"7\",\"0\",\"0\",\"0\",\"FRIO\"\n\"2026-10-11\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - VÍDEOS\",\"ADV01_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURZSsMUW/\",\"R$ 0,18\",\"9\",\"0\",\"0\",\"0\",\"FRIO\"\n\"2026-10-11\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - VÍDEOS\",\"ADV02_WKSP_UAN\",\"PAUSED\",\"https://www.instagram.com/p/DefURdRMJYK/\",\"R$ 0,42\",\"27\",\"0\",\"0\",\"0\",\"FRIO\"\n\"2026-10-11\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - VÍDEOS\",\"ADV03_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURZfMYaQ/\",\"R$ 52,79\",\"1731\",\"19\",\"17\",\"0\",\"FRIO\"\n\"2026-10-11\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS01_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5kBMe3Z/\",\"R$ 42,05\",\"2799\",\"24\",\"25\",\"0\",\"QUENTE\"\n\"2026-10-11\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS02_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5ulMFaF/\",\"R$ 2,97\",\"171\",\"1\",\"3\",\"0\",\"QUENTE\"\n\"2026-10-11\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS03_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5lTsJEn/\",\"R$ 0,02\",\"6\",\"0\",\"0\",\"0\",\"QUENTE\"\n\"2026-10-11\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS04_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5ujMiyZ/\",\"R$ 3,59\",\"160\",\"2\",\"1\",\"0\",\"QUENTE\"\n\"2026-10-11\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS05_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT514MeEe/\",\"R$ 7,59\",\"428\",\"7\",\"7\",\"0\",\"QUENTE\"\n\"2026-10-11\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS06_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5nVMqtf/\",\"R$ 0,25\",\"13\",\"0\",\"0\",\"0\",\"QUENTE\"\n\"2026-10-11\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS07_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5nesKa4/\",\"R$ 0,68\",\"34\",\"0\",\"0\",\"0\",\"QUENTE\"\n\"2026-10-11\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - VÍDEO\",\"ADV01_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT6FVMe0y/\",\"R$ 4,97\",\"266\",\"4\",\"5\",\"0\",\"QUENTE\"\n\"2026-10-11\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - VÍDEO\",\"ADV02_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT6EMsTuw/\",\"R$ 4,49\",\"300\",\"4\",\"3\",\"0\",\"QUENTE\"\n\"2026-10-11\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - VÍDEO\",\"ADV03_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT55wshsq/\",\"R$ 43,46\",\"2309\",\"50\",\"51\",\"1\",\"QUENTE\"\n\"2026-10-12\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS01_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURKqsr2R/\",\"R$ 0,38\",\"13\",\"0\",\"0\",\"0\",\"FRIO\"\n\"2026-10-12\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS02_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURPbMmJa/\",\"R$ 50,72\",\"1388\",\"20\",\"23\",\"1\",\"FRIO\"\n\"2026-10-12\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS05_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURNfshj4/\",\"R$ 0,10\",\"1\",\"0\",\"0\",\"0\",\"FRIO\"\n\"2026-10-12\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - VÍDEOS\",\"ADV01_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURZSsMUW/\",\"R$ 0,11\",\"3\",\"0\",\"0\",\"0\",\"FRIO\"\n\"2026-10-12\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - VÍDEOS\",\"ADV02_WKSP_UAN\",\"PAUSED\",\"https://www.instagram.com/p/DefURdRMJYK/\",\"R$ 0,53\",\"8\",\"0\",\"0\",\"0\",\"FRIO\"\n\"2026-10-12\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - VÍDEOS\",\"ADV03_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURZfMYaQ/\",\"R$ 31,36\",\"1458\",\"14\",\"16\",\"0\",\"FRIO\"\n\"2026-10-12\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS01_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5kBMe3Z/\",\"R$ 16,84\",\"1455\",\"10\",\"14\",\"0\",\"QUENTE\"\n\"2026-10-12\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS02_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5ulMFaF/\",\"R$ 2,78\",\"173\",\"0\",\"0\",\"0\",\"QUENTE\"\n\"2026-10-12\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS04_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5ujMiyZ/\",\"R$ 0,31\",\"17\",\"0\",\"0\",\"0\",\"QUENTE\"\n\"2026-10-12\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS05_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT514MeEe/\",\"R$ 9,92\",\"633\",\"4\",\"5\",\"1\",\"QUENTE\"\n\"2026-10-12\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS06_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5nVMqtf/\",\"R$ 2,03\",\"56\",\"1\",\"1\",\"0\",\"QUENTE\"\n\"2026-10-12\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS07_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5nesKa4/\",\"R$ 0,83\",\"46\",\"0\",\"0\",\"0\",\"QUENTE\"\n\"2026-10-12\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - VÍDEO\",\"ADV01_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT6FVMe0y/\",\"R$ 9,93\",\"462\",\"10\",\"11\",\"2\",\"QUENTE\"\n\"2026-10-12\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - VÍDEO\",\"ADV02_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT6EMsTuw/\",\"R$ 3,47\",\"179\",\"3\",\"3\",\"0\",\"QUENTE\"\n\"2026-10-12\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - VÍDEO\",\"ADV03_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT55wshsq/\",\"R$ 19,93\",\"1376\",\"22\",\"25\",\"1\",\"QUENTE\"\n\"2026-10-13\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS01_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURKqsr2R/\",\"R$ 0,06\",\"4\",\"0\",\"0\",\"0\",\"FRIO\"\n\"2026-10-13\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS02_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURPbMmJa/\",\"R$ 24,49\",\"1104\",\"9\",\"11\",\"0\",\"FRIO\"\n\"2026-10-13\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - VÍDEOS\",\"ADV01_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURZSsMUW/\",\"R$ 0,14\",\"14\",\"0\",\"0\",\"0\",\"FRIO\"\n\"2026-10-13\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - VÍDEOS\",\"ADV02_WKSP_UAN\",\"PAUSED\",\"https://www.instagram.com/p/DefURdRMJYK/\",\"R$ 0,05\",\"7\",\"0\",\"0\",\"0\",\"FRIO\"\n\"2026-10-13\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - VÍDEOS\",\"ADV03_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURZfMYaQ/\",\"R$ 25,84\",\"1633\",\"17\",\"22\",\"0\",\"FRIO\"\n\"2026-10-13\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS01_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5kBMe3Z/\",\"R$ 13,35\",\"1091\",\"5\",\"6\",\"0\",\"QUENTE\"\n\"2026-10-13\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS02_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5ulMFaF/\",\"R$ 0,89\",\"67\",\"2\",\"5\",\"0\",\"QUENTE\"\n\"2026-10-13\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS03_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5lTsJEn/\",\"R$ 0,54\",\"31\",\"1\",\"0\",\"0\",\"QUENTE\"\n\"2026-10-13\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS04_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5ujMiyZ/\",\"R$ 0,79\",\"49\",\"0\",\"1\",\"0\",\"QUENTE\"\n\"2026-10-13\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS05_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT514MeEe/\",\"R$ 8,22\",\"511\",\"4\",\"4\",\"0\",\"QUENTE\"\n\"2026-10-13\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS06_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5nVMqtf/\",\"R$ 1,20\",\"17\",\"0\",\"0\",\"0\",\"QUENTE\"\n\"2026-10-13\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS07_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5nesKa4/\",\"R$ 0,17\",\"6\",\"0\",\"0\",\"0\",\"QUENTE\"\n\"2026-10-13\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - VÍDEO\",\"ADV01_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT6FVMe0y/\",\"R$ 6,88\",\"547\",\"5\",\"8\",\"0\",\"QUENTE\"\n\"2026-10-13\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - VÍDEO\",\"ADV02_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT6EMsTuw/\",\"R$ 1,03\",\"96\",\"0\",\"0\",\"0\",\"QUENTE\"\n\"2026-10-13\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - VÍDEO\",\"ADV03_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT55wshsq/\",\"R$ 18,94\",\"1651\",\"14\",\"18\",\"2\",\"QUENTE\"\n\"2026-10-14\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS01_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURKqsr2R/\",\"R$ 0,78\",\"12\",\"0\",\"0\",\"0\",\"FRIO\"\n\"2026-10-14\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS02_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURPbMmJa/\",\"R$ 14,04\",\"421\",\"3\",\"8\",\"0\",\"FRIO\"\n\"2026-10-14\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS03_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefUQ9As8tx/\",\"R$ 0,32\",\"6\",\"0\",\"0\",\"0\",\"FRIO\"\n\"2026-10-14\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS04_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefUQ9ZMo1h/\",\"R$ 5,83\",\"189\",\"1\",\"3\",\"0\",\"FRIO\"\n\"2026-10-14\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS05_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURNfshj4/\",\"R$ 0,85\",\"23\",\"1\",\"1\",\"0\",\"FRIO\"\n\"2026-10-14\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - ESTÁTICOS\",\"ADS06_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURQBM2WB/\",\"R$ 0,02\",\"1\",\"0\",\"0\",\"0\",\"FRIO\"\n\"2026-10-14\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - VÍDEOS\",\"ADV01_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURZSsMUW/\",\"R$ 1,52\",\"90\",\"0\",\"0\",\"0\",\"FRIO\"\n\"2026-10-14\",\"[AC-JGT] [WKSP UAN] [VENDA] [FRIO] 091026\",\"00 - [PF] LAK Leads + LAK Engajamento 30D - VÍDEOS\",\"ADV03_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefURZfMYaQ/\",\"R$ 27,87\",\"1326\",\"8\",\"14\",\"1\",\"FRIO\"\n\"2026-10-14\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS01_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5kBMe3Z/\",\"R$ 2,66\",\"236\",\"0\",\"0\",\"0\",\"QUENTE\"\n\"2026-10-14\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS02_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5ulMFaF/\",\"R$ 22,42\",\"1188\",\"7\",\"13\",\"0\",\"QUENTE\"\n\"2026-10-14\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS03_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5lTsJEn/\",\"R$ 1,16\",\"67\",\"0\",\"0\",\"0\",\"QUENTE\"\n\"2026-10-14\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS04_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5ujMiyZ/\",\"R$ 3,20\",\"200\",\"1\",\"2\",\"0\",\"QUENTE\"\n\"2026-10-14\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS05_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT514MeEe/\",\"R$ 8,97\",\"529\",\"3\",\"6\",\"0\",\"QUENTE\"\n\"2026-10-14\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS06_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5nVMqtf/\",\"R$ 3,93\",\"261\",\"2\",\"2\",\"0\",\"QUENTE\"\n\"2026-10-14\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - ESTÁTICOS\",\"ADS07_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT5nesKa4/\",\"R$ 0,02\",\"5\",\"0\",\"0\",\"0\",\"QUENTE\"\n\"2026-10-14\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - VÍDEO\",\"ADV01_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT6FVMe0y/\",\"R$ 12,47\",\"883\",\"9\",\"9\",\"0\",\"QUENTE\"\n\"2026-10-14\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - VÍDEO\",\"ADV02_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT6EMsTuw/\",\"R$ 1,73\",\"115\",\"4\",\"3\",\"0\",\"QUENTE\"\n\"2026-10-14\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - VÍDEO\",\"ADV03_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefT55wshsq/\",\"R$ 14,44\",\"991\",\"10\",\"12\",\"0\",\"QUENTE\"\n\"2026-10-14\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - VÍDEO — 2\",\"ADV01_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefeRiZsrn0/\",\"R$ 1,01\",\"94\",\"1\",\"1\",\"0\",\"\"\n\"2026-10-14\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - VÍDEO — 2\",\"ADV02_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefeRv4MYy2/\",\"R$ 1,17\",\"64\",\"1\",\"0\",\"0\",\"\"\n\"2026-10-14\",\"[AC-JGT] [WKSP UAN] [VENDA] [QUENTE] 091026\",\"00 - [PQ] Engaja 90D + VV 50 e 75% - VÍDEO — 2\",\"ADV03_WKSP_UAN\",\"ACTIVE\",\"https://www.instagram.com/p/DefeR51MsBE/\",\"R$ 2,52\",\"192\",\"2\",\"1\",\"0\",\"\"", "webhook": "\"Data de Venda\",\"Código da transação\",\"Nome do Produto\",\"Preço do Produto\",\"Moeda\",\"Status\",\"Nome do comprador\",\"E-mail do comprador\",\"Telefone do comprador\",\"Tipo de Pagamento\",\"SRC\",\"SCK\",\"UTM_Source\",\"UTM_Campaign\",\"UTM_Medium\",\"UTM_Content\",\"UTM_Term\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"07/10/2026 18:16:10\",\"HP3120783991\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"197.00\",\"BRL\",\"Aprovado\",\"Ana Julia Tesch de Sales\",\"\",\"\",\"Cartão de Crédito\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"07/10/2026 18:39:18\",\"HP2590230582\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"197.00\",\"BRL\",\"Aprovado\",\"Letícia Oliveira Calheiros\",\"\",\"\",\"Cartão de Crédito\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"07/10/2026 20:42:40\",\"HP3435154491\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"197.00\",\"BRL\",\"Aprovado\",\"Samya Beatryz Carvalho França\",\"\",\"\",\"Cartão de Crédito\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"08/10/2026 01:16:33\",\"HP1880661665\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"197.00\",\"BRL\",\"Aprovado\",\"Camila de Andrade Pacifico\",\"\",\"\",\"Cartão de Crédito\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"08/10/2026 08:02:18\",\"HP2306609346\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"197.00\",\"BRL\",\"Aprovado\",\"ANA CLARA EUGENIO BOTELHO\",\"\",\"\",\"Cartão de Crédito\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"08/10/2026 09:36:22\",\"HP1300506297\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"197.00\",\"BRL\",\"Aprovado\",\"Mylena Lima de Souza Addario\",\"\",\"\",\"Pix\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"08/10/2026 10:23:07\",\"HP1938050548\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"197.00\",\"BRL\",\"Aprovado\",\"Julia Neves\",\"\",\"\",\"Cartão de Crédito\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"08/10/2026 11:26:38\",\"HP1439982968\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"197.00\",\"BRL\",\"Aprovado\",\"Mylena de Oliveira Machado\",\"\",\"\",\"Pix\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"08/10/2026 14:44:47\",\"HP2759332919\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"197.00\",\"BRL\",\"Aprovado\",\"Tamires Mendes Viana\",\"\",\"\",\"Cartão de Crédito\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"08/10/2026 17:11:11\",\"HP3967599352C1\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"197.00\",\"BRL\",\"Aprovado\",\"Esther Rocha de Almeida\",\"\",\"\",\"Pix\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"08/10/2026 22:54:45\",\"HP0087699498\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"197.00\",\"BRL\",\"Aprovado\",\"Jakelini Sandra Santos Dos Santos\",\"\",\"\",\"Cartão de Crédito\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"08/10/2026 23:13:15\",\"HP0666361844\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"197.00\",\"BRL\",\"Aprovado\",\"Karine Cristina Souza da Silva\",\"\",\"\",\"Cartão de Crédito\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"09/10/2026 08:19:57\",\"HP3981034915\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"100.00\",\"BRL\",\"Aprovado\",\"Larissa de Góes Santos\",\"\",\"\",\"Pix\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"09/10/2026 08:43:46\",\"HP3732502450\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"100.00\",\"BRL\",\"Aprovado\",\"Thamires Sepúlveda do Amaral\",\"\",\"\",\"Cartão de Crédito\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"09/10/2026 13:47:12\",\"HP1101310347\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"100.00\",\"BRL\",\"Aprovado\",\"Eliza Matias do Nascimento\",\"\",\"\",\"Cartão de Crédito\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"09/10/2026 14:46:40\",\"HP3313247097\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"100.00\",\"BRL\",\"Aprovado\",\"Fernanda Belieni de Oliveira\",\"\",\"\",\"Pix\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"09/10/2026 14:52:13\",\"HP0209462396\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"100.00\",\"BRL\",\"Aprovado\",\"Dálete Lorrany Estevão Nascimento\",\"\",\"\",\"Pix\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"09/10/2026 16:23:41\",\"HP1862759068\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"100.00\",\"BRL\",\"Aprovado\",\"Erika Luiza Araujo Ferreira Lopes\",\"\",\"\",\"Cartão de Crédito\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"09/10/2026 16:30:35\",\"HP2886575891\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"100.00\",\"BRL\",\"Aprovado\",\"Rayane Reinaux\",\"\",\"\",\"Pix\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"09/10/2026 17:42:32\",\"HP2253895458\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"197.00\",\"BRL\",\"Aprovado\",\"Gabriela oliveira siqueira dos santos\",\"\",\"\",\"Pix\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"09/10/2026 18:54:40\",\"HP0064304792\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"100.00\",\"BRL\",\"Aprovado\",\"Lilian Soares dos Santos\",\"\",\"\",\"Pix\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"09/10/2026 20:04:59\",\"HP0868830066\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"100.00\",\"BRL\",\"Aprovado\",\"Aline Felicio Alves\",\"\",\"\",\"Cartão de Crédito\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"09/10/2026 20:37:49\",\"HP2113492758\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"100.00\",\"BRL\",\"Aprovado\",\"Talita Miranda Chagas\",\"\",\"\",\"Pix\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"09/10/2026 20:38:24\",\"HP2183132309\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"100.00\",\"BRL\",\"Aprovado\",\"Laura Resende Loschi Coloneli\",\"\",\"\",\"Cartão de Crédito\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"09/10/2026 23:23:02\",\"HP1566795219\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"100.00\",\"BRL\",\"Aprovado\",\"Fernanda Maria Faria Ceccon\",\"\",\"\",\"Pix\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"09/10/2026 23:49:32\",\"HP2199707160\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"100.00\",\"BRL\",\"Aprovado\",\"Letícia de Sousa Faria\",\"\",\"\",\"Pix\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"10/10/2026 00:18:30\",\"HP2016582007\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"100.00\",\"BRL\",\"Aprovado\",\"Caroline Mendonça\",\"\",\"\",\"Pix\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"10/10/2026 01:13:55\",\"HP3834520560\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"100.00\",\"BRL\",\"Aprovado\",\"Diana Gertrudes Mota\",\"\",\"\",\"Pix\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"10/10/2026 07:08:59\",\"HP0476663667\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"100.00\",\"BRL\",\"Aprovado\",\"Silvana Campos Reis\",\"\",\"\",\"Cartão de Crédito\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"10/10/2026 07:48:33\",\"HP0030755016\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"100.00\",\"BRL\",\"Aprovado\",\"Raquel Troncoso Chaves Moreno\",\"\",\"\",\"Pix\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"10/10/2026 08:05:37\",\"HP0810256288\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"100.00\",\"BRL\",\"Aprovado\",\"Eva Cristina Fabrício de Carvalho\",\"\",\"\",\"Pix\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"10/10/2026 08:07:50\",\"HP2183809861\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"100.00\",\"BRL\",\"Aprovado\",\"Michelly Abreu Farias\",\"\",\"\",\"Pix\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"10/10/2026 08:14:19\",\"HP2056073227\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"100.00\",\"BRL\",\"Aprovado\",\"SABRINA NASCIMENTO DA SILVA\",\"\",\"\",\"Boleto Bancário\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"10/10/2026 08:52:09\",\"HP2585887786\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"100.00\",\"BRL\",\"Aprovado\",\"Washington Teixeira de Sousa\",\"\",\"\",\"Pix\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"10/10/2026 12:20:37\",\"HP1775283674\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"197.00\",\"BRL\",\"Aprovado\",\"Juliana Ramos\",\"\",\"\",\"Cartão de Crédito\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"11/10/2026 10:22:57\",\"HP3505608391\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"197.00\",\"BRL\",\"Aprovado\",\"MARIANA DA ROCHA\",\"\",\"\",\"Cartão de Crédito\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"11/10/2026 13:20:46\",\"HP3223861638\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"197.00\",\"BRL\",\"Aprovado\",\"Leandra de Souza Lopes\",\"\",\"\",\"Cartão de Crédito\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"12/10/2026 15:26:49\",\"HP4169034800\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"197.00\",\"BRL\",\"Aprovado\",\"Julyana Marise Duarte Martins\",\"\",\"\",\"Cartão de Crédito\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"12/10/2026 16:13:04\",\"HP1397303723\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"197.00\",\"BRL\",\"Aprovado\",\"Mariane Batista\",\"\",\"\",\"Pix\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"12/10/2026 16:43:50\",\"HP2428061351\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"197.00\",\"BRL\",\"Aprovado\",\"ClaúdiaTostes Waról e Souza\",\"\",\"\",\"Cartão de Crédito\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"13/10/2026 08:25:58\",\"HP2425923068\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"197.00\",\"BRL\",\"Aprovado\",\"Christine Katharine Alves Zago Gonçalves Lima\",\"\",\"\",\"Cartão de Crédito\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"13/10/2026 08:58:14\",\"HP3549389856\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"197.00\",\"BRL\",\"Aprovado\",\"Andressa Henrique Oliveira Bezerra\",\"\",\"\",\"Cartão de Crédito\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"13/10/2026 17:27:16\",\"HP1057938225\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"197.00\",\"BRL\",\"Aprovado\",\"Karolina Mara Couto Emerenciano\",\"\",\"\",\"Pix\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"14/10/2026 12:05:25\",\"HP1009193895\",\"Workshop - A equipe da UAN (Liderança e gestão de pessoas)\",\"197.00\",\"BRL\",\"Aprovado\",\"Celiane malaquias\",\"\",\"\",\"Pix\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n"};
+/*SNAP_END*/
+
+// ───────────── Utilitários ─────────────
+const $ = id => document.getElementById(id);
+const norm = s => String(s==null?'':s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
+const p2 = n => String(n).padStart(2,'0');
+const fmtBRL = n => (n&&isFinite(n)) ? 'R$ '+n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+const fmtInt = n => (n&&isFinite(n)) ? Math.round(n).toLocaleString('pt-BR') : '—';
+const fmtNum0 = n => isFinite(n) ? Math.round(n).toLocaleString('pt-BR') : '—';
+const fmtPct = n => (n&&isFinite(n)) ? n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%' : '—';
+const fmtX = n => (n&&isFinite(n)) ? n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'x' : '—';
+const fmtDec = n => (n&&isFinite(n)) ? n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+const div = (a,b) => b>0 ? a/b : 0;
+const brDate = iso => iso ? iso.slice(8,10)+'/'+iso.slice(5,7) : '';
+const hoje = () => new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'});
+function addDays(iso,n){ const d=new Date(iso+'T12:00:00'); d.setDate(d.getDate()+n); return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate()); }
+function weekStart(iso){ const d=new Date(iso+'T12:00:00'); const wd=(d.getDay()+6)%7; return addDays(iso,-wd); }
+
+function parseCSV(text){
+  const rows=[]; let row=[],cur='',q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=c; }
+    else if(c==='"') q=true;
+    else if(c===','){ row.push(cur); cur=''; }
+    else if(c==='\n'){ row.push(cur); rows.push(row); row=[]; cur=''; }
+    else if(c!=='\r') cur+=c;
+  }
+  if(cur.length||row.length){ row.push(cur); rows.push(row); }
+  return rows;
+}
+function findCol(hdr,name){
+  const n=norm(name); let i=hdr.findIndex(h=>norm(h)===n);
+  if(i<0) i=hdr.findIndex(h=>norm(h)&&norm(h).includes(n));
+  return i;
+}
+function money(v){
+  let s=String(v==null?'':v).replace(/R\$/g,'').replace(/\s/g,'');
+  if(!s) return 0;
+  if(s.includes(',')) s=s.replace(/\./g,'').replace(',','.');
+  const n=parseFloat(s); return isFinite(n)?n:0;
+}
+function parseDate(v){
+  const s=String(v||'').trim(); if(!s) return '';
+  let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return m[1]+'-'+m[2]+'-'+m[3];
+  m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); if(m) return m[3]+'-'+p2(m[2])+'-'+p2(m[1]);
+  return '';
+}
+const isTrafego = s => [s.src,s.utmSource].some(x=>norm(x).replace(/[\s_-]/g,'')==='metaads');
+const isPaused = s => String(s||'').toUpperCase().includes('PAUSED');
+
+async function fetchSheetCSV(sheetName){
+  const url=`https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+  const ctl=new AbortController(); const to=setTimeout(()=>ctl.abort(),20000);
+  try{
+    const r=await fetch(url,{signal:ctl.signal}); clearTimeout(to);
+    if(!r.ok) throw new Error(`Planilha "${sheetName}": HTTP ${r.status}. Verifique se está pública.`);
+    const t=await r.text();
+    if(t.includes('Signin')||t.includes('accounts.google')) throw new Error(`Planilha "${sheetName}" requer login. Defina como pública.`);
+    return t;
+  }catch(e){ clearTimeout(to); if(e.name==='AbortError') throw new Error(`Timeout ao carregar "${sheetName}".`); throw e; }
+}
+
+// ───────────── Dados ─────────────
+let GROWS=[], SALES=[], SALES_PENDENTES=0, DATA_MAX='', FROM='', TO='', MODO='live';
+const charts={};
+
+function processGerenciador(rows){
+  if(rows.length<2) return [];
+  const hdr=rows[0], G={}; for(const [k,n] of Object.entries(CONFIG.G)) G[k]=findCol(hdr,n);
+  if(G.date<0||G.inv<0) throw new Error('Aba Gerenciador: não encontrei as colunas Data/Investimento.');
+  const out=[];
+  for(let i=1;i<rows.length;i++){
+    const r=rows[i]; const d=parseDate(r[G.date]); if(!d) continue;
+    const g=k=>G[k]>=0?r[G[k]]:'';
+    out.push({date:d, campaign:g('campaign'), adset:String(g('adset')).trim(), ad:String(g('ad')).trim(), status:g('status'), link:g('link'),
+      inv:money(g('inv')), imp:money(g('imp')), cli:money(g('cli')), ck:money(g('ck')), buy:money(g('buy')),
+      pub:String(g('pub')).trim().toUpperCase()||(/QUENTE/i.test(g('campaign'))?'QUENTE':'FRIO')});
+  }
+  return out;
+}
+function processSales(rows){
+  if(rows.length<2) return [];
+  const hdr=rows[0], W={}; for(const [k,n] of Object.entries(CONFIG.W)) W[k]=findCol(hdr,n);
+  if(W.data<0) throw new Error('Aba Webhook: não encontrei a coluna "Data de Venda".');
+  const RX_NEG=/reembols|refund|cancel|chargeback|estorn|disput|recus/;
+  const out=[], seen=new Set();
+  for(let i=1;i<rows.length;i++){
+    const r=rows[i]; if(!r.some(x=>String(x).trim())) continue;
+    const g=k=>W[k]>=0?String(r[W[k]]==null?'':r[W[k]]).trim():'';
+    const data=parseDate(g('data')); if(!data) continue;
+    if(data<CONFIG.DATA_MINIMA) continue;
+    const st=norm(g('status'));
+    if(!st.includes('aprov')||RX_NEG.test(st)) continue;
+    const cod=g('cod'); if(cod){ if(seen.has(cod)) continue; seen.add(cod); }
+    const s={data, hora:g('data').slice(11,16), cod, nome:g('cliente'), email:g('email'), pgto:g('pgto'), valor:money(g('preco')),
+      src:g('src'), utmSource:g('utmSource'), utmMedium:g('utmMedium'), utmCampaign:g('utmCampaign'), utmContent:g('utmContent')};
+    s.trafego=isTrafego(s); out.push(s);
+  }
+  return out;
+}
+
+async function loadData(){
+  $('loading-overlay').style.display='flex'; $('loading-msg').textContent='Carregando dados da planilha...';
+  try{
+    let g,w; MODO='live';
+    try{ [g,w]=await Promise.all([fetchSheetCSV(CONFIG.GERENCIADOR_SHEET), fetchSheetCSV(CONFIG.WEBHOOK_SHEET)]); }
+    catch(e){ if(SNAP&&SNAP.gerenciador&&SNAP.webhook){ g=SNAP.gerenciador; w=SNAP.webhook; MODO='snap'; } else throw e; }
+    const ontem=addDays(hoje(),-1);
+    DATA_MAX = ontem<CONFIG.DATA_FIM ? ontem : CONFIG.DATA_FIM;
+    const gAll=processGerenciador(parseCSV(g)), sAll=processSales(parseCSV(w));
+    GROWS=gAll.filter(r=>r.date<=DATA_MAX);
+    SALES=sAll.filter(s=>s.data<=DATA_MAX).sort((a,b)=>(b.data+b.hora).localeCompare(a.data+a.hora));
+    SALES_PENDENTES=sAll.filter(s=>s.data>DATA_MAX).length;
+    const all=[...GROWS.map(r=>r.date),...SALES.map(s=>s.data)].sort();
+    const min=all[0]||CONFIG.DATA_MINIMA, max=all[all.length-1]||DATA_MAX;
+    $('dateFrom').min=$('dateTo').min=min; $('dateFrom').max=$('dateTo').max=max;
+    if(!FROM||!TO){ FROM=CONFIG.DATA_INICIO_TRAFEGO>min?CONFIG.DATA_INICIO_TRAFEGO:min; TO=max; }
+    $('dateFrom').value=FROM; $('dateTo').value=TO;
+    $('loading-overlay').style.display='none';
+    renderAll();
+  }catch(e){
+    $('loading-msg').innerHTML='<span style="color:#e74c3c">'+e.message+'</span><br><br><button class="preset-btn" onclick="loadData()">Tentar de novo</button>';
+  }
+}
+
+function allDates(){ return [...GROWS.map(r=>r.date),...SALES.map(s=>s.data)].filter(Boolean).sort(); }
+function setPreset(days,btn){
+  const ds=allDates(); if(!ds.length) return; const last=ds[ds.length-1];
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active')); if(btn) btn.classList.add('active');
+  TO=last;
+  if(days==='all') FROM=ds[0];
+  else if(days==='traf') FROM=CONFIG.DATA_INICIO_TRAFEGO>ds[0]?CONFIG.DATA_INICIO_TRAFEGO:ds[0];
+  else { FROM=addDays(last,-(days-1)); if(FROM<ds[0]) FROM=ds[0]; }
+  $('dateFrom').value=FROM; $('dateTo').value=TO; renderAll();
+}
+function onDateChange(){
+  FROM=$('dateFrom').value; TO=$('dateTo').value; if(FROM&&TO&&FROM>TO){ const t=FROM; FROM=TO; TO=t; $('dateFrom').value=FROM; $('dateTo').value=TO; }
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active')); renderAll();
+}
+function showTab(id,el){
+  document.querySelectorAll('.content').forEach(c=>c.classList.remove('active')); document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  $('tab-'+id).classList.add('active'); if(el) el.classList.add('active'); renderAll();
+}
+
+const inR=(d,f,t)=>(!f||d>=f)&&(!t||d<=t);
+function aggregate(from,to){
+  const rs=GROWS.filter(r=>inR(r.date,from,to)), ss=SALES.filter(s=>inR(s.data,from,to));
+  const a={inv:0,imp:0,cli:0,ck:0,buy:0,fat:0,vendas:ss.length,vTraf:0,fTraf:0};
+  rs.forEach(r=>{a.inv+=r.inv;a.imp+=r.imp;a.cli+=r.cli;a.ck+=r.ck;a.buy+=r.buy;});
+  ss.forEach(s=>{a.fat+=s.valor; if(s.trafego){a.vTraf++;a.fTraf+=s.valor;}});
+  a.lpv=0; dayList(from,to).forEach(d=>{ const md=META.diario[d]; if(md) Object.values(md).forEach(c=>a.lpv+=(c.lpv||0)); });
+  a.vSem=a.vendas-a.vTraf; a.fSem=a.fat-a.fTraf;
+  a.roas=div(a.fat,a.inv); a.cac=div(a.inv,a.vendas); a.ticket=div(a.fat,a.vendas); a.cpc=div(a.inv,a.cli); a.cpm=div(a.inv,a.imp)*1000; a.ctr=div(a.cli,a.imp)*100;
+  return a;
+}
+function dayList(from,to){ const o=[]; if(!from||!to) return o; for(let d=from; d<=to; d=addDays(d,1)) o.push(d); return o; }
+function dayRows(from,to){
+  return dayList(from,to).map(d=>{ const a=aggregate(d,d); a.data=d;
+    const md=META.diario[d]; a.reach=md?Object.values(md).reduce((x,c)=>x+c.reach,0):0; return a; });
+}
+function mkChart(id,cfg){ if(charts[id]) charts[id].destroy(); const c=$(id); if(!c) return;
+  cfg.options=Object.assign({responsive:true,maintainAspectRatio:true,plugins:{legend:{labels:{color:'rgba(255,255,255,.6)',font:{size:10}}}},
+    scales:{x:{ticks:{color:'rgba(255,255,255,.45)',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'rgba(255,255,255,.45)',font:{size:10}},grid:{color:'rgba(255,255,255,.05)'}}}},cfg.options||{});
+  charts[id]=new Chart(c,cfg); }
+const OR='rgba(255,107,43,0.85)', AM='rgba(255,183,55,0.85)';
+
+// ───────────── Banner / avisos ─────────────
+function avisos(){ return ''; }
+
+// ───────────── Aba Tráfego ─────────────
+function renderTrafego(){
+  const a=aggregate(FROM,TO), ss=SALES.filter(s=>inR(s.data,FROM,TO));
+  const reachTot=Object.values(META.campanhas).reduce((x,c)=>x+c.reach,0), impMeta=Object.values(META.campanhas).reduce((x,c)=>x+c.imp,0);
+  const kpi=(l,v,cls,sub)=>`<div class="kpi-card"><div class="kpi-label">${l}</div><div class="kpi-value ${cls||''}">${v}</div>${sub?`<div class="kpi-sub">${sub}</div>`:''}</div>`;
+  const card=s=>`<div class="sale-card ${s.trafego?'traf':''}"><div class="sale-top"><span>${s.trafego?'✅ meta_ads':'⭐ geral'}</span><span style="color:rgba(255,255,255,.4)">${brDate(s.data)} ${s.hora}</span></div>
+    <div class="sale-name">${s.nome||'—'}</div><div class="sale-val">${fmtBRL(s.valor)}</div>
+    <div class="sale-meta">${s.pgto||'—'}<br>Origem: ${s.src||s.utmSource||'sem rastreio'}${s.utmContent?`<br>Criativo: ${s.utmContent}`:''}${s.utmMedium?`<br>Público: ${s.utmMedium}`:''}</div></div>`;
+  const maxF=Math.max(a.imp,1);
+  const bar=(l,v,w,sub)=>`<div class="funil-bar-wrap"><div class="funil-label"><span>${l}</span><span>${fmtInt(v)}${sub?' · '+sub:''}</span></div><div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${Math.max(w,v?1.5:0)}%"></div></div></div>`;
+  $('tab-trafego').innerHTML=avisos()+`
+  <div class="kpi-grid">
+    ${kpi('Investimento (Meta Ads)',fmtBRL(a.inv),'orange')}
+    ${kpi('Fat. Geral (vendas)',fmtBRL(a.fat),'green','todas as vendas do Webhook')}
+    ${kpi('ROAS Geral',fmtX(a.roas),a.roas>=1?'green':'red','fat. geral ÷ investimento')}
+    ${kpi('Vendas Geral',fmtNum0(a.vendas),'','Webhook · aprovadas')}
+    ${kpi('Vendas meta_ads (SRC)',fmtNum0(a.vTraf),'orange',a.vTraf?fmtBRL(a.fTraf):'rastreio entra a partir de 14/10')}
+    ${kpi('Compras gerenciador<span class="tag-meta">*</span>',fmtNum0(a.buy),'yellow','métrica da Meta · referência')}
+    ${kpi('CAC Geral',fmtBRL(a.cac),'','investimento ÷ vendas gerais')}
+    ${kpi('Ticket Médio',fmtBRL(a.ticket))}
+    ${kpi('CPC',fmtBRL(a.cpc))}
+    ${kpi('CPM',fmtBRL(a.cpm))}
+    ${kpi('Frequência (Meta)',fmtDec(div(impMeta,reachTot)),'','impressões ÷ alcance')}
+  </div>
+  <div class="sec-title">Funil — Impressões → Alcance → Cliques → Visualizações da página → Vendas</div>
+  <div class="funil-section"><div>
+    ${bar('Impressões',a.imp,100)}${bar('Alcance (Meta)',reachTot,reachTot/maxF*100,brDate(META.since)+'–'+brDate(META.asOf)+' · período completo')}
+    ${bar('Cliques únicos',a.cli,a.cli/maxF*100,fmtPct(a.ctr)+' CTR')}${bar('Visualizações da página (Meta)',a.lpv,a.lpv/maxF*100)}
+    ${bar('Vendas (Webhook)',a.vendas,a.vendas/maxF*100)}
+  </div><div class="taxa-grid">
+    <div class="taxa-item"><span>CTR (cliques únicos ÷ impressões)</span><span class="taxa-val">${fmtPct(a.ctr)}</span></div>
+    <div class="taxa-item"><span>Visualizações da página ÷ cliques únicos</span><span class="taxa-val">${fmtPct(div(a.lpv,a.cli)*100)}</span></div>
+    <div class="taxa-item"><span>Taxa de venda (vendas ÷ visualizações da página)</span><span class="taxa-val">${fmtPct(div(a.vendas,a.lpv)*100)}</span></div>
+  </div></div>
+  <div class="ob-info" style="margin-top:-4px">O alcance é sempre do período completo da Meta (não dá para somar por dia). A taxa de venda usa as vendas gerais do Webhook, então inclui compras que não vieram do anúncio.</div>
+  <div class="chart-grid-2x2">
+    <div class="chart-card"><h4>Investimento × Faturamento por dia</h4><canvas id="ch-t1"></canvas></div>
+    <div class="chart-card"><h4>Visualizações da página × Vendas por dia</h4><canvas id="ch-t2"></canvas></div>
+  </div>
+  <div class="sec-title">Vendas (${ss.length}) — ✅ meta_ads · ⭐ geral/sem rastreio</div>
+  <div class="sales-scroll">${ss.map(card).join('')||'<div class="kpi-sub">Sem vendas no período.</div>'}</div>
+  ${renderConferencia()}`;
+  const dr=dayRows(FROM,TO), L=dr.map(d=>brDate(d.data));
+  mkChart('ch-t1',{type:'bar',data:{labels:L,datasets:[{label:'Investimento',data:dr.map(d=>d.inv),backgroundColor:OR},{label:'Faturamento',data:dr.map(d=>d.fat),backgroundColor:AM}]}});
+  mkChart('ch-t2',{type:'bar',data:{labels:L,datasets:[{label:'Visualizações da página',data:dr.map(d=>d.lpv),backgroundColor:OR},{label:'Vendas',data:dr.map(d=>d.vendas),backgroundColor:AM}]}});
+}
+
+// ───────────── Conferência Planilha × Meta ─────────────
+function renderConferencia(){
+  const rs=GROWS.filter(r=>inR(r.date,META.since,META.asOf));
+  const sh={inv:0,imp:0,ck:0,buy:0,cli:0}; rs.forEach(r=>{sh.inv+=r.inv;sh.imp+=r.imp;sh.ck+=r.ck;sh.buy+=r.buy;sh.cli+=r.cli;});
+  const C=Object.values(META.campanhas), me={inv:C.reduce((x,c)=>x+c.spend,0),imp:C.reduce((x,c)=>x+c.imp,0),ck:C.reduce((x,c)=>x+c.chk,0),buy:C.reduce((x,c)=>x+c.purch,0),cli:C.reduce((x,c)=>x+c.uclk,0)};
+  const row=(l,a,b,f,nota)=>{ const d=a-b, ok=Math.abs(d)<(f===fmtBRL?0.05:0.5);
+    return `<tr><td>${l}</td><td>${f(a)}</td><td>${f(b)}</td><td class="${ok?'ok':'warn'}">${ok?'✔ bate':(d>0?'+':'')+(f===fmtBRL?fmtBRL(Math.abs(d)).replace('R$ ',d<0?'-R$ ':'R$ '):fmtNum0(d))}</td><td style="text-align:left;font-family:'DM Sans'">${nota||''}</td></tr>`; };
+  const z=f=>x=>f(x)==='—'?'0':f(x);
+  return `<div class="sec-title">Conferência — planilha × gerenciador Meta (${brDate(META.since)}–${brDate(META.asOf)}, campanhas [WKSP UAN])</div>
+  <div class="tbl-wrap"><table><thead><tr><th>Métrica</th><th>Planilha</th><th>Meta (API)</th><th>Diferença</th><th style="text-align:left">Observação</th></tr></thead><tbody>
+  ${row('Investimento',sh.inv,me.inv,fmtBRL)}${row('Impressões',sh.imp,me.imp,z(fmtInt))}${row('Checkouts',sh.ck,me.ck,z(fmtInt))}
+  ${row('Compras gerenciador*',sh.buy,me.buy,z(fmtInt),'mesma métrica nas duas fontes')}
+  ${row('Cliques únicos',sh.cli,me.cli,z(fmtInt),'planilha soma únicos por anúncio/dia; Meta deduplica no período — metodologias diferentes')}
+  </tbody></table></div>
+  <div class="ob-info" style="margin-top:10px">Alcance <b>não está na planilha</b> (vem por dia e some errado): o valor correto é o do período completo, direto da API — FRIO ${fmtInt(META.campanhas.FRIO.reach)} + QUENTE ${fmtInt(META.campanhas.QUENTE.reach)}. A soma pode ter pessoas em comum entre as duas campanhas.</div>`;
+}
+
+// ───────────── Visão Geral ─────────────
+function renderVisao(){
+  const a=aggregate(FROM,TO), dr=dayRows(FROM,TO).reverse();
+  const kpi=(l,v,cls)=>`<div class="kpi-card"><div class="kpi-label">${l}</div><div class="kpi-value ${cls||''}">${v}</div></div>`;
+  $('tab-visao').innerHTML=avisos()+`<div class="kpi-grid">
+    ${kpi('Investimento',fmtBRL(a.inv),'orange')}${kpi('Fat. Total',fmtBRL(a.fat),'green')}${kpi('ROAS Total',fmtX(a.roas),a.roas>=1?'green':'red')}
+    ${kpi('Vendas Total',fmtNum0(a.vendas))}${kpi('meta_ads (SRC)',fmtNum0(a.vTraf),'orange')}${kpi('Sem rastreio',fmtNum0(a.vSem))}
+    ${kpi('Ticket Médio',fmtBRL(a.ticket))}${kpi('CAC Total',fmtBRL(a.cac))}</div>
+  <div class="chart-grid-2x2"><div class="chart-card"><h4>ROAS por dia</h4><canvas id="ch-v1"></canvas></div><div class="chart-card"><h4>Vendas por dia</h4><canvas id="ch-v2"></canvas></div></div>
+  <div class="sec-title">Dia a dia</div><div class="tbl-wrap"><table><thead><tr><th>Data</th><th>Invest.</th><th>Fat. Total</th><th>ROAS</th><th>Vendas</th><th>meta_ads</th><th>Sem rastreio</th><th>Ticket Médio</th><th>CAC</th><th>Checkouts</th><th>Compras Meta*</th><th>Alcance Meta</th></tr></thead><tbody>
+  ${dr.map(d=>`<tr><td>${brDate(d.data)}</td><td>${fmtBRL(d.inv)}</td><td>${fmtBRL(d.fat)}</td><td>${fmtX(d.roas)}</td><td>${fmtNum0(d.vendas)}</td><td>${fmtNum0(d.vTraf)}</td><td>${fmtNum0(d.vSem)}</td><td>${fmtBRL(d.ticket)}</td><td>${fmtBRL(d.cac)}</td><td>${fmtInt(d.ck)}</td><td>${fmtInt(d.buy)}</td><td>${fmtInt(d.reach)}</td></tr>`).join('')}
+  </tbody></table></div><div class="kpi-sub" style="margin-top:8px">Alcance Meta por dia = soma do alcance diário de FRIO + QUENTE (pode repetir pessoas entre campanhas). Antes de ${brDate(CONFIG.DATA_INICIO_TRAFEGO)} não havia investimento — as vendas desses dias são anteriores ao tráfego.</div>`;
+  const asc=[...dr].reverse(), L=asc.map(d=>brDate(d.data));
+  mkChart('ch-v1',{type:'line',data:{labels:L,datasets:[{label:'ROAS',data:asc.map(d=>d.roas),borderColor:OR,backgroundColor:'rgba(255,107,43,.15)',fill:true,tension:.3}]}});
+  mkChart('ch-v2',{type:'bar',data:{labels:L,datasets:[{label:'Vendas gerais',data:asc.map(d=>d.vendas),backgroundColor:OR},{label:'meta_ads (SRC)',data:asc.map(d=>d.vTraf),backgroundColor:AM}]}});
+}
+
+// ───────────── Criativos / Públicos ─────────────
+let criFilter='todos', criSort='inv', pubFilter='todos', pubSort='inv';
+function buildCriPubMaps(from,to){
+  const cri=new Map(), pub=new Map(), adset=new Map();
+  const latest={}; GROWS.forEach(r=>{ const k=r.pub+'|'+r.ad; if(!latest[k]||r.date>=latest[k].date) latest[k]=r; });
+  const latestAs={}; GROWS.forEach(r=>{ const k=r.pub+'|'+r.adset; if(!latestAs[k]||r.date>=latestAs[k].date) latestAs[k]=r; });
+  const add=(m,key,base,r)=>{ if(!m.has(key)) m.set(key,Object.assign({inv:0,imp:0,cli:0,ck:0,buy:0},base)); const o=m.get(key); o.inv+=r.inv;o.imp+=r.imp;o.cli+=r.cli;o.ck+=r.ck;o.buy+=r.buy; };
+  GROWS.filter(r=>inR(r.date,from,to)).forEach(r=>{
+    const l=latest[r.pub+'|'+r.ad];
+    add(cri,r.pub+'|'+r.ad,{ad:r.ad,pub:r.pub,ativo:!isPaused(l.status),link:l.link,adset:l.adset},r);
+    add(pub,r.pub,{pub:r.pub,ativo:true},r);
+    const la=latestAs[r.pub+'|'+r.adset];
+    add(adset,r.pub+'|'+r.adset,{adset:r.adset,pub:r.pub,ativo:!isPaused(la.status)},r);
+  });
+  [cri,pub,adset].forEach(m=>m.forEach(o=>{o.ctr=div(o.cli,o.imp)*100;o.cpc=div(o.inv,o.cli);o.cpm=div(o.inv,o.imp)*1000;o.cck=div(o.inv,o.ck);}));
+  const invFull={}; GROWS.filter(r=>inR(r.date,META.since,META.asOf)).forEach(r=>{ const k=r.pub+'|'+r.ad; invFull[k]=(invFull[k]||0)+r.inv; });
+  const codeOf=s=>norm(s).replace(/[^a-z0-9]/g,'');
+  const salesTraf=SALES.filter(s=>s.trafego&&inR(s.data,from,to));
+  cri.forEach((o,k)=>{ const m=META.anuncios[k]; o.reach=m?m.reach:0; o.freq=m?m.freq:0;
+    o.roasMeta=m&&invFull[k]?div(m.purchVal||0,invFull[k]):0;   // Meta*: período completo, não acompanha o filtro de datas
+    const code=codeOf(o.ad.replace(/_WKSP_UAN$/i,'')), full=codeOf(o.ad);
+    const mine=salesTraf.filter(s=>{ const c=codeOf(s.utmContent); if(!c||!(c.includes(full)||c.includes(code))) return false;
+      const t=norm(s.utmMedium+' '+s.utmCampaign); const pubT=t.includes('quente')?'QUENTE':(t.includes('frio')?'FRIO':''); return !pubT||pubT===o.pub; });
+    o.vTraf=mine.length; o.fTraf=mine.reduce((x,s)=>x+s.valor,0); o.roasReal=mine.length?div(o.fTraf,o.inv):null; });
+  pub.forEach((o,k)=>{ const m=META.campanhas[k]; o.reach=m?m.reach:0; o.freq=m?m.freq:0; });
+  adset.forEach(o=>{ const m=META.conjuntos[o.adset]; o.reach=m?m.reach:0; o.freq=m?m.freq:0; });
+  return {cri:[...cri.values()],pub:[...pub.values()],adset:[...adset.values()]};
+}
+const SORTS={inv:'Investimento',ctr:'CTR',cpc:'CPC',ck:'Checkouts',buy:'Compras Meta*'};
+function sortFn(k){ return (a,b)=> k==='cpc' ? ((a.cpc||1e9)-(b.cpc||1e9)) : (b[k]-a[k]); }
+function setCriFilter(v){criFilter=v;renderCriativos();} function setCriSort(v){criSort=v;renderCriativos();}
+function setPubFilter(v){pubFilter=v;renderPublicos();} function setPubSort(v){pubSort=v;renderPublicos();}
+const note=`<div class="ob-info">Sem página de vendas e sem UTM confiável, as <b>vendas reais por criativo/público não são rastreáveis</b> — aqui valem investimento, CTR, CPC, checkouts e as <b>compras do gerenciador<span class="tag-meta">*</span></b> (referência). <b>ROAS Meta*</b> = valor de compra do gerenciador ÷ investimento do período completo ${brDate(META.since)}–${brDate(META.asOf)} (referência, não acompanha o filtro de datas). Quando houver vendas rastreadas (SRC meta_ads) com <code>utm_content</code> igual ao anúncio, o card passa a mostrar o <b>ROAS real</b>.</div>`;
+function renderCriativos(){
+  const {cri}=buildCriPubMaps(FROM,TO);
+  let list=cri.filter(o=>criFilter==='todos'||(criFilter==='ativos'?o.ativo:!o.ativo)).sort(sortFn(criSort));
+  const btn=(f,v,l,cur)=>`<button class="${f} ${cur===v?'active':''}" onclick="${f==='cri-filter-btn'?'setCriFilter':'setCriSort'}('${v}')">${l}</button>`;
+  $('tab-criativos').innerHTML=note+`<div class="cri-filterbar">${btn('cri-filter-btn','todos','Todos',criFilter)}${btn('cri-filter-btn','ativos','Ativos',criFilter)}${btn('cri-filter-btn','inativos','Inativos',criFilter)}
+   <span class="cri-sort-label" style="margin-left:12px">Ordenar:</span>${Object.entries(SORTS).map(([k,l])=>btn('cri-sort-btn',k,l,criSort)).join('')}</div>
+  <div class="cri-grid">${list.map(o=>`<div class="cri-card ${o.ativo?'ativo':''}"><div class="cri-card-header"><div class="cri-name">${o.ad}<br><span style="color:rgba(255,255,255,.4);font-weight:400">${o.pub}</span></div><span class="cri-badge ${o.ativo?'ativo':'inativo'}">${o.ativo?'Ativo':'Inativo'}</span></div>
+    <div class="cri-metrics">
+    <div class="cri-metric"><span class="cri-metric-label">Investimento</span><span class="cri-metric-val hl">${fmtBRL(o.inv)}</span></div>
+    <div class="cri-metric"><span class="cri-metric-label">CTR</span><span class="cri-metric-val">${fmtPct(o.ctr)}</span></div>
+    <div class="cri-metric"><span class="cri-metric-label">CPC</span><span class="cri-metric-val">${fmtBRL(o.cpc)}</span></div>
+    <div class="cri-metric"><span class="cri-metric-label">Checkouts</span><span class="cri-metric-val">${fmtInt(o.ck)}</span></div>
+    <div class="cri-metric"><span class="cri-metric-label">Compras Meta*</span><span class="cri-metric-val">${fmtInt(o.buy)}</span></div>
+    <div class="cri-metric"><span class="cri-metric-label">${o.roasReal!=null?'ROAS (vendas rastreadas)':'ROAS Meta*'}</span><span class="cri-metric-val hl">${fmtX(o.roasReal!=null?o.roasReal:o.roasMeta)}</span></div></div>
+    ${o.link?`<a class="cri-link" href="${o.link}" target="_blank" rel="noopener">${o.link}</a>`:''}</div>`).join('')||'<div class="kpi-sub">Nada no período.</div>'}</div>
+  <div class="sec-title">Tabela</div><div class="tbl-wrap"><table><thead><tr><th>Anúncio</th><th>Público</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Checkouts</th><th>Custo/Checkout</th><th>Compras Meta*</th><th>ROAS Meta*</th><th>Vendas rastreadas</th><th>ROAS rastreado</th></tr></thead><tbody>
+  ${list.map(o=>`<tr><td>${o.ad}</td><td>${o.pub}</td><td>${fmtBRL(o.inv)}</td><td>${fmtInt(o.imp)}</td><td>${fmtInt(o.cli)}</td><td>${fmtPct(o.ctr)}</td><td>${fmtBRL(o.cpc)}</td><td>${fmtBRL(o.cpm)}</td><td>${fmtInt(o.ck)}</td><td>${fmtBRL(o.cck)}</td><td>${fmtInt(o.buy)}</td><td>${fmtX(o.roasMeta)}</td><td>${fmtNum0(o.vTraf)}</td><td>${fmtX(o.roasReal)}</td></tr>`).join('')}</tbody></table></div>`;
+}
+function renderPublicos(){
+  const {pub,adset}=buildCriPubMaps(FROM,TO);
+  const lp=pub.filter(o=>pubFilter==='todos'||o.pub===pubFilter).sort(sortFn(pubSort)), la=adset.filter(o=>pubFilter==='todos'||o.pub===pubFilter).sort(sortFn(pubSort));
+  const b=(v,l)=>`<button class="pub-filter-btn ${pubFilter===v?'active':''}" onclick="setPubFilter('${v}')">${l}</button>`;
+  const card=(nome,o)=>`<div class="pub-card ${o.ativo?'ativo':''}"><div class="pub-card-header"><div class="pub-name">${nome}</div><span class="cri-badge ${o.ativo?'ativo':'inativo'}">${o.pub}</span></div>
+    <div class="pub-metrics"><div class="pub-metric"><div class="pub-metric-val">${fmtBRL(o.inv)}</div><div class="pub-metric-lbl">Invest.</div></div><div class="pub-metric"><div class="pub-metric-val neutral">${fmtPct(o.ctr)}</div><div class="pub-metric-lbl">CTR</div></div><div class="pub-metric"><div class="pub-metric-val neutral">${fmtBRL(o.cpc)}</div><div class="pub-metric-lbl">CPC</div></div>
+    <div class="pub-metric"><div class="pub-metric-val neutral">${fmtInt(o.ck)}</div><div class="pub-metric-lbl">Checkouts</div></div><div class="pub-metric"><div class="pub-metric-val neutral">${fmtInt(o.buy)}</div><div class="pub-metric-lbl">Compras Meta*</div></div><div class="pub-metric"><div class="pub-metric-val neutral">${fmtInt(o.reach)}</div><div class="pub-metric-lbl">Alcance · ${fmtDec(o.freq)}x</div></div></div></div>`;
+  $('tab-publicos').innerHTML=note+`<div class="cri-filterbar">${b('todos','Todos')}${b('FRIO','Frio')}${b('QUENTE','Quente')}<span class="cri-sort-label" style="margin-left:12px">Ordenar:</span>${Object.entries(SORTS).map(([k,l])=>`<button class="pub-sort-btn ${pubSort===k?'active':''}" onclick="setPubSort('${k}')">${l}</button>`).join('')}</div>
+  <div class="sec-title">Campanhas por público</div><div class="pub-grid">${lp.map(o=>card('Campanha '+o.pub,o)).join('')}</div>
+  <div class="sec-title">Conjuntos de anúncios</div><div class="pub-grid">${la.map(o=>card(o.adset,o)).join('')}</div>
+  <div class="tbl-wrap"><table><thead><tr><th>Conjunto</th><th>Público</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Checkouts</th><th>Compras Meta*</th><th>Alcance</th><th>Freq.</th></tr></thead><tbody>
+  ${la.map(o=>`<tr><td>${o.adset}</td><td>${o.pub}</td><td>${fmtBRL(o.inv)}</td><td>${fmtInt(o.imp)}</td><td>${fmtInt(o.cli)}</td><td>${fmtPct(o.ctr)}</td><td>${fmtBRL(o.cpc)}</td><td>${fmtBRL(o.cpm)}</td><td>${fmtInt(o.ck)}</td><td>${fmtInt(o.buy)}</td><td>${fmtInt(o.reach)}</td><td>${fmtDec(o.freq)}</td></tr>`).join('')}</tbody></table></div>`;
+}
+
+// ───────────── Semana / Mês ─────────────
+function groupBy(keyFn,labelFn){
+  const days=dayRows(FROM,TO), m=new Map();
+  days.forEach(d=>{ const k=keyFn(d.data); if(!m.has(k)) m.set(k,{k,label:labelFn(k,d.data),from:d.data,to:d.data}); const g=m.get(k); g.to=d.data; });
+  return [...m.values()].map(g=>Object.assign(g,aggregate(g.from,g.to)));
+}
+function periodTable(rows){
+  return `<div class="tbl-wrap"><table><thead><tr><th>Período</th><th>Invest.</th><th>Fat. Total</th><th>ROAS</th><th>Vendas</th><th>meta_ads</th><th>Ticket</th><th>CAC</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Checkouts</th><th>Compras Meta*</th></tr></thead><tbody>
+  ${rows.map(g=>`<tr><td>${g.label}</td><td>${fmtBRL(g.inv)}</td><td>${fmtBRL(g.fat)}</td><td>${fmtX(g.roas)}</td><td>${fmtNum0(g.vendas)}</td><td>${fmtNum0(g.vTraf)}</td><td>${fmtBRL(g.ticket)}</td><td>${fmtBRL(g.cac)}</td><td>${fmtInt(g.cli)}</td><td>${fmtPct(g.ctr)}</td><td>${fmtBRL(g.cpc)}</td><td>${fmtInt(g.ck)}</td><td>${fmtInt(g.buy)}</td></tr>`).join('')}</tbody></table></div>`;
+}
+function renderSemanal(){
+  const rows=groupBy(weekStart,(k,d)=>'Sem. '+brDate(k)+' →'); rows.forEach(g=>g.label='Sem. '+brDate(g.from)+'–'+brDate(g.to));
+  $('tab-semanal').innerHTML=avisos()+`<div class="chart-grid-2x2"><div class="chart-card"><h4>Investimento por semana</h4><canvas id="ch-s1"></canvas></div><div class="chart-card"><h4>CTR por semana</h4><canvas id="ch-s2"></canvas></div></div>`+periodTable(rows);
+  mkChart('ch-s1',{type:'bar',data:{labels:rows.map(g=>g.label),datasets:[{label:'Investimento',data:rows.map(g=>g.inv),backgroundColor:OR},{label:'Faturamento',data:rows.map(g=>g.fat),backgroundColor:AM}]}});
+  mkChart('ch-s2',{type:'line',data:{labels:rows.map(g=>g.label),datasets:[{label:'CTR %',data:rows.map(g=>g.ctr),borderColor:OR,backgroundColor:'rgba(255,107,43,.15)',fill:true,tension:.3}]}});
+}
+function renderMensal(){
+  const mn=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const rows=groupBy(d=>d.slice(0,7),k=>mn[+k.slice(5,7)-1]+'/'+k.slice(0,4));
+  $('tab-mensal').innerHTML=avisos()+`<div class="chart-grid-2x2"><div class="chart-card"><h4>Investimento × Faturamento por mês</h4><canvas id="ch-m1"></canvas></div><div class="chart-card"><h4>CTR por mês</h4><canvas id="ch-m2"></canvas></div></div>`+periodTable(rows);
+  mkChart('ch-m1',{type:'bar',data:{labels:rows.map(g=>g.label),datasets:[{label:'Investimento',data:rows.map(g=>g.inv),backgroundColor:OR},{label:'Faturamento',data:rows.map(g=>g.fat),backgroundColor:AM}]}});
+  mkChart('ch-m2',{type:'line',data:{labels:rows.map(g=>g.label),datasets:[{label:'CTR %',data:rows.map(g=>g.ctr),borderColor:OR,backgroundColor:'rgba(255,107,43,.15)',fill:true,tension:.3}]}});
+}
+
+function renderAll(){
+  document.title=CONFIG.PRODUTO+' · '+CONFIG.CLIENTE+' — Jamelli GT';
+  $('range-info').textContent=FROM&&TO?(brDate(FROM)+' → '+brDate(TO)+' · dados até '+brDate(DATA_MAX)):'';
+  const act=document.querySelector('.content.active'); const id=act?act.id.replace('tab-',''):'trafego';
+  ({trafego:renderTrafego,visao:renderVisao,criativos:renderCriativos,publicos:renderPublicos,semanal:renderSemanal,mensal:renderMensal})[id]();
+}
+loadData();
+</script>
+</body>
+</html>
