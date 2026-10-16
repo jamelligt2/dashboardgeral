@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Legado em Família · Lilian — Jamelli GT</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Crect width='36' height='36' rx='8' fill='%230a0a0a'/%3E%3Ctext x='18' y='25' text-anchor='middle' font-family='Arial,sans-serif' font-weight='700' font-size='13' fill='%23ff6b2b'%3EJGT%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ===== BASE — perpétuo v2 sobre preto puro (identidade-jamelli-gt) ===== */
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0a0a;color:#e8e6f0;font-family:'DM Sans',sans-serif;min-height:100vh}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:#141414}::-webkit-scrollbar-thumb{background:#ff6b2b55;border-radius:3px}
+.wrap{max-width:1320px;margin:0 auto;padding:0 28px 60px}
+.topbar{background:#141414;padding:12px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.07);position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:10px}
+.brand{font-size:17px;font-weight:700;color:#ff6b2b}
+.subtitle{font-size:11px;color:rgba(255,255,255,0.4);margin-top:2px}
+.logo-jgt{display:flex;align-items:center;gap:10px}
+.logo-jgt svg{width:36px;height:36px;flex-shrink:0}
+.logo-text{display:flex;flex-direction:column}
+.logo-text strong{font-size:13px;font-weight:700;color:#ff6b2b;letter-spacing:.3px}
+.logo-text span{font-size:10px;color:rgba(255,255,255,.35);margin-top:1px}
+.period-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.period-bar label{font-size:11px;color:rgba(255,255,255,.45);white-space:nowrap}
+.date-input{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:#e8e6f0;padding:5px 10px;border-radius:6px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;outline:none;min-width:118px;color-scheme:dark}
+.date-input:focus{border-color:#ff6b2b}
+.date-input::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;cursor:pointer}
+.period-sep{color:rgba(255,255,255,.2);font-size:13px;padding:0 2px}
+.preset-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;transition:all .2s;white-space:nowrap}
+.preset-btn:hover,.preset-btn.active{background:rgba(255,107,43,.2);border-color:#ff6b2b;color:#ff6b2b;font-weight:600}
+.range-info{font-size:11px;color:rgba(255,107,43,.75);font-family:'DM Mono',monospace;white-space:nowrap;padding-left:4px}
+.live-cluster{display:flex;align-items:center;gap:8px;font-size:11px;color:rgba(255,255,255,.4);margin-top:4px;justify-content:flex-end}
+.live-dot{width:7px;height:7px;border-radius:50%;background:#2ecc71;box-shadow:0 0 5px #2ecc71;flex-shrink:0}
+.live-dot.loading{background:#f1c40f;box-shadow:0 0 5px #f1c40f;animation:pulse 1s infinite}
+.live-dot.err{background:#e74c3c;box-shadow:0 0 5px #e74c3c;animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.btn-refresh{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:#e8e6f0;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600;font-family:'DM Sans',sans-serif}
+.btn-refresh:hover{border-color:#ff6b2b;color:#ff6b2b}
+.btn-refresh:disabled{opacity:.5;cursor:default}
+.tabs{display:flex;border-bottom:1px solid rgba(255,255,255,0.07);background:#141414;padding:0 28px;overflow-x:auto}
+.tab{padding:12px 20px;cursor:pointer;font-size:13px;color:rgba(255,255,255,0.5);border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
+.tab:hover{color:#e8e6f0}.tab.active{color:#ff6b2b;border-bottom-color:#ff6b2b;font-weight:600}
+.content{padding:24px 0;display:none}.content.active{display:block}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:20px}
+.kpi-card{background:#141414;border:1px solid #444;border-top:3px solid #ff6b2b;border-radius:10px;padding:16px 18px}
+.kpi-label{font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.kpi-value{font-size:20px;font-weight:700;font-family:'DM Mono',monospace}
+.kpi-sub{font-size:11px;color:rgba(255,255,255,.4);margin-top:4px;font-family:'DM Mono',monospace}
+.orange{color:#ff6b2b}.green{color:#2ecc71}.red{color:#e74c3c}.yellow{color:#f1c40f}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#141414;color:rgba(255,255,255,.45);padding:8px 10px;text-align:right;font-weight:500;border-bottom:1px solid rgba(255,255,255,.07);white-space:nowrap}
+th:first-child{text-align:left}
+td{padding:7px 10px;text-align:right;border-bottom:1px solid rgba(255,255,255,.04);font-family:'DM Mono',monospace;font-size:11px;color:#e8e6f0}
+td:first-child{text-align:left;font-family:'DM Sans',sans-serif;font-size:12px}
+tr:nth-child(even) td{background:rgba(255,255,255,.035)}
+tr:hover td{background:rgba(255,255,255,.07)}
+.tbl-wrap{overflow-x:auto;border-radius:8px;border:1px solid rgba(255,255,255,.07)}
+.chart-card{background:#141414;border:1px solid #444;border-top:3px solid #ff6b2b;border-radius:10px;padding:16px;margin-top:16px}
+.chart-card h4{font-size:11px;color:rgba(255,255,255,.45);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
+.chart-card canvas{max-height:260px}
+.sec-title{font-size:13px;font-weight:600;color:rgba(255,255,255,.65);margin:20px 0 10px;border-left:3px solid #ff6b2b;padding-left:10px}
+.sec-title:first-child{margin-top:0}
+
+/* ===== CAPTAÇÃO — mesma linguagem visual ===== */
+.temp-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:20px}
+.temp-card{border-radius:10px;padding:18px;border:2px solid}
+.temp-card.quente{border-color:#e74c3c;background:rgba(231,76,60,.08)}
+.temp-card.frio{border-color:#42a5f5;background:rgba(66,165,245,.08)}
+.temp-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px}
+.temp-card.quente .temp-title{color:#e74c3c}
+.temp-card.frio .temp-title{color:#42a5f5}
+.temp-sub{font-size:11px;color:rgba(255,255,255,.4);margin-bottom:14px}
+.temp-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.temp-metric{background:rgba(255,255,255,.04);border-radius:6px;padding:8px 6px;text-align:center}
+.temp-metric-val{font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:#e8e6f0}
+.temp-metric-lbl{font-size:9px;color:rgba(255,255,255,.35);margin-top:2px;text-transform:uppercase;letter-spacing:.4px}
+.temp-detail{font-size:11px;color:rgba(255,255,255,.55);font-family:'DM Mono',monospace;line-height:1.7}
+.comp-card{background:#141414;border:1px solid #444;border-top:3px solid #ff6b2b;border-radius:10px;padding:18px;display:flex;flex-direction:column;justify-content:center;gap:10px}
+.comp-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:rgba(255,255,255,.7);padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.comp-row:last-child{border-bottom:none}
+.comp-val{font-family:'DM Mono',monospace;font-size:15px;font-weight:600;color:#ff6b2b}
+.comp-bar-track{flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:5px;overflow:hidden;margin:0 10px}
+.comp-bar-fill{height:100%;border-radius:5px}
+.comp-text{font-size:11.5px;color:rgba(255,255,255,.55);line-height:1.5}
+.comp-text b{color:#ff6b2b}
+
+.funil-wrap{display:flex;gap:16px;align-items:stretch;margin-bottom:20px;flex-wrap:wrap}
+.funnel-svg-wrap{flex:0 0 52%;max-width:52%;background:#141414;border:1px solid #444;border-top:3px solid #ff6b2b;border-radius:10px;padding:12px}
+.funnel-svg-wrap svg{width:100%;height:auto;display:block}
+.funnel-metrics-row{flex:1;min-width:220px;display:flex;flex-direction:column;gap:12px}
+.metric-card{--c:#ff6b2b;position:relative;overflow:hidden;flex:1;background:#141414;border:1px solid #444;border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;justify-content:center}
+.metric-card::after{content:'';position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--c)}
+.metric-card .kpi-value{font-size:26px;color:var(--c)}
+
+tr.total td{background:rgba(255,107,43,.12);color:#ff6b2b;font-weight:700;border-top:1px solid #ff6b2b}
+a.link-ad{color:rgba(255,107,43,.8);text-decoration:none}
+a.link-ad:hover{color:#ff6b2b;text-decoration:underline}
+
+.profile-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.profile-card{background:#141414;border:1px solid #444;border-top:3px solid #ff6b2b;border-radius:10px;padding:16px}
+.profile-card h4{margin:0 0 12px;font-size:11px;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+.profile-item{margin-bottom:10px}
+.profile-item .top{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;color:rgba(255,255,255,.7)}
+.profile-item .top b{color:#e8e6f0;font-family:'DM Mono',monospace}
+.profile-bar{height:6px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden}
+.profile-bar span{display:block;height:100%;background:#ff6b2b}
+
+.search-box{margin-bottom:14px}
+.search-box input{width:100%;max-width:340px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:#e8e6f0;padding:9px 14px;border-radius:8px;font-size:13px;font-family:'DM Sans',sans-serif}
+.search-box input::placeholder{color:rgba(255,255,255,.35)}
+.search-box input:focus{outline:none;border-color:#ff6b2b}
+
+.lead-count{font-size:12px;color:rgba(255,255,255,.5);font-family:'DM Mono',monospace;margin:0 0 10px}
+.lead-table th{text-align:left}
+.lead-table td{vertical-align:top;text-align:left}
+.lead-table td:first-child,.lead-table th:first-child{text-align:center;color:rgba(255,255,255,.35);font-family:'DM Mono',monospace}
+.lead-table td.nm{font-family:'DM Sans',sans-serif;font-size:12px;color:#e8e6f0;white-space:nowrap}
+.lead-table td.nw{white-space:nowrap}
+.lead-table td.ans{font-family:'DM Sans',sans-serif;font-size:12px;color:rgba(255,255,255,.8);min-width:150px;max-width:230px;line-height:1.4}
+.lead-table th.qh{white-space:normal;min-width:150px;max-width:230px;line-height:1.3;font-size:11px;vertical-align:bottom}
+.skeleton{color:rgba(255,255,255,.4);font-size:13px;padding:30px;text-align:center}
+
+@media(max-width:1150px){.profile-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:900px){.temp-grid{grid-template-columns:1fr}.funil-wrap{flex-direction:column}.funnel-svg-wrap{flex:none;max-width:100%}.kpi-grid{grid-template-columns:repeat(2,1fr)}.profile-grid{grid-template-columns:1fr}.live-cluster{justify-content:flex-start}}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="logo-jgt">
+    <svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+      <rect width="36" height="36" rx="8" fill="#ff6b2b" fill-opacity="0.9"/>
+      <text x="18" y="25" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="13" fill="white">JGT</text>
+    </svg>
+    <div class="logo-text">
+      <strong>Jamelli GT</strong>
+      <span>Tráfego Pago</span>
+    </div>
+  </div>
+  <div class="period-bar">
+    <label>Período</label>
+    <input type="date" class="date-input" id="dateFrom">
+    <span class="period-sep">→</span>
+    <input type="date" class="date-input" id="dateTo">
+    <button class="preset-btn" data-preset="7">7d</button>
+    <button class="preset-btn" data-preset="30">30d</button>
+    <button class="preset-btn" data-preset="all">Tudo</button>
+    <span class="range-info" id="filterRangeLabel"></span>
+  </div>
+  <div>
+    <div class="brand" id="brand-title">🎯 Legado em Família · Lilian</div>
+    <div class="subtitle">Dashboard de Captação — JGTCL0049 · dados ao vivo da planilha · Jamelli GT</div>
+    <div class="live-cluster">
+      <span class="live-dot" id="liveDot"></span>
+      <span id="liveStatus">carregando…</span>
+      <button class="btn-refresh" id="btnRefresh">Atualizar agora</button>
+      <span id="liveUpdated"></span>
+    </div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" data-tab="visao-geral">🌐 Visão Geral</div>
+  <div class="tab" data-tab="criativos">Criativos</div>
+  <div class="tab" data-tab="publicos">Públicos</div>
+  <div class="tab" data-tab="analise-diaria">Análise Diária</div>
+  <div class="tab" data-tab="leads">Leads</div>
+</div>
+
+<div class="wrap">
+  <div id="appRoot">
+    <div class="skeleton">Carregando dados da planilha…</div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  // ============================= CONFIG =============================
+  var SHEET_ID = '1F_oyP5sMc_s7aSHgZdTspZWDKR3lk-5r9GnFWJehJIU';
+  var REFRESH_MS = 60 * 60 * 1000; // 1 hora
+
+  // O formulário da Lilian tem 8 perguntas (colunas D a K da aba "LD COMPLETO").
+  // O perfil é montado dinamicamente a partir das respostas reais — nada de opções fixas.
+  var QUESTION_COUNT = 8;
+  var MAX_OPTIONS = 6;
+
+  // ============================= STATE =============================
+  var state = {
+    metaRows: [],
+    leadRows: [],
+    qLabels: [],
+    minDate: null,
+    maxDate: null,
+    filterFrom: null,
+    filterTo: null,
+    dailyChart: null,
+    loading: false
+  };
+
+  // ============================= HELPERS =============================
+  function fmtBRL(v) {
+    if (v === null || v === undefined || isNaN(v)) return '—';
+    var neg = v < 0; v = Math.abs(v);
+    var fixed = v.toFixed(2);
+    var parts = fixed.split('.');
+    var intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return (neg ? '-' : '') + 'R$ ' + intPart + ',' + parts[1];
+  }
+  function fmtInt(v) {
+    return Math.round(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+  function fmtPct(v, dec) {
+    if (dec === undefined) dec = 2;
+    if (v === null || v === undefined || isNaN(v)) return '—';
+    return v.toFixed(dec).replace('.', ',') + '%';
+  }
+  function fmtCPL(leads, cpl) { return leads > 0 ? fmtBRL(cpl) : '—'; }
+  function fmtCPC(clicks, cpc) { return clicks > 0 ? fmtBRL(cpc) : '—'; }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  // ============================= GVIZ TABLE -> STRING ROWS =============================
+  // Each cell becomes the same kind of plain string our parsers already expect
+  // (the sheet's own formatted display, e.g. "R$ 1.435,81", "13/07/2026", "31").
+  function cellStr(cell) {
+    if (!cell) return '';
+    if (cell.f !== undefined && cell.f !== null) return cell.f;
+    if (cell.v === undefined || cell.v === null) return '';
+    return String(cell.v);
+  }
+  function tableToRows(json) {
+    var rows = (json && json.table && json.table.rows) || [];
+    return rows.map(function (row) {
+      var cells = (row && row.c) || [];
+      var out = [];
+      for (var i = 0; i < cells.length; i++) out.push(cellStr(cells[i]));
+      return out;
+    });
+  }
+
+  function parseCurrencyBR(s) {
+    if (!s) return 0;
+    var t = String(s).replace('R$', '').trim();
+    if (t === '') return 0;
+    t = t.replace(/\./g, '').replace(',', '.');
+    var v = parseFloat(t);
+    return isNaN(v) ? 0 : v;
+  }
+  function parseIntSafe(s) {
+    if (!s) return 0;
+    var v = parseInt(String(s).trim(), 10);
+    return isNaN(v) ? 0 : v;
+  }
+  function brDateToISO(s) {
+    var m = String(s).trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!m) return null;
+    return m[3] + '-' + m[2] + '-' + m[1];
+  }
+  function isoToBR(iso) {
+    var p = iso.split('-'); return p[2] + '/' + p[1] + '/' + p[0];
+  }
+  function isoToDM(iso) {
+    var p = iso.split('-'); return p[2] + '/' + p[1];
+  }
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  function localISO(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+  function todayLocalISO() { return localISO(new Date()); }
+  function isoAddDays(iso, days) {
+    var p = iso.split('-').map(Number);
+    var d = new Date(p[0], p[1] - 1, p[2]);
+    d.setDate(d.getDate() + days);
+    return localISO(d);
+  }
+
+  function parseMetaRows(csvRows) {
+    var out = [];
+    for (var i = 0; i < csvRows.length; i++) {
+      var r = csvRows[i];
+      if (!r || !r[0]) continue;
+      var dateISO = brDateToISO(r[0]);
+      if (!dateISO) continue;
+      out.push({
+        dateISO: dateISO,
+        adset: (r[2] || '').trim(),
+        ad: (r[3] || '').trim(),
+        link: r[4] || '',
+        spend: parseCurrencyBR(r[5]),
+        clicks: parseIntSafe(r[6]),
+        impr: parseIntSafe(r[8]),
+        leads: parseIntSafe(r[9])
+      });
+    }
+    return out;
+  }
+  function classifyTemp(adsetName) { return /engajamento/i.test(adsetName) ? 'quente' : 'frio'; }
+
+  // Aceita "2026-10-16 14:30" (ISO) ou "16/10/2026 14:30:00" (BR). Linha sem data válida
+  // (ex.: cabeçalho que escapou) é ignorada.
+  function parseLeadDate(s) {
+    s = String(s || '').trim();
+    var m;
+    // Timestamp com fuso (ex.: 2026-10-16T02:19:46.000Z) -> converte para America/Sao_Paulo,
+    // para o lead cair no mesmo dia da mídia (Meta Ads usa o dia local).
+    if (/^\d{4}-\d{2}-\d{2}T.*(Z|[+-]\d{2}:?\d{2})$/.test(s)) {
+      var dt = new Date(s);
+      if (!isNaN(dt.getTime())) {
+        var p = dt.toLocaleString('sv-SE', { timeZone: 'America/Sao_Paulo', hourCycle: 'h23' });
+        return { dateOnly: p.slice(0, 10), hhmm: p.slice(11, 16) };
+      }
+    }
+    m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ]+(\d{1,2}):(\d{2}))?/);
+    if (m) return { dateOnly: m[1] + '-' + m[2] + '-' + m[3], hhmm: m[4] ? pad2(+m[4]) + ':' + m[5] : '' };
+    m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,T]+(\d{1,2}):(\d{2}))?/);
+    if (m) return { dateOnly: m[3] + '-' + pad2(+m[2]) + '-' + pad2(+m[1]), hhmm: m[4] ? pad2(+m[4]) + ':' + m[5] : '' };
+    return null;
+  }
+  function parseLeadRows(csvRows) {
+    var out = [];
+    for (var i = 0; i < csvRows.length; i++) {
+      var r = csvRows[i];
+      if (!r || !r[0]) continue;
+      var d = parseLeadDate(r[0]);
+      if (!d) continue;
+      var nome = (r[1] || '').trim();
+      if (nome.toLowerCase().indexOf('<test lead') === 0) continue;
+      var answers = [];
+      for (var q = 0; q < QUESTION_COUNT; q++) answers.push(String(r[3 + q] == null ? '' : r[3 + q]).trim());
+      out.push({
+        dataISO: d.dateOnly + ' ' + d.hhmm, dateOnly: d.dateOnly, hhmm: d.hhmm, nome: nome,
+        telefone: (r[2] || '').trim(), answers: answers
+      });
+    }
+    return out;
+  }
+  function fmtPhone(telRaw) {
+    var t = String(telRaw || '').replace(/\D/g, '');
+    if (t.length === 13 && t.indexOf('55') === 0) return '+55 (' + t.slice(2,4) + ') ' + t.slice(4,9) + '-' + t.slice(9,13);
+    if (t.length === 12 && t.indexOf('55') === 0) return '+55 (' + t.slice(2,4) + ') ' + t.slice(4,8) + '-' + t.slice(8,12);
+    if (t.length === 11) return '+55 (' + t.slice(0,2) + ') ' + t.slice(2,7) + '-' + t.slice(7,11);
+    if (t.length === 10) return '+55 (' + t.slice(0,2) + ') ' + t.slice(2,6) + '-' + t.slice(6,10);
+    return telRaw || '—';
+  }
+
+  // ============================= AGGREGATION =============================
+  function agg(rows) {
+    var inv = 0, clk = 0, imp = 0, lds = 0;
+    for (var i = 0; i < rows.length; i++) { inv += rows[i].spend; clk += rows[i].clicks; imp += rows[i].impr; lds += rows[i].leads; }
+    var ctr = imp ? (clk / imp * 100) : 0;
+    var cpc = clk ? (inv / clk) : 0;
+    var cpm = imp ? (inv / imp * 1000) : 0;
+    var cpl = lds ? (inv / lds) : 0;
+    var txconv = clk ? (lds / clk * 100) : 0;
+    return { invest: inv, clicks: clk, impr: imp, leads: lds, ctr: ctr, cpc: cpc, cpm: cpm, cpl: cpl, txconv: txconv };
+  }
+  function groupBy(rows, keyFn) {
+    var m = {}, order = [];
+    for (var i = 0; i < rows.length; i++) {
+      var k = keyFn(rows[i]);
+      if (!m[k]) { m[k] = []; order.push(k); }
+      m[k].push(rows[i]);
+    }
+    return { map: m, keys: order };
+  }
+  function cplSortAsc(a, b) {
+    var av = a.leads > 0 ? a.cpl : Infinity;
+    var bv = b.leads > 0 ? b.cpl : Infinity;
+    return av - bv;
+  }
+  // ============================= DATA FETCH (JSONP — não sofre bloqueio de CORS) =============================
+  var jsonpSeq = 0;
+  function fetchJSONP(url) {
+    return new Promise(function (resolve, reject) {
+      jsonpSeq++;
+      var cbName = '__gvizCb_' + Date.now() + '_' + jsonpSeq;
+      var script = document.createElement('script');
+      var done = false;
+      var timeoutId = setTimeout(function () {
+        if (done) return;
+        done = true;
+        cleanup();
+        reject(new Error('tempo esgotado ao carregar a planilha'));
+      }, 20000);
+      function cleanup() {
+        clearTimeout(timeoutId);
+        try { delete window[cbName]; } catch (e) { window[cbName] = undefined; }
+        if (script.parentNode) script.parentNode.removeChild(script);
+      }
+      window[cbName] = function (data) {
+        if (done) return;
+        done = true;
+        cleanup();
+        resolve(data);
+      };
+      script.onerror = function () {
+        if (done) return;
+        done = true;
+        cleanup();
+        reject(new Error('falha de rede ao carregar a planilha'));
+      };
+      var full = url + (url.indexOf('?') === -1 ? '?' : '&') + 'tqx=out:json;responseHandler:' + cbName + '&_=' + Date.now();
+      script.src = full;
+      document.head.appendChild(script);
+    });
+  }
+  function loadTable(sheetName) {
+    var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/gviz/tq?headers=1&sheet=' + encodeURIComponent(sheetName);
+    return fetchJSONP(url).then(function (json) {
+      if (!json || json.status === 'error') {
+        var msg = (json && json.errors && json.errors[0] && (json.errors[0].detailed_message || json.errors[0].message)) || 'erro ao ler a aba ' + sheetName;
+        throw new Error(msg);
+      }
+      var rows = tableToRows(json);
+      rows.labels = ((json.table && json.table.cols) || []).map(function (c) { return (c && c.label) || ''; });
+      return rows;
+    });
+  }
+
+  function loadData() {
+    setLive('loading', 'atualizando…');
+    document.getElementById('btnRefresh').disabled = true;
+    return Promise.all([loadTable('Meta_Ads'), loadTable('LD COMPLETO')]).then(function (r) {
+      var metaRows = parseMetaRows(r[0]);
+      var leadRows = parseLeadRows(r[1]);
+      state.qLabels = (r[1].labels || []).slice(3, 3 + QUESTION_COUNT);
+      if (metaRows.length === 0) throw new Error('planilha vazia');
+      state.metaRows = metaRows;
+      state.leadRows = leadRows;
+      var dates = metaRows.map(function (r) { return r.dateISO; }).sort();
+      state.minDate = dates[0];
+      state.maxDate = dates[dates.length - 1];
+      if (!state.filterFrom || !state.filterTo || state.presetAll) {
+        state.filterFrom = state.minDate;
+        state.filterTo = state.maxDate;
+      } else {
+        if (state.filterTo > state.maxDate) state.filterTo = state.maxDate;
+      }
+      document.getElementById('dateFrom').min = state.minDate;
+      document.getElementById('dateFrom').max = state.maxDate;
+      document.getElementById('dateTo').min = state.minDate;
+      document.getElementById('dateTo').max = state.maxDate;
+      document.getElementById('dateFrom').value = state.filterFrom;
+      document.getElementById('dateTo').value = state.filterTo;
+      setLive('ok', 'ao vivo');
+      var now = new Date();
+      document.getElementById('liveUpdated').textContent = 'Última atualização: ' + now.toLocaleTimeString('pt-BR');
+      render();
+    }).catch(function (err) {
+      console.error(err);
+      var reason = (err && err.message) ? err.message : 'erro desconhecido';
+      var hasData = state.metaRows.length > 0;
+      setLive('err', 'falha ao atualizar: ' + reason + (hasData ? ' (dados anteriores mantidos)' : ''));
+    }).finally(function () {
+      document.getElementById('btnRefresh').disabled = false;
+    });
+  }
+
+  function setLive(kind, text) {
+    var dot = document.getElementById('liveDot');
+    dot.className = 'live-dot' + (kind === 'loading' ? ' loading' : kind === 'err' ? ' err' : '');
+    document.getElementById('liveStatus').textContent = text;
+  }
+
+  // ============================= RENDER =============================
+  function getFiltered() {
+    var f = state.filterFrom, t = state.filterTo;
+    var meta = state.metaRows.filter(function (r) { return r.dateISO >= f && r.dateISO <= t; });
+    var leads = state.leadRows.filter(function (r) { return r.dateOnly >= f && r.dateOnly <= t; });
+    return { meta: meta, leads: leads };
+  }
+
+  function render() {
+    var filt = getFiltered();
+    var meta = filt.meta, leadsF = filt.leads;
+
+    document.getElementById('filterRangeLabel').textContent =
+      isoToBR(state.filterFrom) + ' → ' + isoToBR(state.filterTo) +
+      ' · ' + meta.length + ' linhas de mídia · ' + leadsF.length + ' leads';
+
+    var root = document.getElementById('appRoot');
+    if (!root.querySelector('.content')) {
+      root.innerHTML = buildSkeleton();
+      bindTabs();
+      document.getElementById('leadSearch').addEventListener('input', applyLeadSearch);
+    }
+
+    renderVisaoGeral(meta, leadsF);
+    renderCriativos(meta);
+    renderPublicos(meta);
+    renderAnaliseDiaria(meta);
+    renderLeads(leadsF);
+  }
+
+  function buildSkeleton() {
+    return '' +
+    '<div class="content active" id="visao-geral"></div>' +
+    '<div class="content" id="criativos"></div>' +
+    '<div class="content" id="publicos"></div>' +
+    '<div class="content" id="analise-diaria"></div>' +
+    '<div class="content" id="leads">' +
+    '  <div class="sec-title">Leads do Formulário — Contato e Respostas</div>' +
+    '  <div class="search-box" style="margin-top:14px"><input type="text" id="leadSearch" placeholder="Buscar por nome ou telefone..."></div>' +
+    '  <div class="lead-count" id="leadCount"></div>' +
+    '  <div class="tbl-wrap"><table id="leadsTable" class="lead-table"><thead></thead><tbody></tbody></table></div>' +
+    '</div>';
+  }
+
+  function bindTabs() {
+    var btns = document.querySelectorAll('.tab');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].addEventListener('click', function (e) {
+        var btn = e.currentTarget;
+        document.querySelectorAll('.tab').forEach(function (b) { b.classList.remove('active'); });
+        document.querySelectorAll('.content').forEach(function (c) { c.classList.remove('active'); });
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.tab).classList.add('active');
+      });
+    }
+  }
+
+  // ---------- VISAO GERAL ----------
+  function renderVisaoGeral(meta, leadsF) {
+    var total = agg(meta);
+    var quenteRows = meta.filter(function (r) { return classifyTemp(r.adset) === 'quente'; });
+    var frioRows = meta.filter(function (r) { return classifyTemp(r.adset) === 'frio'; });
+    var quente = agg(quenteRows), frio = agg(frioRows);
+
+    var qDetail = detailBreakdown(quenteRows, function (r) { return r.ad; });
+    var fDetail = detailBreakdown(frioRows, function (r) { return r.adset; });
+
+    var totalLeadsQF = quente.leads + frio.leads;
+    var pctQ = totalLeadsQF ? (quente.leads / totalLeadsQF * 100) : 0;
+    var pctF = totalLeadsQF ? (frio.leads / totalLeadsQF * 100) : 0;
+    var cplDiff = (quente.leads > 0 && frio.leads > 0 && quente.cpl > 0) ? ((quente.cpl - frio.cpl) / quente.cpl * 100) : null;
+
+    // Leads reais = respostas do formulário (aba "LD COMPLETO"). Enquanto o formulário ainda não
+    // tiver nenhuma resposta, usa a coluna "Action Leads" do Meta Ads como fonte (e sinaliza isso).
+    // Rankings por criativo/público/quente-frio sempre usam o Meta Ads (única fonte com atribuição por anúncio).
+    var useForm = state.leadRows.length > 0;
+    var realLeads = useForm ? leadsF.length : total.leads;
+    var realCpl = realLeads ? (total.invest / realLeads) : 0;
+    var realTxconv = total.clicks ? (realLeads / total.clicks * 100) : 0;
+
+    var html = '';
+    html += '<div class="kpi-grid">' +
+      kpiCard('Investimento Total', fmtBRL(total.invest), null, 'orange') +
+      kpiCard('CTR Médio', fmtPct(total.ctr)) +
+      kpiCard('CPM Médio', fmtBRL(total.cpm)) +
+      kpiCard('CPL Médio', fmtCPL(realLeads, realCpl), realLeads + ' leads no período' + (useForm ? '' : ' (Meta Ads)'), 'orange') +
+      '</div>';
+
+    html += '<div class="sec-title">Público Quente vs Público Frio</div>';
+    html += '<div class="temp-grid">';
+    html += '<div class="temp-card quente"><div class="temp-title">🔥 Público Quente</div><div class="temp-sub">Engajamento 365D</div>' +
+      '<div class="temp-metrics">' +
+      tempMetric(fmtBRL(quente.invest), 'Investimento') +
+      tempMetric(fmtCPL(quente.leads, quente.cpl), 'CPL') +
+      tempMetric(fmtInt(quente.leads), 'Leads') +
+      '</div><div class="temp-detail">' + qDetail.map(function (d) {
+        return '<div style="display:flex;justify-content:space-between;gap:10px"><span>' + esc(d.key) + '</span><span>' + fmtBRL(d.a.invest) + ' · CPL ' + fmtCPL(d.a.leads, d.a.cpl) + ' · ' + d.a.leads + (d.a.leads === 1 ? ' lead' : ' leads') + '</span></div>';
+      }).join('') + '</div></div>';
+
+    html += '<div class="temp-card frio"><div class="temp-title">❄️ Público Frio</div><div class="temp-sub">Públicos frios (demais conjuntos)</div>' +
+      '<div class="temp-metrics">' +
+      tempMetric(fmtBRL(frio.invest), 'Investimento') +
+      tempMetric(fmtCPL(frio.leads, frio.cpl), 'CPL') +
+      tempMetric(fmtInt(frio.leads), 'Leads') +
+      '</div><div class="temp-detail">' + fDetail.map(function (d) {
+        return '<div style="display:flex;justify-content:space-between;gap:10px"><span>' + esc(d.key) + '</span><span>' + fmtBRL(d.a.invest) + ' · CPL ' + fmtCPL(d.a.leads, d.a.cpl) + ' · ' + d.a.leads + (d.a.leads === 1 ? ' lead' : ' leads') + '</span></div>';
+      }).join('') + '</div></div>';
+
+    html += '<div class="comp-card"><div class="temp-title" style="color:#ff6b2b">Comparativo</div>' +
+      '<div class="comp-row"><span>Quente</span><div class="comp-bar-track"><div class="comp-bar-fill" style="width:' + pctQ.toFixed(2) + '%;background:#e74c3c"></div></div><span class="comp-val">' + fmtPct(pctQ) + '</span></div>' +
+      '<div class="comp-row"><span>Frio</span><div class="comp-bar-track"><div class="comp-bar-fill" style="width:' + pctF.toFixed(2) + '%;background:#42a5f5"></div></div><span class="comp-val">' + fmtPct(pctF) + '</span></div>' +
+      '<div class="comp-text">' + compareStatText(quente, frio, cplDiff) + '</div></div>';
+    html += '</div>';
+
+    var funnelTotal = { impr: total.impr, clicks: total.clicks, ctr: total.ctr, leads: realLeads, txconv: realTxconv };
+    html += '<div class="sec-title">Funil de Conversão</div>';
+    html += '<div class="funil-wrap"><div class="funnel-svg-wrap">' + funnelSVG(funnelTotal) + '</div>' +
+      '<div class="funnel-metrics-row">' +
+      metricCard('CPC — Custo por Clique', fmtCPC(total.clicks, total.cpc), '#ff6b2b') +
+      metricCard('TX Conversão (Cliques → Leads)', fmtPct(realTxconv), '#f1c40f') +
+      metricCard('CPL — Custo por Lead', fmtCPL(realLeads, realCpl), '#2ecc71') +
+      '</div></div>';
+
+    html += '<div class="sec-title">Perfil dos Leads (Formulário)</div>';
+    html += profileSection(leadsF);
+
+    var daily = buildDaily(meta);
+    html += '<div class="sec-title">Evolução Diária</div>';
+    html += '<div class="tbl-wrap"><table><thead><tr><th>Dia</th><th>Investimento</th><th>Impressões</th><th>Cliques</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th></tr></thead><tbody>' +
+      daily.map(function (d) {
+        return '<tr><td>' + isoToDM(d.dateISO) + '</td><td>' + fmtBRL(d.a.invest) + '</td><td>' + fmtInt(d.a.impr) + '</td><td>' + fmtInt(d.a.clicks) + '</td><td>' + fmtInt(d.a.leads) + '</td><td>' + fmtPct(d.a.ctr) + '</td><td>' + fmtCPC(d.a.clicks, d.a.cpc) + '</td><td>' + fmtCPL(d.a.leads, d.a.cpl) + '</td></tr>';
+      }).join('') +
+      "<tr class='total'><td>TOTAL</td><td>" + fmtBRL(total.invest) + '</td><td>' + fmtInt(total.impr) + '</td><td>' + fmtInt(total.clicks) + '</td><td>' + fmtInt(total.leads) + '</td><td>' + fmtPct(total.ctr) + '</td><td>' + fmtCPC(total.clicks, total.cpc) + '</td><td>' + fmtCPL(total.leads, total.cpl) + '</td></tr>' +
+      '</tbody></table></div>';
+    html += '<div class="chart-card"><h4>Leads &amp; CPL por dia</h4><canvas id="dailyChart" height="90"></canvas></div>';
+
+    document.getElementById('visao-geral').innerHTML = html;
+    renderDailyChart(daily);
+  }
+
+  function detailBreakdown(rows, keyFn) {
+    var g = groupBy(rows, keyFn);
+    var out = [];
+    for (var i = 0; i < g.keys.length; i++) {
+      var k = g.keys[i], a = agg(g.map[k]);
+      if (a.leads > 0) out.push({ key: k, a: a });
+    }
+    out.sort(function (a, b) { return b.a.leads - a.a.leads; });
+    return out;
+  }
+  function compareStatText(quente, frio, cplDiff) {
+    var winner = null, diffTxt = '';
+    if (cplDiff !== null) {
+      if (cplDiff > 0) { winner = 'Frio'; diffTxt = fmtPct(Math.abs(cplDiff)) + ' menor'; }
+      else if (cplDiff < 0) { winner = 'Quente'; diffTxt = fmtPct(Math.abs(cplDiff)) + ' menor'; }
+    }
+    var totalLeads = quente.leads + frio.leads;
+    var pctF = totalLeads ? (frio.leads / totalLeads * 100) : 0;
+    if (frio.invest === 0) return 'Ainda não há conjuntos de público frio em veiculação — o comparativo aparece assim que houver.';
+    if (!winner) return 'Dados insuficientes para comparar CPL no período selecionado.';
+    return 'O público <b>' + winner + '</b> converte a um CPL <b>' + diffTxt + '</b> que o outro grupo, e o Frio responde por <b>' + fmtPct(pctF) + '</b> dos leads do período.';
+  }
+  function kpiCard(label, value, sub, colorClass) {
+    var valClass = 'kpi-value' + (colorClass ? ' ' + colorClass : '');
+    return '<div class="kpi-card"><div class="kpi-label">' + esc(label) + '</div><div class="' + valClass + '">' + value + '</div>' + (sub ? '<div class="kpi-sub">' + esc(sub) + '</div>' : '') + '</div>';
+  }
+  function tempMetric(val, lbl) {
+    return '<div class="temp-metric"><div class="temp-metric-val">' + val + '</div><div class="temp-metric-lbl">' + esc(lbl) + '</div></div>';
+  }
+  function metricCard(lbl, val, color) {
+    return '<div class="metric-card" style="--c:' + color + '"><div class="kpi-label">' + esc(lbl) + '</div><div class="kpi-value">' + val + '</div></div>';
+  }
+  // As respostas/perguntas vêm da planilha como "7_a_14_anos", "decidimos_juntos"… — limpa para leitura.
+  function cleanText(s) {
+    return String(s == null ? '' : s)
+      .replace(/_/g, ' ')
+      .replace(/quemdecide/i, 'quem decide')
+      .replace(/,(?=[A-Za-zÀ-ÿ])/g, ', ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  function questionTitle(q) {
+    var l = cleanText(state.qLabels[q]);
+    return (!l || /^pergunta\s*\d+$/i.test(l)) ? 'Pergunta ' + (q + 1) : l;
+  }
+  function prettyAnswer(v) {
+    var s = cleanText(v);
+    return s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+  }
+  function profileSection(leadsF) {
+    var cards = '';
+    for (var q = 0; q < QUESTION_COUNT; q++) {
+      var counts = {}, answered = 0;
+      for (var i = 0; i < leadsF.length; i++) {
+        var v = prettyAnswer(leadsF[i].answers[q]);
+        if (!v) continue;
+        counts[v] = (counts[v] || 0) + 1;
+        answered++;
+      }
+      if (!answered) continue;
+      var keys = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; });
+      var shown = keys.slice(0, MAX_OPTIONS);
+      var items = shown.map(function (k) {
+        var pct = counts[k] / answered * 100;
+        var txt = k.length > 80 ? k.slice(0, 77) + '…' : k;
+        return '<div class="profile-item"><div class="top"><span>' + esc(txt) + '</span><b>' + fmtPct(pct, 1) + '</b></div><div class="profile-bar"><span style="width:' + pct.toFixed(2) + '%"></span></div></div>';
+      }).join('');
+      if (keys.length > shown.length) {
+        items += '<div class="profile-item"><div class="top"><span>+ ' + (keys.length - shown.length) + ' outras respostas</span><b></b></div></div>';
+      }
+      cards += '<div class="profile-card"><h4>' + esc(questionTitle(q)) + ' · ' + answered + (answered === 1 ? ' resposta' : ' respostas') + '</h4>' + items + '</div>';
+    }
+    if (!cards) return '<div class="skeleton">Aguardando as primeiras respostas do formulário no período selecionado…</div>';
+    return '<div class="profile-grid" style="margin-top:14px">' + cards + '</div>';
+  }
+  function buildDaily(meta) {
+    var g = groupBy(meta, function (r) { return r.dateISO; });
+    var keys = g.keys.slice().sort();
+    return keys.map(function (k) { return { dateISO: k, a: agg(g.map[k]) }; });
+  }
+  function funnelSVG(total) {
+    return '<svg viewBox="0 0 1200 540" width="100%" xmlns="http://www.w3.org/2000/svg">' +
+      '<defs>' +
+      '<linearGradient id="gradImpr" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#5c2200"/><stop offset="50%" stop-color="#cc4a00"/><stop offset="100%" stop-color="#5c2200"/></linearGradient>' +
+      '<linearGradient id="gradClicks" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#8a3a14"/><stop offset="50%" stop-color="#ff6b2b"/><stop offset="100%" stop-color="#8a3a14"/></linearGradient>' +
+      '<linearGradient id="gradLeads" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#14683a"/><stop offset="50%" stop-color="#2ecc71"/><stop offset="100%" stop-color="#14683a"/></linearGradient>' +
+      '<filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="12" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>' +
+      '</defs>' +
+      '<polygon points="80,20 1120,20 1000,180 200,180" fill="url(#gradImpr)" stroke="#0a0a0a" stroke-width="2"/>' +
+      '<text x="600" y="90" text-anchor="middle" fill="#fff" font-family="DM Mono,monospace" font-size="56" font-weight="700">' + fmtInt(total.impr) + '</text>' +
+      '<text x="600" y="120" text-anchor="middle" fill="rgba(255,255,255,.85)" font-family="DM Sans,sans-serif" font-size="14" letter-spacing="1" font-weight="600">IMPRESSÕES</text>' +
+      '<text x="600" y="210" text-anchor="middle" fill="rgba(255,255,255,.6)" font-family="DM Sans,sans-serif" font-size="14">CTR <tspan fill="#ff6b2b" font-family="DM Mono,monospace">' + fmtPct(total.ctr) + '</tspan></text>' +
+      '<line x1="600" y1="180" x2="600" y2="230" stroke="#444" stroke-width="2" stroke-dasharray="4,4"/>' +
+      '<polygon points="200,230 1000,230 880,360 320,360" fill="url(#gradClicks)" stroke="#0a0a0a" stroke-width="2"/>' +
+      '<text x="600" y="300" text-anchor="middle" fill="#fff" font-family="DM Mono,monospace" font-size="56" font-weight="700">' + fmtInt(total.clicks) + '</text>' +
+      '<text x="600" y="330" text-anchor="middle" fill="rgba(255,255,255,.85)" font-family="DM Sans,sans-serif" font-size="14" letter-spacing="1" font-weight="600">CLIQUES</text>' +
+      '<text x="600" y="392" text-anchor="middle" fill="rgba(255,255,255,.6)" font-family="DM Sans,sans-serif" font-size="14">TX Conversão <tspan fill="#ff6b2b" font-family="DM Mono,monospace">' + fmtPct(total.txconv) + '</tspan></text>' +
+      '<line x1="600" y1="360" x2="600" y2="412" stroke="#444" stroke-width="2" stroke-dasharray="4,4"/>' +
+      '<polygon points="320,412 880,412 800,520 400,520" fill="url(#gradLeads)" stroke="#0a0a0a" stroke-width="2" filter="url(#glow)"/>' +
+      '<text x="600" y="480" text-anchor="middle" fill="#fff" font-family="DM Mono,monospace" font-size="68" font-weight="700">' + fmtInt(total.leads) + '</text>' +
+      '<text x="600" y="508" text-anchor="middle" fill="rgba(255,255,255,.9)" font-family="DM Sans,sans-serif" font-size="14" letter-spacing="1" font-weight="600">LEADS</text>' +
+      '</svg>';
+  }
+  function renderDailyChart(daily) {
+    var ctxEl = document.getElementById('dailyChart');
+    if (!ctxEl) return;
+    if (state.dailyChart) { state.dailyChart.destroy(); state.dailyChart = null; }
+    var labels = daily.map(function (d) { return isoToDM(d.dateISO); });
+    var leadsArr = daily.map(function (d) { return d.a.leads; });
+    var cplArr = daily.map(function (d) { return d.a.leads > 0 ? Math.round(d.a.cpl * 100) / 100 : null; });
+    var ctx = ctxEl.getContext('2d');
+    state.dailyChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          { type: 'bar', label: 'Leads', data: leadsArr, backgroundColor: 'rgba(255,107,43,0.85)', borderRadius: 3, yAxisID: 'y' },
+          { type: 'line', label: 'CPL (R$)', data: cplArr, borderColor: 'rgba(255,183,55,0.85)', backgroundColor: 'rgba(255,183,55,0.85)', spanGaps: true, tension: 0.3, yAxisID: 'y1', pointRadius: 2 }
+        ]
+      },
+      options: {
+        responsive: true,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { labels: { color: '#e8e6f0', font: { family: 'DM Sans' } } },
+          tooltip: { backgroundColor: '#141414', titleColor: '#e8e6f0', bodyColor: '#e8e6f0', borderColor: '#444', borderWidth: 1 }
+        },
+        scales: {
+          x: { ticks: { color: 'rgba(255,255,255,.45)', font: { family: 'DM Mono', size: 10 }, maxRotation: 90, minRotation: 90, autoSkip: true, maxTicksLimit: 32 }, grid: { color: 'rgba(255,255,255,0.06)' } },
+          y: { position: 'left', ticks: { color: 'rgba(255,255,255,.45)', font: { family: 'DM Mono', size: 10 } }, grid: { color: 'rgba(255,255,255,0.06)' }, title: { display: true, text: 'Leads', color: 'rgba(255,255,255,.45)' } },
+          y1: { position: 'right', ticks: { color: 'rgba(255,255,255,.45)', font: { family: 'DM Mono', size: 10 } }, grid: { display: false }, title: { display: true, text: 'CPL (R$)', color: 'rgba(255,255,255,.45)' } }
+        }
+      }
+    });
+  }
+
+  // ---------- CRIATIVOS ----------
+  function renderCriativos(meta) {
+    var g = groupBy(meta, function (r) { return r.ad; });
+    var creatives = g.keys.map(function (k) {
+      var rows = g.map[k], a = agg(rows);
+      // link: use the one from the most recent dated row for this creative
+      var latest = rows.reduce(function (best, r) { return (!best || r.dateISO > best.dateISO) ? r : best; }, null);
+      return { ad: k, link: latest ? latest.link : '', a: a };
+    });
+    creatives.sort(function (x, y) { return cplSortAsc(x.a, y.a); });
+    var n = creatives.length;
+    var html = '<div class="sec-title">Ranking de Criativos (melhor → pior CPL)</div>' +
+      '<div class="tbl-wrap"><table><thead><tr><th>#</th><th>Criativo</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th><th>Link</th></tr></thead><tbody>' +
+      creatives.map(function (c, i) {
+        var a = c.a;
+        return '<tr><td>' + (i + 1) + '</td><td>' + esc(c.ad) + '</td><td>' + fmtBRL(a.invest) + '</td><td>' + fmtInt(a.impr) + '</td><td>' + fmtInt(a.clicks) + '</td><td>' + fmtInt(a.leads) + '</td><td>' + fmtPct(a.ctr) + '</td><td>' + fmtCPC(a.clicks, a.cpc) + '</td><td>' + fmtCPL(a.leads, a.cpl) + '</td><td>' + (c.link ? "<a class='link-ad' href='" + esc(c.link) + "' target='_blank' rel='noopener'>ver anúncio</a>" : '—') + '</td></tr>';
+      }).join('') +
+      '</tbody></table></div>';
+    document.getElementById('criativos').innerHTML = html;
+  }
+
+  // ---------- PUBLICOS ----------
+  function renderPublicos(meta) {
+    var g = groupBy(meta, function (r) { return r.adset; });
+    var publicos = g.keys.map(function (k) {
+      var rows = g.map[k], a = agg(rows);
+      return { adset: k, temp: classifyTemp(k), a: a };
+    });
+    publicos.sort(function (x, y) { return cplSortAsc(x.a, y.a); });
+    var n = publicos.length;
+    var html = '<div class="sec-title">Ranking de Públicos (melhor → pior CPL)</div>' +
+      '<div class="tbl-wrap"><table><thead><tr><th>#</th><th>Conjunto</th><th>Temp.</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th></tr></thead><tbody>' +
+      publicos.map(function (p, i) {
+        var a = p.a;
+        var tempColor = p.temp === 'quente' ? '#e74c3c' : '#42a5f5';
+        return '<tr><td>' + (i + 1) + '</td><td>' + esc(p.adset) + "</td><td><span style='color:" + tempColor + ";font-weight:700;font-size:11px;font-family:\"DM Mono\",monospace'>" + (p.temp === 'quente' ? 'QUENTE' : 'FRIO') + '</span></td><td>' + fmtBRL(a.invest) + '</td><td>' + fmtInt(a.impr) + '</td><td>' + fmtInt(a.clicks) + '</td><td>' + fmtInt(a.leads) + '</td><td>' + fmtPct(a.ctr) + '</td><td>' + fmtCPC(a.clicks, a.cpc) + '</td><td>' + fmtCPL(a.leads, a.cpl) + '</td></tr>';
+      }).join('') +
+      '</tbody></table></div>';
+    document.getElementById('publicos').innerHTML = html;
+  }
+
+  // ---------- ANALISE DIARIA ----------
+  function renderAnaliseDiaria(meta) {
+    var g = groupBy(meta, function (r) { return r.dateISO; });
+    var keys = g.keys.slice().sort();
+    var qAccRows = [], fAccRows = [];
+    var rowsHtml = keys.map(function (k) {
+      var rows = g.map[k];
+      var qRows = rows.filter(function (r) { return classifyTemp(r.adset) === 'quente'; });
+      var fRows = rows.filter(function (r) { return classifyTemp(r.adset) === 'frio'; });
+      qAccRows = qAccRows.concat(qRows); fAccRows = fAccRows.concat(fRows);
+      var q = agg(qRows), f = agg(fRows);
+      return '<tr><td>' + isoToDM(k) + '</td><td>' + fmtBRL(q.invest) + '</td><td>' + fmtInt(q.leads) + '</td><td>' + fmtCPL(q.leads, q.cpl) + '</td><td>' + fmtBRL(f.invest) + '</td><td>' + fmtInt(f.leads) + '</td><td>' + fmtCPL(f.leads, f.cpl) + '</td></tr>';
+    }).join('');
+    var qTotal = agg(qAccRows), fTotal = agg(fAccRows);
+    var totalRow = "<tr class='total'><td>TOTAL</td><td>" + fmtBRL(qTotal.invest) + '</td><td>' + fmtInt(qTotal.leads) + '</td><td>' + fmtCPL(qTotal.leads, qTotal.cpl) + '</td><td>' + fmtBRL(fTotal.invest) + '</td><td>' + fmtInt(fTotal.leads) + '</td><td>' + fmtCPL(fTotal.leads, fTotal.cpl) + '</td></tr>';
+    var html = '<div class="sec-title">Comparativo Diário — Público Quente vs Frio</div>' +
+      '<div class="tbl-wrap"><table><thead><tr>' +
+      '<th rowspan="2">Dia</th><th colspan="3" style="text-align:center;color:#e74c3c">Quente (Engajamento 365D)</th><th colspan="3" style="text-align:center;color:#42a5f5">Frio (demais conjuntos)</th>' +
+      '</tr><tr><th>Invest.</th><th>Leads</th><th>CPL</th><th>Invest.</th><th>Leads</th><th>CPL</th></tr></thead><tbody>' +
+      rowsHtml + totalRow + '</tbody></table></div>';
+    document.getElementById('analise-diaria').innerHTML = html;
+  }
+
+  // ---------- LEADS ----------
+  // Colunas de perguntas = as que têm título no cabeçalho da planilha ou alguma resposta.
+  function leadQuestions() {
+    var idx = [];
+    for (var q = 0; q < QUESTION_COUNT; q++) {
+      var has = !!String(state.qLabels[q] || '').trim();
+      if (!has) {
+        for (var i = 0; i < state.leadRows.length; i++) { if (state.leadRows[i].answers[q]) { has = true; break; } }
+      }
+      if (has) idx.push(q);
+    }
+    return idx;
+  }
+  function renderLeads(leadsF) {
+    var qs = leadQuestions();
+    document.querySelector('#leadsTable thead').innerHTML = '<tr><th>#</th><th>Data</th><th>Nome</th><th>Telefone</th>' +
+      qs.map(function (q) { var tt = questionTitle(q); return '<th class="qh" title="' + esc(tt) + '">' + esc(tt) + '</th>'; }).join('') + '</tr>';
+    var sorted = leadsF.slice().sort(function (a, b) { return b.dataISO.localeCompare(a.dataISO); });
+    var tbody = document.querySelector('#leadsTable tbody');
+    tbody.innerHTML = sorted.map(function (l, i) {
+      var p = l.dateOnly.split('-');
+      var dataFmt = p[2] + '/' + p[1] + '/' + p[0] + (l.hhmm ? ' ' + l.hhmm : '');
+      var digits = String(l.telefone || '').replace(/\D/g, '');
+      if (digits.length === 10 || digits.length === 11) digits = '55' + digits;
+      var tel = digits
+        ? "<a class='link-ad' href='https://wa.me/" + digits + "' target='_blank' rel='noopener'>" + esc(fmtPhone(l.telefone)) + '</a>'
+        : '—';
+      return '<tr><td>' + (sorted.length - i) + '</td><td class="nw">' + dataFmt + '</td><td class="nm">' + esc(l.nome || '—') + '</td><td class="nw">' + tel + '</td>' +
+        qs.map(function (q) { var a = prettyAnswer(l.answers[q]); return '<td class="ans">' + (a ? esc(a) : '—') + '</td>'; }).join('') + '</tr>';
+    }).join('');
+    applyLeadSearch();
+  }
+  function applyLeadSearch() {
+    var el = document.getElementById('leadSearch');
+    if (!el) return;
+    var q = el.value.trim().toLowerCase();
+    var rows = document.querySelectorAll('#leadsTable tbody tr'), shown = 0;
+    rows.forEach(function (tr) {
+      var ok = tr.textContent.toLowerCase().indexOf(q) !== -1;
+      tr.style.display = ok ? '' : 'none';
+      if (ok) shown++;
+    });
+    var c = document.getElementById('leadCount');
+    if (c) c.textContent = !rows.length ? 'Nenhum lead no período selecionado.'
+      : (q ? shown + ' de ' + rows.length + ' leads' : rows.length + (rows.length === 1 ? ' lead' : ' leads') + ' no período');
+  }
+
+  // ============================= FILTER UI =============================
+  function applyPreset(preset) {
+    if (!state.maxDate) return;
+    document.querySelectorAll('.preset-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.preset === preset); });
+    if (preset === 'all') {
+      state.presetAll = true;
+      state.filterFrom = state.minDate;
+      state.filterTo = state.maxDate;
+    } else {
+      state.presetAll = false;
+      var days = parseInt(preset, 10);
+      // "7d" / "30d" contam sempre até ontem (data real do aparelho), nunca o dia de hoje
+      // (que costuma ter dados parciais) — limitado ao intervalo real disponível na planilha.
+      var yesterdayISO = isoAddDays(todayLocalISO(), -1);
+      var toISO = yesterdayISO < state.maxDate ? yesterdayISO : state.maxDate;
+      if (toISO < state.minDate) toISO = state.maxDate;
+      var fromISO = isoAddDays(toISO, -(days - 1));
+      state.filterFrom = fromISO < state.minDate ? state.minDate : fromISO;
+      state.filterTo = toISO;
+    }
+    document.getElementById('dateFrom').value = state.filterFrom;
+    document.getElementById('dateTo').value = state.filterTo;
+    render();
+  }
+
+  document.querySelectorAll('.preset-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () { applyPreset(btn.dataset.preset); });
+  });
+  document.getElementById('dateFrom').addEventListener('change', function (e) {
+    state.presetAll = false;
+    state.filterFrom = e.target.value || state.minDate;
+    if (state.filterFrom > state.filterTo) state.filterTo = state.filterFrom;
+    document.getElementById('dateTo').value = state.filterTo;
+    document.querySelectorAll('.preset-btn').forEach(function (b) { b.classList.remove('active'); });
+    render();
+  });
+  document.getElementById('dateTo').addEventListener('change', function (e) {
+    state.presetAll = false;
+    state.filterTo = e.target.value || state.maxDate;
+    if (state.filterTo < state.filterFrom) state.filterFrom = state.filterTo;
+    document.getElementById('dateFrom').value = state.filterFrom;
+    document.querySelectorAll('.preset-btn').forEach(function (b) { b.classList.remove('active'); });
+    render();
+  });
+  document.getElementById('btnRefresh').addEventListener('click', function () { loadData(); });
+
+  // ============================= INIT =============================
+  state.presetAll = true;
+  loadData();
+  setInterval(loadData, REFRESH_MS);
+})();
+</script>
+</body>
+</html>
