@@ -150,6 +150,7 @@ tr.total td{font-weight:700;color:#ff6b2b;border-top:1px solid rgba(255,107,43,.
   <div class="tab" onclick="showTab('publicos',this)">Públicos</div>
   <div class="tab" onclick="showTab('semanal',this)">Semana a Semana</div>
   <div class="tab" onclick="showTab('mensal',this)">Mês a Mês</div>
+  <div class="tab" onclick="showTab('repeteco',this)">🔁 Repeteco</div>
 </div>
 
 <div id="err-slot"></div>
@@ -159,6 +160,7 @@ tr.total td{font-weight:700;color:#ff6b2b;border-top:1px solid rgba(255,107,43,.
 <div class="content" id="tab-publicos"></div>
 <div class="content" id="tab-semanal"></div>
 <div class="content" id="tab-mensal"></div>
+<div class="content" id="tab-repeteco"></div>
 
 <script>
 //#CORE-START
@@ -405,7 +407,7 @@ function processSales(vText, wText, GROWS){
     return { data:r.aprov.d, hora:r.aprov.ts.slice(11,16), ts:r.aprov.ts, nome:r.nome, email:r.email,
       fatPrincipal:r.valor, fatOB:0, nOB:0, obs:[], fatTotal:r.valor, fonte:r.fonte,
       isTrafego:u.isTrafego, criativo:u.criativo, publico:u.publico, campanha:u.campanha, origem:u.origem,
-      _pedidoMs:tsMs(r.pedido.ts) };
+      utm:r.utm, _pedidoMs:tsMs(r.pedido.ts) };
   });
 
   // 3) order bumps entram na venda principal do mesmo e-mail (até OB_JANELA_MIN depois)
@@ -597,6 +599,7 @@ function renderAll(){
   renderTrafego(from,to); renderVisao(from,to);
   renderCriativos(from,to); renderPublicos(from,to);
   renderSemanal(); renderMensal();
+  renderRepeteco();
 }
 
 // ───────────── aba Tráfego ─────────────
@@ -791,6 +794,114 @@ function renderMensal(){
   const c=periodCharts('ch-mes',list);
   document.getElementById('tab-mensal').innerHTML=`<div class="ob-info">Meses de calendário. Esta aba considera todo o histórico (não depende do filtro de data).</div>`+c.html+periodTable(list);
   c.draw();
+}
+
+// ───────────── aba Repeteco ─────────────
+// Vendas do SOS (principal + order bump), tráfego e orgânico, aprovadas DEPOIS de REPETECO.INICIO
+// + campanhas do Gerenciador cujo nome contém "REPETECO". Não segue o filtro de datas do topo.
+const REPETECO = {
+  INICIO:   '2026-10-17 21:00:00',  // horário de Brasília (mesmo formato das vendas)
+  CAMPANHA: 'repeteco',             // trecho do nome da campanha (sem acento/maiúscula)
+};
+// As UTMs do webhook chegam com acentos corrompidos (ex.: "Intera-§-£o 30D"); desfaz isso para casar com o Gerenciador.
+function fixMoji(s){
+  return String(s==null?'':s)
+    .replace(/-§/g,'ç').replace(/-£/g,'ã').replace(/-¡/g,'á')
+    .replace(/-©/g,'é').replace(/-ª/g,'ê').replace(/-­/g,'í')
+    .replace(/-³/g,'ó').replace(/-µ/g,'õ').replace(/-º/g,'ú')
+    .replace(/-¢/g,'â').replace(/-´/g,'ô').replace(/- /g,'à');
+}
+const repHas = x => norm(fixMoji(x)).includes(REPETECO.CAMPANHA);
+function repEnrich(s){
+  const u=s.utm||{};
+  const rep = s.isTrafego && [u.src,u.term,u.camp,u.med,u.cont,s.criativo,s.campanha].some(repHas);
+  const campR = s.isTrafego ? (fixMoji(u.med)||s.campanha||'') : '';
+  const pubR  = s.isTrafego ? ((s.publico && s.publico!=='(sem público)') ? s.publico : (fixMoji(u.camp)||s.publico||'')) : '';
+  return Object.assign({}, s, {rep, campR, pubR});
+}
+function repGroup(gr, rs, fieldG, keyS){
+  const m={};
+  const blank=name=>({name,inv:0,imp:0,cliques:0,pv:0,ck:0,vendas:0,fat:0,last:'',sCamp:'',sAdset:'',sAd:''});
+  gr.forEach(r=>{
+    const k=norm(r[fieldG]); const o=m[k]||(m[k]=blank(r[fieldG]));
+    o.inv+=r.inv; o.imp+=r.imp; o.cliques+=r.cliques; o.pv+=r.pv; o.ck+=r.ck;
+    if(r.date>=o.last){ o.last=r.date; o.sCamp=r.sCamp; o.sAdset=r.sAdset; o.sAd=r.sAd; }
+  });
+  rs.forEach(s=>{ const k=norm(fixMoji(keyS(s))); if(m[k]){ m[k].vendas++; m[k].fat+=s.fatTotal; } });
+  return Object.values(m).map(o=>{
+    o.ativo=!isPaused(o.sAd)&&!isPaused(o.sAdset)&&!isPaused(o.sCamp)&&(o.sAd!==''||o.sAdset!==''||o.sCamp!=='');
+    o.ctr=o.imp?o.cliques/o.imp*100:0; o.cpc=o.cliques?o.inv/o.cliques:0; o.cpm=o.imp?o.inv/o.imp*1000:0;
+    o.roas=o.inv?o.fat/o.inv:0; o.cac=o.vendas?o.inv/o.vendas:0; return o;
+  }).sort((x,y)=>y.inv-x.inv);
+}
+function renderRepeteco(){
+  const el=document.getElementById('tab-repeteco'); if(!el) return;
+  const gr=GROWS.filter(g=>repHas(g.campaign));
+  const all=SALES.filter(s=>s.ts>REPETECO.INICIO).map(repEnrich);
+  const repS=all.filter(s=>s.rep);
+  const a=agg(gr,all);
+  const fatRep=repS.reduce((t,s)=>t+s.fatTotal,0);
+  const roasRep=a.inv?fatRep/a.inv:0, cacRep=repS.length?a.inv/repS.length:0;
+  const nOutros=a.vT-repS.length;
+  const fi=REPETECO.INICIO, fiTxt=fi.slice(8,10)+'/'+fi.slice(5,7)+' às '+fi.slice(11,16);
+  const campNames=[...new Set(gr.map(g=>g.campaign))];
+  const diasInv=[...new Set(gr.filter(g=>g.inv>0).map(g=>g.date))].sort();
+  const info=`<div class="ob-info">🔁 <b>Repeteco:</b> vendas do <b>${esc(CONFIG.PRODUTO)}</b> (principal + order bump), tráfego e orgânico, aprovadas <b>depois de ${fiTxt}</b>, e as campanhas do Gerenciador com <b>"REPETECO"</b> no nome (${campNames.length?campNames.map(esc).join(' e '):'nenhuma encontrada'}). Esta aba <b>não segue o filtro de datas</b> do topo. O Gerenciador é diário${diasInv.length?`: o investimento do Repeteco começa em ${fdate(diasInv[0])}, depois do corte, então nenhum gasto anterior entra`:''}. ROAS e CAC consideram só as vendas de tráfego atribuídas ao Repeteco pela UTM${nOutros>0?` (${nOutros} venda${nOutros>1?'s':''} de tráfego de campanha anterior ${nOutros>1?'ficam':'fica'} de fora deles)`:''}.</div>`;
+
+  const kpis=`<div class="kpi-grid">
+    ${kpi('Investimento (Repeteco)',brl(a.inv),'orange')}
+    ${kpi('Fat. Total',brl(a.fat),'green')}
+    ${kpi('Vendas Total',int(a.vendas)||'0','',obTxt(a.obT+a.obO))}
+    ${kpi('ROAS Repeteco',rx(roasRep),roasRep>=1?'green':(roasRep?'red':''),'só vendas dos criativos REPETECO')}
+    ${kpi('Fat. Tráfego',brl(a.fatT),'green')}
+    ${kpi('Fat. Orgânico',brl(a.fatO),'yellow')}
+    ${kpi('Vendas Tráfego',int(a.vT)||'0','',[obTxt(a.obT),nOutros>0?`${repS.length} do Repeteco`:''].filter(Boolean).join(' · '))}
+    ${kpi('Vendas Orgânico',int(a.vO)||'0','',obTxt(a.obO))}
+    ${kpi('Fat. OB Tráfego',brl(a.obFatT))}
+    ${kpi('Fat. OB Orgânico',brl(a.obFatO))}
+    ${kpi('CAC Repeteco',brl(cacRep))}
+    ${kpi('Ticket Médio',brl(a.ticket))}
+    ${kpi('Cliques',int(a.cliques))}
+    ${kpi('Impressões',int(a.imp))}
+    ${kpi('CPC',brl(a.cpc))}
+    ${kpi('CPM',brl(a.cpm))}
+  </div>`;
+
+  const steps=[['Cliques',a.cliques],['Page View',a.pv],['Checkouts',a.ck],['Compras (Repeteco)',repS.length]];
+  const top=steps[0][1]||1;
+  const bars=steps.map(([l,v])=>`<div class="funil-bar-wrap"><div class="funil-label"><span>${l}</span><span style="font-family:'DM Mono',monospace">${nf(v)}</span></div><div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${Math.max(top?v/top*100:0,v?2:0)}%"></div></div></div>`).join('');
+  const rate=(n,d)=>d?pct(n/d*100):'—';
+  const taxas=[['Clique → Page View',rate(a.pv,a.cliques)],['Page View → Checkout',rate(a.ck,a.pv)],['Checkout → Compra',rate(repS.length,a.ck)],['Page View → Compra',rate(repS.length,a.pv)],['CTR (link)',pct(a.ctr)]]
+    .map(([l,v])=>`<div class="taxa-item"><span>${l}</span><span class="taxa-val">${v}</span></div>`).join('');
+  const funil=`<div class="sec-title">Funil — Meta Ads (campanhas Repeteco)</div><div class="funil-section"><div>${bars}</div><div class="taxa-grid">${taxas}</div></div>`;
+
+  const tbl=(title,list,note)=>`<div class="sec-title">${title}</div>${note?`<div class="ob-info">${note}</div>`:''}<div class="tbl-wrap"><table>${THEAD}<tbody>${list.length?tableRows(list):'<tr><td colspan="14" class="empty">Sem dados.</td></tr>'}</tbody></table></div>`;
+  const tCamp=tbl('Campanhas',repGroup(gr,repS,'campaign',s=>s.campR),'Vendas por campanha, conjunto e criativo consideram só as vendas de tráfego atribuídas ao Repeteco pela UTM.');
+  const tPub =tbl('Públicos (conjuntos)',repGroup(gr,repS,'adset',s=>s.pubR));
+  const tCri =tbl('Criativos',repGroup(gr,repS,'ad',s=>s.criativo));
+
+  const diasSet=new Set([...gr.map(g=>g.date),...all.map(s=>s.data)]);
+  const dias=[...diasSet].sort();
+  const dRows=[...dias].reverse().map(d=>{
+    const g=gr.filter(x=>x.date===d), ss=all.filter(s=>s.data===d), rs=ss.filter(s=>s.rep);
+    const x=agg(g,ss); const fr=rs.reduce((t,s)=>t+s.fatTotal,0);
+    const lbl=fdate(d)+(d===fi.slice(0,10)?` (após ${fi.slice(11,16)})`:'');
+    return `<tr><td>${lbl}</td><td>${brl(x.inv)}</td><td>${brl(x.fat)}</td><td>${rx(x.inv?fr/x.inv:0)}</td><td>${int(x.vendas)}</td><td>${int(x.vT)}</td><td>${int(x.vO)}</td><td>${brl(x.ticket)}</td><td>${brl(rs.length?x.inv/rs.length:0)}</td></tr>`;
+  }).join('');
+  const dTotal=`<tr class="total"><td>Total</td><td>${brl(a.inv)}</td><td>${brl(a.fat)}</td><td>${rx(roasRep)}</td><td>${int(a.vendas)}</td><td>${int(a.vT)}</td><td>${int(a.vO)}</td><td>${brl(a.ticket)}</td><td>${brl(cacRep)}</td></tr>`;
+  const tDia=`<div class="sec-title">Dia a dia</div><div class="tbl-wrap"><table><thead><tr><th>Data</th><th>Invest.</th><th>Fat. Total</th><th>ROAS Repeteco</th><th>Compras Total</th><th>Tráfego</th><th>Orgânicas</th><th>Ticket Médio</th><th>CAC Repeteco</th></tr></thead><tbody>${dRows||'<tr><td colspan="9" class="empty">Sem dados.</td></tr>'}${dRows?dTotal:''}</tbody></table></div>`;
+
+  const cards=all.length?all.map(s=>`<div class="sale-card ${s.isTrafego?'trafego':'organico'}">
+      <div class="sale-top"><div class="sale-name">${s.isTrafego?'✅':'⭐'} ${esc(s.nome||s.email||'—')}</div><div class="sale-val">${brl(s.fatTotal)}</div></div>
+      <div class="sale-meta">
+        ${fdate(s.data)} ${s.hora}<span class="src-badge ${s.fonte==='webhook'?'web':''}">${s.fonte==='webhook'?'webhook':'planilha'}</span>${s.isTrafego?`<span class="src-badge ${s.rep?'web':''}">${s.rep?'repeteco':'campanha anterior'}</span>`:''}<br>
+        ${s.fatOB>0?`🛒 OB: <b>${brl(s.fatOB)}</b> (${s.nOB} e-book${s.nOB>1?'s':''})<br>`:''}
+        ${s.isTrafego?`Criativo: <b>${esc(s.criativo)}</b><br>Campanha: <b>${esc(s.campR||'—')}</b><br>Público: <b>${esc(s.pubR||'—')}</b><br>`:''}
+        Origem: <b>${esc(s.origem)}</b>
+      </div></div>`).join(''):'<div class="empty">Nenhuma venda depois do corte.</div>';
+  const painel=`<div class="sec-title">Vendas (${all.length}) — ✅ tráfego pago · ⭐ orgânico</div><div class="sales-scroll">${cards}</div>`;
+
+  el.innerHTML=info+kpis+funil+tCamp+tPub+tCri+tDia+painel;
 }
 
 loadData();
