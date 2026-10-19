@@ -122,6 +122,7 @@ const CONFIG={
  // Segmentos por código de produto / SCK
  PRODUTO_FISICO:['8361553'],PRODUTO_DIGITAL:['7956109'],
  EXTERIOR_SCK:['120250304155830459','120250887509260459','120250787157490459','[UK]','[EUA]'],
+ TRAFEGO_MANUAL:['HP0942940464'], // vendas sem SCK que vieram de tráfego (ex.: Carla Maria Gomes Ribeiro, boleto 14/10)
  COMBO_SCK:['LIVROCOMBO','120250940441390459','120250917714010459','120250917919140459'], // campanhas Combo (físico + digital)
  // Segmento da campanha no Gerenciador
  SEG_CAMP:[['c',/LIVROCOMBO/i],['f',/FISICO/i],['e',/\[EUA\]|\[UK\]/i]],IGNORAR_CAMP:/Post do Instagram/i,
@@ -157,7 +158,7 @@ async function fetchSheetCSV(sheetName){
   if(text.includes('Signin')||text.includes('accounts.google'))throw new Error(`Planilha "${sheetName}" requer login. Defina como pública.`);
   return text}catch(e){clearTimeout(to);if(e.name==='AbortError')throw new Error(`Timeout ao carregar "${sheetName}".`);throw e}}
 // ── processamento ──
-const isTrafego=s=>(s.utmSource||'').toLowerCase().replace(/[\s_-]/g,'')==='metaads'||((s.utmSource||'').toLowerCase()==='ig'&&(s.utmMedium||'').toLowerCase()==='paid');
+const isTrafego=s=>CONFIG.TRAFEGO_MANUAL.includes(s.tx)||(s.utmSource||'').toLowerCase().replace(/[\s_-]/g,'')==='metaads'||((s.utmSource||'').toLowerCase()==='ig'&&(s.utmMedium||'').toLowerCase()==='paid');
 const isPaused=s=>String(s).includes('PAUSED');
 function segCamp(n){for(const [s,rx] of CONFIG.SEG_CAMP)if(rx.test(n))return s;return 'd'}
 function processGerenciador(rows){
@@ -176,7 +177,7 @@ function processSales(rows){
   const sck=(r[W.sck]||'').trim(),p=sck.split('|');
   const seg=CONFIG.COMBO_SCK.some(x=>sck.includes(x))?'c':(fis?'f':(CONFIG.EXTERIOR_SCK.some(x=>sck.includes(x))?'e':'d'));
   const cur=(r[W.moeda]||'BRL').trim().toUpperCase()==='BRL'?'BRL':'USD';
-  roots.set(String(r[W.tx]).trim(),{data,seg,cur,nome:r[W.cliente],email:r[W.email],pais:r[W.pais],fatPrincipal:num(r[W.fatBruto]),fatOB:0,nOB:0,liq:num(r[W.fatLiq]),
+  roots.set(String(r[W.tx]).trim(),{tx:String(r[W.tx]).trim(),data,seg,cur,nome:r[W.cliente],email:r[W.email],pais:r[W.pais],fatPrincipal:num(r[W.fatBruto]),fatOB:0,nOB:0,liq:num(r[W.fatLiq]),
    utmSource:(p[0]&&p[0]!=='(none)')?p[0]:'',utmMedium:p[1]||'',utmCampaign:p[2]||'',utmContent:p[3]||''})});
  all.forEach(r=>{if(!ok(r)||isRoot(r))return;const rt=roots.get((r[W.root]||'').trim());if(!rt)return;rt.fatOB+=num(r[W.fatBruto]);rt.liq+=num(r[W.fatLiq]);rt.nOB++});
  return [...roots.values()].map(s=>(s.fatTotal=s.fatPrincipal+s.fatOB,s.temOB=s.nOB>0,s.trafego=isTrafego(s),s)).sort((a,b)=>b.data.localeCompare(a.data))}
