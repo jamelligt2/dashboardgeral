@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard Captação — Black26 — Jamelli GT</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Crect width='36' height='36' rx='8' fill='%231a1a2e'/%3E%3Ctext x='18' y='25' text-anchor='middle' font-family='Arial' font-weight='700' font-size='13' fill='%23ff6b35'%3EJGT%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0f0f1a;color:#ffffff;font-family:'DM Sans',sans-serif;min-height:100vh}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:#0f0f1a}::-webkit-scrollbar-thumb{background:#ff6b3555;border-radius:3px}
+
+#loading-overlay{position:fixed;inset:0;background:#0f0f1a;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+#spinner{width:40px;height:40px;border:3px solid rgba(255,107,53,.2);border-top-color:#ff6b35;border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.header{background:#16213e;border-bottom:2px solid #ff6b35;padding:16px 28px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100;flex-wrap:wrap}
+.logo-badge{background:linear-gradient(135deg,#ff6b35,#e04e1c);border-radius:10px;width:46px;height:46px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff;flex-shrink:0}
+.header-divider{width:1px;height:36px;background:rgba(255,255,255,.15)}
+.header-text h1{font-size:16px;font-weight:700;letter-spacing:.3px}
+.header-text p{font-size:11px;color:#777777;margin-top:3px}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.date-input{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:#fff;padding:5px 10px;border-radius:6px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;outline:none}
+.date-input::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;cursor:pointer}
+.sep{color:rgba(255,255,255,.2);font-size:13px}
+.btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.65);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;transition:all .15s;white-space:nowrap}
+.btn:hover,.btn.active{background:rgba(255,107,53,.18);border-color:#ff6b35;color:#ff6b35;font-weight:600}
+
+.tabs{display:flex;background:#16213e;padding:0 28px;overflow-x:auto;border-bottom:1px solid #262640}
+.tab{padding:13px 20px;cursor:pointer;font-size:13px;color:#777777;border-bottom:3px solid transparent;transition:all .15s;white-space:nowrap;font-weight:500}
+.tab:hover{color:#fff}
+.tab.active{color:#ff6b35;border-bottom-color:#ff6b35;font-weight:700}
+
+.content{padding:24px 28px;display:none}
+.content.active{display:block}
+
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:22px}
+.kpi-card{background:#1e1e35;border:1px solid #262640;border-radius:12px;padding:18px 20px}
+.kpi-label{font-size:10.5px;color:#777777;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px}
+.kpi-value{font-size:24px;font-weight:700;font-family:'DM Mono',monospace;color:#ff6b35}
+.kpi-sub{font-size:11px;color:#777777;margin-top:5px;font-family:'DM Mono',monospace}
+
+.sec-title{font-size:13.5px;font-weight:700;color:rgba(255,255,255,.8);margin:26px 0 12px;border-left:3px solid #ff6b35;padding-left:10px;text-transform:uppercase;letter-spacing:.4px}
+
+.temp-grid{display:grid;grid-template-columns:1fr 1fr 0.8fr;gap:14px;margin-bottom:10px}
+.temp-card{border-radius:14px;padding:20px;border:2px solid}
+.temp-card.quente{background:#2a0a0a;border-color:#ff1744}
+.temp-card.frio{background:#061428;border-color:#42a5f5}
+.temp-title{font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;margin-bottom:4px}
+.temp-card.quente .temp-title{color:#ff1744}
+.temp-card.frio .temp-title{color:#42a5f5}
+.temp-sub{font-size:10.5px;color:#aaa;margin-bottom:16px}
+.temp-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.temp-metric-val{font-family:'DM Mono',monospace;font-size:19px;font-weight:700}
+.temp-metric-lbl{font-size:9.5px;color:#999;text-transform:uppercase;margin-top:3px;letter-spacing:.3px}
+.temp-detail{font-size:11px;color:rgba(255,255,255,.65);background:rgba(255,255,255,.04);border-radius:8px;padding:10px 12px;line-height:1.7}
+.temp-detail .row{display:flex;justify-content:space-between;gap:10px}
+.temp-empty{font-size:12px;color:rgba(255,255,255,.4);text-align:center;padding:30px 10px;font-style:italic}
+.comp-card{background:#1e1e35;border:1px solid #262640;border-radius:14px;padding:20px;display:flex;flex-direction:column;justify-content:center;gap:16px}
+.comp-item{text-align:center}
+.comp-item .v{font-family:'DM Mono',monospace;font-size:22px;font-weight:700;color:#ff6b35}
+.comp-item .l{font-size:10px;color:#777;text-transform:uppercase;margin-top:4px;letter-spacing:.4px}
+@media(max-width:900px){.temp-grid{grid-template-columns:1fr}}
+
+.funil-row{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:10px}
+.funnel-svg-wrap{flex:0 0 52%;max-width:52%}
+.funnel-metrics-row{flex:1;display:flex;flex-direction:column;gap:12px;min-width:200px}
+@media(max-width:900px){.funnel-svg-wrap{flex:0 0 100%;max-width:100%}}
+.metric-card{background:#1e1e35;border:1px solid #262640;border-radius:12px;padding:16px 18px;position:relative;overflow:hidden;flex:1;display:flex;flex-direction:column;justify-content:center}
+.metric-card::after{content:'';position:absolute;left:0;right:0;bottom:0;height:3px;border-radius:0 0 12px 12px}
+.metric-card.cpc::after{background:#ff6b35}
+.metric-card.entrada::after{background:#ffd600}
+.metric-card.cadastro::after{background:#00c853}
+.metric-card .mv{font-family:'DM Mono',monospace;font-size:26px;font-weight:700}
+.metric-card.cpc .mv{color:#ff6b35}
+.metric-card.entrada .mv{color:#ffd600}
+.metric-card.cadastro .mv{color:#00c853}
+.metric-card .ml{font-size:10.5px;color:#999;text-transform:uppercase;margin-top:6px;letter-spacing:.4px}
+
+.chart-card{background:#1e1e35;border:1px solid #262640;border-radius:12px;padding:16px;margin-bottom:18px}
+.chart-card h4{font-size:11px;color:#777;margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px}
+.chart-box{height:220px;position:relative}
+
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#16213e;color:#999;padding:9px 10px;text-align:right;font-weight:600;border-bottom:1px solid #262640;white-space:nowrap;font-size:10.5px;text-transform:uppercase;letter-spacing:.3px}
+th:first-child{text-align:left}
+td{padding:8px 10px;text-align:right;border-bottom:1px solid #1e1e35;font-family:'DM Mono',monospace;font-size:11.5px;color:#e8e8e8;white-space:nowrap}
+td:first-child{text-align:left;font-family:'DM Sans',sans-serif;font-size:12px;max-width:340px;white-space:normal;line-height:1.4}
+tr:hover td{background:rgba(255,255,255,.025)}
+tr.total td{background:rgba(255,107,53,.1);font-weight:700;color:#ff6b35;font-family:'DM Mono',monospace}
+.tbl-wrap{overflow-x:auto;border-radius:10px;border:1px solid #262640;margin-bottom:10px}
+
+.badge{display:inline-block;padding:3px 9px;border-radius:5px;font-size:10px;font-weight:700;letter-spacing:.3px}
+.badge.escalar{background:rgba(0,200,83,.18);color:#00c853}
+.badge.manter{background:rgba(255,107,53,.18);color:#ff6b35}
+.badge.avaliar{background:rgba(255,214,0,.18);color:#ffd600}
+.badge.pausar{background:rgba(255,23,68,.18);color:#ff1744}
+.lnk{color:#42a5f5;text-decoration:none;font-size:11px}
+.lnk:hover{text-decoration:underline}
+
+.ft{text-align:center;font-size:10px;color:#444;padding:28px 0 32px}
+@media(max-width:600px){.content{padding:16px}.header{padding:12px 16px}}
+</style>
+</head>
+<body>
+
+<div id="loading-overlay">
+  <div id="spinner"></div>
+  <div style="color:rgba(255,255,255,.5);font-size:13px;max-width:480px;text-align:center" id="loading-msg">Conectando com a planilha...</div>
+  <button id="retry-btn" class="btn" style="display:none" onclick="loadData()">🔄 Tentar novamente</button>
+</div>
+
+<div class="header">
+  <div class="logo-badge">JGT</div>
+  <div class="header-divider"></div>
+  <div class="header-text">
+    <h1>DASHBOARD CAPTAÇÃO — BLACK26</h1>
+    <p id="header-sub">[JGT] [BLACK26] cap041026 · carregando período…</p>
+  </div>
+  <div class="header-right">
+    <input type="date" id="dateFrom" class="date-input" onchange="onDateChange()">
+    <span class="sep">→</span>
+    <input type="date" id="dateTo" class="date-input" onchange="onDateChange()">
+    <button class="btn" onclick="setPreset(7,this)">7d</button>
+    <button class="btn" onclick="setPreset(14,this)">14d</button>
+    <button class="btn active" id="btn-all" onclick="setPreset('all',this)">Tudo</button>
+    <button class="btn" onclick="loadData()">🔄 Atualizar</button>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('visao',this)">Visão Geral</div>
+  <div class="tab" onclick="showTab('criativos',this)">Criativos</div>
+  <div class="tab" onclick="showTab('publicos',this)">Públicos</div>
+  <div class="tab" onclick="showTab('diaria',this)">Análise Diária</div>
+</div>
+
+<!-- ═════ VISÃO GERAL ═════ -->
+<div class="content active" id="tab-visao">
+  <div class="kpi-grid" id="kpi-grid"></div>
+
+  <div class="sec-title">Público Quente vs Público Frio</div>
+  <div class="temp-grid" id="temp-grid"></div>
+
+  <div class="sec-title">Funil de Conversão</div>
+  <div class="funil-row">
+    <div class="funnel-svg-wrap" id="funnel-svg"></div>
+    <div class="funnel-metrics-row" id="funnel-metrics"></div>
+  </div>
+
+  <div class="sec-title">Evolução Diária</div>
+  <div class="chart-card"><h4>Leads e CPL por dia</h4><div class="chart-box"><canvas id="chDiario"></canvas></div></div>
+  <div class="tbl-wrap"><table id="tbl-visao"></table></div>
+</div>
+
+<!-- ═════ CRIATIVOS ═════ -->
+<div class="content" id="tab-criativos">
+  <div class="sec-title">Criativos — ranqueados por CPL</div>
+  <div class="tbl-wrap"><table id="tbl-criativos"></table></div>
+</div>
+
+<!-- ═════ PÚBLICOS ═════ -->
+<div class="content" id="tab-publicos">
+  <div class="sec-title">Públicos — ranqueados por CPL</div>
+  <div class="tbl-wrap"><table id="tbl-publicos"></table></div>
+</div>
+
+<!-- ═════ ANÁLISE DIÁRIA ═════ -->
+<div class="content" id="tab-diaria">
+  <div class="sec-title">Dia a dia, por público e criativo</div>
+  <div class="tbl-wrap"><table id="tbl-diaria-detalhe"></table></div>
+</div>
+
+<div class="ft">Jamelli GT · Dashboard de Captação</div>
+
+<script>
+// ╔══════════════════════════════════════════════════╗
+// ║  CONFIGURAÇÃO — EDITE APENAS AQUI                 ║
+// ╚══════════════════════════════════════════════════╝
+const SHEET_ID   = '1fmf1mic4HcFBMlM2RhqLi88ExZYEPgSBBI7bNkKKspI';
+const SHEET_NAME = 'Black26';
+
+// colunas (por nome do cabeçalho)
+const COL = {
+  date:'Date', inv:'Spend (Cost, Amount Spent)', clicks:'Action Link Clicks',
+  pv:'Action Landing Page View', leads:'Action Leads', campaign:'Campaign Name',
+  adset:'Adset Name', ad:'Ad Name', reach:'Reach (Estimated)', imp:'Impressions',
+  url:'Instagram Permalink URL', vv:'Action Video View',
+  statusCampaign:'Campaign Status', statusAd:'Ad Status',
+};
+
+// palavras-chave de público FRIO (tráfego não aquecido). Tudo que não bater cai em QUENTE
+// (padrão deste cliente: a base é sempre engajamento/retargeting).
+const FRIO_KEYWORDS = ['lak','lookalike','interess','parental','advantage+ automatico','advantage automatico','amplo','broad','look alike'];
+
+// ══════════════════════════════════════════════════════════════
+function $(id){ return document.getElementById(id); }
+const norm = s => String(s==null?'':s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
+const esc  = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function parseCSV(text){
+  const rows=[]; let row=[], cur='', inQ=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(inQ){ if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else inQ=false; } else cur+=c; }
+    else { if(c==='"') inQ=true; else if(c===','){ row.push(cur); cur=''; } else if(c==='\n'){ row.push(cur); rows.push(row); row=[]; cur=''; } else if(c!=='\r') cur+=c; }
+  }
+  if(cur!==''||row.length){ row.push(cur); rows.push(row); }
+  return rows;
+}
+function parseBR(v){
+  if(v==null) return 0;
+  let s=String(v).trim(); if(!s) return 0;
+  s=s.replace(/R\$|\s|%/g,'');
+  if(s.includes(',')) s=s.replace(/\./g,'').replace(',','.');
+  else if(/^-?\d{1,3}(\.\d{3})+$/.test(s)) s=s.replace(/\./g,'');
+  const n=parseFloat(s);
+  return isFinite(n)?n:0;
+}
+function findCol(hdr,name){ const H=hdr.map(norm); return H.indexOf(norm(name)); }
+
+const nf   = (v,d=0)=>(v||0).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const fBRL = v => 'R$ '+nf(v,2);
+const fInt = v => nf(Math.round(v||0),0);
+const fPct = v => (isFinite(v)?nf(v,2):'0,00')+'%';
+const fDM  = d => d?d.slice(8,10)+'/'+d.slice(5,7):'—';
+const div  = (a,b)=> b? a/b : 0;
+
+async function fetchSheetCSV(sheetName){
+  const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),20000);
+  try{
+    const resp=await fetch(url,{signal:controller.signal});
+    clearTimeout(timeout);
+    if(!resp.ok) throw new Error(`Planilha "${sheetName}": HTTP ${resp.status}. Verifique se está pública.`);
+    const text=await resp.text();
+    if(text.includes('Signin')||text.includes('accounts.google')) throw new Error(`Planilha "${sheetName}" requer login. Defina como pública.`);
+    return text;
+  }catch(e){
+    clearTimeout(timeout);
+    if(e.name==='AbortError') throw new Error(`Timeout ao carregar "${sheetName}".`);
+    throw e;
+  }
+}
+
+function isFrio(adsetName){
+  const n = norm(adsetName);
+  return FRIO_KEYWORDS.some(k=>n.includes(norm(k)));
+}
+
+// ── estado global ───────────────────────────────────────────────
+let ROWS=[]; // linhas cruas processadas {date,inv,clicks,pv,leads,imp,campaign,adset,ad,url,vv,statusAd,statusCampaign,temp}
+let currentPreset='all';
+const CH={};
+
+function processRows(raw){
+  if(!raw.length) return [];
+  const hdr=raw[0];
+  const C={}; for(const [k,n] of Object.entries(COL)) C[k]=findCol(hdr,n);
+  const missing=['date','inv','clicks','imp','leads'].filter(k=>C[k]<0);
+  if(missing.length) throw new Error(`Aba "${SHEET_NAME}": colunas não encontradas (${missing.map(k=>COL[k]).join(', ')}).`);
+  const out=[];
+  for(let i=1;i<raw.length;i++){
+    const r=raw[i]; if(!r.some(x=>String(x).trim())) continue;
+    const date=String(r[C.date]||'').trim(); if(!date) continue;
+    const g=k=>C[k]>=0?r[C[k]]:'';
+    const adset=String(g('adset')||'').trim();
+    out.push({
+      date, inv:parseBR(g('inv')), clicks:parseBR(g('clicks')), pv:parseBR(g('pv')),
+      leads:parseBR(g('leads')), imp:parseBR(g('imp')), vv:parseBR(g('vv')),
+      campaign:String(g('campaign')||'').trim(), adset, ad:String(g('ad')||'').trim(),
+      url:String(g('url')||'').trim(),
+      statusAd:String(g('statusAd')||'').trim(), statusCampaign:String(g('statusCampaign')||'').trim(),
+      temp: isFrio(adset)?'frio':'quente',
+    });
+  }
+  return out;
+}
+
+const inRange=(d,from,to)=>(!from||d>=from)&&(!to||d<=to);
+
+function zeroAgg(){ return {inv:0,imp:0,clicks:0,pv:0,leads:0,vv:0}; }
+function addAgg(t,r){ t.inv+=r.inv; t.imp+=r.imp; t.clicks+=r.clicks; t.pv+=r.pv; t.leads+=r.leads; t.vv+=r.vv; }
+function metricsFrom(t){
+  return {
+    ...t,
+    ctr: div(t.clicks,t.imp)*100,
+    cpc: div(t.inv,t.clicks),
+    cpm: div(t.inv,t.imp)*1000,
+    cpl: div(t.inv,t.leads),
+    txEntrada: div(t.pv,t.clicks)*100,
+    txCadastro: div(t.leads,t.pv)*100,
+    hook: div(t.vv,t.imp)*100,
+  };
+}
+
+function filtered(from,to){ return ROWS.filter(r=>inRange(r.date,from,to)); }
+
+function statusBadge(cpl, leads, inv, avgCpl){
+  if(leads>0){
+    if(cpl<=avgCpl*0.7) return 'escalar';
+    if(cpl<=avgCpl*1.1) return 'manter';
+    return 'avaliar';
+  }
+  return inv>=5 ? 'pausar' : 'avaliar';
+}
+const badgeLabel={escalar:'ESCALAR',manter:'MANTER',avaliar:'AVALIAR',pausar:'PAUSAR'};
+
+// ── render ──────────────────────────────────────────────────────
+function render(){
+  const from=$('dateFrom').value, to=$('dateTo').value;
+  const rows=filtered(from,to);
+  const tot=zeroAgg(); rows.forEach(r=>addAgg(tot,r));
+  const m=metricsFrom(tot);
+
+  // KPIs
+  $('kpi-grid').innerHTML = `
+    <div class="kpi-card"><div class="kpi-label">Investimento Total</div><div class="kpi-value">${fBRL(m.inv)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CTR Médio</div><div class="kpi-value">${fPct(m.ctr)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CPM Médio</div><div class="kpi-value">${fBRL(m.cpm)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CPL Médio</div><div class="kpi-value">${fBRL(m.cpl)}</div><div class="kpi-sub">${fInt(m.leads)} leads no período</div></div>
+  `;
+
+  // Quente vs Frio
+  const quenteRows=rows.filter(r=>r.temp==='quente'), frioRows=rows.filter(r=>r.temp==='frio');
+  const tq=zeroAgg(); quenteRows.forEach(r=>addAgg(tq,r)); const mq=metricsFrom(tq);
+  const tf=zeroAgg(); frioRows.forEach(r=>addAgg(tf,r)); const mf=metricsFrom(tf);
+
+  const bySub=(list)=>{
+    const map=new Map();
+    list.forEach(r=>{ if(!map.has(r.adset)) map.set(r.adset,zeroAgg()); addAgg(map.get(r.adset),r); });
+    return [...map.entries()].map(([k,v])=>({name:k,...metricsFrom(v)})).sort((a,b)=>b.inv-a.inv);
+  };
+  const quenteDetail = bySub(quenteRows).slice(0,4)
+    .map(s=>`<div class="row"><span>${esc(s.name)}</span><span>${fBRL(s.inv)} · ${fInt(s.leads)} leads</span></div>`).join('');
+  const frioDetail = bySub(frioRows).slice(0,4)
+    .map(s=>`<div class="row"><span>${esc(s.name)}</span><span>${fBRL(s.inv)} · ${fInt(s.leads)} leads</span></div>`).join('');
+
+  const pctQuente = div(m.leads?m.leads:1, 1)?div(mq.leads,m.leads||1)*100:0;
+  const pctFrio = div(mf.leads,m.leads||1)*100;
+  const difCpl = (mq.leads&&mf.leads) ? (mf.cpl-mq.cpl) : null;
+
+  $('temp-grid').innerHTML = `
+    <div class="temp-card quente">
+      <div class="temp-title">🔥 Público Quente</div>
+      <div class="temp-sub">Engajamento / Retargeting</div>
+      <div class="temp-metrics">
+        <div><div class="temp-metric-val" style="color:#ff1744">${fBRL(mq.inv)}</div><div class="temp-metric-lbl">Investimento</div></div>
+        <div><div class="temp-metric-val" style="color:#ff1744">${mq.leads?fBRL(mq.cpl):'—'}</div><div class="temp-metric-lbl">CPL</div></div>
+        <div><div class="temp-metric-val" style="color:#ff1744">${fInt(mq.leads)}</div><div class="temp-metric-lbl">Leads</div></div>
+      </div>
+      <div class="temp-detail">${quenteDetail || '<div class="temp-empty">Sem dados no período</div>'}</div>
+    </div>
+    <div class="temp-card frio">
+      <div class="temp-title">❄️ Público Frio</div>
+      <div class="temp-sub">LAK / Lookalike / Interesses / Amplo</div>
+      <div class="temp-metrics">
+        <div><div class="temp-metric-val" style="color:#42a5f5">${fBRL(mf.inv)}</div><div class="temp-metric-lbl">Investimento</div></div>
+        <div><div class="temp-metric-val" style="color:#42a5f5">${mf.leads?fBRL(mf.cpl):'—'}</div><div class="temp-metric-lbl">CPL</div></div>
+        <div><div class="temp-metric-val" style="color:#42a5f5">${fInt(mf.leads)}</div><div class="temp-metric-lbl">Leads</div></div>
+      </div>
+      <div class="temp-detail">${frioDetail || '<div class="temp-empty">Nenhum público frio rodando ainda neste período — campanha testando só aquecido.</div>'}</div>
+    </div>
+    <div class="comp-card">
+      <div class="comp-item"><div class="v">${fPct(pctQuente)}</div><div class="l">Leads Quente</div></div>
+      <div class="comp-item"><div class="v">${fPct(pctFrio)}</div><div class="l">Leads Frio</div></div>
+      <div class="comp-item"><div class="v">${difCpl!=null?fBRL(difCpl):'—'}</div><div class="l">Diferença de CPL (Frio − Quente)</div></div>
+    </div>
+  `;
+
+  // Funil
+  $('funnel-svg').innerHTML = funnelSVG(m.imp,m.clicks,m.pv,m.leads);
+  $('funnel-metrics').innerHTML = `
+    <div class="metric-card cpc"><div class="mv">${fBRL(m.cpc)}</div><div class="ml">CPC — Custo por Clique</div></div>
+    <div class="metric-card entrada"><div class="mv">${fPct(m.txEntrada)}</div><div class="ml">Tx Entrada — cliques → página</div></div>
+    <div class="metric-card cadastro"><div class="mv">${fPct(m.txCadastro)}</div><div class="ml">Tx Cadastro — página → lead</div></div>
+  `;
+
+  // Evolução diária
+  const dayMap=new Map();
+  rows.forEach(r=>{ if(!dayMap.has(r.date)) dayMap.set(r.date,zeroAgg()); addAgg(dayMap.get(r.date),r); });
+  const days=[...dayMap.entries()].map(([d,v])=>({date:d,...metricsFrom(v)})).sort((a,b)=>a.date.localeCompare(b.date));
+
+  let th='<tr><th>Dia</th><th>Investimento</th><th>Impressões</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th><th>Tx Cadastro</th></tr>';
+  let tb=days.map(d=>`<tr><td>${fDM(d.date)}</td><td>${fBRL(d.inv)}</td><td>${fInt(d.imp)}</td><td>${fInt(d.clicks)}</td><td>${fInt(d.pv)}</td><td>${fInt(d.leads)}</td><td>${fPct(d.ctr)}</td><td>${fBRL(d.cpc)}</td><td>${d.leads?fBRL(d.cpl):'—'}</td><td>${fPct(d.txCadastro)}</td></tr>`).join('');
+  tb += `<tr class="total"><td>TOTAL</td><td>${fBRL(m.inv)}</td><td>${fInt(m.imp)}</td><td>${fInt(m.clicks)}</td><td>${fInt(m.pv)}</td><td>${fInt(m.leads)}</td><td>${fPct(m.ctr)}</td><td>${fBRL(m.cpc)}</td><td>${m.leads?fBRL(m.cpl):'—'}</td><td>${fPct(m.txCadastro)}</td></tr>`;
+  $('tbl-visao').innerHTML = th+tb;
+
+  drawDailyChart(days);
+
+  // Criativos
+  const byAd=new Map();
+  rows.forEach(r=>{ if(!r.ad) return; if(!byAd.has(r.ad)) byAd.set(r.ad,{inv:0,imp:0,clicks:0,pv:0,leads:0,vv:0,url:r.url,status:r.statusAd}); const a=byAd.get(r.ad); a.inv+=r.inv; a.imp+=r.imp; a.clicks+=r.clicks; a.pv+=r.pv; a.leads+=r.leads; a.vv+=r.vv; });
+  const adList=[...byAd.entries()].map(([name,v])=>({name,...metricsFrom(v),url:v.url,status:v.status}));
+  const avgCplAds = div(adList.filter(a=>a.leads>0).reduce((s,a)=>s+a.inv,0), adList.filter(a=>a.leads>0).reduce((s,a)=>s+a.leads,0)) || m.cpl;
+  adList.sort((a,b)=>{ if(!!a.leads!==!!b.leads) return b.leads-a.leads; if(a.leads&&b.leads) return a.cpl-b.cpl; return b.inv-a.inv; });
+
+  let thc='<tr><th>#</th><th>Criativo</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th><th>Tx Entrada</th><th>Tx Cadastro</th><th>Hook Rate</th><th>Link</th><th>Status</th></tr>';
+  let tbc=adList.map((a,i)=>{
+    const badge=statusBadge(a.cpl,a.leads,a.inv,avgCplAds);
+    return `<tr><td>${i+1}</td><td>${esc(a.name)}</td><td>${fBRL(a.inv)}</td><td>${fInt(a.imp)}</td><td>${fInt(a.clicks)}</td><td>${fInt(a.pv)}</td><td>${fInt(a.leads)}</td><td>${fPct(a.ctr)}</td><td>${fBRL(a.cpc)}</td><td>${a.leads?fBRL(a.cpl):'—'}</td><td>${fPct(a.txEntrada)}</td><td>${fPct(a.txCadastro)}</td><td>${fPct(a.hook)}</td><td>${a.url?`<a class="lnk" href="${esc(a.url)}" target="_blank">ver anúncio</a>`:'—'}</td><td><span class="badge ${badge}">${badgeLabel[badge]}</span></td></tr>`;
+  }).join('');
+  $('tbl-criativos').innerHTML = thc+tbc;
+
+  // Públicos
+  const byAdset=new Map();
+  rows.forEach(r=>{ if(!r.adset) return; if(!byAdset.has(r.adset)) byAdset.set(r.adset,{inv:0,imp:0,clicks:0,pv:0,leads:0,vv:0,temp:r.temp}); const a=byAdset.get(r.adset); a.inv+=r.inv; a.imp+=r.imp; a.clicks+=r.clicks; a.pv+=r.pv; a.leads+=r.leads; a.vv+=r.vv; });
+  const adsetList=[...byAdset.entries()].map(([name,v])=>({name,...metricsFrom(v),temp:v.temp}));
+  const avgCplPub = div(adsetList.filter(a=>a.leads>0).reduce((s,a)=>s+a.inv,0), adsetList.filter(a=>a.leads>0).reduce((s,a)=>s+a.leads,0)) || m.cpl;
+  adsetList.sort((a,b)=>{ if(!!a.leads!==!!b.leads) return b.leads-a.leads; if(a.leads&&b.leads) return a.cpl-b.cpl; return b.inv-a.inv; });
+
+  let thp='<tr><th>#</th><th>Público (conjunto)</th><th>Temperatura</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th><th>Tx Entrada</th><th>Tx Cadastro</th><th>Status</th></tr>';
+  let tbp=adsetList.map((a,i)=>{
+    const badge=statusBadge(a.cpl,a.leads,a.inv,avgCplPub);
+    return `<tr><td>${i+1}</td><td>${esc(a.name)}</td><td style="text-align:left">${a.temp==='quente'?'🔥 Quente':'❄️ Frio'}</td><td>${fBRL(a.inv)}</td><td>${fInt(a.imp)}</td><td>${fInt(a.clicks)}</td><td>${fInt(a.pv)}</td><td>${fInt(a.leads)}</td><td>${fPct(a.ctr)}</td><td>${fBRL(a.cpc)}</td><td>${a.leads?fBRL(a.cpl):'—'}</td><td>${fPct(a.txEntrada)}</td><td>${fPct(a.txCadastro)}</td><td><span class="badge ${badge}">${badgeLabel[badge]}</span></td></tr>`;
+  }).join('');
+  $('tbl-publicos').innerHTML = thp+tbp;
+
+  // Análise diária (dia x público x criativo)
+  const detRows=[...rows].sort((a,b)=> b.date.localeCompare(a.date) || b.inv-a.inv);
+  let thd='<tr><th>Dia</th><th>Público</th><th>Criativo</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPL</th></tr>';
+  let tbd=detRows.map(r=>{
+    const rm=metricsFrom(r);
+    return `<tr><td>${fDM(r.date)}</td><td>${esc(r.adset)}</td><td>${esc(r.ad)}</td><td>${fBRL(r.inv)}</td><td>${fInt(r.imp)}</td><td>${fInt(r.clicks)}</td><td>${fInt(r.pv)}</td><td>${fInt(r.leads)}</td><td>${fPct(rm.ctr)}</td><td>${r.leads?fBRL(rm.cpl):'—'}</td></tr>`;
+  }).join('');
+  $('tbl-diaria-detalhe').innerHTML = thd+tbd;
+
+  // período no cabeçalho
+  const allDates=[...new Set(ROWS.map(r=>r.date))].sort();
+  if(allDates.length){
+    $('header-sub').textContent = `[JGT] [BLACK26] cap041026 · ${fDM(allDates[0])} a ${fDM(allDates[allDates.length-1])}`;
+  }
+}
+
+function funnelSVG(imp,clicks,pv,leads){
+  const ctr=div(clicks,imp)*100, txE=div(pv,clicks)*100, txC=div(leads,pv)*100;
+  const alertaEntrada = txE<70;
+  // larguras proporcionais (min 18%, max 92%) para efeito de funil mesmo quando os valores reais variam muito
+  const wMax=92, wMin=18;
+  const scale=(v,vmax)=> vmax? wMin+(wMax-wMin)*Math.pow(v/vmax,0.42) : wMin;
+  const w1=wMax, w2=scale(clicks,imp), w3=scale(pv,imp), w4=scale(leads,imp);
+  const stage=(y,h,wTop,wBot,label,value,color1,color2,glow)=>{
+    const cx=600;
+    const x1t=cx-(wTop/100*cx), x2t=cx+(wTop/100*cx);
+    const x1b=cx-(wBot/100*cx), x2b=cx+(wBot/100*cx);
+    return `<polygon points="${x1t},${y} ${x2t},${y} ${x2b},${y+h} ${x1b},${y+h}" fill="url(#${color1})" ${glow?'filter="url(#glow)"':''}/>
+      <text x="${cx}" y="${y+h/2+8}" text-anchor="middle" font-family="DM Mono,monospace" font-weight="700" font-size="${label==='LEADS'?68:56}" fill="#fff">${fInt(value)}</text>
+      <text x="${cx}" y="${y+h+22}" text-anchor="middle" font-family="DM Sans,sans-serif" font-weight="600" font-size="13" fill="rgba(255,255,255,.6)" letter-spacing="1">${label}</text>`;
+  };
+  const connector=(y,label,pct,alerta)=>`<text x="600" y="${y}" text-anchor="middle" font-family="DM Mono,monospace" font-weight="700" font-size="15" fill="${alerta?'#ffd600':'rgba(255,255,255,.5)'}">${label}: ${fPct(pct)}${alerta?' ⚠':''}</text>`;
+  return `<svg viewBox="0 0 1200 540" width="100%" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="g1" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#0d2b52"/><stop offset="50%" stop-color="#1a4d8f"/><stop offset="100%" stop-color="#0d2b52"/></linearGradient>
+      <linearGradient id="g2" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#14549e"/><stop offset="50%" stop-color="#2878d4"/><stop offset="100%" stop-color="#14549e"/></linearGradient>
+      <linearGradient id="g3" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#99400f"/><stop offset="50%" stop-color="#ff6b35"/><stop offset="100%" stop-color="#99400f"/></linearGradient>
+      <linearGradient id="g4" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#006633"/><stop offset="50%" stop-color="#00c853"/><stop offset="100%" stop-color="#006633"/></linearGradient>
+      <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="10" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    </defs>
+    ${stage(10,100,w1,w2,'IMPRESSÕES',imp,'g1')}
+    ${connector(140,'CTR',ctr,false)}
+    ${stage(160,100,w2,w3,'CLIQUES',clicks,'g2')}
+    ${connector(290,'TX ENTRADA',txE,alertaEntrada)}
+    ${stage(310,100,w3,w4,'PAGE VIEWS',pv,'g3')}
+    ${connector(440,'TX CADASTRO',txC,false)}
+    ${stage(460,70,w4,w4,'LEADS',leads,'g4',true)}
+  </svg>`;
+}
+
+function drawDailyChart(days){
+  const ctx=document.getElementById('chDiario'); if(!ctx) return;
+  if(CH.diario) CH.diario.destroy();
+  CH.diario=new Chart(ctx,{
+    type:'bar',
+    data:{ labels:days.map(d=>fDM(d.date)),
+      datasets:[
+        {type:'bar',label:'Leads',data:days.map(d=>d.leads),backgroundColor:'#00c853',yAxisID:'y',order:2},
+        {type:'line',label:'CPL (R$)',data:days.map(d=>d.leads?d.cpl:null),borderColor:'#ff6b35',backgroundColor:'#ff6b35',yAxisID:'y1',tension:.3,order:1},
+      ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      scales:{ y:{beginAtZero:true,ticks:{color:'#999'},grid:{color:'#262640'}}, y1:{beginAtZero:true,position:'right',ticks:{color:'#999'},grid:{display:false}}, x:{ticks:{color:'#999'},grid:{display:false}} },
+      plugins:{legend:{labels:{color:'#ccc'}}}
+    }
+  });
+}
+
+// ── tabs / período ──────────────────────────────────────────────
+function showTab(id,el){
+  document.querySelectorAll('.content').forEach(c=>c.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  $('tab-'+id).classList.add('active'); el.classList.add('active');
+}
+function onDateChange(){
+  document.querySelectorAll('.header-right .btn').forEach(b=>b.classList.remove('active'));
+  render();
+}
+function setPreset(days,btn){
+  const allDates=[...new Set(ROWS.map(r=>r.date))].sort();
+  if(!allDates.length) return;
+  const last=allDates[allDates.length-1];
+  if(days==='all'){ $('dateFrom').value=allDates[0]; $('dateTo').value=last; }
+  else { const d=new Date(last+'T00:00:00'); d.setDate(d.getDate()-(days-1)); $('dateFrom').value=d.toISOString().slice(0,10); $('dateTo').value=last; }
+  document.querySelectorAll('.header-right .btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+}
+
+// ── carregamento ────────────────────────────────────────────────
+async function loadData(){
+  $('loading-overlay').style.display='flex';
+  $('retry-btn').style.display='none';
+  $('loading-msg').textContent='Conectando com a planilha...';
+  try{
+    const csv=await fetchSheetCSV(SHEET_NAME);
+    const raw=parseCSV(csv);
+    ROWS=processRows(raw);
+    if(!ROWS.length) throw new Error(`Nenhuma linha de dados encontrada na aba "${SHEET_NAME}".`);
+    const allDates=[...new Set(ROWS.map(r=>r.date))].sort();
+    $('dateFrom').value=allDates[0]; $('dateTo').value=allDates[allDates.length-1];
+    render();
+    $('loading-overlay').style.display='none';
+  }catch(e){
+    $('loading-msg').textContent='Erro: '+e.message;
+    $('retry-btn').style.display='inline-block';
+  }
+}
+document.addEventListener('DOMContentLoaded', loadData);
+</script>
+</body>
+</html>
