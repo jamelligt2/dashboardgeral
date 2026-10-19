@@ -103,7 +103,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
 <span class="range-info" id="range-info"></span><button class="preset-btn" onclick="loadData()" style="margin-left:4px">🔄 Atualizar</button></div>
 <div><div class="brand" id="brand-title">📦 Livro Psi de Negócio · Bianca Amorim</div><div class="subtitle" id="brand-subtitle">Dashboard de Performance — Perpétuo · Jamelli GT · 2026</div></div></div>
 <div class="segbar"><span class="lbl">Produto:</span>
-<button class="preset-btn active" data-seg="all" onclick="setSeg('all',this)">Todos</button><button class="preset-btn" data-seg="d" onclick="setSeg('d',this)">📘 Livro Digital</button><button class="preset-btn" data-seg="f" onclick="setSeg('f',this)">📦 Livro Físico</button><button class="preset-btn" data-seg="e" onclick="setSeg('e',this)">🌎 Exterior</button>
+<button class="preset-btn active" data-seg="all" onclick="setSeg('all',this)">Todos</button><button class="preset-btn" data-seg="d" onclick="setSeg('d',this)">📘 Livro Digital</button><button class="preset-btn" data-seg="c" onclick="setSeg('c',this)">🎁 Combo</button><button class="preset-btn" data-seg="f" onclick="setSeg('f',this)">📦 Livro Físico</button><button class="preset-btn" data-seg="e" onclick="setSeg('e',this)">🌎 Exterior</button>
 <span class="lbl" style="margin-left:auto">Câmbio US$ 1 = R$</span><input type="number" id="fx" class="date-input fx-in" value="5.20" step="0.01" min="1" oninput="onFx()"></div>
 <div class="tabs"><div class="tab active" onclick="showTab('trafego',this)">📊 Tráfego</div><div class="tab" onclick="showTab('visao',this)">🌐 Visão Geral</div><div class="tab" onclick="showTab('criativos',this)">Criativos</div><div class="tab" onclick="showTab('publicos',this)">Públicos</div><div class="tab" onclick="showTab('semanal',this)">Semana a Semana</div><div class="tab" onclick="showTab('mensal',this)">Mês a Mês</div></div>
 <div id="trafego" class="content active"></div><div id="visao" class="content"></div><div id="criativos" class="content"></div><div id="publicos" class="content"></div><div id="semanal" class="content"></div><div id="mensal" class="content"></div>
@@ -121,9 +121,10 @@ const CONFIG={
  STATUS_APROVADO:['aprovado','completo','approved','complete'],
  // Segmentos por código de produto / SCK
  PRODUTO_FISICO:['8361553'],PRODUTO_DIGITAL:['7956109'],
- EXTERIOR_SCK:['120250304155830459'],
+ EXTERIOR_SCK:['120250304155830459','120250887509260459','120250787157490459','[UK]','[EUA]'],
+ COMBO_SCK:['LIVROCOMBO','120250940441390459','120250917714010459','120250917919140459'], // campanhas Combo (físico + digital)
  // Segmento da campanha no Gerenciador
- SEG_CAMP:[['f',/FISICO/i],['e',/\[EUA\]|\[UK\]/i]],IGNORAR_CAMP:/Post do Instagram/i,
+ SEG_CAMP:[['c',/LIVROCOMBO/i],['f',/FISICO/i],['e',/\[EUA\]|\[UK\]/i]],IGNORAR_CAMP:/Post do Instagram/i,
  G:{date:0,campaign:1,adset:2,ad:3,link:4,inv:5,reach:6,imp:7,cliques:8,pv:9,ck:10,statusCampaign:11,statusAdset:12,statusAd:13},
  // Meta Ads conta 'CA 02 - Bianca Amorim' (campanhas [LIVRO]; hoje lida da aba "Gerenciador conta 2" — este bloco ficou vazio): [invest, cliques de link, impressões, page views, checkouts].
  // Reserva (Meta direto, 07/10 14:50): só vale no dia/produto em que o Meta tem MAIS investimento que a planilha (Stract atrasado). Quando a planilha alcança, ela volta a valer sozinha.
@@ -131,7 +132,7 @@ const CONFIG={
  // [data, produto, anúncio, conjunto, invest, cliques de link, impr., page views, checkouts, ativo(1/0)]
  META2:{"d":{"2026-10-06":[60.71,14,1081,6,4],"2026-10-07":[84.34,20,859,13,3]},"e":{},"f":{"2026-10-06":[43.26,5,432,4,0]}}
 };
-const SEGN={d:'Digital',f:'Físico',e:'Exterior'};
+const SEGN={d:'Digital',c:'Combo',f:'Físico',e:'Exterior'};
 const G=CONFIG.G,W=CONFIG.W;
 let GROWS=[],SALES=[],SEG='all',FROM='',TO='',FX=CONFIG.FX_USD,CH={},CRI_F='all',CRI_S='inv',PUB_F='all',PUB_S='inv';
 document.title=CONFIG.PRODUTO+' · '+CONFIG.CLIENTE+' — Jamelli GT';
@@ -156,7 +157,7 @@ async function fetchSheetCSV(sheetName){
   if(text.includes('Signin')||text.includes('accounts.google'))throw new Error(`Planilha "${sheetName}" requer login. Defina como pública.`);
   return text}catch(e){clearTimeout(to);if(e.name==='AbortError')throw new Error(`Timeout ao carregar "${sheetName}".`);throw e}}
 // ── processamento ──
-const isTrafego=s=>(s.utmSource||'').toLowerCase().replace(/[\s_-]/g,'')==='metaads';
+const isTrafego=s=>(s.utmSource||'').toLowerCase().replace(/[\s_-]/g,'')==='metaads'||((s.utmSource||'').toLowerCase()==='ig'&&(s.utmMedium||'').toLowerCase()==='paid');
 const isPaused=s=>String(s).includes('PAUSED');
 function segCamp(n){for(const [s,rx] of CONFIG.SEG_CAMP)if(rx.test(n))return s;return 'd'}
 function processGerenciador(rows){
@@ -173,7 +174,7 @@ function processSales(rows){
  all.forEach(r=>{if(!ok(r)||!isRoot(r))return;const cod=String(r[W.produtoCod]).trim(),data=pdate(r[W.data]);
   const fis=CONFIG.PRODUTO_FISICO.includes(cod),dig=CONFIG.PRODUTO_DIGITAL.includes(cod);if(!fis&&!dig)return;if(data<CONFIG.DATA_MINIMA)return;
   const sck=(r[W.sck]||'').trim(),p=sck.split('|');
-  const seg=fis?'f':(CONFIG.EXTERIOR_SCK.some(x=>sck.includes(x))?'e':'d');
+  const seg=CONFIG.COMBO_SCK.some(x=>sck.includes(x))?'c':(fis?'f':(CONFIG.EXTERIOR_SCK.some(x=>sck.includes(x))?'e':'d'));
   const cur=(r[W.moeda]||'BRL').trim().toUpperCase()==='BRL'?'BRL':'USD';
   roots.set(String(r[W.tx]).trim(),{data,seg,cur,nome:r[W.cliente],email:r[W.email],pais:r[W.pais],fatPrincipal:num(r[W.fatBruto]),fatOB:0,nOB:0,liq:num(r[W.fatLiq]),
    utmSource:(p[0]&&p[0]!=='(none)')?p[0]:'',utmMedium:p[1]||'',utmCampaign:p[2]||'',utmContent:p[3]||''})});
