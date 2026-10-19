@@ -150,7 +150,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
   <div class="tab" onclick="showTab('criativos',this)">Criativos</div>
   <div class="tab" onclick="showTab('publicos',this)">Públicos</div>
   <div class="tab" onclick="showTab('semanal',this)">Semana a Semana</div>
-  <div class="tab" onclick="showTab('mensal',this)">Mês a Mês</div>
+  <div class="tab" onclick="showTab('leads',this)">👥 Leads</div>
 </div>
 
 <!-- ===================== TRÁFEGO ===================== -->
@@ -266,15 +266,11 @@ tr:hover td{background:rgba(255,255,255,.025)}
   </div>
 </div>
 
-<!-- ===================== MÊS A MÊS ===================== -->
-<div class="content" id="tab-mensal">
-  <div class="chart-grid-2x2">
-    <div class="chart-card"><h4>Investimento por Mês</h4><canvas id="chart-mes-inv"></canvas></div>
-    <div class="chart-card"><h4>CTR por Mês</h4><canvas id="chart-mes-ctr"></canvas></div>
-  </div>
+<!-- ===================== LEADS ===================== -->
+<div class="content" id="tab-leads">
   <div class="tbl-wrap">
-    <table id="tabela-mensal">
-      <thead><tr><th>Mês</th><th>Invest.</th><th>Fat.</th><th>ROAS</th><th>Compras</th><th>Cliques</th><th>CTR</th></tr></thead>
+    <table id="tabela-leads">
+      <thead><tr><th>Data</th><th>Nome</th><th>Email</th><th>Telefone</th><th>Produto</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -360,6 +356,7 @@ const W_CANDS = {
   utmMedium: ['utm_medium','utm medium'],
   utmCampaign: ['utm_campaign','utm campaign'],
   utmContent: ['utm_content','utm content'],
+  telefone: ['celular','telefone','whatsapp','phone'],
 };
 
 document.addEventListener('DOMContentLoaded', ()=>{
@@ -520,6 +517,7 @@ function gvizToRows(data){
 // ────────────────────────────────────────────────────────────────────
 let GROWS = [];   // linhas brutas do Gerenciador (Meta_Ads) processadas
 let SALES = [];   // vendas agrupadas do Webhook
+let LEADS = [];   // contatos (nome/email/telefone) de todo comprador aprovado
 let DIAS = [];    // GROWS agregado por dia
 let GCOLS = null, WCOLS = null;
 let HAS_INV = false, HAS_AD_ID = false, HAS_STATUS = false;
@@ -616,6 +614,7 @@ function processWebhook(rows){
       status,
       cliente: WCOLS.cliente!==-1 ? r[WCOLS.cliente] : '',
       email: (WCOLS.email!==-1 ? r[WCOLS.email] : '').toString().trim().toLowerCase(),
+      telefone: WCOLS.telefone!==-1 ? r[WCOLS.telefone] : '',
       fatTotal: WCOLS.fatTotal!==-1 ? parseValor(r[WCOLS.fatTotal]) : 0,
       fatPrincipal: WCOLS.fatPrincipal!==-1 ? parseValor(r[WCOLS.fatPrincipal]) : 0,
       fatOB: WCOLS.fatOB!==-1 ? parseValor(r[WCOLS.fatOB]) : 0,
@@ -644,8 +643,34 @@ function processWebhook(rows){
     const principais = g.filter(r => r.produtoNorm.includes(CONFIG.PRODUTO_NOME_MATCH)
       && (r.fatPrincipal || r.fatTotal) >= CONFIG.PRODUTO_PRECO_MINIMO)
       .sort((a,b)=> a.data.localeCompare(b.data));
-    if(!principais.length) return;
     const obRows = g.filter(r => r.produtoNorm.includes(CONFIG.OB_NOME_MATCH));
+
+    if(!principais.length){
+      // Comprou só o order bump (ex: Falta de Paciência), sem o produto
+      // principal junto — mesmo assim entra no relatório como uma venda
+      // (fatPrincipal fica 0, fatTotal = valor do(s) OB). Antes essas linhas
+      // eram descartadas silenciosamente por não ter produto principal.
+      if(!obRows.length) return;
+      const obSorted = obRows.slice().sort((a,b)=> a.data.localeCompare(b.data));
+      const first = obSorted[0];
+      if(first.data < CONFIG.DATA_MINIMA) return;
+      const fatOBVal = obRows.reduce((s,r)=> s + (r.fatOB || r.fatPrincipal || r.fatTotal || 0), 0);
+      sales.push({
+        data: first.data,
+        nome: first.cliente,
+        email: first.email,
+        fatTotal: fatOBVal,
+        fatPrincipal: 0,
+        fatOB: fatOBVal,
+        obCount: obRows.length,
+        utmSource: first.utmSource,
+        utmMedium: first.utmMedium,
+        utmCampaign: first.utmCampaign,
+        utmContent: first.utmContent,
+      });
+      return;
+    }
+
     // Todo o valor de order bump do email é somado na venda principal mais
     // antiga (não há coluna que ligue cada OB a um pedido específico nesta
     // planilha) — nos casos comuns (1 principal por email) isso é exato.
@@ -670,6 +695,23 @@ function processWebhook(rows){
   });
 
   SALES = sales.sort((a,b)=> b.data.localeCompare(a.data));
+
+  // Leads: um contato por email aprovado (nome, email, telefone, data mais
+  // antiga e produtos comprados) — inclui também quem comprou só o OB.
+  const leadsMap = {};
+  raw.forEach(r=>{
+    if(r.data < CONFIG.DATA_MINIMA) return;
+    const key = r.email;
+    if(!key) return;
+    const L = leadsMap[key] = leadsMap[key] || {data: r.data, nome: r.cliente, email: r.email, telefone: r.telefone, produtos: new Set()};
+    if(r.data < L.data) L.data = r.data;
+    if(!L.nome) L.nome = r.cliente;
+    if(!L.telefone) L.telefone = r.telefone;
+    if(r.produto) L.produtos.add(r.produto);
+  });
+  LEADS = Object.values(leadsMap)
+    .map(L=> ({ data: L.data, nome: L.nome, email: L.email, telefone: L.telefone, produto: Array.from(L.produtos).join(' + ') }))
+    .sort((a,b)=> b.data.localeCompare(a.data));
 
   // Agrega Gerenciador por dia
   const diasMap = {};
@@ -783,7 +825,8 @@ function renderAll(from, to){
   renderVisaoGeral(fDias, fSales);
   buildCriPubMaps(from, to);
   renderSemanal();
-  renderMensal();
+  const fLeads = LEADS.filter(l => (!from || l.data>=from) && (!to || l.data<=to));
+  renderLeads(fLeads);
 }
 
 function calcTotais(fDias, fSales){
@@ -1091,22 +1134,22 @@ function renderSemanal(){
 }
 
 // ────────────────────────────────────────────────────────────────────
-// MÊS A MÊS
+// LEADS
 // ────────────────────────────────────────────────────────────────────
-function monthKey(dateStr){
-  return dateStr.slice(0,7); // 'YYYY-MM'
+function telefoneWhatsLink(tel){
+  if(!tel) return '';
+  // Mantém só dígitos; se não vier com DDI (ex: já sem o "+55"), assume Brasil.
+  let digits = String(tel).replace(/\D/g,'');
+  if(digits && !digits.startsWith('55') && digits.length <= 11) digits = '55' + digits;
+  if(!digits) return '';
+  return `<a href="https://wa.me/${digits}" target="_blank" rel="noopener" style="color:#ffb937;text-decoration:none">${tel} ↗</a>`;
 }
-
-function renderMensal(){
-  const data = aggregatePeriodo(monthKey);
-  const tbody = document.querySelector('#tabela-mensal tbody');
-  tbody.innerHTML = data.slice().reverse().map(m=>{
-    const roas = m.inv>0 ? m.fat/m.inv : null;
-    const ctr = m.impressions>0 ? m.clicks/m.impressions*100 : null;
-    return `<tr><td>${m.key}</td><td>${fmtBRL(m.inv)}</td><td>${fmtBRL(m.fat)}</td><td>${fmtRoas(roas)}</td><td>${m.compras}</td><td>${fmtNum(m.clicks)}</td><td>${fmtPct(ctr,2)}</td></tr>`;
-  }).join('') || '<tr><td colspan="7" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados</td></tr>';
-  drawChart('chart-mes-inv', 'mes-inv', data.map(m=>m.key), data.map(m=>m.inv), 'Investimento');
-  drawChart('chart-mes-ctr', 'mes-ctr', data.map(m=>m.key), data.map(m=> m.impressions>0? +(m.clicks/m.impressions*100).toFixed(2):0), 'CTR %');
+function renderLeads(leads){
+  const tbody = document.querySelector('#tabela-leads tbody');
+  tbody.innerHTML = leads.map(l=>{
+    const data = l.data ? l.data.split('-').reverse().join('/') : '';
+    return `<tr><td>${data}</td><td>${l.nome||''}</td><td>${l.email||''}</td><td>${telefoneWhatsLink(l.telefone)}</td><td>${l.produto||''}</td></tr>`;
+  }).join('') || '<tr><td colspan="5" style="text-align:center;color:rgba(255,255,255,.4)">Sem dados</td></tr>';
 }
 
 const chartRefs = {};
