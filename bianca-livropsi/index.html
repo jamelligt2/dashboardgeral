@@ -160,7 +160,7 @@ async function fetchSheetCSV(sheetName){
   if(text.includes('Signin')||text.includes('accounts.google'))throw new Error(`Planilha "${sheetName}" requer login. Defina como pública.`);
   return text}catch(e){clearTimeout(to);if(e.name==='AbortError')throw new Error(`Timeout ao carregar "${sheetName}".`);throw e}}
 // ── processamento ──
-const isTrafego=s=>CONFIG.TRAFEGO_MANUAL.includes(s.tx)||(s.utmSource||'').toLowerCase().replace(/[\s_-]/g,'')==='metaads'||(['ig','fb'].includes((s.utmSource||'').toLowerCase())&&(s.utmMedium||'').toLowerCase()==='paid');
+const isTrafego=s=>CONFIG.TRAFEGO_MANUAL.includes(s.tx)||(s.utmSource||'').toLowerCase().replace(/[\s_-]/g,'')==='metaads'||!!s.pago;
 const isPaused=s=>String(s).includes('PAUSED');
 function segCamp(n){for(const [s,rx] of CONFIG.SEG_CAMP)if(rx.test(n))return s;return 'd'}
 function processGerenciador(rows){
@@ -168,7 +168,7 @@ function processGerenciador(rows){
   ativo:!isPaused(r[G.statusAd])&&!isPaused(r[G.statusAdset])&&!isPaused(r[G.statusCampaign])&&(r[G.statusAd]||r[G.statusAdset]||r[G.statusCampaign])!=='',seg:segCamp(r[G.campaign])}))
  .filter(g=>!CONFIG.IGNORAR_CAMP.test(g.campanha))}
 function utmNomes(p){const pago=['ig','fb'].includes(p[0])&&p[1]==='paid',N=CONFIG.ID_NOMES;
- if(pago)return{utmMedium:N.adset[p[4]]||p[4]||'paid',utmCampaign:N.camp[p[2]]||p[2]||'',utmContent:N.ad[p[3]]||p[3]||''};
+ if(pago)return{pago:true,utmMedium:N.adset[p[4]]||p[4]||'paid',utmCampaign:N.camp[p[2]]||p[2]||'',utmContent:N.ad[p[3]]||p[3]||''};
  return{utmMedium:p[1]||'',utmCampaign:p[2]||'',utmContent:p[3]||''}}
 function processSales(rows){
  const byTx=new Map();
