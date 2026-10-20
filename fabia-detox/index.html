@@ -145,6 +145,7 @@ tr.total td{font-weight:700;color:#ff6b2b;border-top:1px solid rgba(255,107,43,.
 
 <div class="tabs">
   <div class="tab active" onclick="showTab('trafego',this)">📊 Tráfego</div>
+  <div class="tab" onclick="showTab('origem',this)">🧭 Origem das Vendas</div>
   <div class="tab" onclick="showTab('visao',this)">🌐 Visão Geral</div>
   <div class="tab" onclick="showTab('criativos',this)">Criativos</div>
   <div class="tab" onclick="showTab('publicos',this)">Públicos</div>
@@ -154,6 +155,7 @@ tr.total td{font-weight:700;color:#ff6b2b;border-top:1px solid rgba(255,107,43,.
 
 <div id="err-slot"></div>
 <div class="content active" id="tab-trafego"></div>
+<div class="content" id="tab-origem"></div>
 <div class="content" id="tab-visao"></div>
 <div class="content" id="tab-criativos"></div>
 <div class="content" id="tab-publicos"></div>
@@ -259,6 +261,24 @@ const CONFIG = {
     statusAd:       'Ad Status',
     link:           'Instagram Permalink URL',
   },
+};
+
+// ── Planilha do SOS (usada só na aba "Origem das Vendas") ───────────
+CONFIG.SOS = {
+  SHEET_ID:          '1QWb7vxPyQ4JNHbz5p0HvUZzsjnvUPyhdQjDuY-Nl4wQ',
+  GERENCIADOR_SHEET: 'GERENCIADOR',
+  ABAS: [ {nome:'Todas as vendas até hoje 15/10 10h', tipo:'planilha'},
+          {nome:'Vendas até agora',                   tipo:'planilha'},
+          {nome:'Webhook',                            tipo:'webhook'} ],
+  PRODUTO_NOME:   'SOS Desinflamação',
+  PRECO_MINIMO:   10,     // principal R$ 19 x order bumps R$ 9,90
+  WEBHOOK_AJUSTE_HORAS: 4, // horários do webhook do SOS estão 4h atrás de Brasília
+  V: { id:'id transação', status:'status', moeda:'moeda', valor:'valor venda', produto:'nome produto',
+       nome:'nome contato', email:'email contato', pedido:'data pedido', aprov:'data aprovacao',
+       utmSrc:'utm_source', utmTerm:'rppc utm term', utmCamp:'rppc utm campaign', utmMed:'rppc utm medium', utmCont:'rppc utm content' },
+  W: { id:'transacao_id', status:'status', moeda:'moeda', valor:'valor', produto:'produto', nome:'nome', email:'email',
+       pedido:'data_venda', aprov:'data_venda',
+       utmSrc:'utm_source', utmTerm:'utm_term', utmCamp:'utm_campaign', utmMed:'utm_medium', utmCont:'utm_content' },
 };
 
 const SHEET_ID = CONFIG.SHEET_ID;
@@ -371,7 +391,7 @@ function precoTabela(v){
   for(const p of CONFIG.PRECOS_TABELA){ if(v>=p-0.01 && v<=p*(1+CONFIG.JUROS_MAX)) return p; }
   return v;
 }
-function readSheetRows(text, MAP, fonte){
+function readSheetRows(text, MAP, fonte, ajusteH){
   const rows=Array.isArray(text)?text:parseCSV(text); if(!rows.length) return [];
   const m=hmap(rows[0]); const ix={};
   const REQ = fonte==='webhook' ? ['status','valor','produto','pedido'] : ['status','valor','produto','email','pedido'];
@@ -380,7 +400,7 @@ function readSheetRows(text, MAP, fonte){
   const out=[];
   rows.slice(1).forEach(r=>{
     if(!r || r.every(c=>clean(c)==='')) return;
-    const aj = fonte==='webhook' ? (CONFIG.WEBHOOK_AJUSTE_HORAS||0) : 0;
+    const aj = fonte==='webhook' ? (ajusteH!=null ? ajusteH : (CONFIG.WEBHOOK_AJUSTE_HORAS||0)) : 0;
     const pedido=shiftDT(parseDT(val(r,'pedido')), aj);
     const aprov =shiftDT(parseDT(val(r,'aprov')), aj) || pedido;
     let valor=parseBR(val(r,'valor'));
@@ -493,6 +513,7 @@ const isPaused=s=>String(s||'').includes('PAUSED');
 
 // ───────────── estado ─────────────
 let GROWS=[], SALES=[], DIAS=[], STATS=null;
+let SOS_BUYERS=new Map(), SOS_INFO={erro:'',linhas:0,compradores:0,abas:{}};
 let presetMode='all', FIRST_LOAD=true;
 let criFilter='todos', criSort='inv', pubFilter='todos', pubSort='inv';
 const charts={};
@@ -516,7 +537,7 @@ function gvizToRows(t){
   });
   return rows;
 }
-function fetchSheetRows(sheetName, optional=false){
+function fetchSheetRows(sheetName, optional=false, sheetId=SHEET_ID){
   return new Promise((resolve,reject)=>{
     const cb='__gv'+Math.random().toString(36).slice(2);
     const s=document.createElement('script');
@@ -529,7 +550,7 @@ function fetchSheetRows(sheetName, optional=false){
       finish(resolve,gvizToRows(resp.table));
     };
     s.onerror=()=>fail(`Não foi possível carregar "${sheetName}". Verifique a internet e se a planilha está pública (qualquer pessoa com o link).`);
-    s.src=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:${cb}&sheet=${encodeURIComponent(sheetName)}&_=${Date.now()}`;
+    s.src=`https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json;responseHandler:${cb}&sheet=${encodeURIComponent(sheetName)}&_=${Date.now()}`;
     document.head.appendChild(s);
   });
 }
@@ -545,6 +566,8 @@ async function loadData(silent){
     const vText=await fetchSheetRows(CONFIG.VENDAS_SHEET);
     msg.textContent='Carregando Webhook (após o corte)...';
     const wText=await fetchSheetRows(CONFIG.WEBHOOK_SHEET, true);
+    msg.textContent='Carregando compradores do SOS...';
+    await loadSOS();
     GROWS=processGerenciador(gText);
     const r=processSales(vText,wText,GROWS);
     SALES=r.SALES; STATS=r.STATS;
@@ -559,6 +582,47 @@ async function loadData(silent){
   }finally{
     ov.style.display='none';
   }
+}
+
+// ───────────── compradores do SOS (aba Origem das Vendas) ─────────────
+// Lê a planilha do SOS, acha quem comprou o SOS e guarda, por e-mail, a PRIMEIRA compra aprovada
+// com a origem dela (tráfego pago x orgânico), usando a mesma regra de UTM do dash do SOS.
+async function loadSOS(){
+  const C=CONFIG.SOS, info={erro:'',linhas:0,compradores:0,abas:{}}, buyers=new Map();
+  try{
+    const gRows=await fetchSheetRows(C.GERENCIADOR_SHEET,true,C.SHEET_ID);
+    const ent={ads:Object.create(null),sets:Object.create(null),camps:Object.create(null),adCamp:Object.create(null)};
+    if(gRows.length>1){
+      const m=hmap(gRows[0]), ia=colIx(m,'Ad Name',false), is=colIx(m,'Adset Name',false), ic=colIx(m,'Campaign Name',false);
+      gRows.slice(1).forEach(r=>{
+        const ad=ia>=0?clean(r[ia]):'', st=is>=0?clean(r[is]):'', cp=ic>=0?clean(r[ic]):'';
+        if(ad){ ent.ads[norm(ad)]=ad; ent.adCamp[norm(ad)]=cp; }
+        if(st) ent.sets[norm(st)]=st;
+        if(cp) ent.camps[norm(cp)]=cp;
+      });
+    }
+    const aprovSet=new Set(CONFIG.STATUS_APROVADO), pN=norm(C.PRODUTO_NOME);
+    for(const aba of C.ABAS){
+      try{
+        const rows=await fetchSheetRows(aba.nome,true,C.SHEET_ID);
+        if(rows.length<2){ info.abas[aba.nome]='sem dados / não carregou'; continue; }
+        const rr=readSheetRows(rows, aba.tipo==='webhook'?C.W:C.V, aba.tipo, aba.tipo==='webhook'?C.WEBHOOK_AJUSTE_HORAS:0);
+        let n=0;
+        rr.forEach(r=>{
+          if(isTesteRow(r) || !r.email) return;
+          if(!aprovSet.has(r.status.toUpperCase()) || (r.moeda&&r.moeda!=='BRL') || !r.aprov) return;
+          if(!(norm(r.produto).includes(pN) && r.valor>=C.PRECO_MINIMO)) return;
+          n++;
+          const u=resolveUtm(r.utm, ent), prev=buyers.get(r.email);
+          if(!prev || r.aprov.ts<prev.ts || (r.aprov.ts===prev.ts && u.isTrafego && !prev.isTrafego)) buyers.set(r.email,{ts:r.aprov.ts, isTrafego:u.isTrafego, origem:u.origem, criativo:u.criativo, aba:aba.nome});
+        });
+        info.abas[aba.nome]=rr.length+' linhas · '+n+' compras do SOS';
+        info.linhas+=rr.length;
+      }catch(e){ info.abas[aba.nome]='erro: '+e.message; }
+    }
+  }catch(e){ info.erro=e.message; }
+  info.compradores=buyers.size;
+  SOS_BUYERS=buyers; SOS_INFO=info;
 }
 
 // ───────────── período ─────────────
@@ -626,7 +690,7 @@ function renderAll(){
   const gi=document.getElementById('range-info');
   const nd=DIAS.filter(d=>inR(d,from,to)).length;
   gi.textContent = `${fdate(from)} → ${fdate(to==='9999-12-31'?'':to)} · ${nd} dia${nd===1?'':'s'}`;
-  renderTrafego(from,to); renderVisao(from,to);
+  renderTrafego(from,to); renderOrigem(from,to); renderVisao(from,to);
   renderCriativos(from,to); renderPublicos(from,to);
   renderSemanal(); renderMensal();
 }
@@ -674,6 +738,55 @@ function renderTrafego(from,to){
       </div></div>`).join(''):'<div class="empty">Nenhuma venda no período selecionado.</div>';
   const painel=`<div class="sec-title">Vendas (${ss.length}) — ✅ tráfego pago · ⭐ orgânico</div><div class="sales-scroll">${cards}</div>`;
   document.getElementById('tab-trafego').innerHTML=info+kpis+funil+origem+painel;
+}
+
+// ───────────── aba Origem das Vendas ─────────────
+// Cada venda do Detox cai em UMA categoria (nesta ordem):
+//  1) campanha do Detox  → a própria venda veio de tráfego pago (meta_ads)
+//  2) comprador do SOS (orgânico) → já tinha comprado o SOS antes e essa compra do SOS veio do orgânico
+//  3) comprador do SOS (tráfego)  → já tinha comprado o SOS antes e essa compra do SOS veio do tráfego pago
+//  4) sem compra anterior do SOS
+function classificaVenda(s){
+  if(s.isTrafego) return {cat:'detox', sos:SOS_BUYERS.get(s.email)||null};
+  const b=SOS_BUYERS.get(s.email);
+  if(b && b.ts<=s.ts) return {cat:b.isTrafego?'sosT':'sosO', sos:b};
+  return {cat:'sem', sos:null};
+}
+const fdt=ts=>ts?fdate(ts.slice(0,10))+' '+ts.slice(11,16):'—';
+function renderOrigem(from,to){
+  const ss=SALES.filter(s=>inR(s.data,from,to));
+  const CATS=[
+    ['detox','1) Vieram da campanha do Detox','green','✅'],
+    ['sosO','2) Compradores do SOS que vieram do orgânico','yellow','🌱'],
+    ['sosT','3) Compradores do SOS que vieram do tráfego','orange','🎯'],
+    ['sem','Sem compra anterior do SOS','','⭐'],
+  ];
+  const g={detox:[],sosO:[],sosT:[],sem:[]};
+  ss.forEach(s=>{ const c=classificaVenda(s); g[c.cat].push({s,sos:c.sos}); });
+  const tot=ss.length, fatTot=ss.reduce((x,s)=>x+s.fatTotal,0);
+  const fatOf=k=>g[k].reduce((x,o)=>x+o.s.fatTotal,0);
+  const sosErro = SOS_INFO.erro || (SOS_INFO.compradores===0 ? 'Nenhum comprador do SOS foi carregado — verifique se a planilha do SOS está pública.' : '');
+  const abasTxt=Object.entries(SOS_INFO.abas).map(([k,v])=>`${esc(k)}: ${esc(v)}`).join(' · ');
+  const info=`<div class="ob-info">🧭 <b>Como ler:</b> cada venda do <b>${esc(CONFIG.PRODUTO)}</b> entra em uma única categoria. <b>1)</b> a venda veio do tráfego pago do Detox (meta_ads / anúncio do Detox). <b>2)</b> e <b>3)</b> o comprador <u>já tinha comprado o ${esc(CONFIG.SOS.PRODUTO_NOME)}</u> (cruzado por e-mail, só vale compra do SOS feita antes da compra do Detox) e a <b>primeira compra dele no SOS</b> veio do orgânico (2) ou do tráfego pago (3). O restante não comprou o SOS antes. Segue o filtro de período do topo.${sosErro?`<div class="red" style="margin-top:6px">⚠️ ${esc(sosErro)}</div>`:''}<details style="margin-top:6px"><summary style="cursor:pointer;color:rgba(255,255,255,.55)">Diagnóstico da planilha do SOS</summary>Compradores do SOS identificados: <b>${SOS_INFO.compradores}</b>${abasTxt?`<br>${abasTxt}`:''}</details></div>`;
+  const kpis=`<div class="kpi-grid">
+    ${kpi('Vendas do Detox',int(tot)||'0','',brl(fatTot))}
+    ${CATS.map(([k,l,cls])=>kpi(l,int(g[k].length)||'0',cls,(tot?pct(g[k].length/tot*100):'—')+' · '+brl(fatOf(k)))).join('')}
+  </div>`;
+  const bars=CATS.map(([k,l,cls,ic])=>{ const v=g[k].length; return `<div class="funil-bar-wrap"><div class="funil-label"><span>${ic} ${l}</span><span style="font-family:'DM Mono',monospace">${nf(v)} · ${tot?pct(v/tot*100):'—'}</span></div><div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${tot?Math.max(v/tot*100,v?2:0):0}%"></div></div></div>`; }).join('');
+  const resumo=`<div class="sec-title">De onde vieram as vendas do Detox</div><div class="funil-section"><div style="grid-column:1/-1">${bars}</div></div>`;
+  // detalhe: como o comprador do SOS chegou ao SOS
+  const det={};
+  [['sosO','Orgânico'],['sosT','Tráfego']].forEach(([k,lab])=>g[k].forEach(o=>{
+    const nome = k==='sosT' ? (o.sos.criativo&&o.sos.criativo!=='(sem criativo)'?'meta_ads · '+o.sos.criativo:'meta_ads') : (o.sos.origem||'direto');
+    const key=lab+'|'+nome; const d=det[key]||(det[key]={lab,nome,v:0,fat:0,k}); d.v++; d.fat+=o.s.fatTotal;
+  }));
+  const dl=Object.values(det).sort((a,b)=>(a.k===b.k?0:(a.k==='sosO'?-1:1))||b.v-a.v);
+  const tblDet=`<div class="sec-title">Como esses compradores chegaram ao SOS</div><div class="tbl-wrap"><table><thead><tr><th>Veio do SOS por</th><th>Origem da compra do SOS</th><th>Vendas do Detox</th><th>Faturamento</th></tr></thead><tbody>${dl.map(d=>`<tr><td>${d.k==='sosT'?'🎯':'🌱'} ${d.lab}</td><td>${esc(d.nome)}</td><td>${int(d.v)}</td><td>${brl(d.fat)}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">Sem vendas nessa categoria no período.</td></tr>'}</tbody></table></div>`;
+  // lista de compradores
+  const rows=[]; CATS.forEach(([k,l,cls,ic])=>g[k].forEach(o=>rows.push({k,ic,l,o})));
+  rows.sort((a,b)=>CATS.findIndex(c=>c[0]===a.k)-CATS.findIndex(c=>c[0]===b.k)||b.o.s.ts.localeCompare(a.o.s.ts));
+  const lista=`<div class="sec-title">Compradores do Detox (${tot})</div><div class="tbl-wrap"><table><thead><tr><th>Categoria</th><th>Cliente</th><th>Compra do Detox</th><th>Origem no Detox</th><th>1ª compra do SOS</th><th>Origem no SOS</th></tr></thead><tbody>${rows.map(({k,ic,l,o})=>`<tr><td>${ic} ${esc(l.replace(/^\d\) /,''))}</td><td>${esc(o.s.nome||o.s.email||'—')}</td><td>${fdt(o.s.ts)} · ${brl(o.s.fatTotal)}</td><td>${esc(o.s.origem)}</td><td>${o.sos?fdt(o.sos.ts):'—'}</td><td>${o.sos?esc(o.sos.isTrafego?('meta_ads'+(o.sos.criativo&&o.sos.criativo!=='(sem criativo)'?' · '+o.sos.criativo:'')):o.sos.origem):'—'}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">Nenhuma venda no período selecionado.</td></tr>'}</tbody></table></div>`;
+  document.getElementById('tab-origem').innerHTML=info+kpis+resumo+tblDet+lista;
 }
 
 // ───────────── aba Visão Geral ─────────────
