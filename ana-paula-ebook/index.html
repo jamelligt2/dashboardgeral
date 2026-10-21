@@ -386,7 +386,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 // ═══════════════════════════════════════════════════════════════════
 const norm = s => (s==null?'':String(s)).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
 const esc  = s => (s==null?'':String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const isTrafego = s => norm(s.utmSource) === 'metaads';
+// Orgânico é desprezível neste perpétuo: venda SEM UTM é tratada como tráfego (só vira orgânico se tiver outra origem explícita)
+const isTrafego = s => !String(s.utmSource||'').trim() || norm(s.utmSource) === 'metaads';
 
 function num(v){
   if(v==null) return 0;
@@ -578,7 +579,7 @@ function buildSales(webhookSales){
     });
     LOAD_INFO.historico++;
   }
-  LOAD_INFO.manuais = 0; LOAD_INFO.outrasCampanhas = 0;
+  LOAD_INFO.manuais = 0; LOAD_INFO.outrasCampanhas = 0; LOAD_INFO.semUtmNaoAtribuidas = 0;
   const campKey = norm(CONFIG.CAMPANHA);
   const out = [];
   for(const s of byCod.values()){
@@ -587,6 +588,7 @@ function buildSales(webhookSales){
       s.utmSource=man.utmSource; s.utmMedium=man.utmMedium; s.utmCampaign=man.utmCampaign; s.utmContent=man.utmContent;
       s.atribManual = man.nota || 'Atribuição manual'; LOAD_INFO.manuais++;
     }
+    if(!s.utmSource && s.origem==='webhook') LOAD_INFO.semUtmNaoAtribuidas++;   // venda do webhook sem UTM e sem atribuição manual → cai em "orgânico" por padrão
     if(s.data < DATA_MINIMA) continue;
     if(campKey && s.utmCampaign && !norm(s.utmCampaign).includes(campKey)){ LOAD_INFO.outrasCampanhas++; continue; }
     out.push(s);
@@ -722,6 +724,7 @@ function renderTrafego(){
   let notes = '';
   if(LOAD_INFO.webhookErro) notes += `<div class="ob-info warn">⚠ Aba "${esc(WEBHOOK_SHEET)}" indisponível (${esc(LOAD_INFO.webhookErro)}). Exibindo apenas as vendas do histórico Eduzz.</div>`;
   if(LOAD_INFO.manuais) notes += `<div class="ob-info warn">⚠ ${LOAD_INFO.manuais} venda(s) chegaram <b>sem UTM</b> (webhook criado depois) e foram atribuídas ao anúncio pelo pixel do Meta — identificadas com aviso amarelo no painel de vendas.</div>`;
+  if(LOAD_INFO.semUtmNaoAtribuidas) notes += `<div class="ob-info warn">⚠ ${LOAD_INFO.semUtmNaoAtribuidas} venda(s) do webhook chegaram <b>sem UTM e sem atribuição manual</b> — estão contabilizadas como <b>tráfego</b> (o orgânico deste perpétuo é desprezível), mas sem criativo/público definidos — aparecem como “(sem UTM)” em Criativos e Públicos.</div>`;
   if(LOAD_INFO.historico) notes += `<div class="ob-info">ℹ ${LOAD_INFO.historico} venda(s) anteriores ao webhook vêm do export Eduzz (bloco <b>VENDAS_HISTORICO</b>). Novas vendas entram automaticamente pela aba ${esc(WEBHOOK_SHEET)}.${LOAD_INFO.outrasCampanhas?` ${LOAD_INFO.outrasCampanhas} venda(s) de outras campanhas ignoradas.`:''}</div>`;
   document.getElementById('traf-notes').innerHTML = notes;
 
@@ -784,7 +787,7 @@ function renderTrafego(){
       ${s.fatOB>0 ? `<div class="buyer-ob">🛒 OB: ${brl(s.fatOB)}</div>` : ''}
       <div class="buyer-line"><b>Criativo:</b> ${esc(NAMES.ad.get(norm(s.utmContent)) || s.utmContent || '—')}</div>
       <div class="buyer-line"><b>Público:</b> ${esc(NAMES.adset.get(norm(s.utmMedium)) || s.utmMedium || '—')}</div>
-      <div class="buyer-line"><b>Origem:</b> ${esc(s.utmSource||'orgânico / sem UTM')}</div>
+      <div class="buyer-line"><b>Origem:</b> ${esc(s.utmSource||'sem UTM (contada como tráfego)')}</div>
       ${s.atribManual ? `<div class="buyer-warn">⚠ ${esc(s.atribManual)}</div>` : ''}
     </div>`;
   }).join('') : '<div class="empty-msg">Nenhuma venda no período.</div>';
@@ -905,7 +908,7 @@ function renderPaginas(){
   const row = (name, e, bold) => `<tr${bold?' style="font-weight:700"':''}><td>${name}</td><td>${cell(e.vendas,e.cliques)}</td><td>${cell(e.pv,e.cliques)}</td><td>${cell(e.ck,e.pv)}</td><td>${cell(e.vendas,e.pv)}</td></tr>`;
   const head = ['Página','Clique → Compra (taxa)','Clique → Page View (connect rate)','Page View → Checkout','Page View → Compra (conversão da página)'];
   document.getElementById('pag-table').innerHTML = `<thead><tr>${head.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>` +
-    list.map(e => row(esc(e.name) + (e.ativo ? '' : ' <span class="cnt">(pausada)</span>'), e, false)).join('') +
+    list.filter(e => e.cliques>0 || e.pv>0).map(e => row(esc(e.name) + (e.ativo ? '' : ' <span class="cnt">(pausada)</span>'), e, false)).join('') +   // linha "(sem UTM)" não tem cliques: entra só no Total
     row('Total', tot, true) + '</tbody>';
 }
 
