@@ -152,7 +152,7 @@ const dbr=d=>d?d.split('-').reverse().join('/'):'';
 const brl=(v,cur)=>cur==='BRL'?v:v*FX;
 function csv(t){const rows=[];let r=[],c='',q=false;for(let i=0;i<t.length;i++){const ch=t[i];if(q){if(ch=='"'){if(t[i+1]=='"'){c+='"';i++}else q=false}else c+=ch}else if(ch=='"')q=true;else if(ch==','){r.push(c);c=''}else if(ch=='\n'){r.push(c);rows.push(r);r=[];c=''}else if(ch!='\r')c+=ch}if(c||r.length){r.push(c);rows.push(r)}return rows}
 async function fetchSheetCSV(sheetName){
- const url=`https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+ const url=`https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}&_=${Date.now()}`;
  const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),30000);
  try{const resp=await fetch(url,{signal:ctl.signal});clearTimeout(to);
   if(!resp.ok)throw new Error(`Planilha "${sheetName}": HTTP ${resp.status}. Verifique se está pública.`);
@@ -281,5 +281,13 @@ function listView(id,items,F,S,fn,title,opts){
  <div class="tbl-wrap"><table><tr><th>Nome</th><th>Invest.</th><th>Fat. Tráfego</th><th>ROAS</th><th>Vendas</th><th>CAC</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Impr.</th></tr>${l.map(c=>`<tr><td>${c.nome}</td><td>${R(c.inv)}</td><td>${R(c.fat)}</td><td>${X(c.fat/c.inv)}</td><td>${c.n||'—'}</td><td>${R(c.inv/c.n)}</td><td>${I(c.cliques)}</td><td>${P(c.cliques/c.imp*100)}</td><td>${R(c.inv/c.cliques)}</td><td>${I(c.imp)}</td></tr>`).join('')}</table></div>`}
 function renderCri(){if(!GROWS.length)return;listView('criativos',buildCriPubMaps(FROM,TO).cri,CRI_F,CRI_S,'setCri','Criativos (anúncios)',['inv:Investimento','ctr:CTR','cpc:CPC','roas:ROAS','vendas:Vendas'])}
 function renderPub(){if(!GROWS.length)return;listView('publicos',buildCriPubMaps(FROM,TO).pub,PUB_F,PUB_S,'setPub','Públicos (conjuntos)',['inv:Investimento','ctr:CTR','cpc:CPC','roas:ROAS','vendas:Vendas'])}
+// atualização automática a cada 5 min (silenciosa: mantém o período e os filtros escolhidos)
+async function refreshQuiet(){try{const antes=allDates().slice(-1)[0],seguindo=!TO||TO>=antes;
+ const g=processGerenciador(csv(await fetchSheetCSV(CONFIG.GERENCIADOR_SHEET))).concat(processGerenciador(csv(await fetchSheetCSV(CONFIG.GERENCIADOR_SHEET2))));
+ const v=processSales(csv(await fetchSheetCSV(CONFIG.WEBHOOK_SHEET)));GROWS=g;SALES=v;
+ if(seguindo){const a=allDates();TO=a[a.length-1]||TO;document.getElementById('dateTo').value=TO}
+ render()}catch(e){/* mantém os dados atuais; tenta de novo no próximo ciclo */}}
+setInterval(()=>{if(!document.hidden)refreshQuiet()},300000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshQuiet()});
 loadData();
 </script></body></html>
