@@ -113,6 +113,24 @@ def main(raw):
         st[m.get('name', str(m['id']))] = m.get('effective_status', '')
     data['ad_status'] = st
 
+    # --- link do criativo (permalink da publicação) ---
+    # creatives.json (opcional): resposta de ads_get_creatives com id e effective_object_story_id.
+    # ads_meta.json precisa trazer creative_id para ligar anúncio -> criativo.
+    links = dict(data.get('ad_links', {}))
+    cpath = os.path.join(raw, 'creatives.json')
+    if os.path.exists(cpath):
+        with open(cpath, encoding='utf-8') as f:
+            cr = json.load(f)
+        if isinstance(cr, dict):
+            cr = cr.get('ad_creatives', cr)
+        story = {str(c['id']): c.get('effective_object_story_id') or c.get('object_story_id') for c in cr}
+        for m in meta.values():
+            sid = story.get(str(m.get('creative_id', '')))
+            if sid and '_' in sid:
+                page, post = sid.split('_', 1)
+                links[m.get('name', str(m['id']))] = f'https://www.facebook.com/{page}/posts/{post}'
+    data['ad_links'] = links
+
     # --- posicionamento (acumulado da campanha) ---
     if plc:
         data['placements'] = [[str(r['id']), place_key(r), round(num(r.get('amount_spent')), 2),
