@@ -13,7 +13,8 @@ Conta Meta Ads 736602091732648. Entram as campanhas com `[BF]` no nome (filtro `
 | arquivo | level | período | campos / extras |
 |---|---|---|---|
 | `ads_daily.json` | ad | `last_3d`, `time_increment="1"` | id, name, adset_id, amount_spent, impressions, link_click, omni_landing_page_view, lead |
-| `ads_meta.json` | ad | `maximum` | id, name, adset_id, campaign_name, effective_status |
+| `ads_meta.json` | ad | `maximum` | id, name, adset_id, campaign_name, effective_status, creative_id |
+| `creatives.json` | — | — | `ads_get_creatives` com os creative_ids acima, fields id, effective_object_story_id (vira o link "ver post" de cada criativo; opcional, os links anteriores ficam guardados) |
 | `adsets.json` | adset | `maximum` | id, name, effective_status, daily_budget |
 | `placements.json` | adset | `maximum` | id, amount_spent, impressions, link_click, omni_landing_page_view, lead · breakdowns `publisher_platform`, `platform_position` |
 
