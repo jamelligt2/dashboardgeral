@@ -103,10 +103,6 @@ a{color:var(--or)}
     <section id="t-geral">
       <div class="kpis" id="kpis"></div>
 
-      <h2>Público quente × público frio</h2>
-      <p class="note">Quente = remarketing e engajamento. Frio = interesses, lookalike e abertos. A separação vem do nome do conjunto de anúncios.</p>
-      <div class="temp" id="temp"></div>
-
       <h2>Funil de conversão</h2>
       <p class="note">Campanha de clique para o WhatsApp: não há página de captura, então o funil vai de impressões a cliques, conversas e vendas. As vendas vêm da aba Vendas da planilha e não dependem do período escolhido.</p>
       <div class="fun"><div class="funnel-svg-wrap" id="funnel"></div><div class="funnel-metrics-row" id="fmetrics"></div></div>
@@ -140,7 +136,6 @@ a{color:var(--or)}
 (function () {
   var SHEET = '1sAMP1KDVmSXc8lJ4rlM32JG2azu1zN2PWg5iuVJPyC8';
   var R_ESC = 0.85, R_AVA = 1.15, R_PAU = 1.75, MIN_GASTO = 20;
-  var QUENTE = /engaj|remarket|retarget|quente|visitant|365|180|\b30d\b|seguidor|salvou/i;
 
   function parseBR(str) { return parseFloat(String(str).replace(/\./g, '').replace(',', '.')) || 0; }
   var nf = new Intl.NumberFormat('pt-BR');
@@ -253,36 +248,11 @@ a{color:var(--or)}
     k.append(kpi('Investimento total', money(a.spend), 'no período'), kpi('CTR médio', pc(a.ctr), 'cliques no link ÷ impressões'), kpi('CPM médio', money(a.cpm), 'por mil impressões'),
       kpi('CPL médio (custo por conversa)', S.hasConv ? money(a.cpl) : '—', S.hasConv ? int(a.conv) + ' conversas iniciadas' : 'coluna de conversas não encontrada', true));
 
-    renderTemp(rows);
     renderFunnel(a, all);
     renderEvo(rows);
     renderRank(rows, a);
     renderPub(rows, a);
     renderDaily(rows);
-  }
-
-  function renderTemp(rows) {
-    var q = rows.filter(function (r) { return QUENTE.test(r.set); }), f = rows.filter(function (r) { return !QUENTE.test(r.set); });
-    var aq = agg(q), af = agg(f), tot = aq.conv + af.conv, box = $('temp'); box.replaceChildren();
-    var card = function (cls, titulo, sub, g, list, empty) {
-      var c = el('div', 'card ' + cls), h = el('div', 't-h'); h.append(el('b', '', titulo), el('small', '', sub)); c.append(h);
-      var m = el('div', 't-m');
-      [['Investimento', money(g.spend)], ['CPL', S.hasConv ? money(g.cpl) : '—'], ['Conversas', S.hasConv ? int(g.conv) : '—']].forEach(function (x) { var d = el('div'); d.append(el('span', '', x[0]), el('b', '', x[1])); m.append(d); });
-      c.append(m);
-      var d = el('div', 't-d');
-      if (!list.length) d.append(el('div', '', empty));
-      else { var by = groupBy(list, 'set'); Object.keys(by).forEach(function (n) { var x = agg(by[n]), r = el('div'); r.append(el('span', '', n), el('b', '', money(x.spend) + (S.hasConv ? ' · ' + int(x.conv) + ' conv.' : ''))); d.append(r); }); }
-      c.append(d); return c;
-    };
-    box.append(
-      card('t-q', 'PÚBLICO QUENTE', 'remarketing / engajamento', aq, q, 'Esta campanha não tem conjunto de público quente. O detalhe por posicionamento (Feed × Stories) não vem na planilha.'),
-      card('t-f', 'PÚBLICO FRIO', 'interesses / lookalike', af, f, ''));
-    var cmp = el('div', 'card cmp');
-    cmp.append(el('h2', '', 'Comparativo'), el('span', 'note', '% das conversas de cada temperatura'));
-    var l1 = el('b', 'big', S.hasConv && tot ? 'Quente ' + pc(aq.conv / tot, pct1) + ' · Frio ' + pc(af.conv / tot, pct1) : '—');
-    var l2 = el('b', 'big', S.hasConv && aq.cpl != null && af.cpl != null ? 'Dif. de CPL: ' + money(Math.abs(aq.cpl - af.cpl)) : 'Dif. de CPL: —');
-    cmp.append(l1, el('span', 'note', 'Diferença entre o CPL quente e o frio'), l2);
-    box.append(cmp);
   }
 
   function renderFunnel(a, all) {
@@ -348,15 +318,15 @@ a{color:var(--or)}
   }
 
   function renderPub(rows, a) {
-    var by = groupBy(rows, 'set'), list = Object.keys(by).map(function (n) { var g = agg(by[n]); g.name = n; g.q = QUENTE.test(n); g.st = status(g, a.cpl); return g; });
+    var by = groupBy(rows, 'set'), list = Object.keys(by).map(function (n) { var g = agg(by[n]); g.name = n; g.st = status(g, a.cpl); return g; });
     list.sort(S.hasConv ? function (x, y) { return (x.cpl == null) - (y.cpl == null) || (x.cpl - y.cpl) || y.spend - x.spend; } : function (x, y) { return y.spend - x.spend; });
     $('pb-n').textContent = 'Por conjunto de anúncios, do melhor para o pior CPL, no período escolhido.';
     var t = $('pub'); t.replaceChildren();
-    t.append(th(['#', { t: 'Conjunto', l: true }, { t: 'Temperatura', l: true }, 'Invest.', 'Imp.', 'Cliques', 'Conversas', 'CTR', 'CPC', 'CPL', { t: 'Status', l: true }]));
+    t.append(th(['#', { t: 'Conjunto', l: true }, 'Invest.', 'Imp.', 'Cliques', 'Conversas', 'CTR', 'CPC', 'CPL', { t: 'Status', l: true }]));
     var tb = el('tbody');
     list.forEach(function (g, i) {
-      var tr = el('tr'), tp = el('td', 'l'); tp.append(el('span', 'badge ' + (g.q ? 'b-q' : 'b-f'), g.q ? 'QUENTE' : 'FRIO'));
-      tr.append(td(String(i + 1)), td(g.name, 'l'), tp, td(money(g.spend)), td(int(g.imp)), td(int(g.clicks)), td(S.hasConv ? int(g.conv) : '—'), td(pc(g.ctr)), td(money(g.cpc)), td(S.hasConv ? money(g.cpl) : '—'), badge(g.st));
+      var tr = el('tr');
+      tr.append(td(String(i + 1)), td(g.name, 'l'), td(money(g.spend)), td(int(g.imp)), td(int(g.clicks)), td(S.hasConv ? int(g.conv) : '—'), td(pc(g.ctr)), td(money(g.cpc)), td(S.hasConv ? money(g.cpl) : '—'), badge(g.st));
       tb.append(tr);
     });
     t.append(tb);
