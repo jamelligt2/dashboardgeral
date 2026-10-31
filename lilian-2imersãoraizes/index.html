@@ -440,7 +440,7 @@ async function fetchRows(gid, label){
 }
 
 // ───────────────────────── Estado ─────────────────────────
-let GROWS=[], SALES=[], DIAG={}, GLAST='';
+let GROWS=[], SALES=[], DIAG={}, GLAST='', HAS_STATUS=false;
 let criFilter='todos', criSort='inv', pubFilter='todos', pubSort='inv';
 const CH={};
 const LS_KEY='jgt_budget_v2_'+CONFIG.SHEET_ID;
@@ -491,7 +491,9 @@ function processGerenciador(rows){
     pv:    findCol(hdr,['action landing page view','landing page view','page view']),
     ck:    findCol(hdr,['action omni initiated checkout','initiated checkout','checkout']),
     adId:  findCol(hdr,['ad id']),
+    st:    findCol(hdr,['ad status','status do anuncio','status do anúncio']),
   };
+  HAS_STATUS = C.st>=0;
   if(C.date<0||C.inv<0) throw new Error('Aba Meta_Ads: não encontrei as colunas Date / Spend. Confira o cabeçalho.');
   const g=(r,k)=>C[k]>=0?String(r[C[k]]==null?'':r[C[k]]).trim():'';
   const out=[];
@@ -500,7 +502,7 @@ function processGerenciador(rows){
     const date=parseDate(g(r,'date'));
     if(!date) continue;
     out.push({
-      date, camp:g(r,'camp'), adset:g(r,'adset'), ad:g(r,'ad'), link:g(r,'link'), adId:g(r,'adId'),
+      date, camp:g(r,'camp'), adset:g(r,'adset'), ad:g(r,'ad'), link:g(r,'link'), adId:g(r,'adId'), st:g(r,'st').toUpperCase(),
       inv:parseBR(g(r,'inv')), imp:parseBR(g(r,'imp')), reach:parseBR(g(r,'reach')),
       clk:parseBR(g(r,'clk')), pv:parseBR(g(r,'pv')), ck:parseBR(g(r,'ck')),
     });
@@ -811,7 +813,13 @@ function renderVisao({t,rows,sales}){
 // ── Criativos / Públicos ──
 function buildCriPubMaps(from,to){
   const activeAds=new Set(), activeSets=new Set();
-  for(const r of GROWS){ if(r.date===GLAST && (r.inv>0||r.imp>0)){ activeAds.add(r.ad); activeSets.add(r.adset); } }
+  // Ativo = coluna "Ad Status" da planilha == ACTIVE (PAUSED, ADSET_PAUSED e CAMPAIGN_PAUSED = inativo).
+  // O mesmo nome de criativo/público pode existir em várias campanhas: fica ativo se ao menos uma entrega estiver ACTIVE.
+  // Sem a coluna, cai no critério antigo (teve entrega no último dia).
+  for(const r of GROWS){
+    const on = HAS_STATUS ? r.st==='ACTIVE' : (r.date===GLAST && (r.inv>0||r.imp>0));
+    if(on){ activeAds.add(r.ad); activeSets.add(r.adset); }
+  }
   const cri=new Map(), pub=new Map();
   const touch=(map,key)=>{ if(!map.has(key)) map.set(key,{key,inv:0,imp:0,clk:0,pv:0,ck:0,vendas:0,fat:0,ids:new Set(),ads:new Set(),link:'',ativo:false}); return map.get(key); };
   for(const r of GROWS){
