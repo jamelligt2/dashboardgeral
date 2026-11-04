@@ -248,7 +248,7 @@ a.plink:hover,a.plink:focus-visible{text-decoration:underline}
 
   <footer class="foot">
     <p>Fonte: planilha "JGTCL0045 - Yogalaya - Impulsionamento e Lives", abas Seguidores, numero de seguidores e Live.</p>
-    <p>O alcance das lives é a soma do alcance de cada transmissão, então a mesma pessoa pode ser contada mais de uma vez. 04/11 é um dia parcial. Seguidores vêm das colunas semanais da planilha (14 a 20/10, 21 a 27/10 e 28/10 a 04/11, mais o período anterior a 14/10 de ADE2208 e ADE2608) e só entram quando a semana cabe inteira no período filtrado. Semanas vazias na planilha ficam de fora, junto com o investimento e as visitas delas. O dia 04/11 é parcial.</p>
+    <p>O alcance das lives é a soma do alcance de cada transmissão, então a mesma pessoa pode ser contada mais de uma vez. 04/11 é um dia parcial. Seguidores vêm das colunas semanais da planilha (14 a 20/10, 21 a 27/10 e 28/10 a 03/11, mais o período anterior a 14/10 de ADE2208 e ADE2608) e só entram quando a semana cabe inteira no período filtrado. Semanas vazias na planilha ficam de fora, junto com o investimento e as visitas delas. O dia 04/11 é parcial.</p>
   </footer>
 </main>
 
@@ -266,10 +266,10 @@ a.plink:hover,a.plink:focus-visible{text-decoration:underline}
   function lnk(u,t){return '<a class="plink" href="'+u+'" target="_blank" rel="noopener noreferrer">'+t+' ↗</a>';}
   var FOLL={A:380,B:816,C:231,D:29};
   // crescimento semanal de seguidores (aba "numero de seguidores"); as semanas de A e B cobrem só parte do total
-  var WEEKS=['14 a 21/10','21 a 28/10','28/10 a 04/11'];
+  var WEEKS=['14 a 20/10','21 a 27/10','28/10 a 03/11'];
   var FW={A:[19,26,null],B:[189,192,null],C:[null,73,158],D:[null,null,29]};
-  // intervalo de datas de cada coluna semanal (a planilha informa só o rótulo; cada semana vai do início citado até o dia anterior ao início da próxima)
-  var WSPAN=[['2026-10-14','2026-10-20'],['2026-10-21','2026-10-27'],['2026-10-28','2026-11-04']];
+  // intervalo de datas de cada coluna semanal, conforme o rótulo da planilha
+  var WSPAN=[['2026-10-14','2026-10-20'],['2026-10-21','2026-10-27'],['2026-10-28','2026-11-03']];
   var PRE_END='2026-10-13';
   // blocos de seguidores por criativo: total da planilha menos as semanas = período anterior a 14/10; semanas vazias ficam de fora
   var FB={};
@@ -370,6 +370,8 @@ a.plink:hover,a.plink:focus-visible{text-decoration:underline}
   SEG.forEach(function(r){if(DATES.indexOf(r[0])<0)DATES.push(r[0]);});
   DATES.sort();
   var FIRST=DATES[0],LAST=DATES[DATES.length-1];
+  // "últimos N dias" não incluem o dia parcial (hoje): terminam no último dia fechado
+  var FD=DATES.filter(function(d){return d!==PARTIAL;}),LASTFULL=FD[FD.length-1];
   var range={from:FIRST,to:LAST};
   var filter='all';
   function inR(d){return d>=range.from&&d<=range.to;}
@@ -438,7 +440,7 @@ a.plink:hover,a.plink:focus-visible{text-decoration:underline}
   function renderKpis(){
     var t=totals(filter),na=t.f===null;
     var cpv=t.v>0?t.s/t.v:null;
-    var nd='sem semana completa da planilha no período; selecione 28/10 a 04/11 ou o período todo';
+    var nd='sem semana completa da planilha no período; selecione uma semana da planilha (ex.: 28/10 a 03/11) ou o período todo';
     var cards=[
       ['Investimento',brl(t.s),int(t.i)+' impressões','',''],
       ['Visitas ao perfil',int(t.v),rLabel(),'',''],
@@ -635,7 +637,7 @@ a.plink:hover,a.plink:focus-visible{text-decoration:underline}
     var tC=totals('C');
     if(tC.v>0){
       cards.splice(2,0,['ADV1109 entrou em 28/10 com '+brl(tC.s/tC.v)+' por visita',
-        'Foram '+int(tC.v)+' visitas com '+brl(tC.s)+' até '+dm(DATES[DATES.length-1])+', quando passou a concentrar a entrega no lugar do ADE2608. A planilha mostra '+int(FOLL.C)+' seguidores: '+int(FW.C[1])+' na semana de 21 a 28/10 e '+int(FW.C[2])+' na de 28/10 a 04/11.']);
+        'Foram '+int(tC.v)+' visitas com '+brl(tC.s)+' até '+dm(DATES[DATES.length-1])+', quando passou a concentrar a entrega no lugar do ADE2608. A planilha mostra '+int(FOLL.C)+' seguidores: '+int(FW.C[1])+' na semana de '+WEEKS[1]+' e '+int(FW.C[2])+' na de '+WEEKS[2]+'.']);
     }
     var tD=totals('D');
     if(tD.v>0){
@@ -649,8 +651,8 @@ a.plink:hover,a.plink:focus-visible{text-decoration:underline}
   // sincroniza campos de data e chips de período
   function syncSegControls(){
     $('s-from').value=range.from;$('s-to').value=range.to;
-    var n=DATES.length,p14=DATES[Math.max(0,n-14)],p7=DATES[Math.max(0,n-7)];
-    var cur=isFull()?'all':(range.to===LAST&&range.from===p14?'14':(range.to===LAST&&range.from===p7?'7':''));
+    var n=FD.length,p14=FD[Math.max(0,n-14)],p7=FD[Math.max(0,n-7)];
+    var cur=isFull()?'all':(range.to===LASTFULL&&range.from===p14?'14':(range.to===LASTFULL&&range.from===p7?'7':''));
     document.querySelectorAll('.chip[data-p]').forEach(function(c){c.setAttribute('aria-pressed',c.getAttribute('data-p')===cur?'true':'false');});
     var nd=days(filter).length;
     $('seg-range').textContent=(filter==='all'?'Todos os criativos':NAMES[filter])+' · '+rLabel()+' · '+nd+' '+plural(nd,'dia','dias');
@@ -669,8 +671,8 @@ a.plink:hover,a.plink:focus-visible{text-decoration:underline}
   });
   document.querySelectorAll('.chip[data-p]').forEach(function(b){
     b.addEventListener('click',function(){
-      var p=b.getAttribute('data-p'),n=DATES.length;
-      range={from:p==='all'?FIRST:DATES[Math.max(0,n-(+p))],to:LAST};
+      var p=b.getAttribute('data-p'),n=FD.length;
+      range=p==='all'?{from:FIRST,to:LAST}:{from:FD[Math.max(0,n-(+p))],to:LASTFULL};
       hideTip();renderSeg();
     });
   });
