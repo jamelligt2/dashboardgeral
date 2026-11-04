@@ -190,6 +190,12 @@ a.plink:hover,a.plink:focus-visible{text-decoration:underline}
     <div class="reads" id="seg-reads"></div>
 
     <div class="panel">
+      <div class="ph"><div><h2>Seguidores por semana</h2><p>Crescimento semanal de cada criativo, conforme a aba "numero de seguidores".</p></div></div>
+      <div class="tw"><table id="tb-week"></table></div>
+      <p class="note" id="week-note"></p>
+    </div>
+
+    <div class="panel">
       <div class="ph"><div><h2>Criativos lado a lado</h2><p>Verde marca o melhor valor de cada coluna de custo e de conversão.</p></div></div>
       <div class="tw"><table id="tb-cri"></table></div>
       <p class="note" id="cri-note">Conversão = seguidores ÷ visitas ao perfil. Seguidores por criativo vêm da aba "numero de seguidores" da planilha.</p>
@@ -242,7 +248,7 @@ a.plink:hover,a.plink:focus-visible{text-decoration:underline}
 
   <footer class="foot">
     <p>Fonte: planilha "JGTCL0045 - Yogalaya - Impulsionamento e Lives", abas Seguidores, numero de seguidores e Live.</p>
-    <p>O alcance das lives é a soma do alcance de cada transmissão, então a mesma pessoa pode ser contada mais de uma vez. 04/11 é um dia parcial. Seguidores são contados por criativo no período todo, por isso aparecem só quando o período completo está selecionado, com investimento e visitas até 30/10, último dia completo antes da leitura da contagem. A planilha não informa a data da contagem, e o ADV2710 (a partir de 30/10) ainda não tem contagem própria.</p>
+    <p>O alcance das lives é a soma do alcance de cada transmissão, então a mesma pessoa pode ser contada mais de uma vez. 04/11 é um dia parcial. Seguidores são contados por criativo no período todo, por isso aparecem só quando o período completo está selecionado, com investimento e visitas até 04/11, dia da última leitura da contagem. A planilha não informa a data exata da contagem, só as semanas, e o dia 04/11 é parcial.</p>
   </footer>
 </main>
 
@@ -258,9 +264,12 @@ a.plink:hover,a.plink:focus-visible{text-decoration:underline}
   // permalinks dos posts impulsionados (coluna Instagram Permalink URL da planilha)
   var LINKS={A:'https://www.instagram.com/p/DdZidj6g3TM/',B:'https://www.instagram.com/p/Dd3txiXAWk7/',C:'https://www.instagram.com/p/DfCtl52gJyc/',D:'https://www.instagram.com/p/DfH_KMYgvSn/'};
   function lnk(u,t){return '<a class="plink" href="'+u+'" target="_blank" rel="noopener noreferrer">'+t+' ↗</a>';}
-  var FOLL={A:380,B:816,C:73};
+  var FOLL={A:380,B:816,C:231,D:29};
+  // crescimento semanal de seguidores (aba "numero de seguidores"); as semanas de A e B cobrem só parte do total
+  var WEEKS=['14 a 21/10','21 a 28/10','28/10 a 04/11'];
+  var FW={A:[19,26,null],B:[189,192,null],C:[null,73,158],D:[null,null,29]};
   // última contagem de seguidores da aba "numero de seguidores" (a planilha não informa a data; vale para os dados até este dia)
-  var FOLL_UNTIL='2026-10-30';
+  var FOLL_UNTIL='2026-11-04';
   // [data, criativo, investimento, impressões, visitas ao perfil]
   var SEG=[
     ['2026-09-17','A',11.63,947,51],
@@ -551,6 +560,17 @@ a.plink:hover,a.plink:focus-visible{text-decoration:underline}
     $('tb-cri').innerHTML='<thead><tr><th>Criativo</th><th>Investimento</th><th>Impressões</th><th>Visitas</th><th>Custo/visita</th><th>Seguidores</th><th>Custo/seguidor</th><th>Conversão</th></tr></thead><tbody>'+rows+'</tbody>';
     $('cri-note').textContent='Conversão = seguidores ÷ visitas ao perfil. Seguidores por criativo vêm da aba "numero de seguidores" da planilha'+(na?' e só existem para o período completo.':'; custo por seguidor e conversão usam investimento e visitas até '+dm(FOLL_UNTIL)+', data da contagem disponível.');
 
+    var wh='<thead><tr><th>Criativo</th>'+WEEKS.map(function(w){return '<th>'+w+'</th>';}).join('')+'<th>Antes de 14/10</th><th>Total</th></tr></thead>',wr='',wt=[0,0,0],wb=0,wT=0;
+    KEYS.forEach(function(k){
+      var w=FW[k],sum=0;
+      var cells=w.map(function(x,i){if(x!==null){sum+=x;wt[i]+=x;}return '<td'+(x===null?' class="muted"':'')+'>'+(x===null?'-':int(x))+'</td>';}).join('');
+      var pre=FOLL[k]-sum;wb+=pre;wT+=FOLL[k];
+      wr+='<tr><td>'+NAMES[k]+'</td>'+cells+'<td'+(pre>0?'':' class="muted"')+'>'+(pre>0?int(pre):'-')+'</td><td>'+int(FOLL[k])+'</td></tr>';
+    });
+    wr+='<tr class="tot"><td>Total</td>'+wt.map(function(x){return '<td>'+int(x)+'</td>';}).join('')+'<td>'+int(wb)+'</td><td>'+int(wT)+'</td></tr>';
+    $('tb-week').innerHTML=wh+'<tbody>'+wr+'</tbody>';
+    $('week-note').textContent='"Antes de 14/10" é o total do criativo menos as três semanas informadas (a planilha só detalha por semana a partir de 14/10). Células com "-" não têm valor na planilha.';
+
     var jr='',js=0,ji=0,jv=0;
     JULY.forEach(function(p){
       js+=p.s;ji+=p.i;jv+=p.v;
@@ -594,12 +614,12 @@ a.plink:hover,a.plink:focus-visible{text-decoration:underline}
     var tC=totals('C');
     if(tC.v>0){
       cards.splice(2,0,['ADV1109 entrou em 28/10 com '+brl(tC.s/tC.v)+' por visita',
-        'Foram '+int(tC.v)+' visitas com '+brl(tC.s)+' até '+dm(DATES[DATES.length-1])+', quando passou a concentrar a entrega no lugar do ADE2608. A contagem da planilha mostra '+int(FOLL.C)+' seguidores.']);
+        'Foram '+int(tC.v)+' visitas com '+brl(tC.s)+' até '+dm(DATES[DATES.length-1])+', quando passou a concentrar a entrega no lugar do ADE2608. A planilha mostra '+int(FOLL.C)+' seguidores: '+int(FW.C[1])+' na semana de 21 a 28/10 e '+int(FW.C[2])+' na de 28/10 a 04/11.']);
     }
     var tD=totals('D');
     if(tD.v>0){
       cards.splice(3,0,['ADV2710 entrou em 30/10 com '+brl(tD.s/tD.v)+' por visita',
-        'Foram '+int(tD.v)+' visitas com '+brl(tD.s)+' até '+dm(DATES[DATES.length-1])+'. Ainda não há contagem de seguidores para este criativo.']);
+        'Foram '+int(tD.v)+' visitas com '+brl(tD.s)+' até '+dm(DATES[DATES.length-1])+', com '+int(FOLL.D)+' seguidores ('+brl(tD.s/FOLL.D)+' por seguidor).']);
     }
     if(weekCard)cards.push(weekCard);
     $('seg-reads').innerHTML=cards.map(function(c){return '<div class="read"><h3>'+c[0]+'</h3><p>'+c[1]+'</p></div>';}).join('');
