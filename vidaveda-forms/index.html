@@ -283,6 +283,10 @@ const CONFIG = {
   // Leads do formulário nativo (alimentada pela integração que também envia ao Clint). Primeira aba.
   leadsSheetId: '1nVndU4bUt4qS_FESEaXXrhwHHF7DzxpG8Lf0parIanc',
   leadsSheet: '',                 // vazio = primeira aba
+  // Sincronização nativa da Meta (fonte completa). Precisa estar "qualquer pessoa com o link: leitor".
+  // Se não estiver pública, o painel usa só a planilha acima.
+  metaSheetId: '1_Mvky9qiy04NqJNs5WLUUnmDVLt6bFaRPUix6aEZkHQ',
+  metaSheet: 'Leads',
   // Gerenciador (Stract) — mesma planilha do dash do Invicta
   capSheetId: '1TB-_hXgk_n1q8PqkFtpbf_ON0Aa4BTIq4-CtYxvFo4c',
   capSheet: 'GERENCIADOR',
@@ -323,7 +327,7 @@ const PERGUNTAS = [
 ];
 
 /* ================= ESTADO ================= */
-let CAP = [], LEADS = [], FILTRO = {ini:null, fim:null}, LAST_OK = null, RETRY = 0, RETRY_T = null, LOADING = false;
+let META_OK = false, CAP = [], LEADS = [], FILTRO = {ini:null, fim:null}, LAST_OK = null, RETRY = 0, RETRY_T = null, LOADING = false;
 const CHARTS = {};
 
 /* ================= UTIL ================= */
@@ -368,11 +372,13 @@ async function carregar(manual){
   if (LOADING) return; LOADING = true; clearTimeout(RETRY_T);
   try {
     $('loadStatus') && ($('loadStatus').textContent = 'Lendo gerenciador e formulário…');
-    const [cap, leads] = await Promise.all([
+    const [cap, leads, meta] = await Promise.all([
       fetchCSV(CONFIG.capSheetId, CONFIG.capSheet, ['Campaign Name']),
       fetchCSV(CONFIG.leadsSheetId, CONFIG.leadsSheet, ['Lead ID','Nome']),
+      CONFIG.metaSheetId ? fetchCSV(CONFIG.metaSheetId, CONFIG.metaSheet, ['created_time']).catch(e => { console.warn('Planilha da Meta indisponível:', e.message); return null; }) : null,
     ]);
-    prepararCap(cap); prepararLeads(leads);
+    META_OK = !!meta;
+    prepararCap(cap); prepararLeads(meta ? [meta, leads] : [leads]);
     LAST_OK = new Date(); RETRY = 0;
     $('loading').style.display = 'none'; $('app').style.display = 'block';
     setBadge('ok');
@@ -387,7 +393,7 @@ async function carregar(manual){
 function setBadge(st){
   const b = $('liveBadge'), h = LAST_OK ? LAST_OK.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '--';
   b.className = 'live-badge';
-  if (st === 'ok') { b.textContent = 'Dados ao vivo'; $('updatedAt').textContent = 'Atualizado às ' + h; return; }
+  if (st === 'ok') { b.textContent = 'Dados ao vivo'; $('updatedAt').textContent = 'Atualizado às ' + h + (META_OK ? '' : ' · leads só da planilha do Clint'); return; }
   const min = Math.round((Date.now() - LAST_OK)/60000);
   if (min >= 20) { b.classList.add('bad'); b.textContent = `Sem conexão há ${min} min`; }
   else { b.classList.add('warn'); b.textContent = 'Reconectando…'; }
@@ -421,19 +427,23 @@ function pontuar(row){
 }
 function temperatura(s){ return s >= CONFIG.quente ? 'Quente' : s >= CONFIG.morno ? 'Morno' : 'Frio'; }
 
-function prepararLeads(rows){
+function prepararLeads(fontes){
+  const vistos = new Set();
+  LEADS = [];
+  for (const rows of fontes) lerFonteLeads(rows, vistos);
+}
+function lerFonteLeads(rows, vistos){
   const r0 = rows[0] || {};
   const c = { data: findCol(r0,['Data/Hora','created_time','Data']), nome: findCol(r0,['Nome','nome_completo']),
     wpp: findCol(r0,['WhatsApp','whatsapp']), email: findCol(r0,['E-mail','email']), camp: findCol(r0,['Campanha','campaign_name']),
     ad: findCol(r0,['Anúncio','Anuncio','ad_name']), id: findCol(r0,['Lead ID','id']) };
-  const vistos = new Set();
-  LEADS = [];
   for (const r of rows){
     const nome = limpa(r[c.nome]).trim(), email = limpa(r[c.email]).toLowerCase();
     if (!nome && !email) continue;
     if (/test@meta\.com|@jamelligt\.com\.br/.test(email) || /^teste\b|\(apagar\)|dummy data/i.test(nome)) continue;
     if (c.camp && r[c.camp] && !CONFIG.campanha.test(r[c.camp])) continue;
-    const key = (r[c.id]||'').trim() || email || nome; if (vistos.has(key)) continue; vistos.add(key);
+    const id = String(r[c.id]||'').replace(/^l:/,'').trim();
+    const key = id ? 'id:'+id : email ? 'em:'+email : 'nm:'+nome; if (vistos.has(key)) continue; vistos.add(key);
     const d = parseLeadDate(r[c.data]); if (!d) continue;
     const sc = pontuar(r);
     LEADS.push({ raw:r, date:d.iso, hora:d.hora, quando:d.txt, nome, wpp:r[c.wpp]||'', ad:(r[c.ad]||'').trim()||'(sem anúncio)',
