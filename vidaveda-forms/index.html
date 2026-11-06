@@ -206,7 +206,7 @@ tfoot td{font-weight:700;background:rgba(255,107,0,.05)}
   <div class="tab" onclick="switchTab(1)">Criativos</div>
   <div class="tab" onclick="switchTab(2)">Perfil dos Leads</div>
   <div class="tab" onclick="switchTab(3)">Dia a Dia</div>
-  <div class="tab" onclick="switchTab(4)">Leads</div>
+  <div class="tab" onclick="switchTab(4)">Pontuação dos Leads</div>
 </div>
 
 <!-- 1 VISÃO GERAL -->
@@ -263,8 +263,9 @@ tfoot td{font-weight:700;background:rgba(255,107,0,.05)}
 
 <!-- 5 LEADS -->
 <div class="page" id="p4">
-  <div class="section-title">Lista de leads</div>
-  <div class="section-note">Contatos mascarados neste painel. A lista completa está na planilha "Vida Veda - Leads Formulário Nativo".</div>
+  <div class="section-title">Pontuação dos leads</div>
+  <div class="section-note">Ranking da maior para a menor pontuação, igual à aba "Pontuação dos Leads" da planilha. Quem faz 9 pontos (o máximo) fica em verde. Pontos por pergunta: Relação, Tempo e Já participou valem até 2; Quando começar vale até 3. Contatos mascarados neste painel.</div>
+  <div class="kpi-grid" id="kpiPts" style="margin-bottom:16px"></div>
   <div class="lead-tools">
     <input type="search" id="fBusca" placeholder="Buscar nome…" oninput="renderLeads()">
     <select id="fTemp" onchange="renderLeads()"><option value="">Todas as temperaturas</option><option>Quente</option><option>Morno</option><option>Frio</option></select>
@@ -436,7 +437,10 @@ function lerFonteLeads(rows, vistos){
   const r0 = rows[0] || {};
   const c = { data: findCol(r0,['Data/Hora','created_time','Data']), nome: findCol(r0,['Nome','nome_completo']),
     wpp: findCol(r0,['WhatsApp','whatsapp']), email: findCol(r0,['E-mail','email']), camp: findCol(r0,['Campanha','campaign_name']),
-    ad: findCol(r0,['Anúncio','Anuncio','ad_name']), id: findCol(r0,['Lead ID','id']) };
+    ad: findCol(r0,['Anúncio','Anuncio','ad_name']), id: findCol(r0,['Lead ID','id']),
+    pRel: findCol(r0,['Pts Relação']), pTempo: findCol(r0,['Pts Tempo']), pPart: findCol(r0,['Pts Já participou']),
+    pQuando: findCol(r0,['Pts Quando']), pTot: findCol(r0,['Pontuação total']) };
+  const lerPts = (r,col,calc) => { const v = col ? String(r[col]??'').trim() : ''; return /^\d+$/.test(v) ? +v : calc; };
   for (const r of rows){
     const nome = limpa(r[c.nome]).trim(), email = limpa(r[c.email]).toLowerCase();
     if (!nome && !email) continue;
@@ -445,9 +449,11 @@ function lerFonteLeads(rows, vistos){
     const id = String(r[c.id]||'').replace(/^l:/,'').trim();
     const key = id ? 'id:'+id : email ? 'em:'+email : 'nm:'+nome; if (vistos.has(key)) continue; vistos.add(key);
     const d = parseLeadDate(r[c.data]); if (!d) continue;
-    const sc = pontuar(r);
-    LEADS.push({ raw:r, date:d.iso, hora:d.hora, quando:d.txt, nome, wpp:r[c.wpp]||'', ad:(r[c.ad]||'').trim()||'(sem anúncio)',
-      score: sc.total, temp: temperatura(sc.total) });
+    const sc = pontuar(r);  // det na ordem do SCORE: quando, tempo, relação, participou
+    const pts = { rel: lerPts(r,c.pRel,sc.det[2]), tempo: lerPts(r,c.pTempo,sc.det[1]), part: lerPts(r,c.pPart,sc.det[3]), quando: lerPts(r,c.pQuando,sc.det[0]) };
+    const total = lerPts(r, c.pTot, pts.rel + pts.tempo + pts.part + pts.quando);
+    LEADS.push({ raw:r, date:d.iso, hora:d.hora, quando:d.txt, nome, wpp:limpa(r[c.wpp]), ad:limpa(r[c.ad]).trim()||'(sem anúncio)',
+      pts, score: total, temp: temperatura(total), daPlanilha: !!(c.pTot && /^\d+$/.test(String(r[c.pTot]??'').trim())) });
   }
 }
 
@@ -680,27 +686,48 @@ function preencherFiltroAd(){
 const mascarar = w => { const d = String(w).replace(/\D/g,''); return d.length >= 8 ? `(${d.slice(-11,-9)||'··'}) •••••-${d.slice(-4)}` : '-'; };
 function renderLeads(){
   if (!AGG) return;
+  const todos = AGG.leads, N = todos.length;
+  const media = N ? todos.reduce((a,l)=>a+l.score,0)/N : null;
+  const maxNota = N ? Math.max(...todos.map(l=>l.score)) : null;
+  const cnt = t => todos.filter(l=>l.temp===t).length;
+  const nove = todos.filter(l=>l.score===9).length;
+  $('kpiPts').innerHTML = [
+    ['Leads pontuados', int(N), 'no período filtrado'],
+    ['Quentes (5+)', int(cnt('Quente')), pct(div(cnt('Quente'),N),0)+' dos leads','color:var(--green)'],
+    ['Mornos (3–4)', int(cnt('Morno')), pct(div(cnt('Morno'),N),0)+' dos leads','color:var(--yellow)'],
+    ['Frios (0–2)', int(cnt('Frio')), pct(div(cnt('Frio'),N),0)+' dos leads','color:#7d9bff'],
+    ['Pontuação média', media==null?'-':media.toLocaleString('pt-BR',{maximumFractionDigits:1}), `maior nota: ${maxNota??'-'} · ${nove} com 9 pontos`,'color:var(--orange)'],
+  ].map(([l,v,sub,st])=>`<div class="kpi-card"><div class="label">${l}</div><div class="value" style="${st||''}">${v}</div><div class="sub">${sub}</div></div>`).join('');
+
   const busca = norm($('fBusca').value), temp = $('fTemp').value, ad = $('fAd').value;
-  const lista = AGG.leads.filter(l=>(!busca||norm(l.nome).includes(busca)) && (!temp||l.temp===temp) && (!ad||l.ad===ad));
-  const qc = (l,kw) => pretty(l.raw[findCol(l.raw,kw)]);
+  const lista = todos.filter(l=>(!busca||norm(l.nome).includes(busca)) && (!temp||l.temp===temp) && (!ad||l.ad===ad));
   const cols = [
-    {k:'quando',t:'Data',v:l=>l.date+String(l.hora??'').padStart(2,'0')+l.quando},
-    {k:'nome',t:'Nome',v:l=>l.nome},{k:'wpp',t:'WhatsApp',v:l=>l.wpp},
-    {k:'score',t:'Pontos',num:1,v:l=>l.score},{k:'temp',t:'Temperatura',v:l=>l.score},
+    {k:'nome',t:'Nome',v:l=>l.nome},
+    {k:'score',t:'Total',num:1,v:l=>l.score*1e12 + +(l.date.replace(/-/g,'')+String(l.hora??0).padStart(2,'0'))},
+    {k:'temp',t:'Temperatura',v:l=>l.score},
+    {k:'rel',t:'Relação c/ Ayurveda',num:1,v:l=>l.pts.rel},
+    {k:'tempo',t:'Tempo seguindo',num:1,v:l=>l.pts.tempo},
+    {k:'part',t:'Já participou',num:1,v:l=>l.pts.part},
+    {k:'qd',t:'Quando começar',num:1,v:l=>l.pts.quando},
     {k:'ad',t:'Criativo',v:l=>l.ad},
-    {k:'quando2',t:'Quando quer começar',v:l=>qc(l,SCORE[0].col)},
-    {k:'tempo',t:'Compromisso',v:l=>qc(l,SCORE[1].col)},
-    {k:'casa',t:'Já é da casa?',v:l=>qc(l,SCORE[3].col)},
-    {k:'busca',t:'O que busca',v:l=>qc(l,PERGUNTAS[3].col)},
+    {k:'wpp',t:'WhatsApp',v:l=>l.wpp},
+    {k:'quando',t:'Data/Hora',v:l=>l.date+String(l.hora??'').padStart(2,'0')+l.quando},
   ];
-  const {sorted, head} = sortable('tLeads', lista, cols, renderLeads, 'quando', 'desc');
+  const {sorted, head} = sortable('tLeads', lista, cols, renderLeads, 'score', 'desc');
   const cls = {Quente:'badge-green',Morno:'badge-yellow',Frio:'badge-blue'};
-  $('leadCount').textContent = `${lista.length} de ${AGG.leads.length} leads`;
-  $('tLeads').innerHTML = `<thead><tr>${head}</tr></thead><tbody>${sorted.map(l=>`<tr>
-    <td>${esc(l.quando)}</td><td><b>${esc(l.nome)}</b></td><td style="color:var(--text-muted)">${mascarar(l.wpp)}</td>
-    <td class="num">${l.score}</td><td><span class="badge ${cls[l.temp]}">${l.temp.toUpperCase()}</span></td>
-    <td>${esc(l.ad)}</td><td class="wrap">${esc(qc(l,SCORE[0].col))}</td><td class="wrap">${esc(qc(l,SCORE[1].col))}</td>
-    <td class="wrap">${esc(qc(l,SCORE[3].col))}</td><td class="wrap">${esc(qc(l,PERGUNTAS[3].col))}</td></tr>`).join('') || '<tr><td colspan="10" class="empty">Nenhum lead com esse filtro</td></tr>'}</tbody>`;
+  const cel = (v,max) => `<td class="num"><span style="font-weight:700;color:${v===max?'var(--green)':v===0?'var(--text-muted)':'var(--text-primary)'}">${v}</span><span style="color:var(--text-muted);font-size:10px"> / ${max}</span></td>`;
+  $('leadCount').textContent = `${lista.length} de ${N} leads`;
+  $('tLeads').innerHTML = `<thead><tr><th>#</th>${head}</tr></thead><tbody>${sorted.map((l,i)=>{
+    const top = l.score === 9;
+    const st = top ? ' style="background:rgba(0,214,143,.16)"' : '';
+    return `<tr${st}>
+    <td style="color:var(--text-muted)">${i+1}</td>
+    <td><b>${esc(l.nome)}</b></td>
+    <td class="num"><div class="rate" style="justify-content:flex-end"><div class="track"><div class="fill" style="width:${Math.round(l.score/9*100)}%"></div></div><b style="font-size:14px;min-width:34px;text-align:right">${l.score}<span style="color:var(--text-muted);font-size:10px;font-weight:500"> /9</span></b></div></td>
+    <td><span class="badge ${cls[l.temp]}">${l.temp.toUpperCase()}</span></td>
+    ${cel(l.pts.rel,2)}${cel(l.pts.tempo,2)}${cel(l.pts.part,2)}${cel(l.pts.quando,3)}
+    <td>${esc(l.ad)}</td><td style="color:var(--text-muted)">${mascarar(l.wpp)}</td><td>${esc(l.quando)}</td></tr>`;
+  }).join('') || '<tr><td colspan="11" class="empty">Nenhum lead com esse filtro</td></tr>'}</tbody>`;
 }
 
 function switchTab(i){
