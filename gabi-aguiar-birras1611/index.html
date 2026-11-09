@@ -341,20 +341,12 @@ const CONFIG = {
 // aba "Weebhook " (gap de integração, não é pra uso recorrente). Cada
 // item soma um order bump na venda já existente do mesmo telefone, ou
 // cria uma venda nova se o telefone ainda não tiver nenhuma.
-const MANUAL_SALES = [
-  {
-    telefone: '5541991138088', // Fernanda Bellini
-    nome: 'Fernanda Bellini',
-    data: '2026-11-02',
-    produto: 'Falta de Paciência',
-    fatOB: 22.66,
-    obCount: 1,
-    utmSource: 'meta_ads',
-    utmMedium: '120251594858610185',
-    utmCampaign: '120251594858620185',
-    utmContent: '120251594858700185',
-  },
-];
+// Esvaziado em 09/11/2026: a venda da Fernanda Bellini (que estava aqui
+// manualmente) agora vem certinho pela própria planilha, depois que o
+// cliente ajustou a aba "Weebhook " — ver nota no projeto. Deixar a
+// entrada manual aqui teria DOBRADO o OB dela. Reaproveitar este array
+// só se aparecer outro gap confirmado igual a esse.
+const MANUAL_SALES = [];
 
 // Candidatos de nome de coluna (detecção automática por cabeçalho — robusta
 // a mudanças de ordem/nome nas planilhas dos clientes)
@@ -376,28 +368,28 @@ const G_CANDS = {
   adId: ['ad id','id do anuncio','anuncio id'],
 };
 const W_CANDS = {
-  // Export "flat" nativo da Kiwify (uma linha por EVENTO do pedido —
-  // pix_created, order_approved, boleto_created, order_refunded etc. —
-  // todas com o mesmo order_id). Uma venda só fica pronta quando olhamos o
-  // GRUPO de linhas do mesmo order_id, não uma linha isolada.
-  orderId: ['order_id'],
-  orderStatus: ['order_status'],
-  eventType: ['webhook_event_type'],
-  // "approved_date" é a data real da venda aprovada; created_at/updated_at
-  // nesta planilha vêm quase sempre zerados ("1970-01-01", bug de origem
-  // Kiwify/Make) — tratados como inválidos mais abaixo no processWebhook.
-  data: ['approved_date','created_at','updated_at','data'],
-  produto: ['product.product_name','produto','product'],
-  fullName: ['customer.full_name'],
-  firstName: ['customer.first_name'],
-  email: ['customer.email'],
-  telefone: ['customer.mobile','celular','telefone','whatsapp','phone'],
-  // Valor da venda em centavos (ver CONFIG.VALORES_EM_CENTAVOS)
-  fatTotal: ['commissions.charge_amount','valor liquido','faturado total','valor total'],
-  utmSource: ['trackingparameters.utm_source','utm_source','utm source'],
-  utmMedium: ['trackingparameters.utm_medium','utm_medium','utm medium'],
-  utmCampaign: ['trackingparameters.utm_campaign','utm_campaign','utm campaign'],
-  utmContent: ['trackingparameters.utm_content','utm_content','utm content'],
+  // Export "Vendas" padrão da Kiwify (trocado pelo cliente em 09/11/2026 —
+  // ver nota no projeto). Agora é 1 LINHA = 1 PRODUTO já aprovado (sem
+  // eventos intermediários tipo pix_created/waiting_payment misturados).
+  // Principal e order bump do mesmo checkout vêm em linhas separadas, com
+  // "ID da venda" diferente cada uma — por isso o agrupamento por comprador
+  // continua usando telefone (ver chaveComprador), não o ID da venda.
+  orderId: ['id da venda'],
+  status: ['status'],
+  data: ['data de criacao','data de criação','data'],
+  produto: ['produto'],
+  cliente: ['cliente'],
+  email: ['email'],
+  telefone: ['celular','telefone','whatsapp','phone'],
+  // "Preço base do produto" é o valor cheio do item (R$34,90 / R$24,90),
+  // igual em todas as planilhas já feitas pra essa cliente — não usar
+  // "Valor líquido" (já vem com taxa descontada) nem "Total com acréscimo"
+  // (pode vir inflado pelo juro do cartão parcelado).
+  fatTotal: ['preco base do produto','preço base do produto','commissions.charge_amount','valor liquido','faturado total','valor total'],
+  utmSource: ['tracking utm_source','trackingparameters.utm_source','utm_source','utm source'],
+  utmMedium: ['tracking utm_medium','trackingparameters.utm_medium','utm_medium','utm medium'],
+  utmCampaign: ['tracking utm_campaign','trackingparameters.utm_campaign','utm_campaign','utm campaign'],
+  utmContent: ['tracking utm_content','trackingparameters.utm_content','utm_content','utm content'],
 };
 
 document.addEventListener('DOMContentLoaded', ()=>{
@@ -636,63 +628,35 @@ function processWebhook(rows){
   const headers = rows[0] || [];
   WCOLS = buildColMap(headers, W_CANDS);
 
-  // 1) Lê toda linha bruta — nesta planilha 1 linha = 1 EVENTO do pedido
-  // (pix_created, order_approved, order_refunded...), não 1 venda. Guarda só
-  // order_id/order_status/webhook_event_type aqui (sempre confiáveis em
-  // qualquer tipo de evento); os demais campos só são lidos depois, direto
-  // da linha aprovada — ver GOTCHA 2 no CONFIG sobre por que não dá pra
-  // misturar campos de linhas diferentes do mesmo pedido.
-  const events = [];
+  // 1) Export "Vendas" padrão da Kiwify: 1 linha = 1 produto já com status
+  // final (paid/refunded/etc.), sem eventos intermediários. Lê direto da
+  // própria linha — nada de cruzar campos entre linhas diferentes aqui.
+  const RX_NEG = /REEMBOLS|REFUND|CHARGEBACK|ESTORN|DISPUT|CANCEL|RECUSAD|REFUSED/;
+  const orders = [];
   for(let i=1;i<rows.length;i++){
     const r = rows[i];
     if(!r || r.every(c=>c==='')) continue;
-    const orderId = WCOLS.orderId!==-1 ? String(r[WCOLS.orderId]||'').trim() : '';
-    if(!orderId) continue;
-    events.push({
-      orderId,
-      orderStatus: (WCOLS.orderStatus!==-1 ? r[WCOLS.orderStatus] : '').toString().trim().toUpperCase(),
-      eventType: (WCOLS.eventType!==-1 ? r[WCOLS.eventType] : '').toString().trim().toUpperCase(),
-      r,
-    });
-  }
 
-  // 2) Agrupa os eventos por order_id — um mesmo pedido pode ter várias
-  // linhas (pix/boleto criado, depois aprovado, eventual reembolso depois).
-  const orderGroups = {};
-  events.forEach(e=>{
-    (orderGroups[e.orderId] = orderGroups[e.orderId] || []).push(e);
-  });
+    const status = (WCOLS.status!==-1 ? r[WCOLS.status] : '').toString().trim().toUpperCase();
+    if(RX_NEG.test(status)) continue; // reembolso/estorno/chargeback — fora
+    if(!CONFIG.STATUS_APROVADO.includes(status)) continue; // ainda pendente/recusado
 
-  // 3) Decide se cada pedido é uma venda aprovada e extrai os campos de
-  // valor/cliente/UTM SÓ da linha aprovada (order_status de venda paga) —
-  // nunca das linhas anteriores do mesmo pedido, que vêm com colunas
-  // deslocadas nesta planilha (GOTCHA 2 no CONFIG).
-  const RX_NEG = /REEMBOLS|REFUND|CHARGEBACK|ESTORN|DISPUT|CANCEL|RECUSAD|REFUSED/;
-  const orders = [];
-  Object.values(orderGroups).forEach(g=>{
-    const statusText = g.map(e=> e.orderStatus+' '+e.eventType).join(' ');
-    if(RX_NEG.test(statusText)) return; // pedido com reembolso/cancelamento em algum momento — fora
-    const paidEvent = g.find(e=> CONFIG.STATUS_APROVADO.includes(e.orderStatus) || e.eventType.includes('APPROVED'));
-    if(!paidEvent) return; // ainda pendente (pix/boleto gerado, mas não pago)
-
-    const r = paidEvent.r;
     let data = toISODate(WCOLS.data!==-1 ? r[WCOLS.data] : '');
-    if(data === '1970-01-01') data = ''; // placeholder de data zerada (bug de origem)
-    if(!data || data < CONFIG.DATA_MINIMA) return;
+    if(data === '1970-01-01') data = '';
+    if(!data || data < CONFIG.DATA_MINIMA) continue;
 
     const produto = WCOLS.produto!==-1 ? (r[WCOLS.produto]||'') : '';
-    const fullName = WCOLS.fullName!==-1 ? (r[WCOLS.fullName]||'') : '';
-    const firstName = WCOLS.firstName!==-1 ? (r[WCOLS.firstName]||'') : '';
-    // Commissions.charge_amount vem em centavos nesta planilha — dividido
-    // aqui manualmente (não usar CONFIG.VALORES_EM_CENTAVOS, que afetaria
-    // também o Investimento do Meta_Ads, já em reais).
-    const fatTotal = (WCOLS.fatTotal!==-1 ? parseValor(r[WCOLS.fatTotal]) : 0) / 100;
+    const cliente = WCOLS.cliente!==-1 ? (r[WCOLS.cliente]||'') : '';
+    // "Preço base do produto" já vem em reais nesta planilha (sem centavos,
+    // sem flag) — ver comentário no W_CANDS sobre por que essa coluna e não
+    // "Valor líquido"/"Total com acréscimo".
+    const fatTotal = WCOLS.fatTotal!==-1 ? parseValor(r[WCOLS.fatTotal]) : 0;
 
     orders.push({
       data,
       produto,
       produtoNorm: normStr(produto),
-      cliente: fullName || firstName,
+      cliente,
       email: (WCOLS.email!==-1 ? r[WCOLS.email] : '').toString().trim().toLowerCase(),
       telefone: WCOLS.telefone!==-1 ? r[WCOLS.telefone] : '',
       fatTotal,
@@ -701,9 +665,9 @@ function processWebhook(rows){
       utmCampaign: WCOLS.utmCampaign!==-1 ? r[WCOLS.utmCampaign] : '',
       utmContent: WCOLS.utmContent!==-1 ? r[WCOLS.utmContent] : '',
     });
-  });
+  }
 
-  // 4) Agrupa os pedidos aprovados por comprador para juntar produto
+  // 2) Agrupa os pedidos aprovados por comprador para juntar produto
   // principal + order bump(s) numa única venda. Usa TELEFONE como chave
   // (sempre presente e correto nesta planilha — ver GOTCHA), com email como
   // fallback e, por último, data+nome.
