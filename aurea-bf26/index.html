@@ -23,6 +23,12 @@ body{background:#0a0a0a;color:#e8e6f0;font-family:'DM Sans',sans-serif;min-heigh
 .logo-text span{font-size:10px;color:rgba(255,255,255,.35);margin-top:1px}
 .period-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .period-bar label{font-size:11px;color:rgba(255,255,255,.45);white-space:nowrap}
+.date-input{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:#e8e6f0;padding:5px 10px;border-radius:6px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;outline:none;min-width:118px}
+.date-input:focus{border-color:#ff6b2b}
+.date-input::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;cursor:pointer}
+.period-sep{color:rgba(255,255,255,.2);font-size:13px;padding:0 2px}
+.preset-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;transition:all .2s;white-space:nowrap}
+.preset-btn:hover,.preset-btn.active{background:rgba(255,107,43,.2);border-color:#ff6b2b;color:#ff6b2b;font-weight:600}
 .range-info{font-size:11px;color:rgba(255,107,43,.75);font-family:'DM Mono',monospace;white-space:nowrap;padding-left:4px}
 .tabs{display:flex;border-bottom:1px solid rgba(255,255,255,0.07);background:#141414;padding:0 28px;overflow-x:auto}
 .tab{padding:12px 20px;cursor:pointer;font-size:13px;color:rgba(255,255,255,0.5);border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
@@ -86,10 +92,24 @@ a.link-ad:hover{color:#ff6b2b;text-decoration:underline}
 @media(max-width:900px){.temp-grid{grid-template-columns:1fr}.funil-wrap{flex-direction:column}.funnel-svg-wrap{flex:none;max-width:100%}}
 .note{font-size:11px;color:rgba(255,255,255,.35);margin-top:8px}
 .dim{color:rgba(255,255,255,.35)}
-@media(max-width:600px){.topbar,.tabs{padding-left:16px;padding-right:16px}.content{padding:18px 16px}}
+.src-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 28px;background:#0a0a0a;border-bottom:1px solid rgba(255,255,255,.07);font-size:11px;color:rgba(255,255,255,.45)}
+.src-dot{width:8px;height:8px;border-radius:50%;background:#2ecc71;flex-shrink:0}
+.src-bar.snap .src-dot{background:#f1c40f}
+.src-bar.err .src-dot{background:#e74c3c}
+.src-bar strong{color:#e8e6f0;font-weight:600}
+.src-bar .mono{font-family:'DM Mono',monospace}
+#btn-refresh{margin-left:auto}
+#btn-refresh[disabled]{opacity:.5;cursor:wait}
+@media(max-width:600px){.topbar,.tabs,.src-bar{padding-left:16px;padding-right:16px}.content{padding:18px 16px}.date-input{min-width:0}#btn-refresh{margin-left:0}}
 </style>
 </head>
 <body>
+
+<div id="loading-overlay" style="position:fixed;inset:0;background:#0a0a0a;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px">
+  <div style="width:40px;height:40px;border:3px solid rgba(255,107,43,.2);border-top-color:#ff6b2b;border-radius:50%;animation:spin 1s linear infinite"></div>
+  <div style="color:rgba(255,255,255,.5);font-size:13px" id="loading-msg">Carregando dados...</div>
+  <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+</div>
 
 <div class="topbar">
   <div class="logo-jgt">
@@ -104,7 +124,14 @@ a.link-ad:hover{color:#ff6b2b;text-decoration:underline}
   </div>
   <div class="period-bar">
     <label>Período</label>
-    <span class="range-info" id="range-info">04/11/2026 → 06/11/2026</span>
+    <input type="date" class="date-input" id="date-from">
+    <span class="period-sep">→</span>
+    <input type="date" class="date-input" id="date-to">
+    <button class="preset-btn" data-preset="7">7d</button>
+    <button class="preset-btn" data-preset="14">14d</button>
+    <button class="preset-btn" data-preset="30">30d</button>
+    <button class="preset-btn active" data-preset="all">Tudo</button>
+    <span class="range-info" id="range-info">—</span>
   </div>
   <div>
     <div class="brand" id="brand-title">🎯 Black Friday · Aurea Santos</div>
@@ -117,6 +144,12 @@ a.link-ad:hover{color:#ff6b2b;text-decoration:underline}
   <div class="tab" onclick="showTab('criativos',this)">Criativos</div>
   <div class="tab" onclick="showTab('publicos',this)">Públicos</div>
   <div class="tab" onclick="showTab('diaria',this)">Análise Diária</div>
+</div>
+
+<div class="src-bar" id="src-bar">
+  <span class="src-dot"></span>
+  <span id="src-text">—</span>
+  <button class="preset-btn" id="btn-refresh" onclick="loadData(true)">Atualizar dados</button>
 </div>
 
 <!-- ABA 1 -->
@@ -138,14 +171,13 @@ a.link-ad:hover{color:#ff6b2b;text-decoration:underline}
     <h4>Leads e CPL por dia</h4>
     <canvas id="chart-dia"></canvas>
   </div>
-  <p class="note">Dados do Meta Ads (campanha [JGT][LEAD][BLACKFRIDAY] LL1111) extraídos em 06/11/2026 às 12h41. O dia 06/11 está parcial.</p>
 </div>
 
 <!-- ABA 2 -->
 <div class="content" id="criativos">
   <div class="sec-title">Ranking de criativos por CPL</div>
   <div class="tbl-wrap"><table id="tbl-cri"></table></div>
-  <p class="note">Hook Rate aparece como — porque os anúncios desta campanha não registram visualizações de vídeo.</p>
+  <p class="note" id="note-hook"></p>
 </div>
 
 <!-- ABA 3 -->
@@ -154,6 +186,7 @@ a.link-ad:hover{color:#ff6b2b;text-decoration:underline}
   <div class="tbl-wrap"><table id="tbl-pub"></table></div>
   <div class="sec-title">Feed vs Stories por conjunto</div>
   <div class="tbl-wrap"><table id="tbl-place"></table></div>
+  <p class="note" id="note-place"></p>
 </div>
 
 <!-- ABA 4 -->
@@ -165,258 +198,368 @@ a.link-ad:hover{color:#ff6b2b;text-decoration:underline}
 </div>
 
 <script>
-// ===== DADOS (Meta Ads, conta 496907794834947, extraídos em 06/11/2026 12h41) =====
-var ACCOUNT='496907794834947';
-var DAYS=['2026-11-04','2026-11-05','2026-11-06'];
-// conjuntos: chave -> [id, status]
-var ADSETS={
-  'CJ01':['120248206212100144','PAUSADO'],
-  'CJ02':['120248206841320144','ATIVO'],
-  'CJ03':['120248206871390144','PAUSADO'],
-  'CJ04':['120248206888610144','ATIVO'],
-  'CJ05':['120248206911420144','PAUSADO'],
-  'CJ06':['120248206946590144','PAUSADO'],
-  'CJ07':['120248206965670144','PAUSADO'],
-  'CJ08':['120248206991150144','ATIVO'],
-  'CJ09':['120248207009720144','PAUSADO'],
-  'CJ10':['120248207033580144','PAUSADO'],
-  'CJ11':['120248207084580144','PAUSADO']
+// ╔══════════════════════════════════════════════════╗
+// ║  CONFIGURAÇÃO — EDITE APENAS AQUI                 ║
+// ╚══════════════════════════════════════════════════╝
+var CONFIG = {
+  // Planilha da Aurea (JGTCL0004 - Aurea Santos - RH Business)
+  SHEET_ID:        '1I9D3AnbyN2rrpwqAp9cu65hjqiMyBrFTOpHo6yRgO1k',
+  SHEET_NAME:      'BF26',                 // aba com os dados diários por anúncio
+  PLACE_SHEET:     'BF26-Posicionamento',  // aba opcional com Platform Position
+  CAMPAIGN_FILTER: 'LL1111',               // só entram linhas cuja campanha contém este texto
+  ACCOUNT:         '496907794834947',
+  AUTO_REFRESH_MIN: 15                     // recarrega sozinho a cada N minutos (0 = desliga)
 };
-// anúncios: nome, id, conjunto, status, por dia [invest, imp, cliques, PV, leads]
-var ADS=[
- ['BF-ADE01','120248206212080144','CJ01','PAUSADO',[[12.23,225,21,16,0],[12.63,328,5,4,2],[0,0,0,0,0]]],
- ['BF-ADE02','120248206831470144','CJ01','PAUSADO',[[3.29,111,2,2,1],[3.57,60,0,0,0],[0,0,0,0,0]]],
- ['BF-ADE03','120248206841310144','CJ02','ATIVO',[[2.29,47,6,2,1],[0.25,8,0,1,0],[0.08,4,0,0,0]]],
- ['BF-ADE04','120248206841330144','CJ02','ATIVO',[[9.59,190,10,9,4],[19.86,471,7,6,2],[9.27,178,1,1,0]]],
- ['BF-ADE05','120248206871400144','CJ03','PAUSADO',[[11.43,304,7,4,0],[13.89,275,2,0,0],[10.45,165,3,4,1]]],
- ['BF-ADE06','120248206871410144','CJ03','PAUSADO',[[0.34,9,0,0,0],[0,0,0,0,0],[0.12,4,0,0,0]]],
- ['BF-ADE07','120248206888600144','CJ04','ATIVO',[[8.8,165,9,7,2],[20,453,11,11,4],[7.14,138,2,2,0]]],
- ['BF-ADE08','120248206888590144','CJ04','ATIVO',[[6.01,134,2,2,0],[0,0,0,0,0],[0,0,0,0,0]]],
- ['BF-ADE09','120248206911410144','CJ05','PAUSADO',[[11.77,370,8,5,0],[15.62,385,10,8,2],[8.24,190,5,3,1]]],
- ['BF-ADE10','120248206911430144','CJ05','PAUSADO',[[1.49,15,3,1,0],[0,0,0,0,0],[0,0,0,0,0]]],
- ['BF-ADE11','120248206946600144','CJ06','PAUSADO',[[4.99,114,8,6,0],[2.89,51,0,0,0],[0.07,2,0,0,0]]],
- ['BF-ADE12','120248206946610144','CJ06','PAUSADO',[[7.18,149,5,4,0],[19.67,382,12,11,2],[8.08,150,5,4,1]]],
- ['BF-ADE13','120248206965680144','CJ07','PAUSADO',[[10.71,247,3,4,0],[0.05,3,0,0,0],[0,0,0,0,0]]],
- ['BF-ADE14','120248206965690144','CJ07','PAUSADO',[[0.46,16,0,0,0],[13.4,314,5,3,0],[8.47,187,1,1,0]]],
- ['BF-ADE15','120248206991140144','CJ08','PAUSADO',[[4.55,147,0,0,1],[1.19,31,0,0,0],[0,0,0,0,0]]],
- ['BF-ADE16','120248206991130144','CJ08','ATIVO',[[7.53,237,9,7,1],[13.09,376,8,5,4],[9.26,194,1,1,0]]],
- ['BF-ADE17','120248207009730144','CJ09','PAUSADO',[[2.52,85,3,2,0],[3.81,95,2,0,0],[0,0,0,0,0]]],
- ['BF-ADE18','120248207009740144','CJ09','PAUSADO',[[10.74,262,17,16,1],[12.92,307,7,8,2],[0,0,0,0,0]]],
- ['BF-ADE19','120248207033560144','CJ10','PAUSADO',[[9.44,60,12,9,0],[1.56,29,2,1,1],[0,0,0,0,0]]],
- ['BF-ADE20','120248207033570144','CJ10','PAUSADO',[[4.2,121,2,1,0],[14.34,304,4,5,0],[8.11,172,1,1,0]]],
- ['BF-ADE21','120248207084570144','CJ11','PAUSADO',[[0.16,7,1,1,0],[0.34,12,0,0,0],[0.24,4,0,0,0]]],
- ['BF-ADE22','120248207084590144','CJ11','PAUSADO',[[0.52,8,0,0,0],[0.21,7,0,0,0],[0.77,13,0,0,0]]],
- ['BF-ADE23','120248207115230144','CJ11','PAUSADO',[[9.59,297,4,4,1],[14.11,288,1,1,1],[11.52,185,5,4,1]]]
-];
-// posicionamentos por conjunto (período todo): [invest, imp, cliques, PV, leads]
-var PLACE={
- 'CJ01':{feed:[[1.06,25,0,0,0],[8.12,174,1,1,0]],stories:[[0.03,4,1,1,0],[10.62,280,5,4,2]],reels:[[1.5,90,2,2,1],[0.03,2,0,0,0]]},
- 'CJ02':{feed:[[3.63,84,1,1,0],[21.33,443,9,7,3]],stories:[[0.23,13,0,0,0],[11.01,252,6,6,3]],reels:[[2.04,66,2,1,1],[0.05,4,0,0,0]]},
- 'CJ03':{feed:[[3.3,69,2,2,0],[19.53,381,3,3,1]],stories:[[0.17,8,1,1,0],[10.41,226,1,0,0]],reels:[[1.59,36,2,1,0],[0.13,6,0,0,0]]},
- 'CJ04':{feed:[[1.15,18,0,0,0],[22.61,422,13,11,4]],stories:[[0.01,2,0,0,0],[13,339,5,6,1]],reels:[[2.46,58,2,2,1],[0.07,6,0,0,0]]},
- 'CJ05':{feed:[[2.63,71,2,2,0],[13.42,320,5,4,1]],stories:[[0.27,6,0,0,0],[17.61,463,15,10,2]],reels:[[1.18,54,0,0,0],[0.54,18,0,0,0]]},
- 'CJ06':{feed:[[3.19,43,3,1,0],[22.56,423,9,7,1]],stories:[[0.05,1,0,0,0],[11.11,259,7,7,2]],reels:[[1.62,75,3,4,0],[0.02,2,0,0,0]]},
- 'CJ07':{feed:[[2.98,42,0,0,0],[14.45,266,2,2,0]],stories:[[0.01,1,0,0,0],[12.06,326,5,3,0]],reels:[[2.16,62,2,3,0],[0.03,4,0,0,0]]},
- 'CJ08':{feed:[[2.25,60,0,0,1],[20.67,487,8,4,3]],stories:[[0.29,4,0,0,0],[8.88,333,5,4,2]],reels:[[2.17,69,1,1,0],[0.15,10,0,0,0]]},
- 'CJ09':{feed:[[1.9,67,2,2,0],[17.64,410,12,11,3]],stories:[[6.16,171,7,3,0]],reels:[[1.16,63,2,3,0],[0.24,7,0,0,0]]},
- 'CJ10':{feed:[[1.55,40,1,1,1],[17.45,316,4,3,0]],stories:[[0.07,3,0,0,0],[9.98,231,4,4,0]],reels:[[1.03,34,0,0,0],[0.14,8,0,0,0]]},
- 'CJ11':{feed:[[1.52,30,0,0,0],[19.55,359,5,5,3]],stories:[[1.33,3,0,0,0],[12.51,327,4,3,0]],reels:[[0.97,48,0,0,0],[0.06,5,0,0,0]]}
+// colunas (por nome do cabeçalho) — mesmo padrão dos outros dashboards do repositório
+var COL = {
+  date:'Date', campaign:'Campaign Name', adset:'Adset Name', ad:'Ad Name',
+  inv:'Spend (Cost, Amount Spent)', imp:'Impressions', clicks:'Action Link Clicks',
+  pv:'Action Landing Page View', leads:'Action Leads', vv:'Action Video View',
+  url:'Instagram Permalink URL', statusAd:'Ad Status', position:'Platform Position'
 };
+var FRIO_KEYWORDS = ['lak','lookalike','look alike','interess','parental','amplo','broad','advantage'];
+
+// Dados gravados (Meta Ads, extraídos em 09/11/2026 09h). Usados só quando a planilha não responde.
+// rows: [data, idConjunto, conjunto, anúncio, idAnúncio, status, invest, imp, cliques, PV, leads]
+// place: [data, idConjunto, conjunto, plataforma, posicionamento, invest, imp, cliques, PV, leads]
+var SNAP = {"rows":[["2026-11-04","120248206212100144","00 - Engajamento 365D","BF-ADE01","120248206212080144","ADSET_PAUSED",12.23,225,21,16,0],["2026-11-04","120248206212100144","00 - Engajamento 365D","BF-ADE02","120248206831470144","ADSET_PAUSED",3.29,111,2,2,1],["2026-11-04","120248206841320144","00 - Engajamento 365D","BF-ADE03","120248206841310144","ACTIVE",2.29,47,6,2,1],["2026-11-04","120248206841320144","00 - Engajamento 365D","BF-ADE04","120248206841330144","ACTIVE",9.59,190,10,9,4],["2026-11-04","120248206871390144","00 - Engajamento 365D","BF-ADE05","120248206871400144","ADSET_PAUSED",11.43,304,7,4,0],["2026-11-04","120248206871390144","00 - Engajamento 365D","BF-ADE06","120248206871410144","ADSET_PAUSED",0.34,9,0,0,0],["2026-11-04","120248206888610144","00 - Engajamento 365D","BF-ADE08","120248206888590144","ACTIVE",6.01,134,2,2,0],["2026-11-04","120248206888610144","00 - Engajamento 365D","BF-ADE07","120248206888600144","ACTIVE",8.8,165,9,7,2],["2026-11-04","120248206911420144","00 - Engajamento 365D","BF-ADE09","120248206911410144","ADSET_PAUSED",11.77,370,8,5,0],["2026-11-04","120248206911420144","00 - Engajamento 365D","BF-ADE10","120248206911430144","ADSET_PAUSED",1.49,15,3,1,0],["2026-11-04","120248206946590144","00 - Engajamento 365D","BF-ADE11","120248206946600144","ADSET_PAUSED",4.99,114,8,6,0],["2026-11-04","120248206946590144","00 - Engajamento 365D","BF-ADE12","120248206946610144","ADSET_PAUSED",7.18,149,5,4,0],["2026-11-04","120248206965670144","00 - Engajamento 365D","BF-ADE13","120248206965680144","ADSET_PAUSED",10.71,247,3,4,0],["2026-11-04","120248206965670144","00 - Engajamento 365D","BF-ADE14","120248206965690144","ADSET_PAUSED",0.46,16,0,0,0],["2026-11-04","120248206991150144","00 - Engajamento 365D","BF-ADE16","120248206991130144","ACTIVE",7.53,237,9,7,1],["2026-11-04","120248206991150144","00 - Engajamento 365D","BF-ADE15","120248206991140144","PAUSED",4.55,147,0,0,1],["2026-11-04","120248207009720144","00 - Engajamento 365D","BF-ADE17","120248207009730144","ADSET_PAUSED",2.52,85,3,2,0],["2026-11-04","120248207009720144","00 - Engajamento 365D","BF-ADE18","120248207009740144","ADSET_PAUSED",10.74,262,17,16,1],["2026-11-04","120248207033580144","00 - Engajamento 365D","BF-ADE19","120248207033560144","ADSET_PAUSED",9.44,60,12,9,0],["2026-11-04","120248207033580144","00 - Engajamento 365D","BF-ADE20","120248207033570144","ADSET_PAUSED",4.2,121,2,1,0],["2026-11-04","120248207084580144","00 - Engajamento 365D","BF-ADE21","120248207084570144","ADSET_PAUSED",0.16,7,1,1,0],["2026-11-04","120248207084580144","00 - Engajamento 365D","BF-ADE22","120248207084590144","ADSET_PAUSED",0.52,8,0,0,0],["2026-11-04","120248207084580144","00 - Engajamento 365D","BF-ADE23","120248207115230144","ADSET_PAUSED",9.59,297,4,4,1],["2026-11-05","120248206212100144","00 - Engajamento 365D","BF-ADE01","120248206212080144","ADSET_PAUSED",12.63,328,5,4,2],["2026-11-05","120248206212100144","00 - Engajamento 365D","BF-ADE02","120248206831470144","ADSET_PAUSED",3.57,60,0,0,0],["2026-11-05","120248206841320144","00 - Engajamento 365D","BF-ADE03","120248206841310144","ACTIVE",0.25,8,0,1,0],["2026-11-05","120248206841320144","00 - Engajamento 365D","BF-ADE04","120248206841330144","ACTIVE",19.86,471,7,6,2],["2026-11-05","120248206871390144","00 - Engajamento 365D","BF-ADE05","120248206871400144","ADSET_PAUSED",13.89,275,2,0,0],["2026-11-05","120248206888610144","00 - Engajamento 365D","BF-ADE07","120248206888600144","ACTIVE",20.0,453,11,11,4],["2026-11-05","120248206911420144","00 - Engajamento 365D","BF-ADE09","120248206911410144","ADSET_PAUSED",15.62,385,10,8,2],["2026-11-05","120248206946590144","00 - Engajamento 365D","BF-ADE11","120248206946600144","ADSET_PAUSED",2.89,51,0,0,0],["2026-11-05","120248206946590144","00 - Engajamento 365D","BF-ADE12","120248206946610144","ADSET_PAUSED",19.67,382,12,11,2],["2026-11-05","120248206965670144","00 - Engajamento 365D","BF-ADE13","120248206965680144","ADSET_PAUSED",0.05,3,0,0,0],["2026-11-05","120248206965670144","00 - Engajamento 365D","BF-ADE14","120248206965690144","ADSET_PAUSED",13.4,314,5,3,0],["2026-11-05","120248206991150144","00 - Engajamento 365D","BF-ADE16","120248206991130144","ACTIVE",13.09,376,8,5,4],["2026-11-05","120248206991150144","00 - Engajamento 365D","BF-ADE15","120248206991140144","PAUSED",1.19,31,0,0,0],["2026-11-05","120248207009720144","00 - Engajamento 365D","BF-ADE17","120248207009730144","ADSET_PAUSED",3.81,95,2,0,0],["2026-11-05","120248207009720144","00 - Engajamento 365D","BF-ADE18","120248207009740144","ADSET_PAUSED",12.92,307,7,8,2],["2026-11-05","120248207033580144","00 - Engajamento 365D","BF-ADE19","120248207033560144","ADSET_PAUSED",1.56,29,2,1,1],["2026-11-05","120248207033580144","00 - Engajamento 365D","BF-ADE20","120248207033570144","ADSET_PAUSED",14.34,304,4,5,0],["2026-11-05","120248207084580144","00 - Engajamento 365D","BF-ADE21","120248207084570144","ADSET_PAUSED",0.34,12,0,0,0],["2026-11-05","120248207084580144","00 - Engajamento 365D","BF-ADE22","120248207084590144","ADSET_PAUSED",0.21,7,0,0,0],["2026-11-05","120248207084580144","00 - Engajamento 365D","BF-ADE23","120248207115230144","ADSET_PAUSED",14.11,288,1,1,1],["2026-11-06","120248206841320144","00 - Engajamento 365D","BF-ADE03","120248206841310144","ACTIVE",1.08,31,1,1,0],["2026-11-06","120248206841320144","00 - Engajamento 365D","BF-ADE04","120248206841330144","ACTIVE",18.69,472,10,9,3],["2026-11-06","120248206871390144","00 - Engajamento 365D","BF-ADE05","120248206871400144","ADSET_PAUSED",10.49,167,3,4,1],["2026-11-06","120248206871390144","00 - Engajamento 365D","BF-ADE06","120248206871410144","ADSET_PAUSED",0.12,4,0,0,0],["2026-11-06","120248206888610144","00 - Engajamento 365D","BF-ADE07","120248206888600144","ACTIVE",20.19,526,6,6,2],["2026-11-06","120248206911420144","00 - Engajamento 365D","BF-ADE09","120248206911410144","ADSET_PAUSED",8.45,195,5,3,1],["2026-11-06","120248206946590144","00 - Engajamento 365D","BF-ADE11","120248206946600144","ADSET_PAUSED",0.5,3,0,0,0],["2026-11-06","120248206946590144","00 - Engajamento 365D","BF-ADE12","120248206946610144","ADSET_PAUSED",8.15,152,5,4,1],["2026-11-06","120248206965670144","00 - Engajamento 365D","BF-ADE14","120248206965690144","ADSET_PAUSED",8.54,191,1,1,0],["2026-11-06","120248206991150144","00 - Engajamento 365D","BF-ADE16","120248206991130144","ACTIVE",23.91,594,7,4,0],["2026-11-06","120248207033580144","00 - Engajamento 365D","BF-ADE20","120248207033570144","ADSET_PAUSED",8.29,175,1,1,0],["2026-11-06","120248207084580144","00 - Engajamento 365D","BF-ADE21","120248207084570144","ADSET_PAUSED",0.24,4,0,0,0],["2026-11-06","120248207084580144","00 - Engajamento 365D","BF-ADE22","120248207084590144","ADSET_PAUSED",0.77,13,0,0,0],["2026-11-06","120248207084580144","00 - Engajamento 365D","BF-ADE23","120248207115230144","ADSET_PAUSED",11.8,196,5,5,2],["2026-11-07","120248206841320144","00 - Engajamento 365D","BF-ADE03","120248206841310144","ACTIVE",2.83,96,5,2,0],["2026-11-07","120248206841320144","00 - Engajamento 365D","BF-ADE04","120248206841330144","ACTIVE",13.23,282,4,3,2],["2026-11-07","120248206888610144","00 - Engajamento 365D","BF-ADE08","120248206888590144","ACTIVE",0.11,2,1,0,0],["2026-11-07","120248206888610144","00 - Engajamento 365D","BF-ADE07","120248206888600144","ACTIVE",21.26,539,7,6,3],["2026-11-07","120248206991150144","00 - Engajamento 365D","BF-ADE16","120248206991130144","ACTIVE",20.35,420,6,3,1],["2026-11-08","120248206841320144","00 - Engajamento 365D","BF-ADE03","120248206841310144","ACTIVE",8.67,304,3,3,0],["2026-11-08","120248206841320144","00 - Engajamento 365D","BF-ADE04","120248206841330144","ACTIVE",17.81,432,8,6,3],["2026-11-08","120248206888610144","00 - Engajamento 365D","BF-ADE08","120248206888590144","ACTIVE",11.54,348,8,7,1],["2026-11-08","120248206888610144","00 - Engajamento 365D","BF-ADE07","120248206888600144","ACTIVE",20.85,696,12,11,1],["2026-11-08","120248206991150144","00 - Engajamento 365D","BF-ADE16","120248206991130144","ACTIVE",32.0,801,13,9,2],["2026-11-08","120248207084580144","00 - Engajamento 365D","BF-ADE23","120248207115230144","ADSET_PAUSED",0.0,0,0,1,0],["2026-11-09","120248206841320144","00 - Engajamento 365D","BF-ADE03","120248206841310144","ACTIVE",0.79,35,1,1,0],["2026-11-09","120248206841320144","00 - Engajamento 365D","BF-ADE04","120248206841330144","ACTIVE",4.73,95,1,1,1],["2026-11-09","120248206888610144","00 - Engajamento 365D","BF-ADE08","120248206888590144","ACTIVE",1.36,1,1,1,0],["2026-11-09","120248206888610144","00 - Engajamento 365D","BF-ADE07","120248206888600144","ACTIVE",9.21,249,2,2,0],["2026-11-09","120248206991150144","00 - Engajamento 365D","BF-ADE16","120248206991130144","ACTIVE",5.9,144,1,0,0]],"place":[["2026-11-04","120248206212100144","00 - Engajamento 365D","","an_classic",9.42,37,19,14,0],["2026-11-04","120248206212100144","00 - Engajamento 365D","","facebook_reels",0.01,1,0,0,0],["2026-11-04","120248206212100144","00 - Engajamento 365D","","facebook_reels_overlay",0.0,1,0,0,0],["2026-11-04","120248206212100144","00 - Engajamento 365D","","facebook_stories",0.02,3,1,1,0],["2026-11-04","120248206212100144","00 - Engajamento 365D","","feed",2.18,73,0,0,0],["2026-11-04","120248206212100144","00 - Engajamento 365D","","instagram_reels",0.96,74,2,2,0],["2026-11-04","120248206212100144","00 - Engajamento 365D","","instagram_stories",2.63,73,1,1,1],["2026-11-04","120248206212100144","00 - Engajamento 365D","","right_hand_column",0.0,1,0,0,0],["2026-11-04","120248206212100144","00 - Engajamento 365D","","status",0.3,72,0,0,0],["2026-11-04","120248206212100144","00 - Engajamento 365D","","threads_feed",0.0,1,0,0,0],["2026-11-04","120248206841320144","00 - Engajamento 365D","","an_classic",2.56,11,6,3,0],["2026-11-04","120248206841320144","00 - Engajamento 365D","","facebook_reels",0.01,1,0,0,0],["2026-11-04","120248206841320144","00 - Engajamento 365D","","feed",4.9,102,6,5,2],["2026-11-04","120248206841320144","00 - Engajamento 365D","","instagram_reels",0.52,19,1,0,0],["2026-11-04","120248206841320144","00 - Engajamento 365D","","instagram_stories",3.84,95,3,3,3],["2026-11-04","120248206841320144","00 - Engajamento 365D","","status",0.05,9,0,0,0],["2026-11-04","120248206871390144","00 - Engajamento 365D","","an_classic",0.73,5,3,1,0],["2026-11-04","120248206871390144","00 - Engajamento 365D","","facebook_reels",0.01,1,0,0,0],["2026-11-04","120248206871390144","00 - Engajamento 365D","","facebook_stories",0.04,2,0,0,0],["2026-11-04","120248206871390144","00 - Engajamento 365D","","feed",6.94,180,2,2,0],["2026-11-04","120248206871390144","00 - Engajamento 365D","","instagram_reels",0.7,21,1,1,0],["2026-11-04","120248206871390144","00 - Engajamento 365D","","instagram_stories",3.33,99,1,0,0],["2026-11-04","120248206871390144","00 - Engajamento 365D","","instream_video",0.02,1,0,0,0],["2026-11-04","120248206871390144","00 - Engajamento 365D","","status",0.0,3,0,0,0],["2026-11-04","120248206871390144","00 - Engajamento 365D","","threads_feed",0.0,1,0,0,0],["2026-11-04","120248206888610144","00 - Engajamento 365D","","an_classic",2.2,13,4,3,0],["2026-11-04","120248206888610144","00 - Engajamento 365D","","facebook_reels",0.03,2,0,0,0],["2026-11-04","120248206888610144","00 - Engajamento 365D","","facebook_stories",0.0,1,0,0,0],["2026-11-04","120248206888610144","00 - Engajamento 365D","","feed",6.58,125,4,3,0],["2026-11-04","120248206888610144","00 - Engajamento 365D","","instagram_reels",0.72,18,1,1,1],["2026-11-04","120248206888610144","00 - Engajamento 365D","","instagram_stories",5.2,119,2,2,1],["2026-11-04","120248206888610144","00 - Engajamento 365D","","search",0.01,2,0,0,0],["2026-11-04","120248206888610144","00 - Engajamento 365D","","status",0.07,19,0,0,0],["2026-11-04","120248206911420144","00 - Engajamento 365D","","an_classic",1.23,6,4,1,0],["2026-11-04","120248206911420144","00 - Engajamento 365D","","facebook_reels",0.05,10,0,0,0],["2026-11-04","120248206911420144","00 - Engajamento 365D","","facebook_stories",0.04,1,0,0,0],["2026-11-04","120248206911420144","00 - Engajamento 365D","","feed",5.67,167,2,2,0],["2026-11-04","120248206911420144","00 - Engajamento 365D","","instagram_explore_grid_home",0.0,1,0,0,0],["2026-11-04","120248206911420144","00 - Engajamento 365D","","instagram_reels",0.31,23,0,0,0],["2026-11-04","120248206911420144","00 - Engajamento 365D","","instagram_stories",5.78,163,5,3,0],["2026-11-04","120248206911420144","00 - Engajamento 365D","","status",0.16,13,0,0,0],["2026-11-04","120248206911420144","00 - Engajamento 365D","","threads_feed",0.02,1,0,0,0],["2026-11-04","120248206946590144","00 - Engajamento 365D","","an_classic",3.92,14,7,5,0],["2026-11-04","120248206946590144","00 - Engajamento 365D","","facebook_reels_overlay",0.02,3,1,1,0],["2026-11-04","120248206946590144","00 - Engajamento 365D","","facebook_stories",0.05,1,0,0,0],["2026-11-04","120248206946590144","00 - Engajamento 365D","","feed",5.46,126,2,0,0],["2026-11-04","120248206946590144","00 - Engajamento 365D","","instagram_explore_grid_home",0.01,2,0,0,0],["2026-11-04","120248206946590144","00 - Engajamento 365D","","instagram_reels",0.39,26,2,3,0],["2026-11-04","120248206946590144","00 - Engajamento 365D","","instagram_stories",2.26,84,1,1,0],["2026-11-04","120248206946590144","00 - Engajamento 365D","","marketplace",0.01,2,0,0,0],["2026-11-04","120248206946590144","00 - Engajamento 365D","","status",0.05,5,0,0,0],["2026-11-04","120248206965670144","00 - Engajamento 365D","","an_classic",0.34,3,0,0,0],["2026-11-04","120248206965670144","00 - Engajamento 365D","","facebook_stories",0.01,1,0,0,0],["2026-11-04","120248206965670144","00 - Engajamento 365D","","feed",6.67,104,0,0,0],["2026-11-04","120248206965670144","00 - Engajamento 365D","","instagram_reels",0.76,34,1,2,0],["2026-11-04","120248206965670144","00 - Engajamento 365D","","instagram_stories",3.36,115,2,2,0],["2026-11-04","120248206965670144","00 - Engajamento 365D","","marketplace",0.0,1,0,0,0],["2026-11-04","120248206965670144","00 - Engajamento 365D","","status",0.03,5,0,0,0],["2026-11-04","120248206991150144","00 - Engajamento 365D","","an_classic",0.85,5,3,3,0],["2026-11-04","120248206991150144","00 - Engajamento 365D","","facebook_reels",0.1,6,0,0,0],["2026-11-04","120248206991150144","00 - Engajamento 365D","","facebook_stories",0.22,2,0,0,0],["2026-11-04","120248206991150144","00 - Engajamento 365D","","feed",6.39,205,4,2,2],["2026-11-04","120248206991150144","00 - Engajamento 365D","","instagram_explore_grid_home",0.0,1,0,0,0],["2026-11-04","120248206991150144","00 - Engajamento 365D","","instagram_reels",1.17,37,1,1,0],["2026-11-04","120248206991150144","00 - Engajamento 365D","","instagram_stories",3.26,125,1,1,0],["2026-11-04","120248206991150144","00 - Engajamento 365D","","marketplace",0.0,1,0,0,0],["2026-11-04","120248206991150144","00 - Engajamento 365D","","status",0.09,2,0,0,0],["2026-11-04","120248207009720144","00 - Engajamento 365D","","an_classic",2.77,12,6,7,0],["2026-11-04","120248207009720144","00 - Engajamento 365D","","facebook_reels",0.22,6,0,0,0],["2026-11-04","120248207009720144","00 - Engajamento 365D","","facebook_reels_overlay",0.0,1,0,0,0],["2026-11-04","120248207009720144","00 - Engajamento 365D","","feed",7.21,211,8,6,1],["2026-11-04","120248207009720144","00 - Engajamento 365D","","instagram_explore_grid_home",0.0,2,0,0,0],["2026-11-04","120248207009720144","00 - Engajamento 365D","","instagram_reels",0.59,29,1,2,0],["2026-11-04","120248207009720144","00 - Engajamento 365D","","instagram_stories",2.43,80,5,3,0],["2026-11-04","120248207009720144","00 - Engajamento 365D","","instream_video",0.02,1,0,0,0],["2026-11-04","120248207009720144","00 - Engajamento 365D","","status",0.02,4,0,0,0],["2026-11-04","120248207009720144","00 - Engajamento 365D","","threads_feed",0.0,1,0,0,0],["2026-11-04","120248207033580144","00 - Engajamento 365D","","an_classic",7.12,22,12,9,0],["2026-11-04","120248207033580144","00 - Engajamento 365D","","facebook_reels",0.0,1,0,0,0],["2026-11-04","120248207033580144","00 - Engajamento 365D","","feed",3.3,81,1,1,0],["2026-11-04","120248207033580144","00 - Engajamento 365D","","instagram_reels",0.24,14,0,0,0],["2026-11-04","120248207033580144","00 - Engajamento 365D","","instagram_stories",2.95,56,1,0,0],["2026-11-04","120248207033580144","00 - Engajamento 365D","","marketplace",0.0,1,0,0,0],["2026-11-04","120248207033580144","00 - Engajamento 365D","","status",0.03,6,0,0,0],["2026-11-04","120248207084580144","00 - Engajamento 365D","","an_classic",0.17,3,1,1,0],["2026-11-04","120248207084580144","00 - Engajamento 365D","","facebook_reels",0.03,3,0,0,0],["2026-11-04","120248207084580144","00 - Engajamento 365D","","facebook_stories",0.01,1,0,0,0],["2026-11-04","120248207084580144","00 - Engajamento 365D","","feed",5.66,134,2,2,1],["2026-11-04","120248207084580144","00 - Engajamento 365D","","instagram_reels",0.36,26,0,0,0],["2026-11-04","120248207084580144","00 - Engajamento 365D","","instagram_stories",4.0,126,2,2,0],["2026-11-04","120248207084580144","00 - Engajamento 365D","","marketplace",0.0,1,0,0,0],["2026-11-04","120248207084580144","00 - Engajamento 365D","","search",0.0,1,0,0,0],["2026-11-04","120248207084580144","00 - Engajamento 365D","","status",0.04,15,0,0,0],["2026-11-04","120248207084580144","00 - Engajamento 365D","","threads_feed",0.0,2,0,0,0],["2026-11-05","120248206212100144","00 - Engajamento 365D","","facebook_reels",0.02,1,0,0,0],["2026-11-05","120248206212100144","00 - Engajamento 365D","","facebook_stories",0.01,1,0,0,0],["2026-11-05","120248206212100144","00 - Engajamento 365D","","feed",7.0,126,1,1,0],["2026-11-05","120248206212100144","00 - Engajamento 365D","","instagram_explore_grid_home",0.0,1,0,0,0],["2026-11-05","120248206212100144","00 - Engajamento 365D","","instagram_reels",0.54,16,0,0,1],["2026-11-05","120248206212100144","00 - Engajamento 365D","","instagram_stories",7.99,207,4,3,1],["2026-11-05","120248206212100144","00 - Engajamento 365D","","right_hand_column",0.01,3,0,0,0],["2026-11-05","120248206212100144","00 - Engajamento 365D","","status",0.52,29,0,0,0],["2026-11-05","120248206212100144","00 - Engajamento 365D","","threads_feed",0.11,4,0,0,0],["2026-11-05","120248206841320144","00 - Engajamento 365D","","an_classic",0.0,0,0,1,0],["2026-11-05","120248206841320144","00 - Engajamento 365D","","facebook_profile_feed",0.02,1,0,0,0],["2026-11-05","120248206841320144","00 - Engajamento 365D","","facebook_reels",0.01,1,0,0,0],["2026-11-05","120248206841320144","00 - Engajamento 365D","","facebook_reels_overlay",0.0,1,0,0,0],["2026-11-05","120248206841320144","00 - Engajamento 365D","","facebook_stories",0.16,7,0,0,0],["2026-11-05","120248206841320144","00 - Engajamento 365D","","feed",13.74,305,4,3,1],["2026-11-05","120248206841320144","00 - Engajamento 365D","","instagram_explore_grid_home",0.0,3,0,0,0],["2026-11-05","120248206841320144","00 - Engajamento 365D","","instagram_reels",0.87,36,1,1,1],["2026-11-05","120248206841320144","00 - Engajamento 365D","","instagram_stories",5.22,119,2,2,0],["2026-11-05","120248206841320144","00 - Engajamento 365D","","status",0.04,4,0,0,0],["2026-11-05","120248206841320144","00 - Engajamento 365D","","threads_feed",0.05,2,0,0,0],["2026-11-05","120248206871390144","00 - Engajamento 365D","","facebook_reels",0.1,2,0,0,0],["2026-11-05","120248206871390144","00 - Engajamento 365D","","facebook_stories",0.02,2,0,0,0],["2026-11-05","120248206871390144","00 - Engajamento 365D","","feed",8.81,171,1,0,0],["2026-11-05","120248206871390144","00 - Engajamento 365D","","instagram_explore_grid_home",0.0,1,0,0,0],["2026-11-05","120248206871390144","00 - Engajamento 365D","","instagram_reels",0.2,13,1,0,0],["2026-11-05","120248206871390144","00 - Engajamento 365D","","instagram_stories",4.62,79,0,0,0],["2026-11-05","120248206871390144","00 - Engajamento 365D","","right_hand_column",0.01,1,0,0,0],["2026-11-05","120248206871390144","00 - Engajamento 365D","","status",0.04,3,0,0,0],["2026-11-05","120248206871390144","00 - Engajamento 365D","","threads_feed",0.09,3,0,0,0],["2026-11-05","120248206888610144","00 - Engajamento 365D","","facebook_reels",0.04,3,0,0,0],["2026-11-05","120248206888610144","00 - Engajamento 365D","","feed",13.05,246,7,6,4],["2026-11-05","120248206888610144","00 - Engajamento 365D","","instagram_explore_grid_home",0.18,1,0,0,0],["2026-11-05","120248206888610144","00 - Engajamento 365D","","instagram_reels",0.89,30,1,1,0],["2026-11-05","120248206888610144","00 - Engajamento 365D","","instagram_stories",5.7,166,3,4,0],["2026-11-05","120248206888610144","00 - Engajamento 365D","","status",0.11,5,0,0,0],["2026-11-05","120248206888610144","00 - Engajamento 365D","","threads_feed",0.03,2,0,0,0],["2026-11-05","120248206911420144","00 - Engajamento 365D","","facebook_reels",0.35,5,0,0,0],["2026-11-05","120248206911420144","00 - Engajamento 365D","","facebook_stories",0.2,4,0,0,0],["2026-11-05","120248206911420144","00 - Engajamento 365D","","feed",7.09,150,4,3,1],["2026-11-05","120248206911420144","00 - Engajamento 365D","","instagram_reels",0.6,23,0,0,0],["2026-11-05","120248206911420144","00 - Engajamento 365D","","instagram_stories",7.33,197,6,5,1],["2026-11-05","120248206911420144","00 - Engajamento 365D","","marketplace",0.02,1,0,0,0],["2026-11-05","120248206911420144","00 - Engajamento 365D","","right_hand_column",0.01,2,0,0,0],["2026-11-05","120248206911420144","00 - Engajamento 365D","","status",0.02,3,0,0,0],["2026-11-05","120248206946590144","00 - Engajamento 365D","","facebook_reels",0.01,1,0,0,0],["2026-11-05","120248206946590144","00 - Engajamento 365D","","facebook_reels_overlay",0.01,1,0,0,0],["2026-11-05","120248206946590144","00 - Engajamento 365D","","feed",15.13,250,7,6,1],["2026-11-05","120248206946590144","00 - Engajamento 365D","","instagram_reels",1.11,43,1,1,0],["2026-11-05","120248206946590144","00 - Engajamento 365D","","instagram_stories",6.18,128,4,4,1],["2026-11-05","120248206946590144","00 - Engajamento 365D","","right_hand_column",0.05,5,0,0,0],["2026-11-05","120248206946590144","00 - Engajamento 365D","","status",0.05,4,0,0,0],["2026-11-05","120248206946590144","00 - Engajamento 365D","","threads_feed",0.02,1,0,0,0],["2026-11-05","120248206965670144","00 - Engajamento 365D","","facebook_profile_feed",0.01,1,0,0,0],["2026-11-05","120248206965670144","00 - Engajamento 365D","","facebook_reels",0.03,4,0,0,0],["2026-11-05","120248206965670144","00 - Engajamento 365D","","feed",7.35,143,2,2,0],["2026-11-05","120248206965670144","00 - Engajamento 365D","","instagram_reels",0.81,16,0,0,0],["2026-11-05","120248206965670144","00 - Engajamento 365D","","instagram_stories",4.79,126,3,1,0],["2026-11-05","120248206965670144","00 - Engajamento 365D","","right_hand_column",0.07,4,0,0,0],["2026-11-05","120248206965670144","00 - Engajamento 365D","","search",0.01,1,0,0,0],["2026-11-05","120248206965670144","00 - Engajamento 365D","","status",0.37,21,0,0,0],["2026-11-05","120248206965670144","00 - Engajamento 365D","","threads_feed",0.01,1,0,0,0],["2026-11-05","120248206991150144","00 - Engajamento 365D","","facebook_reels",0.04,2,0,0,0],["2026-11-05","120248206991150144","00 - Engajamento 365D","","facebook_stories",0.07,2,0,0,0],["2026-11-05","120248206991150144","00 - Engajamento 365D","","feed",10.03,234,4,2,2],["2026-11-05","120248206991150144","00 - Engajamento 365D","","instagram_reels",0.86,29,0,0,0],["2026-11-05","120248206991150144","00 - Engajamento 365D","","instagram_stories",3.16,129,3,2,2],["2026-11-05","120248206991150144","00 - Engajamento 365D","","marketplace",0.02,2,0,0,0],["2026-11-05","120248206991150144","00 - Engajamento 365D","","right_hand_column",0.04,3,0,0,0],["2026-11-05","120248206991150144","00 - Engajamento 365D","","status",0.06,6,1,1,0],["2026-11-05","120248207009720144","00 - Engajamento 365D","","facebook_reels",0.02,1,0,0,0],["2026-11-05","120248207009720144","00 - Engajamento 365D","","facebook_reels_overlay",0.01,1,0,0,0],["2026-11-05","120248207009720144","00 - Engajamento 365D","","feed",12.33,266,6,7,2],["2026-11-05","120248207009720144","00 - Engajamento 365D","","instagram_explore_grid_home",0.0,2,0,0,0],["2026-11-05","120248207009720144","00 - Engajamento 365D","","instagram_reels",0.57,34,1,1,0],["2026-11-05","120248207009720144","00 - Engajamento 365D","","instagram_stories",3.73,91,2,0,0],["2026-11-05","120248207009720144","00 - Engajamento 365D","","marketplace",0.0,1,0,0,0],["2026-11-05","120248207009720144","00 - Engajamento 365D","","status",0.07,6,0,0,0],["2026-11-05","120248207033580144","00 - Engajamento 365D","","facebook_reels",0.08,5,0,0,0],["2026-11-05","120248207033580144","00 - Engajamento 365D","","facebook_stories",0.04,2,0,0,0],["2026-11-05","120248207033580144","00 - Engajamento 365D","","feed",10.85,185,4,3,1],["2026-11-05","120248207033580144","00 - Engajamento 365D","","instagram_explore_grid_home",0.0,1,0,0,0],["2026-11-05","120248207033580144","00 - Engajamento 365D","","instagram_reels",0.61,17,0,0,0],["2026-11-05","120248207033580144","00 - Engajamento 365D","","instagram_stories",4.15,109,2,3,0],["2026-11-05","120248207033580144","00 - Engajamento 365D","","status",0.13,12,0,0,0],["2026-11-05","120248207033580144","00 - Engajamento 365D","","threads_feed",0.04,2,0,0,0],["2026-11-05","120248207084580144","00 - Engajamento 365D","","facebook_reels",0.01,1,0,0,0],["2026-11-05","120248207084580144","00 - Engajamento 365D","","facebook_reels_overlay",0.02,2,0,0,0],["2026-11-05","120248207084580144","00 - Engajamento 365D","","facebook_stories",0.04,1,0,0,0],["2026-11-05","120248207084580144","00 - Engajamento 365D","","feed",9.17,159,1,1,1],["2026-11-05","120248207084580144","00 - Engajamento 365D","","instagram_reels",0.4,16,0,0,0],["2026-11-05","120248207084580144","00 - Engajamento 365D","","instagram_stories",4.89,125,0,0,0],["2026-11-05","120248207084580144","00 - Engajamento 365D","","status",0.05,2,0,0,0],["2026-11-05","120248207084580144","00 - Engajamento 365D","","threads_feed",0.08,1,0,0,0],["2026-11-06","120248206841320144","00 - Engajamento 365D","","facebook_reels",0.06,5,0,0,0],["2026-11-06","120248206841320144","00 - Engajamento 365D","","facebook_stories",0.12,10,0,0,0],["2026-11-06","120248206841320144","00 - Engajamento 365D","","feed",13.17,304,7,6,1],["2026-11-06","120248206841320144","00 - Engajamento 365D","","instagram_reels",1.46,34,0,0,0],["2026-11-06","120248206841320144","00 - Engajamento 365D","","instagram_stories",4.62,132,4,4,2],["2026-11-06","120248206841320144","00 - Engajamento 365D","","marketplace",0.02,1,0,0,0],["2026-11-06","120248206841320144","00 - Engajamento 365D","","status",0.27,13,0,0,0],["2026-11-06","120248206841320144","00 - Engajamento 365D","","threads_feed",0.05,4,0,0,0],["2026-11-06","120248206871390144","00 - Engajamento 365D","","facebook_reels",0.04,4,0,0,0],["2026-11-06","120248206871390144","00 - Engajamento 365D","","facebook_reels_overlay",0.0,1,0,0,0],["2026-11-06","120248206871390144","00 - Engajamento 365D","","facebook_stories",0.11,4,1,1,0],["2026-11-06","120248206871390144","00 - Engajamento 365D","","feed",7.13,100,2,3,1],["2026-11-06","120248206871390144","00 - Engajamento 365D","","instagram_reels",0.68,2,0,0,0],["2026-11-06","120248206871390144","00 - Engajamento 365D","","instagram_stories",2.43,47,0,0,0],["2026-11-06","120248206871390144","00 - Engajamento 365D","","status",0.2,11,0,0,0],["2026-11-06","120248206871390144","00 - Engajamento 365D","","threads_feed",0.02,2,0,0,0],["2026-11-06","120248206888610144","00 - Engajamento 365D","","facebook_reels",0.05,8,0,0,0],["2026-11-06","120248206888610144","00 - Engajamento 365D","","facebook_stories",0.02,2,0,0,0],["2026-11-06","120248206888610144","00 - Engajamento 365D","","feed",11.68,240,3,3,1],["2026-11-06","120248206888610144","00 - Engajamento 365D","","instagram_explore_grid_home",0.0,2,0,0,0],["2026-11-06","120248206888610144","00 - Engajamento 365D","","instagram_reels",1.49,35,0,0,0],["2026-11-06","120248206888610144","00 - Engajamento 365D","","instagram_stories",6.58,212,3,3,1],["2026-11-06","120248206888610144","00 - Engajamento 365D","","status",0.19,21,0,0,0],["2026-11-06","120248206888610144","00 - Engajamento 365D","","threads_feed",0.18,6,0,0,0],["2026-11-06","120248206911420144","00 - Engajamento 365D","","facebook_reels",0.14,3,0,0,0],["2026-11-06","120248206911420144","00 - Engajamento 365D","","facebook_stories",0.03,1,0,0,0],["2026-11-06","120248206911420144","00 - Engajamento 365D","","feed",3.38,77,1,1,0],["2026-11-06","120248206911420144","00 - Engajamento 365D","","instagram_explore_grid_home",0.0,1,0,0,0],["2026-11-06","120248206911420144","00 - Engajamento 365D","","instagram_reels",0.26,8,0,0,0],["2026-11-06","120248206911420144","00 - Engajamento 365D","","instagram_stories",4.64,104,4,2,1],["2026-11-06","120248206911420144","00 - Engajamento 365D","","status",0.0,1,0,0,0],["2026-11-06","120248206946590144","00 - Engajamento 365D","","facebook_reels",0.01,1,0,0,0],["2026-11-06","120248206946590144","00 - Engajamento 365D","","feed",5.19,92,3,2,0],["2026-11-06","120248206946590144","00 - Engajamento 365D","","instagram_reels",0.11,5,0,0,0],["2026-11-06","120248206946590144","00 - Engajamento 365D","","instagram_stories",3.17,49,2,2,1],["2026-11-06","120248206946590144","00 - Engajamento 365D","","marketplace",0.0,1,0,0,0],["2026-11-06","120248206946590144","00 - Engajamento 365D","","status",0.17,7,0,0,0],["2026-11-06","120248206965670144","00 - Engajamento 365D","","feed",3.35,62,0,0,0],["2026-11-06","120248206965670144","00 - Engajamento 365D","","instagram_explore_grid_home",0.01,1,0,0,0],["2026-11-06","120248206965670144","00 - Engajamento 365D","","instagram_reels",0.58,12,1,1,0],["2026-11-06","120248206965670144","00 - Engajamento 365D","","instagram_stories",4.05,86,0,0,0],["2026-11-06","120248206965670144","00 - Engajamento 365D","","marketplace",0.01,2,0,0,0],["2026-11-06","120248206965670144","00 - Engajamento 365D","","status",0.41,26,0,0,0],["2026-11-06","120248206965670144","00 - Engajamento 365D","","threads_feed",0.13,2,0,0,0],["2026-11-06","120248206991150144","00 - Engajamento 365D","","facebook_reels",0.08,6,0,0,0],["2026-11-06","120248206991150144","00 - Engajamento 365D","","facebook_stories",0.35,7,0,0,0],["2026-11-06","120248206991150144","00 - Engajamento 365D","","feed",13.05,262,3,1,0],["2026-11-06","120248206991150144","00 - Engajamento 365D","","instagram_explore_grid_home",0.01,1,0,0,0],["2026-11-06","120248206991150144","00 - Engajamento 365D","","instagram_reels",1.25,31,1,1,0],["2026-11-06","120248206991150144","00 - Engajamento 365D","","instagram_stories",8.17,246,2,1,0],["2026-11-06","120248206991150144","00 - Engajamento 365D","","status",0.92,39,1,1,0],["2026-11-06","120248206991150144","00 - Engajamento 365D","","threads_feed",0.08,2,0,0,0],["2026-11-06","120248207033580144","00 - Engajamento 365D","","facebook_reels",0.06,2,0,0,0],["2026-11-06","120248207033580144","00 - Engajamento 365D","","facebook_stories",0.03,1,0,0,0],["2026-11-06","120248207033580144","00 - Engajamento 365D","","feed",5.05,92,0,0,0],["2026-11-06","120248207033580144","00 - Engajamento 365D","","instagram_reels",0.17,3,0,0,0],["2026-11-06","120248207033580144","00 - Engajamento 365D","","instagram_stories",2.91,67,1,1,0],["2026-11-06","120248207033580144","00 - Engajamento 365D","","status",0.07,10,0,0,0],["2026-11-06","120248207084580144","00 - Engajamento 365D","","facebook_reels",0.02,1,0,0,0],["2026-11-06","120248207084580144","00 - Engajamento 365D","","facebook_reels_overlay",0.01,1,0,0,0],["2026-11-06","120248207084580144","00 - Engajamento 365D","","facebook_stories",1.26,1,0,0,0],["2026-11-06","120248207084580144","00 - Engajamento 365D","","feed",6.53,102,2,2,1],["2026-11-06","120248207084580144","00 - Engajamento 365D","","instagram_reels",0.24,7,0,0,0],["2026-11-06","120248207084580144","00 - Engajamento 365D","","instagram_stories",3.61,78,2,2,1],["2026-11-06","120248207084580144","00 - Engajamento 365D","","status",1.14,23,1,1,0],["2026-11-07","120248206841320144","00 - Engajamento 365D","","facebook_profile_feed",0.01,1,0,0,0],["2026-11-07","120248206841320144","00 - Engajamento 365D","","facebook_reels",0.05,3,0,0,0],["2026-11-07","120248206841320144","00 - Engajamento 365D","","facebook_stories",0.19,10,1,0,0],["2026-11-07","120248206841320144","00 - Engajamento 365D","","feed",9.51,200,5,5,2],["2026-11-07","120248206841320144","00 - Engajamento 365D","","instagram_explore_grid_home",0.02,2,0,0,0],["2026-11-07","120248206841320144","00 - Engajamento 365D","","instagram_reels",0.92,27,1,0,0],["2026-11-07","120248206841320144","00 - Engajamento 365D","","instagram_stories",4.66,106,2,0,0],["2026-11-07","120248206841320144","00 - Engajamento 365D","","status",0.66,24,0,0,0],["2026-11-07","120248206841320144","00 - Engajamento 365D","","threads_feed",0.04,5,0,0,0],["2026-11-07","120248206888610144","00 - Engajamento 365D","","facebook_reels",0.56,20,0,0,0],["2026-11-07","120248206888610144","00 - Engajamento 365D","","facebook_reels_overlay",0.0,1,0,0,0],["2026-11-07","120248206888610144","00 - Engajamento 365D","","facebook_stories",0.05,3,0,0,0],["2026-11-07","120248206888610144","00 - Engajamento 365D","","feed",10.42,230,5,5,3],["2026-11-07","120248206888610144","00 - Engajamento 365D","","instagram_reels",1.68,42,1,0,0],["2026-11-07","120248206888610144","00 - Engajamento 365D","","instagram_stories",7.12,190,1,0,0],["2026-11-07","120248206888610144","00 - Engajamento 365D","","marketplace",0.02,1,0,0,0],["2026-11-07","120248206888610144","00 - Engajamento 365D","","status",1.31,45,1,1,0],["2026-11-07","120248206888610144","00 - Engajamento 365D","","threads_feed",0.21,9,0,0,0],["2026-11-07","120248206991150144","00 - Engajamento 365D","","facebook_reels",0.01,1,0,0,0],["2026-11-07","120248206991150144","00 - Engajamento 365D","","facebook_reels_overlay",0.01,1,0,0,0],["2026-11-07","120248206991150144","00 - Engajamento 365D","","facebook_stories",0.25,10,1,0,0],["2026-11-07","120248206991150144","00 - Engajamento 365D","","feed",9.99,160,4,2,1],["2026-11-07","120248206991150144","00 - Engajamento 365D","","instagram_reels",0.66,27,0,0,0],["2026-11-07","120248206991150144","00 - Engajamento 365D","","instagram_stories",7.58,158,1,1,0],["2026-11-07","120248206991150144","00 - Engajamento 365D","","status",1.83,62,0,0,0],["2026-11-07","120248206991150144","00 - Engajamento 365D","","threads_feed",0.02,1,0,0,0],["2026-11-08","120248206841320144","00 - Engajamento 365D","","facebook_reels",0.57,26,0,0,0],["2026-11-08","120248206841320144","00 - Engajamento 365D","","facebook_stories",1.09,19,1,0,0],["2026-11-08","120248206841320144","00 - Engajamento 365D","","feed",16.51,402,6,5,3],["2026-11-08","120248206841320144","00 - Engajamento 365D","","instagram_explore_grid_home",0.0,1,0,0,0],["2026-11-08","120248206841320144","00 - Engajamento 365D","","instagram_reels",1.06,34,0,0,0],["2026-11-08","120248206841320144","00 - Engajamento 365D","","instagram_stories",6.39,215,3,3,0],["2026-11-08","120248206841320144","00 - Engajamento 365D","","marketplace",0.0,1,0,0,0],["2026-11-08","120248206841320144","00 - Engajamento 365D","","status",0.81,36,1,1,0],["2026-11-08","120248206841320144","00 - Engajamento 365D","","threads_feed",0.05,2,0,0,0],["2026-11-08","120248206888610144","00 - Engajamento 365D","","facebook_profile_feed",0.04,3,0,0,0],["2026-11-08","120248206888610144","00 - Engajamento 365D","","facebook_reels",0.63,26,0,0,0],["2026-11-08","120248206888610144","00 - Engajamento 365D","","facebook_stories",0.05,5,0,0,0],["2026-11-08","120248206888610144","00 - Engajamento 365D","","feed",15.12,433,6,6,0],["2026-11-08","120248206888610144","00 - Engajamento 365D","","instagram_explore_grid_home",0.0,1,0,0,0],["2026-11-08","120248206888610144","00 - Engajamento 365D","","instagram_reels",2.44,98,4,3,1],["2026-11-08","120248206888610144","00 - Engajamento 365D","","instagram_stories",12.42,359,9,8,1],["2026-11-08","120248206888610144","00 - Engajamento 365D","","instream_video",0.0,1,0,0,0],["2026-11-08","120248206888610144","00 - Engajamento 365D","","search",0.04,1,0,0,0],["2026-11-08","120248206888610144","00 - Engajamento 365D","","status",1.54,115,1,1,0],["2026-11-08","120248206888610144","00 - Engajamento 365D","","threads_feed",0.11,2,0,0,0],["2026-11-08","120248206991150144","00 - Engajamento 365D","","facebook_profile_feed",0.03,1,0,0,0],["2026-11-08","120248206991150144","00 - Engajamento 365D","","facebook_reels",0.53,13,0,0,0],["2026-11-08","120248206991150144","00 - Engajamento 365D","","facebook_reels_overlay",0.01,1,0,0,0],["2026-11-08","120248206991150144","00 - Engajamento 365D","","facebook_stories",0.18,13,0,0,0],["2026-11-08","120248206991150144","00 - Engajamento 365D","","feed",18.12,353,8,5,0],["2026-11-08","120248206991150144","00 - Engajamento 365D","","instagram_reels",0.71,26,0,0,0],["2026-11-08","120248206991150144","00 - Engajamento 365D","","instagram_stories",7.1,194,3,2,1],["2026-11-08","120248206991150144","00 - Engajamento 365D","","marketplace",0.04,2,0,0,0],["2026-11-08","120248206991150144","00 - Engajamento 365D","","status",5.24,193,2,2,1],["2026-11-08","120248206991150144","00 - Engajamento 365D","","threads_feed",0.04,5,0,0,0],["2026-11-08","120248207084580144","00 - Engajamento 365D","","feed",0.0,0,0,1,0],["2026-11-09","120248206841320144","00 - Engajamento 365D","","facebook_reels",0.13,2,0,0,0],["2026-11-09","120248206841320144","00 - Engajamento 365D","","facebook_stories",0.04,3,0,0,0],["2026-11-09","120248206841320144","00 - Engajamento 365D","","feed",4.91,75,0,0,0],["2026-11-09","120248206841320144","00 - Engajamento 365D","","instagram_reels",0.12,6,0,0,0],["2026-11-09","120248206841320144","00 - Engajamento 365D","","instagram_stories",1.42,36,1,1,0],["2026-11-09","120248206841320144","00 - Engajamento 365D","","status",0.22,9,0,0,0],["2026-11-09","120248206841320144","00 - Engajamento 365D","","threads_feed",0.03,1,1,1,1],["2026-11-09","120248206888610144","00 - Engajamento 365D","","facebook_profile_feed",0.01,2,0,0,0],["2026-11-09","120248206888610144","00 - Engajamento 365D","","facebook_reels",1.24,18,0,0,0],["2026-11-09","120248206888610144","00 - Engajamento 365D","","facebook_stories",0.12,4,0,0,0],["2026-11-09","120248206888610144","00 - Engajamento 365D","","feed",5.26,124,1,1,0],["2026-11-09","120248206888610144","00 - Engajamento 365D","","instagram_reels",0.46,11,0,0,0],["2026-11-09","120248206888610144","00 - Engajamento 365D","","instagram_stories",1.7,68,1,1,0],["2026-11-09","120248206888610144","00 - Engajamento 365D","","status",1.68,19,1,1,0],["2026-11-09","120248206888610144","00 - Engajamento 365D","","threads_feed",0.08,3,0,0,0],["2026-11-09","120248206991150144","00 - Engajamento 365D","","facebook_reels",0.12,6,0,0,0],["2026-11-09","120248206991150144","00 - Engajamento 365D","","feed",3.02,68,1,0,0],["2026-11-09","120248206991150144","00 - Engajamento 365D","","instagram_reels",0.13,6,0,0,0],["2026-11-09","120248206991150144","00 - Engajamento 365D","","instagram_stories",1.43,37,0,0,0],["2026-11-09","120248206991150144","00 - Engajamento 365D","","status",1.19,27,0,0,0]]};
+var SNAP_AT = '09/11/2026 09h05';
 
 // ===== HELPERS =====
-function parseBR(str){return parseFloat(String(str).replace(/\./g,'').replace(',','.'))||0;}
+function $(id){return document.getElementById(id);}
+function norm(s){return String(s==null?'':s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function parseBR(v){
+  if(v==null)return 0;var s=String(v).trim();if(!s)return 0;
+  s=s.replace(/R\$|\s|%/g,'');if(s==='-')return 0;
+  if(s.indexOf(',')>=0)s=s.replace(/\./g,'').replace(',','.');
+  else if(/^-?\d{1,3}(\.\d{3})+$/.test(s))s=s.replace(/\./g,'');
+  var n=parseFloat(s);return isFinite(n)?n:0;
+}
+function parseCSV(text){
+  var rows=[],row=[],cur='',q=false;
+  for(var i=0;i<text.length;i++){var c=text[i];
+    if(q){if(c==='"'){if(text[i+1]==='"'){cur+='"';i++;}else q=false;}else cur+=c;}
+    else{if(c==='"')q=true;else if(c===','){row.push(cur);cur='';}else if(c==='\n'){row.push(cur);rows.push(row);row=[];cur='';}else if(c!=='\r')cur+=c;}
+  }
+  if(cur!==''||row.length){row.push(cur);rows.push(row);}
+  return rows;
+}
+function toISO(d){
+  d=String(d||'').trim();
+  var m1=d.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m1)return m1[1]+'-'+m1[2]+'-'+m1[3];
+  var m2=d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);if(m2)return m2[3]+'-'+('0'+m2[2]).slice(-2)+'-'+('0'+m2[1]).slice(-2);
+  return '';
+}
 function ok(v){return isFinite(v)&&!isNaN(v)&&v!==0;}
 function brl(v){return ok(v)?'R$ '+v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';}
 function pct(v){return ok(v)?v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%':'—';}
 function int(v){return ok(v)?Math.round(v).toLocaleString('pt-BR'):'—';}
-function fmtDay(d){var p=d.split('-');return p[2]+'/'+p[1];}
-function z(){return {s:0,i:0,c:0,p:0,l:0};}
-function add(a,r){a.s+=r[0];a.i+=r[1];a.c+=r[2];a.p+=r[3];a.l+=r[4];return a;}
-function m(a){return {ctr:a.c/a.i*100,cpc:a.s/a.c,cpm:a.s/a.i*1000,cpl:a.s/a.l,txe:a.p/a.c*100,txc:a.l/a.p*100};}
+function fmtDay(d){return d?d.slice(8,10)+'/'+d.slice(5,7):'—';}
+function fmtFull(d){return d?d.slice(8,10)+'/'+d.slice(5,7)+'/'+d.slice(0,4):'—';}
+function addDays(iso,n){var d=new Date(iso+'T12:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
+function z(){return {s:0,i:0,c:0,p:0,l:0,vv:0};}
+function add(a,r){a.s+=r.s;a.i+=r.i;a.c+=r.c;a.p+=r.p;a.l+=r.l;a.vv+=(r.vv||0);return a;}
+function m(a){return {ctr:a.c/a.i*100,cpc:a.s/a.c,cpm:a.s/a.i*1000,cpl:a.s/a.l,txe:a.p/a.c*100,txc:a.l/a.p*100,hook:a.vv/a.i*100};}
+function isFrio(name){var n=norm(name);return FRIO_KEYWORDS.some(function(k){return n.indexOf(norm(k))>=0;});}
 function showTab(id,el){
   document.querySelectorAll('.content').forEach(function(c){c.classList.remove('active');});
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
-  document.getElementById(id).classList.add('active');el.classList.add('active');
+  $(id).classList.add('active');el.classList.add('active');
 }
-function adsetLabel(k){
-  var names=ADS.filter(function(a){return a[2]===k;}).map(function(a){return a[0].replace('BF-','');});
-  return 'Engajamento 365D · '+names.join(' / ');
+function posGroup(p){
+  var n=norm(p);
+  if(n.indexOf('stor')>=0)return 'stories';
+  if(n.indexOf('reel')>=0)return 'reels';
+  if(n==='feed'||n.indexOf('profile_feed')>=0||n==='facebook feed'||n==='instagram feed'||/(^| )feed$/.test(n)&&n.indexOf('threads')<0)return 'feed';
+  return 'outros';
 }
-function adLink(id){return 'https://adsmanager.facebook.com/adsmanager/manage/ads?act='+ACCOUNT+'&selected_ad_ids='+id;}
+
+// ===== ESTADO =====
+var ROWS=[],PROWS=[],SOURCE='',SOURCE_MSG='',LOADED_AT=null,MIN_DATE='',MAX_DATE='',PRESET='all',CHART=null,TIMER=null;
+var SNAP_ADID={},SNAP_STATUS={};
+SNAP.rows.forEach(function(r){SNAP_ADID[r[3]]=r[4];SNAP_STATUS[r[3]]=r[5];});
+
+function snapRows(){
+  return SNAP.rows.map(function(r){return {date:r[0],setKey:r[1],adset:r[2],ad:r[3],adId:r[4],status:r[5],s:r[6],i:r[7],c:r[8],p:r[9],l:r[10],vv:0,url:''};});
+}
+function snapPlace(){
+  return SNAP.place.map(function(r){return {date:r[0],setKey:r[1],adset:r[2],pos:r[4],s:r[5],i:r[6],c:r[7],p:r[8],l:r[9]};});
+}
+
+function fetchSheetCSV(sheet){
+  var url='https://docs.google.com/spreadsheets/d/'+CONFIG.SHEET_ID+'/gviz/tq?tqx=out:csv&sheet='+encodeURIComponent(sheet)+'&t='+Date.now();
+  var ctl=new AbortController(),t=setTimeout(function(){ctl.abort();},20000);
+  return fetch(url,{signal:ctl.signal,cache:'no-store'}).then(function(r){
+    clearTimeout(t);
+    if(!r.ok)throw new Error('a aba "'+sheet+'" respondeu HTTP '+r.status);
+    return r.text();
+  }).then(function(txt){
+    if(txt.indexOf('accounts.google')>=0||txt.indexOf('<html')>=0)throw new Error('a planilha pede login; deixe-a com acesso por link');
+    return txt;
+  },function(e){clearTimeout(t);throw e.name==='AbortError'?new Error('tempo esgotado ao ler a aba "'+sheet+'"'):e;});
+}
+function headerIdx(hdr){
+  var H=hdr.map(norm),C={};
+  Object.keys(COL).forEach(function(k){C[k]=H.indexOf(norm(COL[k]));});
+  return C;
+}
+// O gviz troca o cabeçalho pela 1ª linha quando a aba pedida não existe; checar colunas evita ler a aba errada.
+function parseMain(txt){
+  var raw=parseCSV(txt);if(!raw.length)throw new Error('a aba "'+CONFIG.SHEET_NAME+'" está vazia');
+  var C=headerIdx(raw[0]);
+  var miss=['date','campaign','inv','imp','clicks','leads'].filter(function(k){return C[k]<0;});
+  if(miss.length)throw new Error(miss.length>=4?'a aba "'+CONFIG.SHEET_NAME+'" ainda não existe na planilha':'a aba "'+CONFIG.SHEET_NAME+'" está sem as colunas '+miss.map(function(k){return COL[k];}).join(', '));
+  var out=[],f=norm(CONFIG.CAMPAIGN_FILTER);
+  for(var i=1;i<raw.length;i++){
+    var r=raw[i],g=function(k){return C[k]>=0?r[C[k]]:'';};
+    var date=toISO(g('date'));if(!date)continue;
+    if(f&&norm(g('campaign')).indexOf(f)<0)continue;
+    var ad=String(g('ad')||'').trim(),adset=String(g('adset')||'').trim();
+    var o={date:date,setKey:adset||'(sem conjunto)',adset:adset,ad:ad,adId:SNAP_ADID[ad]||'',status:String(g('statusAd')||SNAP_STATUS[ad]||'').trim(),
+      s:parseBR(g('inv')),i:parseBR(g('imp')),c:parseBR(g('clicks')),p:parseBR(g('pv')),l:parseBR(g('leads')),vv:parseBR(g('vv')),url:String(g('url')||'').trim()};
+    if(o.s||o.i||o.c||o.p||o.l)out.push(o);
+  }
+  if(!out.length)throw new Error('a aba "'+CONFIG.SHEET_NAME+'" não tem linhas da campanha '+CONFIG.CAMPAIGN_FILTER);
+  return out;
+}
+function parsePlace(txt){
+  var raw=parseCSV(txt);if(!raw.length)return null;
+  var C=headerIdx(raw[0]);if(C.date<0||C.position<0||C.inv<0)return null;
+  var out=[],f=norm(CONFIG.CAMPAIGN_FILTER);
+  for(var i=1;i<raw.length;i++){
+    var r=raw[i],g=function(k){return C[k]>=0?r[C[k]]:'';};
+    var date=toISO(g('date'));if(!date)continue;
+    if(C.campaign>=0&&f&&norm(g('campaign')).indexOf(f)<0)continue;
+    var adset=String(g('adset')||'').trim();
+    out.push({date:date,setKey:adset||'(sem conjunto)',adset:adset,pos:g('position'),s:parseBR(g('inv')),i:parseBR(g('imp')),c:parseBR(g('clicks')),p:parseBR(g('pv')),l:parseBR(g('leads'))});
+  }
+  return out.length?out:null;
+}
+
+function loadData(manual){
+  var btn=$('btn-refresh');btn.disabled=true;btn.textContent='Atualizando...';
+  if(!LOADED_AT){$('loading-msg').textContent='Carregando dados da planilha...';}
+  return fetchSheetCSV(CONFIG.SHEET_NAME).then(function(txt){
+    ROWS=parseMain(txt);SOURCE='live';SOURCE_MSG='';
+    return fetchSheetCSV(CONFIG.PLACE_SHEET).then(parsePlace,function(){return null;}).then(function(p){PROWS=p||[];});
+  }).catch(function(e){
+    ROWS=snapRows();PROWS=snapPlace();SOURCE='snap';SOURCE_MSG=e&&e.message?e.message:String(e);
+  }).then(function(){
+    LOADED_AT=new Date();
+    var ds=ROWS.map(function(r){return r.date;}).sort();
+    var prevMax=MAX_DATE;MIN_DATE=ds[0];MAX_DATE=ds[ds.length-1];
+    if(!$('date-from').value||PRESET!=='custom'||!prevMax)applyPreset(PRESET==='custom'?'all':PRESET,true);
+    $('date-from').min=$('date-to').min=MIN_DATE;$('date-from').max=$('date-to').max=MAX_DATE;
+    renderSource();render();
+    btn.disabled=false;btn.textContent='Atualizar dados';
+    var ov=$('loading-overlay');if(ov)ov.style.display='none';
+  });
+}
+function renderSource(){
+  var bar=$('src-bar'),hh=LOADED_AT.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  bar.className='src-bar'+(SOURCE==='snap'?' snap':'');
+  if(SOURCE==='live'){
+    $('src-text').innerHTML='<strong>Ao vivo</strong> · planilha da Aurea, aba <span class="mono">'+esc(CONFIG.SHEET_NAME)+'</span> · dados até '+fmtFull(MAX_DATE)+' · lido às <span class="mono">'+hh+'</span>'+(CONFIG.AUTO_REFRESH_MIN?' · atualiza sozinho a cada '+CONFIG.AUTO_REFRESH_MIN+' min':'');
+  }else{
+    $('src-text').innerHTML='<strong>Dados gravados</strong> de '+SNAP_AT+' (Meta Ads) · a planilha não respondeu: '+esc(SOURCE_MSG)+'. Quando a aba estiver lá, o dash passa a ler ao vivo sozinho.';
+  }
+}
+
+// ===== FILTRO DE DATAS =====
+function applyPreset(p,silent){
+  PRESET=p;
+  document.querySelectorAll('.preset-btn[data-preset]').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-preset')===p);});
+  if(p==='all'){$('date-from').value=MIN_DATE;$('date-to').value=MAX_DATE;}
+  else if(p!=='custom'){var n=parseInt(p,10);var f=addDays(MAX_DATE,-(n-1));$('date-from').value=f<MIN_DATE?MIN_DATE:f;$('date-to').value=MAX_DATE;}
+  if(!silent)render();
+}
+document.querySelectorAll('.preset-btn[data-preset]').forEach(function(b){b.addEventListener('click',function(){applyPreset(b.getAttribute('data-preset'));});});
+['date-from','date-to'].forEach(function(id){$(id).addEventListener('change',function(){applyPreset('custom');});});
+function range(){
+  var f=$('date-from').value||MIN_DATE,t=$('date-to').value||MAX_DATE;
+  if(f>t){var x=f;f=t;t=x;}
+  return {f:f,t:t};
+}
+
+// ===== RENDER =====
 function statusBadge(a,cplMedio){
+  if(!a.l)return a.s>=cplMedio?'<span class="badge pausar">PAUSAR</span>':'<span class="badge avaliar">AVALIAR</span>';
   var cpl=a.s/a.l;
-  if(!a.l){return a.s>=cplMedio?'<span class="badge pausar">PAUSAR</span>':'<span class="badge avaliar">AVALIAR</span>';}
   if(cpl<=cplMedio*0.8)return '<span class="badge escalar">ESCALAR</span>';
   if(cpl<=cplMedio*1.2)return '<span class="badge manter">MANTER</span>';
   if(cpl<=cplMedio*1.6)return '<span class="badge avaliar">AVALIAR</span>';
   return '<span class="badge pausar">PAUSAR</span>';
 }
-function sortByCpl(a,b){
-  if(a.l&&b.l)return a.s/a.l-b.s/b.l;
-  if(a.l)return -1;if(b.l)return 1;return b.s-a.s;
+function sortByCpl(a,b){if(a.l&&b.l)return a.s/a.l-b.s/b.l;if(a.l)return -1;if(b.l)return 1;return b.s-a.s;}
+function statusTxt(s){var n=norm(s);if(!n)return '';if(n==='active'||n==='ativo')return 'ativo';if(n.indexOf('paused')>=0||n.indexOf('pausad')>=0)return 'pausado';return n;}
+function adLink(r){
+  if(r.adId)return 'https://adsmanager.facebook.com/adsmanager/manage/ads?act='+CONFIG.ACCOUNT+'&selected_ad_ids='+r.adId;
+  if(/^https?:\/\//.test(r.url))return r.url;
+  return '';
 }
+function row10(cells){return '<tr>'+cells.map(function(c){return '<td>'+c+'</td>';}).join('')+'</tr>';}
 
-// ===== AGREGAÇÕES =====
-var TOT=z(),BYDAY=DAYS.map(function(){return z();}),BYSET={};
-ADS.forEach(function(ad){
-  ad.tot=z();
-  ad[4].forEach(function(r,i){add(TOT,r);add(BYDAY[i],r);add(ad.tot,r);});
-  if(!BYSET[ad[2]])BYSET[ad[2]]=z();
-  ad[4].forEach(function(r){add(BYSET[ad[2]],r);});
-});
-var M=m(TOT);
+function render(){
+  var R=range(),rows=ROWS.filter(function(r){return r.date>=R.f&&r.date<=R.t;});
+  var prows=PROWS.filter(function(r){return r.date>=R.f&&r.date<=R.t;});
+  $('range-info').textContent=fmtFull(R.f)+' → '+fmtFull(R.t);
+  var today=new Date().toISOString().slice(0,10);
+  var lastPartial=(MAX_DATE>=addDays(today,-1)); // último dia da base ainda em andamento
+  var TOT=z(),days={},ads={},sets={},setOrder=[];
+  rows.forEach(function(r){
+    add(TOT,r);
+    (days[r.date]=days[r.date]||z());add(days[r.date],r);
+    var ak=r.ad||'(sem nome)';
+    if(!ads[ak]){ads[ak]=z();ads[ak].r=r;}add(ads[ak],r);
+    if(r.status)ads[ak].r=r.date>=ads[ak].r.date?r:ads[ak].r;
+    if(!sets[r.setKey]){sets[r.setKey]=z();sets[r.setKey].ads={};sets[r.setKey].name=r.adset;setOrder.push(r.setKey);}
+    add(sets[r.setKey],r);sets[r.setKey].ads[ak]=1;
+  });
+  var DAYS=Object.keys(days).sort(),M=m(TOT);
+  var multiSameName=setOrder.length>1&&setOrder.every(function(k){return sets[k].name===sets[setOrder[0]].name;});
+  function setLabel(k){
+    var s=sets[k];if(!s)return esc(k);
+    var names=Object.keys(s.ads).sort().map(function(a){return a.replace(/^BF-/,'');});
+    return esc(s.name||k)+(multiSameName||names.length<=4?' <span class="dim">· '+esc(names.join(' / '))+'</span>':'');
+  }
 
-// ===== KPIs =====
-document.getElementById('kpis').innerHTML=
- '<div class="kpi-card"><div class="kpi-label">Investimento total</div><div class="kpi-value orange">'+brl(TOT.s)+'</div><div class="kpi-sub">'+DAYS.length+' dias de veiculação</div></div>'+
- '<div class="kpi-card"><div class="kpi-label">CTR médio</div><div class="kpi-value">'+pct(M.ctr)+'</div><div class="kpi-sub">cliques no link / impressões</div></div>'+
- '<div class="kpi-card"><div class="kpi-label">CPM médio</div><div class="kpi-value">'+brl(M.cpm)+'</div><div class="kpi-sub">custo por mil impressões</div></div>'+
- '<div class="kpi-card"><div class="kpi-label">CPL médio</div><div class="kpi-value orange">'+brl(M.cpl)+'</div><div class="kpi-sub">'+int(TOT.l)+' leads</div></div>';
+  if(!rows.length){
+    ['kpis','temp','funnel','funnel-metrics'].forEach(function(id){$(id).innerHTML='';});
+    $('kpis').innerHTML='<div class="kpi-card"><div class="kpi-label">Sem dados</div><div class="kpi-value">—</div><div class="kpi-sub">nenhuma linha no período escolhido</div></div>';
+    ['tbl-evol','tbl-cri','tbl-pub','tbl-place','tbl-comp','tbl-det'].forEach(function(id){$(id).innerHTML='';});
+    if(CHART){CHART.destroy();CHART=null;}
+    return;
+  }
 
-// ===== QUENTE x FRIO =====
-var PF=z(),PS=z();
-Object.keys(PLACE).forEach(function(k){
-  PLACE[k].feed.forEach(function(r){add(PF,r);});
-  PLACE[k].stories.forEach(function(r){add(PS,r);});
-});
-document.getElementById('temp').innerHTML=
- '<div class="temp-card quente"><div class="temp-title">Público Quente</div><div class="temp-sub">Engajamento 365D · 11 conjuntos</div>'+
- '<div class="temp-metrics"><div class="temp-metric"><div class="temp-metric-val">'+brl(TOT.s)+'</div><div class="temp-metric-lbl">Invest.</div></div>'+
- '<div class="temp-metric"><div class="temp-metric-val">'+brl(M.cpl)+'</div><div class="temp-metric-lbl">CPL</div></div>'+
- '<div class="temp-metric"><div class="temp-metric-val">'+int(TOT.l)+'</div><div class="temp-metric-lbl">Leads</div></div></div>'+
- '<div class="temp-detail">Feed: '+brl(PF.s)+' · '+int(PF.l)+' leads · CPL '+brl(PF.s/PF.l)+'<br>Stories: '+brl(PS.s)+' · '+int(PS.l)+' leads · CPL '+brl(PS.s/PS.l)+'</div></div>'+
- '<div class="temp-card frio"><div class="temp-title">Público Frio</div><div class="temp-sub">Nenhum conjunto frio nesta campanha</div>'+
- '<div class="temp-metrics"><div class="temp-metric"><div class="temp-metric-val">—</div><div class="temp-metric-lbl">Invest.</div></div>'+
- '<div class="temp-metric"><div class="temp-metric-val">—</div><div class="temp-metric-lbl">CPL</div></div>'+
- '<div class="temp-metric"><div class="temp-metric-val">—</div><div class="temp-metric-lbl">Leads</div></div></div>'+
- '<div class="temp-detail">A campanha roda só com Engajamento 365D.</div></div>'+
- '<div class="comp-card"><div class="kpi-label">Comparativo</div>'+
- '<div class="comp-row"><span>Leads do quente</span><span class="comp-val">100,00%</span></div>'+
- '<div class="comp-row"><span>Leads do frio</span><span class="comp-val">—</span></div>'+
- '<div class="comp-row"><span>Diferença de CPL</span><span class="comp-val">—</span></div>'+
- '<div class="comp-row"><span>CPL Feed vs Stories</span><span class="comp-val">'+brl(PF.s/PF.l)+' / '+brl(PS.s/PS.l)+'</span></div></div>';
+  // KPIs
+  $('kpis').innerHTML=
+   '<div class="kpi-card"><div class="kpi-label">Investimento total</div><div class="kpi-value orange">'+brl(TOT.s)+'</div><div class="kpi-sub">'+DAYS.length+' dia'+(DAYS.length>1?'s':'')+' com veiculação</div></div>'+
+   '<div class="kpi-card"><div class="kpi-label">CTR médio</div><div class="kpi-value">'+pct(M.ctr)+'</div><div class="kpi-sub">cliques no link / impressões</div></div>'+
+   '<div class="kpi-card"><div class="kpi-label">CPM médio</div><div class="kpi-value">'+brl(M.cpm)+'</div><div class="kpi-sub">custo por mil impressões</div></div>'+
+   '<div class="kpi-card"><div class="kpi-label">CPL médio</div><div class="kpi-value orange">'+brl(M.cpl)+'</div><div class="kpi-sub">'+int(TOT.l)+' leads</div></div>';
 
-// ===== FUNIL =====
-(function(){
-  var st=[
-    {lbl:'IMPRESSÕES',v:TOT.i,c:'#cc4a00',e:'#5c2200',fs:56},
-    {lbl:'CLIQUES',v:TOT.c,c:'#ff6b2b',e:'#8a3a14',fs:56},
-    {lbl:'PAGE VIEWS',v:TOT.p,c:'#e8781f',e:'#7a4010',fs:56},
-    {lbl:'LEADS',v:TOT.l,c:'#2ecc71',e:'#14683a',fs:68}
-  ];
-  var conn=[
-    {t:'CTR',v:M.ctr,warn:false},
-    {t:'TX Entrada',v:M.txe,warn:M.txe<70},
-    {t:'TX Cadastro',v:M.txc,warn:false}
-  ];
+  // Quente x Frio
+  var Q=z(),F=z(),qSets={},fSets={};
+  rows.forEach(function(r){if(isFrio(r.adset)){add(F,r);fSets[r.setKey]=1;}else{add(Q,r);qSets[r.setKey]=1;}});
+  var PF=z(),PS=z();
+  prows.forEach(function(r){var g=posGroup(r.pos);if(g==='feed')add(PF,r);else if(g==='stories')add(PS,r);});
+  var qDet=prows.length?'Feed: '+brl(PF.s)+' · '+int(PF.l)+' leads · CPL '+brl(PF.s/PF.l)+'<br>Stories: '+brl(PS.s)+' · '+int(PS.l)+' leads · CPL '+brl(PS.s/PS.l):'Sem dados de posicionamento.';
+  var fDet=Object.keys(fSets).map(function(k){var s=z();rows.forEach(function(r){if(r.setKey===k)add(s,r);});return esc(sets[k].name)+': '+brl(s.s)+' · '+int(s.l)+' leads';}).join('<br>')||'Nenhum conjunto frio no período.';
+  function tcard(cls,title,sub,a,det){var x=m(a);return '<div class="temp-card '+cls+'"><div class="temp-title">'+title+'</div><div class="temp-sub">'+sub+'</div><div class="temp-metrics"><div class="temp-metric"><div class="temp-metric-val">'+brl(a.s)+'</div><div class="temp-metric-lbl">Invest.</div></div><div class="temp-metric"><div class="temp-metric-val">'+brl(x.cpl)+'</div><div class="temp-metric-lbl">CPL</div></div><div class="temp-metric"><div class="temp-metric-val">'+int(a.l)+'</div><div class="temp-metric-lbl">Leads</div></div></div><div class="temp-detail">'+det+'</div></div>';}
+  var nq=Object.keys(qSets).length,nf=Object.keys(fSets).length;
+  var dif=(Q.l&&F.l)?((F.s/F.l)/(Q.s/Q.l)-1)*100:NaN;
+  $('temp').innerHTML=
+    tcard('quente','Público Quente',nq?'Engajamento / retargeting · '+nq+' conjunto'+(nq>1?'s':''):'Nenhum conjunto quente',Q,qDet)+
+    tcard('frio','Público Frio',nf?'Lookalike / interesses · '+nf+' conjunto'+(nf>1?'s':''):'Nenhum conjunto frio nesta campanha',F,fDet)+
+    '<div class="comp-card"><div class="kpi-label">Comparativo</div>'+
+    '<div class="comp-row"><span>Leads do quente</span><span class="comp-val">'+pct(Q.l/TOT.l*100)+'</span></div>'+
+    '<div class="comp-row"><span>Leads do frio</span><span class="comp-val">'+pct(F.l/TOT.l*100)+'</span></div>'+
+    '<div class="comp-row"><span>CPL frio vs quente</span><span class="comp-val">'+(isFinite(dif)?(dif>0?'+':'')+pct(dif):'—')+'</span></div>'+
+    '<div class="comp-row"><span>CPL Feed / Stories</span><span class="comp-val">'+brl(PF.s/PF.l)+' / '+brl(PS.s/PS.l)+'</span></div></div>';
+
+  // Funil
+  var st=[{lbl:'IMPRESSÕES',v:TOT.i,c:'#cc4a00',e:'#5c2200',fs:56},{lbl:'CLIQUES',v:TOT.c,c:'#ff6b2b',e:'#8a3a14',fs:56},{lbl:'PAGE VIEWS',v:TOT.p,c:'#e8781f',e:'#7a4010',fs:56},{lbl:'LEADS',v:TOT.l,c:'#2ecc71',e:'#14683a',fs:68}];
+  var conn=[{t:'CTR',v:M.ctr,w:false},{t:'TX Entrada',v:M.txe,w:M.txe<70},{t:'TX Cadastro',v:M.txc,w:false}];
   var W=[1120,920,740,560,400],H=100,G=40,svg='<svg viewBox="0 0 1200 540" width="100%" xmlns="http://www.w3.org/2000/svg"><defs>';
   st.forEach(function(s,i){svg+='<linearGradient id="g'+i+'" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="'+s.e+'"/><stop offset=".5" stop-color="'+s.c+'"/><stop offset="1" stop-color="'+s.e+'"/></linearGradient>';});
   svg+='<filter id="glow" x="-20%" y="-40%" width="140%" height="180%"><feGaussianBlur stdDeviation="10" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>';
   st.forEach(function(s,i){
-    var y=i*(H+G),wt=W[i],wb=W[i+1],x0=600-wt/2,x1=600+wt/2,x2=600+wb/2,x3=600-wb/2;
-    svg+='<polygon points="'+x0+','+y+' '+x1+','+y+' '+x2+','+(y+H)+' '+x3+','+(y+H)+'" fill="url(#g'+i+')"'+(i===3?' filter="url(#glow)"':'')+'/>';
+    var y=i*(H+G),wt=W[i],wb=W[i+1];
+    svg+='<polygon points="'+(600-wt/2)+','+y+' '+(600+wt/2)+','+y+' '+(600+wb/2)+','+(y+H)+' '+(600-wb/2)+','+(y+H)+'" fill="url(#g'+i+')"'+(i===3?' filter="url(#glow)"':'')+'/>';
     svg+='<text x="600" y="'+(y+28)+'" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="14" letter-spacing="1" fill="rgba(255,255,255,.85)">'+s.lbl+'</text>';
     svg+='<text x="600" y="'+(y+(i===3?88:84))+'" text-anchor="middle" font-family="DM Mono,monospace" font-weight="700" font-size="'+s.fs+'" fill="#fff">'+int(s.v)+'</text>';
-    if(i<3){
-      var c=conn[i],col=c.warn?'#f1c40f':'#ff6b2b';
-      svg+='<text x="600" y="'+(y+H+27)+'" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="16" fill="rgba(255,255,255,.6)">'+c.t+' <tspan font-family="DM Mono,monospace" font-weight="700" fill="'+col+'">'+pct(c.v)+(c.warn?' ⚠':'')+'</tspan></text>';
-    }
+    if(i<3){var c=conn[i];svg+='<text x="600" y="'+(y+H+27)+'" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="16" fill="rgba(255,255,255,.6)">'+c.t+' <tspan font-family="DM Mono,monospace" font-weight="700" fill="'+(c.w?'#f1c40f':'#ff6b2b')+'">'+pct(c.v)+(c.w?' ⚠':'')+'</tspan></text>';}
   });
-  svg+='</svg>';
-  document.getElementById('funnel').innerHTML=svg;
-  document.getElementById('funnel-metrics').innerHTML=
+  $('funnel').innerHTML=svg+'</svg>';
+  $('funnel-metrics').innerHTML=
    '<div class="metric-card" style="--c:#ff6b2b"><div class="kpi-label">CPC — Custo por clique</div><div class="kpi-value">'+brl(M.cpc)+'</div></div>'+
    '<div class="metric-card" style="--c:#f1c40f"><div class="kpi-label">TX Entrada — cliques que chegam à página</div><div class="kpi-value">'+pct(M.txe)+'</div></div>'+
    '<div class="metric-card" style="--c:#2ecc71"><div class="kpi-label">TX Cadastro — page views que viram lead</div><div class="kpi-value">'+pct(M.txc)+'</div></div>';
-})();
 
-// ===== EVOLUÇÃO DIÁRIA =====
-(function(){
+  // Evolução diária
+  function dayLbl(d){return fmtDay(d)+(lastPartial&&d===MAX_DATE?' <span class="dim">(parcial)</span>':'');}
   var h='<thead><tr><th>Dia</th><th>Investimento</th><th>Impressões</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th><th>TX Cadastro</th></tr></thead><tbody>';
-  function row(lbl,a,cls){var x=m(a);return '<tr'+(cls?' class="'+cls+'"':'')+'><td>'+lbl+'</td><td>'+brl(a.s)+'</td><td>'+int(a.i)+'</td><td>'+int(a.c)+'</td><td>'+int(a.p)+'</td><td>'+int(a.l)+'</td><td>'+pct(x.ctr)+'</td><td>'+brl(x.cpc)+'</td><td>'+brl(x.cpl)+'</td><td>'+pct(x.txc)+'</td></tr>';}
-  DAYS.forEach(function(d,i){h+=row(fmtDay(d)+(i===DAYS.length-1?' <span class="dim">(parcial)</span>':''),BYDAY[i]);});
-  h+=row('Total',TOT,'total')+'</tbody>';
-  document.getElementById('tbl-evol').innerHTML=h;
+  function erow(lbl,a,cls){var x=m(a);return '<tr'+(cls?' class="'+cls+'"':'')+'><td>'+lbl+'</td><td>'+brl(a.s)+'</td><td>'+int(a.i)+'</td><td>'+int(a.c)+'</td><td>'+int(a.p)+'</td><td>'+int(a.l)+'</td><td>'+pct(x.ctr)+'</td><td>'+brl(x.cpc)+'</td><td>'+brl(x.cpl)+'</td><td>'+pct(x.txc)+'</td></tr>';}
+  DAYS.forEach(function(d){h+=erow(dayLbl(d),days[d]);});
+  $('tbl-evol').innerHTML=h+erow('Total',TOT,'total')+'</tbody>';
 
-  var ax={grid:{color:'rgba(255,255,255,0.06)'},ticks:{color:'rgba(255,255,255,0.45)',font:{family:'DM Mono',size:10}}};
-  new Chart(document.getElementById('chart-dia'),{
-    data:{labels:DAYS.map(fmtDay),datasets:[
-      {type:'bar',label:'Leads',data:BYDAY.map(function(a){return a.l;}),backgroundColor:'rgba(255,107,43,0.85)',yAxisID:'y',borderRadius:4},
-      {type:'line',label:'CPL (R$)',data:BYDAY.map(function(a){return a.l?+(a.s/a.l).toFixed(2):null;}),borderColor:'rgba(255,183,55,0.85)',backgroundColor:'rgba(255,183,55,0.85)',yAxisID:'y1',tension:.3,pointRadius:4}
-    ]},
-    options:{responsive:true,maintainAspectRatio:true,
-      plugins:{legend:{labels:{color:'#e8e6f0',font:{family:'DM Sans',size:11}}},tooltip:{backgroundColor:'#141414',titleColor:'#e8e6f0',bodyColor:'#e8e6f0',borderColor:'#444',borderWidth:1,
-        callbacks:{label:function(c){return c.dataset.yAxisID==='y1'?' CPL: '+brl(c.parsed.y):' Leads: '+c.parsed.y;}}}},
-      scales:{x:ax,y:Object.assign({},ax,{position:'left',beginAtZero:true}),y1:Object.assign({},ax,{position:'right',beginAtZero:true,grid:{drawOnChartArea:false}})}}
-  });
-})();
+  if(typeof Chart!=='undefined'){
+    if(CHART)CHART.destroy();
+    var ax={grid:{color:'rgba(255,255,255,0.06)'},ticks:{color:'rgba(255,255,255,0.45)',font:{family:'DM Mono',size:10}}};
+    CHART=new Chart($('chart-dia'),{
+      data:{labels:DAYS.map(fmtDay),datasets:[
+        {type:'bar',label:'Leads',data:DAYS.map(function(d){return days[d].l;}),backgroundColor:'rgba(255,107,43,0.85)',yAxisID:'y',borderRadius:4},
+        {type:'line',label:'CPL (R$)',data:DAYS.map(function(d){var a=days[d];return a.l?+(a.s/a.l).toFixed(2):null;}),borderColor:'rgba(255,183,55,0.85)',backgroundColor:'rgba(255,183,55,0.85)',yAxisID:'y1',tension:.3,pointRadius:4,spanGaps:true}
+      ]},
+      options:{responsive:true,plugins:{legend:{labels:{color:'#e8e6f0',font:{family:'DM Sans',size:11}}},
+        tooltip:{backgroundColor:'#141414',titleColor:'#e8e6f0',bodyColor:'#e8e6f0',borderColor:'#444',borderWidth:1,callbacks:{label:function(c){return c.dataset.yAxisID==='y1'?' CPL: '+brl(c.parsed.y):' Leads: '+c.parsed.y;}}}},
+        scales:{x:ax,y:Object.assign({},ax,{position:'left',beginAtZero:true,ticks:Object.assign({},ax.ticks,{precision:0})}),y1:Object.assign({},ax,{position:'right',beginAtZero:true,grid:{drawOnChartArea:false}})}}
+    });
+  }
 
-// ===== CRIATIVOS =====
-(function(){
-  var list=ADS.map(function(ad){var a=ad.tot;a.ad=ad;return a;}).sort(sortByCpl);
-  var h='<thead><tr><th>#</th><th style="text-align:left">Criativo</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th><th>TX Entrada</th><th>TX Cadastro</th><th>Hook Rate</th><th>Link</th><th>Status</th></tr></thead><tbody>';
+  // Criativos
+  var hasVV=TOT.vv>0;
+  var list=Object.keys(ads).map(function(k){var a=ads[k];a.name=k;return a;}).sort(sortByCpl);
+  h='<thead><tr><th>#</th><th style="text-align:left">Criativo</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th><th>TX Entrada</th><th>TX Cadastro</th><th>Hook Rate</th><th>Link</th><th>Status</th></tr></thead><tbody>';
   list.forEach(function(a,i){
-    var x=m(a);
-    h+='<tr><td>'+(i+1)+'</td><td style="text-align:left;font-family:\'DM Sans\',sans-serif;font-size:12px">'+a.ad[0]+' <span class="dim">· '+a.ad[3].toLowerCase()+'</span></td><td>'+brl(a.s)+'</td><td>'+int(a.i)+'</td><td>'+int(a.c)+'</td><td>'+int(a.p)+'</td><td>'+int(a.l)+'</td><td>'+pct(x.ctr)+'</td><td>'+brl(x.cpc)+'</td><td>'+brl(x.cpl)+'</td><td>'+pct(x.txe)+'</td><td>'+pct(x.txc)+'</td><td>—</td><td><a class="link-ad" href="'+adLink(a.ad[1])+'" target="_blank" rel="noopener">abrir</a></td><td>'+statusBadge(a,M.cpl)+'</td></tr>';
+    var x=m(a),lk=adLink(a.r),stt=statusTxt(a.r.status);
+    h+='<tr><td>'+(i+1)+'</td><td style="text-align:left;font-family:\'DM Sans\',sans-serif;font-size:12px">'+esc(a.name)+(stt?' <span class="dim">· '+esc(stt)+'</span>':'')+'</td><td>'+brl(a.s)+'</td><td>'+int(a.i)+'</td><td>'+int(a.c)+'</td><td>'+int(a.p)+'</td><td>'+int(a.l)+'</td><td>'+pct(x.ctr)+'</td><td>'+brl(x.cpc)+'</td><td>'+brl(x.cpl)+'</td><td>'+pct(x.txe)+'</td><td>'+pct(x.txc)+'</td><td>'+(hasVV?pct(x.hook):'—')+'</td><td>'+(lk?'<a class="link-ad" href="'+esc(lk)+'" target="_blank" rel="noopener">abrir</a>':'—')+'</td><td>'+statusBadge(a,M.cpl)+'</td></tr>';
   });
-  var x=m(TOT);
-  h+='<tr class="total"><td></td><td style="text-align:left">Total</td><td>'+brl(TOT.s)+'</td><td>'+int(TOT.i)+'</td><td>'+int(TOT.c)+'</td><td>'+int(TOT.p)+'</td><td>'+int(TOT.l)+'</td><td>'+pct(x.ctr)+'</td><td>'+brl(x.cpc)+'</td><td>'+brl(x.cpl)+'</td><td>'+pct(x.txe)+'</td><td>'+pct(x.txc)+'</td><td>—</td><td></td><td></td></tr></tbody>';
-  document.getElementById('tbl-cri').innerHTML=h;
-})();
+  h+='<tr class="total"><td></td><td style="text-align:left">Total</td><td>'+brl(TOT.s)+'</td><td>'+int(TOT.i)+'</td><td>'+int(TOT.c)+'</td><td>'+int(TOT.p)+'</td><td>'+int(TOT.l)+'</td><td>'+pct(M.ctr)+'</td><td>'+brl(M.cpc)+'</td><td>'+brl(M.cpl)+'</td><td>'+pct(M.txe)+'</td><td>'+pct(M.txc)+'</td><td>'+(hasVV?pct(M.hook):'—')+'</td><td></td><td></td></tr></tbody>';
+  $('tbl-cri').innerHTML=h;
+  $('note-hook').textContent=hasVV?'Hook Rate = visualizações de vídeo / impressões.':'Hook Rate aparece como — porque não há visualizações de vídeo registradas para estes anúncios.';
 
-// ===== PÚBLICOS =====
-(function(){
-  var keys=Object.keys(BYSET).sort(function(a,b){return sortByCpl(BYSET[a],BYSET[b]);});
-  var h='<thead><tr><th>#</th><th style="text-align:left">Conjunto</th><th>Status</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th><th>TX Entrada</th><th>TX Cadastro</th><th>Avaliação</th></tr></thead><tbody>';
-  keys.forEach(function(k,i){
-    var a=BYSET[k],x=m(a);
-    h+='<tr><td>'+(i+1)+'</td><td style="text-align:left;font-family:\'DM Sans\',sans-serif;font-size:12px">'+adsetLabel(k)+'</td><td>'+ADSETS[k][1].toLowerCase()+'</td><td>'+brl(a.s)+'</td><td>'+int(a.i)+'</td><td>'+int(a.c)+'</td><td>'+int(a.p)+'</td><td>'+int(a.l)+'</td><td>'+pct(x.ctr)+'</td><td>'+brl(x.cpc)+'</td><td>'+brl(x.cpl)+'</td><td>'+pct(x.txe)+'</td><td>'+pct(x.txc)+'</td><td>'+statusBadge(a,M.cpl)+'</td></tr>';
-  });
-  var x=m(TOT);
-  h+='<tr class="total"><td></td><td style="text-align:left">Total</td><td></td><td>'+brl(TOT.s)+'</td><td>'+int(TOT.i)+'</td><td>'+int(TOT.c)+'</td><td>'+int(TOT.p)+'</td><td>'+int(TOT.l)+'</td><td>'+pct(x.ctr)+'</td><td>'+brl(x.cpc)+'</td><td>'+brl(x.cpl)+'</td><td>'+pct(x.txe)+'</td><td>'+pct(x.txc)+'</td><td></td></tr></tbody>';
-  document.getElementById('tbl-pub').innerHTML=h;
+  // Públicos
+  var keys=setOrder.slice().sort(function(a,b){return sortByCpl(sets[a],sets[b]);});
+  h='<thead><tr><th>#</th><th style="text-align:left">Conjunto</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th><th>TX Entrada</th><th>TX Cadastro</th><th>Avaliação</th></tr></thead><tbody>';
+  keys.forEach(function(k,i){var a=sets[k],x=m(a);
+    h+='<tr><td>'+(i+1)+'</td><td style="text-align:left;font-family:\'DM Sans\',sans-serif;font-size:12px">'+setLabel(k)+'</td><td>'+brl(a.s)+'</td><td>'+int(a.i)+'</td><td>'+int(a.c)+'</td><td>'+int(a.p)+'</td><td>'+int(a.l)+'</td><td>'+pct(x.ctr)+'</td><td>'+brl(x.cpc)+'</td><td>'+brl(x.cpl)+'</td><td>'+pct(x.txe)+'</td><td>'+pct(x.txc)+'</td><td>'+statusBadge(a,M.cpl)+'</td></tr>';});
+  h+='<tr class="total"><td></td><td style="text-align:left">Total</td><td>'+brl(TOT.s)+'</td><td>'+int(TOT.i)+'</td><td>'+int(TOT.c)+'</td><td>'+int(TOT.p)+'</td><td>'+int(TOT.l)+'</td><td>'+pct(M.ctr)+'</td><td>'+brl(M.cpc)+'</td><td>'+brl(M.cpl)+'</td><td>'+pct(M.txe)+'</td><td>'+pct(M.txc)+'</td><td></td></tr></tbody>';
+  $('tbl-pub').innerHTML=h;
 
-  var p='<thead><tr><th>Conjunto</th><th>Feed invest.</th><th>Feed leads</th><th>Feed CPL</th><th>Stories invest.</th><th>Stories leads</th><th>Stories CPL</th><th>Reels invest.</th><th>Reels leads</th><th>Outros invest.</th><th>Outros leads</th></tr></thead><tbody>';
-  var T={f:z(),s:z(),r:z(),o:z()};
-  keys.forEach(function(k){
-    var f=z(),s=z(),r=z();
-    PLACE[k].feed.forEach(function(v){add(f,v);});PLACE[k].stories.forEach(function(v){add(s,v);});PLACE[k].reels.forEach(function(v){add(r,v);});
-    var t=BYSET[k],o={s:Math.max(0,t.s-f.s-s.s-r.s),i:0,c:0,p:0,l:Math.max(0,t.l-f.l-s.l-r.l)};
-    [['f',f],['s',s],['r',r],['o',o]].forEach(function(q){T[q[0]].s+=q[1].s;T[q[0]].l+=q[1].l;});
-    p+='<tr><td>'+adsetLabel(k)+'</td><td>'+brl(f.s)+'</td><td>'+int(f.l)+'</td><td>'+brl(f.s/f.l)+'</td><td>'+brl(s.s)+'</td><td>'+int(s.l)+'</td><td>'+brl(s.s/s.l)+'</td><td>'+brl(r.s)+'</td><td>'+int(r.l)+'</td><td>'+brl(o.s)+'</td><td>'+int(o.l)+'</td></tr>';
-  });
-  p+='<tr class="total"><td>Total</td><td>'+brl(T.f.s)+'</td><td>'+int(T.f.l)+'</td><td>'+brl(T.f.s/T.f.l)+'</td><td>'+brl(T.s.s)+'</td><td>'+int(T.s.l)+'</td><td>'+brl(T.s.s/T.s.l)+'</td><td>'+brl(T.r.s)+'</td><td>'+int(T.r.l)+'</td><td>'+brl(T.o.s)+'</td><td>'+int(T.o.l)+'</td></tr></tbody>';
-  document.getElementById('tbl-place').innerHTML=p;
-})();
+  if(prows.length){
+    var PB={},pkeys=[];
+    prows.forEach(function(r){if(!PB[r.setKey]){PB[r.setKey]={feed:z(),stories:z(),reels:z(),outros:z()};pkeys.push(r.setKey);}add(PB[r.setKey][posGroup(r.pos)],r);});
+    pkeys.sort(function(a,b){return sets[a]&&sets[b]?sortByCpl(sets[a],sets[b]):0;});
+    var T={feed:z(),stories:z(),reels:z(),outros:z()};
+    h='<thead><tr><th>Conjunto</th><th>Feed invest.</th><th>Feed leads</th><th>Feed CPL</th><th>Stories invest.</th><th>Stories leads</th><th>Stories CPL</th><th>Reels invest.</th><th>Reels leads</th><th>Outros invest.</th><th>Outros leads</th></tr></thead><tbody>';
+    pkeys.forEach(function(k){var p=PB[k];['feed','stories','reels','outros'].forEach(function(g){add(T[g],p[g]);});
+      h+='<tr><td>'+setLabel(k)+'</td><td>'+brl(p.feed.s)+'</td><td>'+int(p.feed.l)+'</td><td>'+brl(p.feed.s/p.feed.l)+'</td><td>'+brl(p.stories.s)+'</td><td>'+int(p.stories.l)+'</td><td>'+brl(p.stories.s/p.stories.l)+'</td><td>'+brl(p.reels.s)+'</td><td>'+int(p.reels.l)+'</td><td>'+brl(p.outros.s)+'</td><td>'+int(p.outros.l)+'</td></tr>';});
+    h+='<tr class="total"><td>Total</td><td>'+brl(T.feed.s)+'</td><td>'+int(T.feed.l)+'</td><td>'+brl(T.feed.s/T.feed.l)+'</td><td>'+brl(T.stories.s)+'</td><td>'+int(T.stories.l)+'</td><td>'+brl(T.stories.s/T.stories.l)+'</td><td>'+brl(T.reels.s)+'</td><td>'+int(T.reels.l)+'</td><td>'+brl(T.outros.s)+'</td><td>'+int(T.outros.l)+'</td></tr></tbody>';
+    $('tbl-place').innerHTML=h;
+    $('note-place').textContent='Outros = Audience Network, Status do WhatsApp, Threads, Explorar e demais posicionamentos. O Meta atribui leads por posicionamento separadamente, então o total pode diferir alguns centavos da tabela acima.';
+  }else{
+    $('tbl-place').innerHTML='';
+    $('note-place').textContent='Sem dados de posicionamento: crie a aba "'+CONFIG.PLACE_SHEET+'" na planilha com a coluna "Platform Position" para ver Feed vs Stories.';
+  }
 
-// ===== ANÁLISE DIÁRIA =====
-(function(){
-  function delta(cur,prev,inverse){
+  // Análise diária
+  function delta(cur,prev,inv){
     if(!ok(cur)||!ok(prev))return '<span class="dim">—</span>';
-    var d=(cur-prev)/prev*100,good=inverse?d<0:d>0;
+    var d=(cur-prev)/prev*100,good=inv?d<0:d>0;
     return '<span class="'+(good?'green':'red')+'">'+(d>0?'+':'')+d.toLocaleString('pt-BR',{maximumFractionDigits:1})+'%</span>';
   }
-  var h='<thead><tr><th>Dia</th><th>Investimento</th><th>Δ Invest.</th><th>Leads</th><th>Δ Leads</th><th>CTR</th><th>Δ CTR</th><th>CPL</th><th>Δ CPL</th><th>TX Cadastro</th><th>Δ TX Cadastro</th></tr></thead><tbody>';
-  BYDAY.forEach(function(a,i){
-    var x=m(a),pv=i?BYDAY[i-1]:null,px=pv?m(pv):{};
-    h+='<tr><td>'+fmtDay(DAYS[i])+(i===DAYS.length-1?' <span class="dim">(parcial)</span>':'')+'</td><td>'+brl(a.s)+'</td><td>'+(pv?delta(a.s,pv.s,false):'<span class="dim">—</span>')+'</td><td>'+int(a.l)+'</td><td>'+(pv?delta(a.l,pv.l,false):'<span class="dim">—</span>')+'</td><td>'+pct(x.ctr)+'</td><td>'+(pv?delta(x.ctr,px.ctr,false):'<span class="dim">—</span>')+'</td><td>'+brl(x.cpl)+'</td><td>'+(pv?delta(x.cpl,px.cpl,true):'<span class="dim">—</span>')+'</td><td>'+pct(x.txc)+'</td><td>'+(pv?delta(x.txc,px.txc,false):'<span class="dim">—</span>')+'</td></tr>';
-  });
-  h+='</tbody>';
-  document.getElementById('tbl-comp').innerHTML=h;
+  h='<thead><tr><th>Dia</th><th>Investimento</th><th>Δ Invest.</th><th>Leads</th><th>Δ Leads</th><th>CTR</th><th>Δ CTR</th><th>CPL</th><th>Δ CPL</th><th>TX Cadastro</th><th>Δ TX Cadastro</th></tr></thead><tbody>';
+  DAYS.forEach(function(d,i){var a=days[d],x=m(a),pv=i?days[DAYS[i-1]]:null,px=pv?m(pv):null,na='<span class="dim">—</span>';
+    h+='<tr><td>'+dayLbl(d)+'</td><td>'+brl(a.s)+'</td><td>'+(pv?delta(a.s,pv.s):na)+'</td><td>'+int(a.l)+'</td><td>'+(pv?delta(a.l,pv.l):na)+'</td><td>'+pct(x.ctr)+'</td><td>'+(pv?delta(x.ctr,px.ctr):na)+'</td><td>'+brl(x.cpl)+'</td><td>'+(pv?delta(x.cpl,px.cpl,true):na)+'</td><td>'+pct(x.txc)+'</td><td>'+(pv?delta(x.txc,px.txc):na)+'</td></tr>';});
+  $('tbl-comp').innerHTML=h+'</tbody>';
 
-  var d='<thead><tr><th>Dia</th><th style="text-align:left">Conjunto</th><th style="text-align:left">Criativo</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th><th>TX Cadastro</th></tr></thead><tbody>';
-  DAYS.forEach(function(day,i){
-    var rows=ADS.filter(function(ad){return ad[4][i][0]>0;}).sort(function(a,b){return a[2]<b[2]?-1:a[2]>b[2]?1:b[4][i][0]-a[4][i][0];});
-    rows.forEach(function(ad){
-      var a=add(z(),ad[4][i]),x=m(a);
-      d+='<tr><td>'+fmtDay(day)+'</td><td style="text-align:left;font-family:\'DM Sans\',sans-serif">'+ad[2]+'</td><td style="text-align:left;font-family:\'DM Sans\',sans-serif">'+ad[0]+'</td><td>'+brl(a.s)+'</td><td>'+int(a.i)+'</td><td>'+int(a.c)+'</td><td>'+int(a.p)+'</td><td>'+int(a.l)+'</td><td>'+pct(x.ctr)+'</td><td>'+brl(x.cpc)+'</td><td>'+brl(x.cpl)+'</td><td>'+pct(x.txc)+'</td></tr>';
-    });
-    var t=BYDAY[i],tx=m(t);
-    d+='<tr class="total"><td>'+fmtDay(day)+'</td><td style="text-align:left">Subtotal</td><td></td><td>'+brl(t.s)+'</td><td>'+int(t.i)+'</td><td>'+int(t.c)+'</td><td>'+int(t.p)+'</td><td>'+int(t.l)+'</td><td>'+pct(tx.ctr)+'</td><td>'+brl(tx.cpc)+'</td><td>'+brl(tx.cpl)+'</td><td>'+pct(tx.txc)+'</td></tr>';
+  var code={};keys.forEach(function(k,i){code[k]='CJ'+('0'+(i+1)).slice(-2);});
+  h='<thead><tr><th>Dia</th><th style="text-align:left">Conjunto</th><th style="text-align:left">Criativo</th><th>Invest.</th><th>Imp.</th><th>Cliques</th><th>PV</th><th>Leads</th><th>CTR</th><th>CPC</th><th>CPL</th><th>TX Cadastro</th></tr></thead><tbody>';
+  DAYS.slice().reverse().forEach(function(d){
+    var dr=rows.filter(function(r){return r.date===d;}).sort(function(a,b){return code[a.setKey]<code[b.setKey]?-1:code[a.setKey]>code[b.setKey]?1:b.s-a.s;});
+    dr.forEach(function(r){var x=m(r);
+      h+='<tr><td>'+fmtDay(d)+'</td><td style="text-align:left;font-family:\'DM Sans\',sans-serif">'+(multiSameName?code[r.setKey]:esc(r.adset))+'</td><td style="text-align:left;font-family:\'DM Sans\',sans-serif">'+esc(r.ad)+'</td><td>'+brl(r.s)+'</td><td>'+int(r.i)+'</td><td>'+int(r.c)+'</td><td>'+int(r.p)+'</td><td>'+int(r.l)+'</td><td>'+pct(x.ctr)+'</td><td>'+brl(x.cpc)+'</td><td>'+brl(x.cpl)+'</td><td>'+pct(x.txc)+'</td></tr>';});
+    var t=days[d],tx=m(t);
+    h+='<tr class="total"><td>'+fmtDay(d)+'</td><td style="text-align:left">Subtotal</td><td></td><td>'+brl(t.s)+'</td><td>'+int(t.i)+'</td><td>'+int(t.c)+'</td><td>'+int(t.p)+'</td><td>'+int(t.l)+'</td><td>'+pct(tx.ctr)+'</td><td>'+brl(tx.cpc)+'</td><td>'+brl(tx.cpl)+'</td><td>'+pct(tx.txc)+'</td></tr>';
   });
-  d+='</tbody>';
-  document.getElementById('tbl-det').innerHTML=d;
-})();
+  $('tbl-det').innerHTML=h+'</tbody>';
+}
+
+loadData().then(function(){
+  if(CONFIG.AUTO_REFRESH_MIN>0)TIMER=setInterval(function(){if(SOURCE==='live'||!document.hidden)loadData();},CONFIG.AUTO_REFRESH_MIN*60000);
+});
 </script>
 </body>
 </html>
