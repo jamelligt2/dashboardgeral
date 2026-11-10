@@ -624,9 +624,31 @@ function processGerenciador(rows){
   GROWS = out;
 }
 
+function looksLikeStatus(v){
+  return /^(paid|approved|complete|completed|confirmed|pago|aprovado|waiting|refused|refunded|cancel|chargeback|disputed|pending|pendente|processing)/.test(normStr(v));
+}
 function processWebhook(rows){
   const headers = rows[0] || [];
   WCOLS = buildColMap(headers, W_CANDS);
+
+  // Checagem de sanidade: essa aba já teve o cabeçalho com os nomes das
+  // colunas trocados/errados em relação aos dados reais (ex: cabeçalho dizia
+  // "order_status" na posição 2, mas os valores de status de verdade estavam
+  // na posição 1 — a coluna 2 tinha o nome do produto). Quando isso acontece,
+  // a detecção por nome de cabeçalho acerta a coluna errada em silêncio e
+  // zera todas as vendas (nenhum valor bate com STATUS_APROVADO). Por isso,
+  // antes de seguir, testamos se a coluna de status detectada realmente
+  // parece ter valores de status em algumas linhas; se não parecer, cai pro
+  // layout fixo (por posição) do export "Vendas" da Kiwify, que é o que essa
+  // aba usa de fato sempre que esse problema aparece.
+  const sample = rows.slice(1, 1+Math.min(30, rows.length-1));
+  const statusOk = WCOLS.status!==-1 && sample.some(r=> looksLikeStatus(r[WCOLS.status]));
+  if(!statusOk){
+    WCOLS = {
+      orderId:0, status:1, produto:2, cliente:3, email:4, telefone:6,
+      fatTotal:31, utmSource:40, utmMedium:41, utmCampaign:42, utmContent:43, data:48,
+    };
+  }
 
   // 1) Export "Vendas" padrão da Kiwify: 1 linha = 1 produto já com status
   // final (paid/refunded/etc.), sem eventos intermediários. Lê direto da
