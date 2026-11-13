@@ -105,6 +105,16 @@ tr.total td{font-weight:700;background:rgba(255,107,43,.07);color:#ff6b2b}
 .erro{background:rgba(231,76,60,.1);border:1px solid rgba(231,76,60,.4);border-radius:10px;padding:16px 18px;margin:24px 28px;font-size:13px;color:#ffb3a9;line-height:1.5}
 @media(max-width:900px){.cri-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:600px){.cri-grid{grid-template-columns:1fr}.chart-grid-2x2{grid-template-columns:1fr}.funil-section{grid-template-columns:1fr}.content{padding:18px 14px}.topbar{padding:12px 14px}.tabs{padding:0 14px}}
+.cri-sub{font-size:9.5px;font-weight:400;color:rgba(255,255,255,.45);margin-top:2px;line-height:1.3}
+.cri-prev{display:block;margin-top:6px;background:rgba(255,107,43,.12);border:1px solid rgba(255,107,43,.35);color:#ff8a57;font-size:10px;font-weight:600;padding:4px 9px;border-radius:6px;cursor:pointer;font-family:inherit}
+.cri-prev:hover{background:rgba(255,107,43,.22)}
+.cri-modal{display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.75);align-items:center;justify-content:center;padding:16px}
+.cri-modal.open{display:flex}
+.cri-modal-box{position:relative;background:#16161f;border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:14px;width:100%;max-width:420px;max-height:92vh;overflow:auto}
+.cri-modal-box iframe{width:100%;height:560px;border:0;border-radius:8px;background:#fff;display:block}
+.cri-modal-x{position:absolute;top:4px;right:10px;background:none;border:0;color:#fff;font-size:24px;cursor:pointer;line-height:1}
+.cri-modal-msg{font-size:11px;color:rgba(255,255,255,.6);margin-top:10px;line-height:1.5}
+.cri-modal-msg a{color:#ff8a57}
 </style>
 </head>
 <body>
@@ -334,6 +344,7 @@ function processSales(rows) {
   const metaOf = r => { const o = {}; metaCols.forEach(([k, v]) => { const key = String(r[k] || '').trim().toLowerCase(); if (key) o[key] = String(r[v] == null ? '' : r[v]).trim(); }); return o; };
   const kwOk = p => !CONFIG.PRODUTO_KEYWORDS.length || CONFIG.PRODUTO_KEYWORDS.some(k => norm(p).includes(norm(k)));
   const tx = new Map();
+  const iType = hdr.findIndex(h => norm(h) === 'sale.type');
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i]; if (!r.some(x => String(x).trim())) continue;
     diag.linhas++;
@@ -341,9 +352,12 @@ function processSales(rows) {
     const evt = g('evento'), txt = norm(evt).replace(/[_.\-]+/g, ' ');
     diag.eventos[evt || '(vazio)'] = (diag.eventos[evt || '(vazio)'] || 0) + 1;
     if (RX_IGN.test(txt)) { diag.ignoradas++; continue; }
-    const data = parseDate(g('data')) || parseDate(g('data2'));
-    const key = g('fatura') || (norm(g('email')) + '|' + data);
-    if (!tx.has(key)) tx.set(key, {rows: [], neg: false});
+    let data = parseDate(g('data')) || parseDate(g('data2'));
+    // vendas históricas importadas (id "hist-AAAAMMDD-NN" na coluna sale.type, data no próprio id)
+    const hm = (iType >= 0 ? String(r[iType] || '') : '').match(/^hist-(\d{4})(\d{2})(\d{2})-/);
+    if (hm && !g('fatura')) data = hm[1] + '-' + hm[2] + '-' + hm[3];
+    const key = hm && !g('fatura') ? String(r[iType]) : (g('fatura') || (norm(g('email')) + '|' + data));
+    if (!tx.has(key)) tx.set(key, {rows: [], neg: false, hist: !!(hm && !g('fatura'))});
     const grp = tx.get(key);
     const neg = RX_NEG.test(txt);
     const pos = !neg && !RX_PEND.test(txt) && (RX_POS.test(txt) || (data && !txt));
@@ -363,7 +377,7 @@ function processSales(rows) {
     if (!data) { diag.semData++; continue; }
     if (CONFIG.DATA_MINIMA && data < CONFIG.DATA_MINIMA) { diag.antesDataMin++; continue; }
     if (!main && produto) { diag.semProduto++; continue; }
-    const total = money(g('fatTotal') || g('fatAlt'));
+    const total = grp.hist ? CONFIG.PRODUTO_PRECO_BASE : money(g('fatTotal') || g('fatAlt'));
     if (CONFIG.IGNORAR_VALOR_ZERO && total <= 0) { diag.valorZero++; continue; }
     const inicialRaw = g('fatInicial');
     const inicial = inicialRaw ? money(inicialRaw) : total;
@@ -375,7 +389,11 @@ function processSales(rows) {
       utmSource: g('utmSource'), utmMedium: g('utmMedium'), utmCampaign: g('utmCampaign'), utmContent: g('utmContent')
     };
     if (metaCols.length) { const mt = metaOf(first.r); s.utmSource = mt.utm_source || s.utmSource; s.utmMedium = mt.utm_medium || s.utmMedium; s.utmCampaign = mt.utm_campaign || s.utmCampaign; s.utmContent = mt.utm_content || s.utmContent; }
-    s.trafego = isTrafego(s);
+    // UTMs novas vêm como "nome|id" (e o conteúdo com "::código"): limpa para casar com o Gerenciador
+    const rawSrc = s.utmSource, rawCamp = s.utmCampaign;
+    const limpa = v => String(v || '').split('::')[0].split('|')[0].trim();
+    s.utmCampaign = limpa(s.utmCampaign); s.utmMedium = limpa(s.utmMedium); s.utmContent = limpa(s.utmContent);
+    s.trafego = isTrafego(s) || /^fb/i.test(String(rawSrc || '').trim()) || /\|\d{10,}/.test(String(rawCamp || ''));
     diag.fontes[s.utmSource || '(vazio)'] = (diag.fontes[s.utmSource || '(vazio)'] || 0) + 1;
     diag.vendas++;
     sales.push(s);
@@ -417,31 +435,49 @@ function diasTable(from, to) {
   return [...m.values()].sort((a, b) => a.data.localeCompare(b.data));
 }
 
+const dnorm = t => { let s = String(t == null ? '' : t); try { s = decodeURIComponent(s.replace(/\+/g, ' ')); } catch (e) {} return norm(s); };
+const nzf = t => dnorm(t).replace(/^0+(?=\d)/, '');
+const shortCamp = c => (String(c || '').replace(/^desafio\s*/i, '').replace(/\[CAMPANHAS DE VENDAS\]\s*/i, '').replace(/\s*\[\d{1,2}\/\d{1,2}\]/g, '').trim()) || String(c || '');
+
 function groupBy(from, to, rowKey, saleKey) {
+  const comp = rowKey === 'ad';   // criativos: separa por campanha + conjunto + nome
   const gs = GROWS.filter(r => inRange(r.data, from, to));
   const ss = SALES.filter(x => inRange(x.data, from, to) && x.trafego);
   const m = new Map();
   gs.forEach(r => {
-    const k = r[rowKey] || '(sem nome)';
-    if (!m.has(k)) m.set(k, {nome: k, inv: 0, imp: 0, cliques: 0, pv: 0, ck: 0, link: '', ativo: false, ultima: '', nV: 0, fat: 0});
+    const nome = r[rowKey] || '(sem nome)';
+    const k = comp ? r.campanha + '\u0001' + r.adset + '\u0001' + nome : nome;
+    if (!m.has(k)) m.set(k, {nome, camp: r.campanha, set: r.adset, sub: '', inv: 0, imp: 0, cliques: 0, pv: 0, ck: 0, link: '', ativo: false, ultima: '', nV: 0, fat: 0});
     const o = m.get(k);
     o.inv += r.inv; o.imp += r.imp; o.cliques += r.cliques; o.pv += r.pv; o.ck += r.ck;
     if (r.link && !o.link) o.link = r.link;
     if (r.data >= o.ultima) { o.ultima = r.data; o.ativo = !isPaused(r.sAd) && !isPaused(r.sSet) && !isPaused(r.sCamp) && (r.sAd || r.sSet || r.sCamp); }
   });
-  const keys = [...m.keys()];
-  let sem = 0;
+  if (comp) {
+    const cnt = new Map();
+    m.forEach(o => { const n = nzf(o.nome); cnt.set(n, (cnt.get(n) || 0) + 1); });
+    m.forEach(o => { if (cnt.get(nzf(o.nome)) > 1) o.sub = shortCamp(o.camp) + (o.set ? ' · ' + o.set : ''); });
+  }
+  const entries = [...m.values()];
+  let sem = 0, amb = 0;
   ss.forEach(x => {
-    const u = norm(x[saleKey]);
-    const hit = u ? keys.find(k => norm(k) === u) || keys.find(k => u.length >= 4 && (norm(k).includes(u) || u.includes(norm(k)))) : null;
-    if (hit) { const o = m.get(hit); o.nV++; o.fat += x.fatTotal; } else sem++;
+    const u = nzf(x[saleKey]);
+    let c = u ? entries.filter(o => nzf(o.nome) === u) : [];
+    if (!c.length && u.length >= 4) c = entries.filter(o => dnorm(o.nome).includes(u) || u.includes(dnorm(o.nome)));
+    if (comp && c.length > 1) {
+      const uc = dnorm(x.utmCampaign);
+      if (uc.length >= 3) { const c2 = c.filter(o => { const cm = dnorm(o.camp); return cm === uc || cm.includes(uc) || uc.includes(cm); }); if (c2.length) c = c2; }
+      if (c.length > 1) { const um = dnorm(x.utmMedium); if (um.length >= 3) { const c3 = c.filter(o => dnorm(o.set) === um); if (c3.length) c = c3; } }
+      if (c.length > 1) { amb++; return; }
+    }
+    if (c.length) { c[0].nV++; c[0].fat += x.fatTotal; } else sem++;
   });
-  const arr = [...m.values()];
+  const arr = entries;
   arr.forEach(o => {
     o.ctr = div(o.cliques, o.imp) == null ? null : div(o.cliques, o.imp) * 100;
     o.cpc = div(o.inv, o.cliques); o.custo = div(o.inv, o.nV); o.roas = div(o.fat, o.inv);
   });
-  return {arr, sem};
+  return {arr, sem, amb};
 }
 
 // ───────────────────────── render ─────────────────────────
@@ -537,26 +573,37 @@ let CRI = {f: 'todos', s: 'inv'}, PUB = {f: 'todos', s: 'inv'};
 const SORTS = {inv: ['Investimento', (a, b) => b.inv - a.inv], ctr: ['CTR', (a, b) => (b.ctr || 0) - (a.ctr || 0)], cpc: ['CPC', (a, b) => (a.cpc == null) - (b.cpc == null) || a.cpc - b.cpc], roas: ['ROAS', (a, b) => (b.roas || 0) - (a.roas || 0)], vendas: ['Vendas', (a, b) => b.nV - a.nV]};
 
 function renderGrupo(tab, state, prefix, rowKey, saleKey, titulo, from, to) {
-  const {arr, sem} = groupBy(from, to, rowKey, saleKey);
+  const {arr, sem, amb} = groupBy(from, to, rowKey, saleKey);
   let list = arr.filter(o => state.f === 'todos' || (state.f === 'ativos' ? o.ativo : !o.ativo)).sort(SORTS[state.s][1]);
   const totV = arr.reduce((t, o) => t + o.nV, 0);
   let h = `<div class="cri-filterbar">` +
     ['todos', 'ativos', 'inativos'].map(f => `<button class="fbtn ${state.f === f ? 'active' : ''}" onclick="setGrp('${prefix}','f','${f}')">${f[0].toUpperCase() + f.slice(1)}</button>`).join('') +
     `<span class="cri-sort-label" style="margin-left:10px">Ordenar:</span>` +
     Object.entries(SORTS).map(([k, [l]]) => `<button class="fbtn ${state.s === k ? 'active' : ''}" onclick="setGrp('${prefix}','s','${k}')">${l}</button>`).join('') + `</div>`;
-  h += `<div class="ob-info">Vendas atribuídas pela UTM (${saleKey === 'utmContent' ? 'UTM Content = nome do anúncio' : 'UTM Medium = nome do conjunto'}). ${sem ? `${sem} venda(s) de tráfego sem correspondência com ${titulo} do período.` : 'Todas as vendas de tráfego casaram.'}</div>`;
+  h += `<div class="ob-info">Vendas atribuídas pela UTM (${saleKey === 'utmContent' ? 'UTM Content = nome do anúncio' : 'UTM Medium = nome do conjunto'}). ${sem ? `${sem} venda(s) de tráfego sem correspondência com ${titulo} do período.` : (amb ? '' : 'Todas as vendas de tráfego casaram.')}${amb ? ` ${amb} venda(s) de tráfego com criativo de mesmo nome em mais de uma campanha e sem a campanha na UTM (utm_campaign), por isso não foram separadas.` : ''}</div>`;
   if (!list.length) { $(tab).innerHTML = h + `<div class="ob-info">Sem dados no período.</div>`; return; }
   const cards = list.map(o => `<div class="${prefix === 'cri' ? 'cri-card' : 'pub-card'} ${o.ativo ? 'ativo' : ''}">` +
-    `<div class="${prefix === 'cri' ? 'cri-card-header' : 'pub-card-header'}"><div class="${prefix === 'cri' ? 'cri-name' : 'pub-name'}">${esc(o.nome)}</div><span class="cri-badge ${o.ativo ? 'ativo' : 'inativo'}">${o.ativo ? 'Ativo' : 'Inativo'}</span></div>` +
+    `<div class="${prefix === 'cri' ? 'cri-card-header' : 'pub-card-header'}"><div class="${prefix === 'cri' ? 'cri-name' : 'pub-name'}">${esc(o.nome)}${o.sub ? `<div class="cri-sub">${esc(o.sub)}</div>` : ''}</div><span class="cri-badge ${o.ativo ? 'ativo' : 'inativo'}">${o.ativo ? 'Ativo' : 'Inativo'}</span></div>` +
     `<div class="cri-metrics">` +
     [['Invest.', fmtBRL(o.inv), ''], ['Vendas', fmtInt(o.nV), ''], ['Custo/ingresso', fmtBRL(o.custo), cls(o.custo)], ['ROAS', fmtX(o.roas), ''], ['CTR', fmtPct(o.ctr), ''], ['CPC', fmtBRL(o.cpc), '']]
       .map(([l, v, c]) => `<div class="cri-metric"><span class="cri-metric-label">${l}</span><span class="cri-metric-val ${c} ${l === 'Custo/ingresso' ? 'hl' : ''}">${v}</span></div>`).join('') + `</div>` +
-    (o.link ? `<a class="cri-link" href="${esc(o.link)}" target="_blank" rel="noopener">Ver anúncio ↗</a>` : '') + `</div>`).join('');
+    (o.link ? `<a class="cri-link" href="${esc(o.link)}" target="_blank" rel="noopener">Ver anúncio ↗</a>` : '') +
+    (prefix === 'cri' && igInfo(o.link) ? `<button class="cri-prev" data-link="${esc(o.link)}" onclick="verCriativo(this.dataset.link)">🖼 Ver criativo</button>` : '') + `</div>`).join('');
   h += `<div class="${prefix === 'cri' ? 'cri-grid' : 'pub-grid'}">${cards}</div>`;
   h += `<div class="tbl-wrap"><table><thead><tr><th>${titulo}</th><th>Status</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>PV</th><th>Checkouts</th><th>Vendas</th><th>Fat.</th><th>Custo/ingresso</th><th>ROAS</th></tr></thead><tbody>` +
-    list.map(o => `<tr><td>${esc(o.nome)}</td><td>${o.ativo ? 'Ativo' : 'Inativo'}</td><td>${fmtBRL(o.inv)}</td><td>${fmtInt(o.imp)}</td><td>${fmtInt(o.cliques)}</td><td>${fmtPct(o.ctr)}</td><td>${fmtBRL(o.cpc)}</td><td>${fmtInt(o.pv)}</td><td>${fmtInt(o.ck)}</td><td>${fmtInt(o.nV)}</td><td>${fmtBRL(o.fat)}</td><td class="${cls(o.custo)}">${fmtBRL(o.custo)}</td><td>${fmtX(o.roas)}</td></tr>`).join('') + `</tbody></table></div>`;
+    list.map(o => `<tr><td>${esc(o.nome)}${o.sub ? `<div class="cri-sub">${esc(o.sub)}</div>` : ''}</td><td>${o.ativo ? 'Ativo' : 'Inativo'}</td><td>${fmtBRL(o.inv)}</td><td>${fmtInt(o.imp)}</td><td>${fmtInt(o.cliques)}</td><td>${fmtPct(o.ctr)}</td><td>${fmtBRL(o.cpc)}</td><td>${fmtInt(o.pv)}</td><td>${fmtInt(o.ck)}</td><td>${fmtInt(o.nV)}</td><td>${fmtBRL(o.fat)}</td><td class="${cls(o.custo)}">${fmtBRL(o.custo)}</td><td>${fmtX(o.roas)}</td></tr>`).join('') + `</tbody></table></div>`;
   $(tab).innerHTML = h;
 }
+function igInfo(u) { const m = String(u || '').match(/instagram\.com\/(p|reel|tv)\/([\w-]+)/i); return m ? {t: m[1].toLowerCase(), c: m[2]} : null; }
+function verCriativo(u) {
+  const i = igInfo(u), b = $('cri-modal-body');
+  b.innerHTML = i
+    ? `<iframe src="https://www.instagram.com/${i.t}/${i.c}/embed/" loading="lazy" allowtransparency="true" scrolling="no"></iframe><div class="cri-modal-msg">Se a imagem não carregar, a publicação pode ser privada (dark post). <a href="https://www.instagram.com/${i.t}/${i.c}/" target="_blank" rel="noopener">Abrir no Instagram ↗</a></div>`
+    : `<div class="cri-modal-msg">Este anúncio não tem publicação do Instagram vinculada.</div>`;
+  $('cri-modal').classList.add('open');
+}
+function fecharCriativo() { $('cri-modal').classList.remove('open'); $('cri-modal-body').innerHTML = ''; }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharCriativo(); });
 function setGrp(prefix, k, v) { (prefix === 'cri' ? CRI : PUB)[k] = v; renderAll(); }
 
 function periodoTabela(tab, key, titulo, from, to) {
@@ -626,5 +673,6 @@ async function loadData() {
 }
 document.addEventListener('DOMContentLoaded', () => { document.title = CONFIG.PRODUTO + ' · ' + CONFIG.CLIENTE + ' — Jamelli GT'; loadData(); });
 </script>
+<div id="cri-modal" class="cri-modal" onclick="if(event.target===this)fecharCriativo()"><div class="cri-modal-box"><button class="cri-modal-x" onclick="fecharCriativo()" aria-label="Fechar">×</button><div id="cri-modal-body"></div></div></div>
 </body>
 </html>
