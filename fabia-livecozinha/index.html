@@ -172,6 +172,7 @@ td.wrap{white-space:normal;min-width:180px;max-width:320px}
 <div class="content" id="criativos">
   <div class="sec-title">Ranking de criativos — do melhor para o pior CPL</div>
   <div class="tbl-wrap"><table id="tbl-criativos"></table></div>
+  <p class="sub-name" style="margin-top:8px;font-size:11px" id="note-cri"></p>
 </div>
 
 <!-- ABA 3 -->
@@ -212,15 +213,13 @@ const CONFIG = {
   // Linhas cuja coluna "obs" contém algum destes textos não contam como lead
   LEADS_IGNORAR_OBS: ['teste'],
 
-  // ── META ADS (investimento, impressões, cliques, page views) ──────
-  // Aba alimentada pelo Stract/Windsor com os dados da conta 201967721904098
-  // (uma linha por dia × anúncio). Pode ficar na mesma planilha dos leads.
-  GER_SHEET_ID: '16E0zpFeWc5TSyFXMVtgAPfO2ZxJ9Qy3hHLoaVvIOwfE',
-  GER_TAB: 'Gerenciador',
-  // Só entram linhas cuja campanha contém este texto (vazio = todas)
+  // ── META ADS ──────────────────────────────────────────────────────
+  // Os dados vêm direto da conta de anúncios (SNAP abaixo), atualizados de hora em hora
+  // por uma tarefa agendada que roda fabia-livecozinha/atualizar_dados.py.
+  // Só entram campanhas cujo nome contém este texto
   FILTRO_CAMPANHA: 'LIVECOZINHA',
 
-  // Recarrega os dados sozinho a cada X minutos (0 = desliga)
+  // Recarrega os leads sozinho a cada X minutos (0 = desliga)
   AUTO_REFRESH_MIN: 10,
 
   // Palavras que marcam um conjunto como PÚBLICO QUENTE (o resto é frio)
@@ -229,25 +228,12 @@ const CONFIG = {
   FRIO_KEYWORDS: ['lal','lak','lookalike','semelhante','interesse','interesses','aberto','broad','advantage','adv','pf','frio']
 };
 
-// Cabeçalhos aceitos para cada campo da aba do Gerenciador (o primeiro que existir é usado)
-const CANDS = {
-  data:      ['Date','Data','Dia','Day','Date Start','Início dos relatórios','Reporting starts'],
-  campanha:  ['Campaign Name','Campanha','Nome da campanha','Campaign'],
-  conjunto:  ['Adset Name','Conj. de Anúncio','Conjunto de anúncios','Conjunto','Nome do conjunto de anúncios','Ad set name','Ad set'],
-  anuncio:   ['Ad Name','Anúncio','Nome do anúncio','Criativo'],
-  campId:    ['Campaign ID','ID da campanha'],
-  adsetId:   ['Adset ID','Ad set ID','ID do conjunto de anúncios','ID do conjunto'],
-  adId:      ['Ad ID','ID do anúncio'],
-  link:      ['Instagram Permalink URL','Link','Link do anúncio','Permalink','Link do criativo'],
-  invest:    ['Spend (Cost, Amount Spent)','Investimento','Valor gasto','Valor usado','Spend','Amount spent','Gasto'],
-  imp:       ['Impressions','Impressões','Impressoes'],
-  cliques:   ['Action Link Clicks','Inline Link Clicks','Cliques','Cliques no link','Link clicks','Clicks','Clique no link'],
-  pv:        ['Action Landing Page View','Page View','Page Views','PageView','Visualizações da página de destino','Landing page views','LPV'],
-  leads:     ['Action Leads','Action Omni Complete Registration','Leads','Leads no site','Lead','Cadastros','Cadastro','Resultados'],
-  views3s:   ['Action Video View','Views 3s','Reproduções de 3 segundos','Reproduções do vídeo por 3 segundos','Visualizações de 3s','3-second video plays','Video 3s'],
-  placement: ['Platform Position (Breakdown)','Posicionamento','Placement','Plataforma e posicionamento','Platform position','Posição'],
-  status:    ['Ad Status','Status','Status de veiculação','Veiculação','Delivery','Effective status']
-};
+// Dados gravados do Meta Ads (conta 201967721904098, extraídos em —). Atualizados pela tarefa agendada.
+// rows:  [data, idConjunto, conjunto, anúncio, idAnúncio, status, invest, imp, cliques, PV, leads, campanha]
+// place: [data, idConjunto, conjunto, plataforma, posicionamento, invest, imp, cliques, PV, leads]
+var SNAP = {"rows":[],"place":[]};
+var SNAP_AT = '';
+
 // Cabeçalhos da aba de leads
 const LCANDS = {
   email:    ['email','e-mail'],
@@ -375,12 +361,12 @@ function gvizToRows(data){
 // ────────────────────────────────────────────────────────────────────
 let ALL_ROWS = [];      // linhas do Gerenciador (todas as datas)
 let ROWS = [];          // linhas do Gerenciador no período escolhido
-let COLS = {}, HAS = {};
+let HAS = {views3s:false, placement:false};
+let PLACE = [], ALL_PLACE = [];
 let ALL_LEADS = [];     // leads únicos da planilha
 let LEADS = [];         // leads do período
 let LEADS_HAS_DATE = false;
 let LEADS_RAW = 0, LEADS_DESC = 0;
-let GER_OK = false, GER_MSG = '';
 let LEAD_SRC = 'planilha'; // 'planilha' | 'meta'
 let RANGE = {from:'', to:'', preset:'all'};
 let BOUNDS = {min:'', max:''};
@@ -395,14 +381,9 @@ async function loadData(manual){
   const ov = document.getElementById('loading-overlay');
   const msg = document.getElementById('loading-msg');
   const first = !ALL_ROWS.length && !ALL_LEADS.length;
-  if(first || manual){ ov.style.display='flex'; document.getElementById('loading-spin').style.display=''; msg.textContent = 'Carregando leads e dados do Meta Ads...'; }
-  let leadsRows = null, gerRows = null, leadsErr = null;
-  const [rl, rg] = await Promise.allSettled([
-    fetchSheetRows(CONFIG.LEADS_SHEET_ID, CONFIG.LEADS_TAB),
-    fetchSheetRows(CONFIG.GER_SHEET_ID, CONFIG.GER_TAB)
-  ]);
-  if(rl.status==='fulfilled') leadsRows = rl.value; else leadsErr = rl.reason;
-  if(rg.status==='fulfilled') gerRows = rg.value; else GER_MSG = rg.reason && rg.reason.message;
+  if(first || manual){ ov.style.display='flex'; document.getElementById('loading-spin').style.display=''; msg.textContent = 'Carregando leads da planilha...'; }
+  let leadsRows = null, leadsErr = null;
+  try{ leadsRows = await fetchSheetRows(CONFIG.LEADS_SHEET_ID, CONFIG.LEADS_TAB); }catch(e){ leadsErr = e; }
 
   if(!leadsRows){
     stopSpinner();
@@ -412,7 +393,7 @@ async function loadData(manual){
   }
   try{
     processLeads(leadsRows);
-    processGer(gerRows);
+    buildFromSnap();
     attributeLeads();
     computeBounds();
     if(first) applyPreset(RANGE.preset); else clampRange();
@@ -466,48 +447,34 @@ function processLeads(rows){
   });
 }
 
-function processGer(rows){
-  ALL_ROWS = []; COLS = {}; HAS = {}; GER_OK = false;
-  if(!rows){ for(const k in CANDS) HAS[k]=false; return; }
-  const {headers, body} = pickHeader(rows, [CANDS.invest, CANDS.campanha]);
-  for(const k in CANDS) COLS[k] = findCol(headers, CANDS[k]);
-  for(const k in COLS) HAS[k] = COLS[k] !== -1;
-  // Se a aba não existir, o Google devolve a 1ª aba (leads): sem colunas de mídia = aba ausente
-  if(!HAS.invest || !HAS.imp){
-    for(const k in HAS) HAS[k]=false;
-    GER_MSG = `A aba "${CONFIG.GER_TAB}" com os dados do Meta Ads ainda não existe na planilha.`;
-    return;
-  }
-  GER_OK = true;
-  const get = (r,k) => COLS[k]===-1 ? '' : (r[COLS[k]]==null ? '' : r[COLS[k]]);
+function buildFromSnap(){
   const filtro = normStr(CONFIG.FILTRO_CAMPANHA);
-  body.forEach(r=>{
-    if(!r || !r.some(c => String(c).trim())) return;
-    const campanha = String(get(r,'campanha')).trim();
-    if(filtro && HAS.campanha && !normStr(campanha).includes(filtro)) return;
+  ALL_ROWS = [];
+  (SNAP.rows||[]).forEach(r=>{
+    const campanha = String(r[11]||'');
+    if(filtro && campanha && !normStr(campanha).includes(filtro)) return;
     const row = {
-      data: toISODate(get(r,'data')), campanha,
-      conjunto: String(get(r,'conjunto')).trim() || '(sem conjunto)',
-      anuncio: String(get(r,'anuncio')).trim() || '(sem nome)',
-      campId: String(get(r,'campId')).trim().replace(/\.0$/,''),
-      adsetId: String(get(r,'adsetId')).trim().replace(/\.0$/,''),
-      adId: String(get(r,'adId')).trim().replace(/\.0$/,''),
-      link: String(get(r,'link')).trim(),
-      placement: String(get(r,'placement')).trim(),
-      status: String(get(r,'status')).trim(),
-      invest: parseBR(get(r,'invest')),
-      imp: parseBR(get(r,'imp')),
-      cliques: parseBR(get(r,'cliques')),
-      pv: parseBR(get(r,'pv')),
-      leadsMeta: parseBR(get(r,'leads')),
-      v3s: parseBR(get(r,'views3s'))
+      data: r[0], campanha, conjunto: r[2] || '(sem conjunto)', anuncio: r[3] || '(sem nome)',
+      campId:'', adsetId: String(r[1]||''), adId: String(r[4]||''), status: r[5]||'',
+      link: r[4] ? `https://adsmanager.facebook.com/adsmanager/manage/ads?act=${CONFIG.CONTA_META}&selected_ad_ids=${r[4]}` : '',
+      placement:'', place:'',
+      invest:+r[6]||0, imp:+r[7]||0, cliques:+r[8]||0, pv:+r[9]||0, leadsMeta:+r[10]||0, v3s:0
     };
-    if(!row.invest && !row.imp && !row.leadsMeta && !row.cliques) return;
     row.temp = classifyTemp(row.conjunto);
-    row.place = placeGroup(row.placement);
     ALL_ROWS.push(row);
   });
-  if(!ALL_ROWS.length) GER_MSG = `A aba "${CONFIG.GER_TAB}" foi lida, mas não há linhas com campanha contendo "${CONFIG.FILTRO_CAMPANHA}".`;
+  const camps = new Map(ALL_ROWS.map(r=>[r.adsetId, r.campanha]));
+  ALL_PLACE = [];
+  (SNAP.place||[]).forEach(r=>{
+    if(!camps.has(String(r[1]))) return;
+    const row = {data:r[0], adsetId:String(r[1]), conjunto:r[2]||'(sem conjunto)', campanha:camps.get(String(r[1])),
+      placement:String(r[4]||''), invest:+r[5]||0, imp:+r[6]||0, cliques:+r[7]||0, pv:+r[8]||0, leadsMeta:+r[9]||0, v3s:0};
+    row.place = placeGroup(row.placement);
+    row.temp = classifyTemp(row.conjunto);
+    ALL_PLACE.push(row);
+  });
+  HAS.placement = ALL_PLACE.length > 0;
+  HAS.leads = ALL_ROWS.length > 0;
 }
 
 function classifyTemp(conjunto){
@@ -593,6 +560,7 @@ function isFullRange(){ return RANGE.preset==='all' || ((!RANGE.from || RANGE.fr
 
 function applyFilter(){
   ROWS = ALL_ROWS.filter(r => inRange(r.data));
+  PLACE = ALL_PLACE.filter(r => inRange(r.data));
   if(LEADS_HAS_DATE){
     LEADS = ALL_LEADS.filter(l => inRange(l.data));
     LEAD_SRC = 'planilha';
@@ -685,24 +653,15 @@ function renderAll(){
 }
 
 function renderNotice(T){
-  const avisos = [];
-  if(!GER_OK || !ALL_ROWS.length){
-    avisos.push(`<b>Dados do Meta Ads ausentes.</b> ${esc(GER_MSG||'')} Crie a aba <b>${esc(CONFIG.GER_TAB)}</b> na planilha de leads e conecte o Stract (conta ${esc(CONFIG.CONTA_META)}, uma linha por dia × anúncio) com as colunas: <span style="font-family:DM Mono,monospace;color:#e8e6f0">Date · Campaign Name · Adset Name · Ad Name · Spend · Impressions · Action Link Clicks · Action Landing Page View · Action Leads · Instagram Permalink URL · Campaign ID · Adset ID · Ad ID</span>. Até lá, só a contagem de leads aparece.`);
-  }
-  if(!LEADS_HAS_DATE){
-    avisos.push(LEAD_SRC==='meta'
-      ? `<b>Leads deste período vêm do Meta Ads.</b> A aba de leads não tem coluna de data, então a planilha só informa o total geral (${fmtNum(ALL_LEADS.length)} leads). Para filtrar os leads da planilha por data, inclua uma coluna <b>data</b> (data e hora do cadastro) na aba "${esc(CONFIG.LEADS_TAB)}".`
-      : `<b>A aba de leads não tem coluna de data.</b> O total de leads da planilha vale para a campanha inteira e a evolução diária usa os leads do Meta. Inclua uma coluna <b>data</b> (data e hora do cadastro) na aba "${esc(CONFIG.LEADS_TAB)}" para filtrar os leads por período.`);
-  }
-  if(LEAD_SRC==='planilha' && LEADS.length && GER_OK && ALL_ROWS.length){
-    const rast = LEADS.filter(l=>l.attr && l.attr.setKey).length;
-    const pct = div(rast, LEADS.length)*100;
-    if(pct < 80) avisos.push(`<b>Só ${fmtNum(rast)} de ${fmtNum(LEADS.length)} leads (${fmtPct(pct)}) têm UTM ligada a um anúncio.</b> Nas abas Criativos e Públicos, o CPL usa apenas os leads rastreados; a coluna "Leads Meta" mostra o que o pixel registrou.`);
-  }
-  if(GER_OK && ALL_ROWS.length && !HAS.placement) avisos.push('Sem coluna <b>Posicionamento</b>: Feed vs Stories fica em branco.');
+  const partes = [];
+  partes.push(ALL_ROWS.length
+    ? `<b>Meta Ads</b> · conta ${esc(CONFIG.CONTA_META)} · dados atualizados em <span style="font-family:DM Mono,monospace">${esc(SNAP_AT)}</span> (de hora em hora, das 8h às 23h)`
+    : `<b>Meta Ads</b> · aguardando a primeira leitura da conta ${esc(CONFIG.CONTA_META)} (atualização de hora em hora, das 8h às 23h)`);
+  partes.push(LEAD_SRC==='meta'
+    ? `<b>Leads</b> · neste período vêm do Meta (a planilha não guarda a data do cadastro; em "Tudo" o total é o da planilha)`
+    : `<b>Leads</b> · planilha de leads, lida ao vivo (${fmtNum(ALL_LEADS.length)} únicos)`);
   const n = document.getElementById('notice');
-  if(avisos.length){ n.innerHTML = avisos.join('<br><br>'); n.style.display='block'; }
-  else n.style.display='none';
+  n.innerHTML = partes.join('<br>'); n.style.display='block';
 }
 
 function kpi(label, val, cls, sub){
@@ -723,11 +682,11 @@ function tempCard(tipo, rows, leadsTemp, setCounts){
   let detail = '';
   if(tipo==='quente'){
     if(HAS.placement){
-      const g = groupBy(rows.filter(r=>r.place), r=>r.place);
+      const g = groupBy(PLACE.filter(r=>r.temp==='quente' && r.place), r=>r.place);
       detail = [...g.entries()].sort((x,y)=>agg(y[1]).invest-agg(x[1]).invest).map(([p,rs])=>{
         const b = agg(rs); return `${esc(p)}: ${fmtBRL(b.invest)} · ${fmtNum(b.leadsMeta)} leads Meta · CPL ${fmtBRL(b.cpl)}`;
       }).join('<br>') || '—';
-    } else detail = 'Sem coluna de posicionamento na planilha';
+    } else detail = 'Sem dados de posicionamento';
   } else {
     const g = groupBy(rows, adsetKey);
     detail = [...g.entries()].sort((x,y)=>agg(y[1]).invest-agg(x[1]).invest).map(([k,rs])=>{
@@ -893,7 +852,7 @@ function renderCriativos(T){
       <td>${fmtBRL(a.invest)}</td><td>${fmtNum(a.imp)}</td><td>${fmtNum(a.cliques)}</td><td>${fmtNum(a.pv)}</td><td>${fmtNum(a.leads)}</td>${metaCol(a)}
       <td>${fmtPct(a.ctr)}</td><td>${fmtBRL(a.cpc)}</td><td class="${cplClass(a.cpl)}">${fmtBRL(a.cpl)}</td>
       <td>${fmtPct(a.txEntrada)}</td><td>${fmtPct(a.txCadastro)}</td><td>${fmtPct(a.hook)}</td>
-      <td>${/^https?:\/\//i.test(link) ? `<a class="link-ad" href="${esc(link)}" target="_blank" rel="noopener">ver ↗</a>` : '—'}</td>
+      <td>${/^https?:\/\//i.test(link) ? `<a class="link-ad" href="${esc(link)}" target="_blank" rel="noopener">abrir ↗</a>` : '—'}</td>
       <td>${statusBadge(a)}</td></tr>`;
   });
   if(!R.length) h += `<tr><td colspan="16" style="text-align:left;padding:14px;color:rgba(255,255,255,.45)">Sem dados de anúncios no período.</td></tr>`;
@@ -901,6 +860,7 @@ function renderCriativos(T){
   h += semRastreioRow(extra, 'Sem anúncio identificado', T.leads - attributed);
   h += `<tr class="total"><td></td><td style="text-align:left">Total</td><td>${fmtBRL(T.invest)}</td><td>${fmtNum(T.imp)}</td><td>${fmtNum(T.cliques)}</td><td>${fmtNum(T.pv)}</td><td>${fmtNum(T.leads)}</td>${metaCol(T)}<td>${fmtPct(T.ctr)}</td><td>${fmtBRL(T.cpc)}</td><td>${fmtBRL(T.cpl)}</td><td>${fmtPct(T.txEntrada)}</td><td>${fmtPct(T.txCadastro)}</td><td>${fmtPct(T.hook)}</td><td></td><td></td></tr></tbody>`;
   document.getElementById('tbl-criativos').innerHTML = h;
+  document.getElementById('note-cri').textContent = LEAD_SRC==='meta' ? '' : 'Leads = leads da planilha ligados ao anúncio pela UTM; "Leads Meta" = o que o pixel registrou.';
 }
 
 function renderPublicos(T){
@@ -929,12 +889,12 @@ function renderPublicos(T){
 function renderPlacement(T){
   const el = document.getElementById('tbl-placement');
   if(!HAS.placement){
-    el.innerHTML = `<tbody><tr><td style="text-align:left;padding:14px;color:rgba(255,255,255,.45)">Adicione a coluna <b style="color:#e8e6f0">Posicionamento</b> (Platform Position) na aba do Gerenciador para ver Feed vs Stories por público.</td></tr></tbody>`;
+    el.innerHTML = `<tbody><tr><td style="text-align:left;padding:14px;color:rgba(255,255,255,.45)">Sem dados de posicionamento no período.</td></tr></tbody>`;
     return;
   }
-  const places = ['Feed','Stories','Reels','Outros'].filter(p => ROWS.some(r=>r.place===p));
+  const places = ['Feed','Stories','Reels','Outros'].filter(p => PLACE.some(r=>r.place===p));
   let h = `<thead><tr><th style="text-align:left">Público (conjunto)</th>` + places.map(p=>`<th>${p} · Invest.</th><th>${p} · Leads Meta</th><th>${p} · CPL</th>`).join('') + `</tr></thead><tbody>`;
-  const g = groupBy(ROWS, adsetKey);
+  const g = groupBy(PLACE, adsetKey);
   [...g.entries()].sort((x,y)=>agg(y[1]).invest-agg(x[1]).invest).forEach(([k,rs])=>{
     const [camp, conj] = k.split('\u0001');
     h += `<tr><td class="wrap" style="text-align:left">${esc(conj)}<div class="sub-name">${esc(camp)}</div></td>`;
@@ -945,7 +905,7 @@ function renderPlacement(T){
     h += `</tr>`;
   });
   h += `<tr class="total"><td style="text-align:left">Total</td>`;
-  places.forEach(p=>{ const b = agg(ROWS.filter(r=>r.place===p)); h += `<td>${fmtBRL(b.invest)}</td><td>${fmtNum(b.leads)}</td><td>${fmtBRL(b.cpl)}</td>`; });
+  places.forEach(p=>{ const b = agg(PLACE.filter(r=>r.place===p)); h += `<td>${fmtBRL(b.invest)}</td><td>${fmtNum(b.leads)}</td><td>${fmtBRL(b.cpl)}</td>`; });
   h += `</tr></tbody>`;
   el.innerHTML = h;
 }
