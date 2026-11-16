@@ -264,8 +264,8 @@ const CONFIG = {
   PRODUTO_KEYWORDS:  ['black friday'],
   VALORES_EM_CENTAVOS: false,        // Hotmart já manda em reais
 
-  // ── Fontes que contam como tráfego pago (UTM Source normalizada) ──
-  FONTES_TRAFEGO:    ['metaads'],
+  // ── Orgânico = UTM/SCK contém algum destes trechos; todo o resto é tráfego pago ──
+  MARCADORES_ORGANICO: ['link_in_bio'],
 
   // ── Colunas do Webhook (por nome de cabeçalho) — cenário Make Hotmart ─
   W: {
@@ -401,8 +401,8 @@ const dBRy = d => d ? `${d.slice(8,10)}/${d.slice(5,7)}/${d.slice(0,4)}` : '';
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const div = (a,b) => b ? a/b : 0;
 function isTrafego(s){
-  const src = norm(s.utmSource).replace(/[\s_\-]/g,'');
-  return CONFIG.FONTES_TRAFEGO.includes(src);
+  const txt = norm([s.sck, s.utmSource, s.utmMedium, s.utmCampaign, s.utmContent].join(' '));
+  return !CONFIG.MARCADORES_ORGANICO.some(m => txt.includes(norm(m)));
 }
 function inRange(d, from, to){ return d && (!from || d >= from) && (!to || d <= to); }
 
@@ -479,7 +479,7 @@ function processGerenciador(rows){
   return out;
 }
 
-// SCK da Hotmart: "source|medium|campaign|content" ou "source-medium-campaign-content-adId"
+// SCK da Hotmart: "source|medium|campaign|content", "source-medium-campaign-content-adId" ou "ig-paid-<ids>"
 // (no formato com hífen o ad id final é usado para achar anúncio/conjunto exatos no Gerenciador)
 function parseSck(sck){
   if(!sck) return null;
@@ -496,6 +496,8 @@ function parseSck(sck){
        utmCampaign: ci>0 ? p[ci].trim() : '',
        utmContent: ci>0 ? p.slice(ci+1,end).join('-').trim() : ''};
   }
+  // formatos como "ig-paid-<id>-<id>-<id>": usa o 1º número que for um anúncio do Gerenciador
+  if(!AD_BY_ID[r.adId]){ const hit=(sck.match(/\d{12,}/g)||[]).find(id=>AD_BY_ID[id]); if(hit) r.adId=hit; }
   if(r.adId && AD_BY_ID[r.adId]){ const g=AD_BY_ID[r.adId]; r.utmContent=g.ad; r.utmMedium=g.adset; r.utmCampaign=g.campaign; }
   return r;
 }
@@ -543,7 +545,7 @@ function processSales(rows){
     const s={
       id:t.id, data, hora:parseTime(g('data')), nome:g('cliente'), email:g('email'), produto,
       fatPrincipal:valor, fatOB:0, fatTotal:valor, obCount:0, pagamento:g('pagamento'),
-      utmSource, utmMedium, utmCampaign, utmContent,
+      utmSource, utmMedium, utmCampaign, utmContent, sck,
       isOB:truthy(g('isOB')), txPai:g('txPai'),
     };
     if(s.isOB && s.txPai) obs.push(s); else mains.set(t.id, s);
@@ -678,7 +680,7 @@ function renderTrafego(P,from,to){
   const modo = campMode()==='filtro' && CONFIG.FILTRO_CAMPANHA ? `só campanhas com "<strong>${esc(CONFIG.FILTRO_CAMPANHA)}</strong>" no nome` : 'a conta inteira';
   document.getElementById('ob-info-trafego').innerHTML =
     `Investimento considera ${modo} (troque no seletor do topo). Faturamento vem das vendas aprovadas da Hotmart; ` +
-    `é <strong>tráfego</strong> quando a UTM Source é <code>meta_ads</code>, qualquer outra origem conta como orgânico. ` +
+    `é <strong>orgânico</strong> só quando a UTM traz <code>link_in_bio</code>; todo o resto (inclusive venda sem UTM) conta como <strong>tráfego</strong>. ` +
     `Vendas reembolsadas ou com chargeback ficam de fora. 🛒 OB = order bump somado à venda principal.`;
 
   // Funil
