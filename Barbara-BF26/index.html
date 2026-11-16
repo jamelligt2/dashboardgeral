@@ -261,7 +261,7 @@ const CONFIG = {
 
   // ── Produto principal (Hotmart) ───────────────────────────────────
   //    [] = aceita qualquer produto que chegar no webhook desta planilha
-  PRODUTO_KEYWORDS:  [],
+  PRODUTO_KEYWORDS:  ['black friday'],
   VALORES_EM_CENTAVOS: false,        // Hotmart já manda em reais
 
   // ── Fontes que contam como tráfego pago (UTM Source normalizada) ──
@@ -305,11 +305,12 @@ const CONFIG = {
     statusCampaign: 'Status_campanha',
     statusAdset:    'Status_conjunto',
     statusAd:       'Status_anúncio',
+    adId:           'Ad ID',
   },
 
   // ── Status Hotmart ────────────────────────────────────────────────
   STATUS_APROVADO:    ['APPROVED', 'COMPLETE', 'COMPLETED'],
-  STATUS_REEMBOLSO:   ['REFUNDED', 'CHARGEBACK', 'CANCELLED', 'CANCELED', 'PROTESTED'],
+  STATUS_REEMBOLSO:   ['REFUNDED', 'CHARGEBACK', 'CANCELLED', 'CANCELED', 'PROTESTED', 'DISPUTE'],
 };
 
 const SHEET_ID          = CONFIG.SHEET_ID;
@@ -437,6 +438,7 @@ async function loadData(){
     msg.textContent='Lendo as vendas (Hotmart)...';
     const wText = await fetchSheetCSV(WEBHOOK_SHEET);
     GROWS = processGerenciador(parseCSV(gText));
+    AD_BY_ID = {}; for(const g of GROWS) if(g.adId) AD_BY_ID[g.adId]=g;
     const r = processSales(parseCSV(wText));
     SALES = r.sales.sort((a,b)=> (b.data+b.hora).localeCompare(a.data+a.hora));
     DIAG = r.diag;
@@ -471,11 +473,33 @@ function processGerenciador(rows){
       date, campaign:g('campaign'), adset:g('adset'), ad:g('ad'), link:g('link'),
       inv:num(g('inv')), reach:num(g('reach')), imp:num(g('imp')), cliques:num(g('cliques')),
       pv:num(g('pv')), ck:num(g('ck')),
-      sCamp:g('statusCampaign').toUpperCase(), sAdset:g('statusAdset').toUpperCase(), sAd:g('statusAd').toUpperCase(),
+      adId:g('adId'), sCamp:g('statusCampaign').toUpperCase(), sAdset:g('statusAdset').toUpperCase(), sAd:g('statusAd').toUpperCase(),
     });
   }
   return out;
 }
+
+// SCK da Hotmart: "source|medium|campaign|content" ou "source-medium-campaign-content-adId"
+// (no formato com hífen o ad id final é usado para achar anúncio/conjunto exatos no Gerenciador)
+function parseSck(sck){
+  if(!sck) return null;
+  let r;
+  if(sck.includes('|')){
+    const p=sck.split('|').map(x=>x.trim());
+    r={utmSource:p[0]||'',utmMedium:p[1]||'',utmCampaign:p[2]||'',utmContent:p[3]||'',adId:''};
+  } else {
+    const p=sck.split('-'); let end=p.length, adId='';
+    if(end>1 && /^\d{6,}$/.test(p[end-1].trim())){ adId=p[end-1].trim(); end--; }
+    const ci=p.findIndex((x,i)=>i>0 && i<end && x.trim().startsWith('['));
+    r={utmSource:p[0].trim(),adId,
+       utmMedium: ci>0 ? p.slice(1,ci).join('-').trim() : p.slice(1,end).join('-').trim(),
+       utmCampaign: ci>0 ? p[ci].trim() : '',
+       utmContent: ci>0 ? p.slice(ci+1,end).join('-').trim() : ''};
+  }
+  if(r.adId && AD_BY_ID[r.adId]){ const g=AD_BY_ID[r.adId]; r.utmContent=g.ad; r.utmMedium=g.adset; r.utmCampaign=g.campaign; }
+  return r;
+}
+let AD_BY_ID={};
 
 function processSales(rows){
   const diag={linhas:0,vendas:0,reembolsadas:0,naoAprovadas:0,antesDataMin:0,semProduto:0,obAnexados:0,status:{},fontes:{}};
@@ -510,11 +534,12 @@ function processSales(rows){
     const produto=g('produto');
     if(CONFIG.PRODUTO_KEYWORDS.length && !CONFIG.PRODUTO_KEYWORDS.some(k=>norm(produto).includes(norm(k)))){ diag.semProduto++; continue; }
     let valor=money(g('valor')); if(CONFIG.VALORES_EM_CENTAVOS) valor/=100;
-    // UTMs: colunas separadas → fallback no SCK bruto → SRC
+    // UTMs: o SCK da Hotmart tem prioridade; colunas UTM só como fallback
+    const sck=g('sck') || (g('utmSource').includes('-') && !g('utmMedium') ? g('utmSource') : '');
     let utmSource=g('utmSource'), utmMedium=g('utmMedium'), utmCampaign=g('utmCampaign'), utmContent=g('utmContent');
-    const sck=g('sck');
-    if(!utmSource && sck.includes('|')){ const p=sck.split('|'); [utmSource,utmMedium,utmCampaign,utmContent]=[p[0]||'',p[1]||'',p[2]||'',p[3]||'']; }
-    if(!utmSource) utmSource = g('src') || sck;
+    const ps=parseSck(sck);
+    if(ps){ ({utmSource,utmMedium,utmCampaign,utmContent}=ps); }
+    if(!utmSource) utmSource = g('src');
     const s={
       id:t.id, data, hora:parseTime(g('data')), nome:g('cliente'), email:g('email'), produto,
       fatPrincipal:valor, fatOB:0, fatTotal:valor, obCount:0, pagamento:g('pagamento'),
