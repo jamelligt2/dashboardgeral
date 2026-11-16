@@ -195,10 +195,15 @@ const CONFIG = {
     utmSrc:null, utmTerm:'rppc utm term', utmCamp:'rppc utm campaign', utmMed:'rppc utm medium', utmCont:'rppc utm content',
   },
   // ── Colunas da aba Webhook (cabeçalho; as que não existirem são ignoradas) ──
+  // (cada campo aceita uma lista de nomes possíveis; vale o primeiro que existir)
   W: {
-    status:'status', moeda:'moeda', valor:'valor', produto:'produto', oferta:'oferta',
-    pagamento:'pagamento', nome:'nome', email:'email', pedido:'data_venda', aprov:'data_venda',
-    utmSrc:'utm_source', utmTerm:'utm_term', utmCamp:'utm_campaign', utmMed:'utm_medium', utmCont:'utm_content',
+    status:['status','status venda','situacao','event'], moeda:['moeda','currency'],
+    valor:['valor','valor venda','value','total'], produto:['produto','nome produto','product','product_name'],
+    oferta:['oferta','nome oferta','offer'], pagamento:['pagamento','forma pagamento','payment'],
+    nome:['nome','nome contato','name'], email:['email','email contato'],
+    pedido:['data_venda','data pedido','data','created_at'], aprov:['data_aprovacao','data aprovacao','data_venda','data pedido','data','created_at'],
+    utmSrc:['utm_source'], utmTerm:['utm_term','rppc utm term'], utmCamp:['utm_campaign','rppc utm campaign'],
+    utmMed:['utm_medium','rppc utm medium'], utmCont:['utm_content','rppc utm content'],
   },
   // ── Colunas do Gerenciador (export Meta) ──────────────────────────
   G: {
@@ -234,7 +239,7 @@ function parseDay(s){ const p=parseDT(s); return p?p.d:''; }
 const tsMs = ts => Date.parse(ts.replace(' ','T')+'Z');
 function shiftDT(dt,h){ if(!dt||!h) return dt; const iso=new Date(tsMs(dt.ts)+h*3600000).toISOString(); return {d:iso.slice(0,10), ts:iso.slice(0,10)+' '+iso.slice(11,19)}; }
 function hmap(hdr){ const m={}; hdr.forEach((h,i)=>{ const k=norm(h); if(k && !(k in m)) m[k]=i; }); return m; }
-function colIx(m,name,required){ if(name==null) return -1; const k=norm(name); if(k in m) return m[k]; if(required) throw new Error('Coluna não encontrada: "'+name+'"'); return -1; }
+function colIx(m,name,required){ if(name==null) return -1; const names=Array.isArray(name)?name:[name]; for(const n of names){ const k=norm(n); if(k in m) return m[k]; } if(required) throw new Error('Coluna não encontrada: "'+names[0]+'"'); return -1; }
 
 // ───────────── Gerenciador ─────────────
 function processGerenciador(rows){
@@ -305,8 +310,8 @@ function processSales(vRowsRaw, wRowsRaw, GROWS){
   const stats={webhookLinhas:0, webhookErro:'', dupIgnoradas:0};
   const vRows=readSheetRows(vRowsRaw, CONFIG.V, 'planilha');
   let wRows=[];
-  try{ wRows=wRowsRaw&&wRowsRaw.length?readSheetRows(wRowsRaw, CONFIG.W, 'webhook'):[]; }
-  catch(e){ stats.webhookErro=e.message; }
+  const temLinhas=wRowsRaw&&wRowsRaw.length>1&&wRowsRaw.slice(1).some(r=>r.some(c=>clean(c)!==''));
+  if(temLinhas){ try{ wRows=readSheetRows(wRowsRaw, CONFIG.W, 'webhook'); } catch(e){ stats.webhookErro=e.message; console.warn('Webhook:',e.message); } }
   stats.webhookLinhas=wRows.length;
   const aprov=new Set(CONFIG.STATUS_APROVADO), pN=norm(CONFIG.PRODUTO_NOME);
   const ok=r=>aprov.has(r.status.toUpperCase()) && (!r.moeda||r.moeda==='BRL') && r.aprov && norm(r.produto).includes(pN) && r.aprov.d>=CONFIG.DATA_MINIMA;
@@ -460,9 +465,7 @@ function mkChart(id,type,labels,datasets,opts={}){
 }
 function fonteInfo(){
   const nPl=SALES.filter(s=>s.fonte==='planilha').length, nWb=SALES.filter(s=>s.fonte==='webhook').length;
-  let w='';
-  if(STATS&&STATS.webhookErro) w=`<div class="warn-box">⚠️ A aba <b>Webhook</b> não pôde ser lida (${esc(STATS.webhookErro)}). As vendas depois de ${corteTxt()} não estão entrando — ajuste o mapa de colunas <code>W</code> no CONFIG.</div>`;
-  return w+`<div class="ob-info">📌 <b>Fonte das vendas:</b> aprovadas até <b>${corteTxt()}</b> vêm da aba <b>"${esc(CONFIG.VENDAS_SHEET)}"</b> (${nPl}); depois disso, da aba <b>"${esc(CONFIG.WEBHOOK_SHEET)}"</b> (${nWb}${STATS&&STATS.dupIgnoradas?` · ${STATS.dupIgnoradas} repetida${STATS.dupIgnoradas>1?'s':''} ignorada${STATS.dupIgnoradas>1?'s':''}`:''}). Conta como venda do NCA todo produto aprovado com <b>"${esc(CONFIG.PRODUTO_NOME)}"</b> no nome (inclui o combo com Beleza Longeva). <b>Tráfego</b> = venda com UTM <b>meta_ads</b>; <b>orgânico</b> = qualquer outra origem. <b>Influenciadas pelo tráfego</b> = compras atribuídas pelo Meta no Gerenciador (podem incluir vendas que chegaram sem UTM). Atualiza sozinho a cada 2 min.</div>`;
+  return `<div class="ob-info">📌 Vendas aprovadas do NCA (inclui o combo com Beleza Longeva): <b>${nPl}</b> até ${corteTxt()} + <b>${nWb}</b> depois disso (webhook). <b>Tráfego</b> = venda que chegou pelo link do anúncio (UTM meta_ads); <b>orgânico</b> = todas as outras. Atualiza sozinho a cada 2 min.</div>`;
 }
 
 // ───────────── render ─────────────
@@ -481,34 +484,31 @@ function renderVisao(from,to){
   const temInv=a.inv>0;
   const kpis=`<div class="kpi-grid">
     ${kpi('Vendas totais',int(a.vendas),'orange',brl(a.fat),true)}
-    ${kpi('Influenciadas pelo tráfego',int(a.infl),'green','compras atribuídas no Gerenciador',true)}
     ${kpi('Vendas do tráfego (UTM)',int(a.vT),'',`${brl(a.fatT)} · ${pct(pT)||'0%'}`,true)}
     ${kpi('Vendas orgânicas',int(a.vO),'yellow',`${brl(a.fatO)} · ${pct(pO)||'0%'}`,true)}
     ${kpi('Faturamento total',brl(a.fat),'green')}
     ${kpi('Ticket médio',brl(a.ticket))}
     ${kpi('Checkouts iniciados (Meta)',int(a.ck))}
     ${temInv?kpi('Investimento',brl(a.inv),'orange'):''}
-    ${temInv?kpi('Custo por compra influenciada',brl(a.cacInfl)):''}
   </div>`;
   const split=`<div class="chart-card" style="margin-bottom:16px"><h4>Composição das vendas</h4>
     <div class="split-bar"><div style="width:${pT}%;background:${C_TRAF}"></div><div style="width:${pO}%;background:${C_ORG}"></div></div>
-    <div class="legend-row"><span><span class="dot" style="background:${C_TRAF}"></span>Tráfego (UTM): ${int(a.vT)} · ${pct(pT)||'0%'}</span><span><span class="dot" style="background:${C_ORG}"></span>Orgânico: ${int(a.vO)} · ${pct(pO)||'0%'}</span><span><span class="dot" style="background:${C_INFL}"></span>Influenciadas (Meta): ${int(a.infl)}</span></div></div>`;
+    <div class="legend-row"><span><span class="dot" style="background:${C_TRAF}"></span>Tráfego (UTM): ${int(a.vT)} · ${pct(pT)||'0%'}</span><span><span class="dot" style="background:${C_ORG}"></span>Orgânico: ${int(a.vO)} · ${pct(pO)||'0%'}</span></div></div>`;
   const ch=`<div class="chart-grid-2x2">
     <div class="chart-card"><h4>Vendas por dia — tráfego x orgânico</h4><div class="chart-box"><canvas id="ch-dia"></canvas></div></div>
     <div class="chart-card"><h4>Vendas por origem</h4><div class="chart-box"><canvas id="ch-origem"></canvas></div></div></div>`;
   const rows=[...dias].reverse().map(d=>{
     const x=agg(GROWS.filter(g=>g.date===d),SALES.filter(s=>s.data===d));
-    return `<tr><td>${fdate(d)}</td><td>${int(x.vendas)}</td><td>${brl(x.fat)}</td><td>${int(x.vT)}</td><td>${int(x.vO)}</td><td>${int(x.infl)}</td><td>${int(x.ck)}</td><td>${brl(x.ticket)}</td></tr>`;
+    return `<tr><td>${fdate(d)}</td><td>${int(x.vendas)}</td><td>${brl(x.fat)}</td><td>${int(x.vT)}</td><td>${int(x.vO)}</td><td>${int(x.ck)}</td><td>${brl(x.ticket)}</td></tr>`;
   }).join('');
-  const tot=`<tr class="total"><td>Total</td><td>${int(a.vendas)}</td><td>${brl(a.fat)}</td><td>${int(a.vT)}</td><td>${int(a.vO)}</td><td>${int(a.infl)}</td><td>${int(a.ck)}</td><td>${brl(a.ticket)}</td></tr>`;
-  const tbl=`<div class="sec-title">Dia a dia</div><div class="tbl-wrap"><table><thead><tr><th>Data</th><th>Vendas totais</th><th>Faturamento</th><th>Tráfego (UTM)</th><th>Orgânico</th><th>Influenciadas (Meta)</th><th>Checkouts (Meta)</th><th>Ticket médio</th></tr></thead><tbody>${rows||'<tr><td colspan="8" class="empty">Sem dados no período.</td></tr>'}${rows?tot:''}</tbody></table></div>`;
+  const tot=`<tr class="total"><td>Total</td><td>${int(a.vendas)}</td><td>${brl(a.fat)}</td><td>${int(a.vT)}</td><td>${int(a.vO)}</td><td>${int(a.ck)}</td><td>${brl(a.ticket)}</td></tr>`;
+  const tbl=`<div class="sec-title">Dia a dia</div><div class="tbl-wrap"><table><thead><tr><th>Data</th><th>Vendas totais</th><th>Faturamento</th><th>Tráfego (UTM)</th><th>Orgânico</th><th>Checkouts (Meta)</th><th>Ticket médio</th></tr></thead><tbody>${rows||'<tr><td colspan="7" class="empty">Sem dados no período.</td></tr>'}${rows?tot:''}</tbody></table></div>`;
   document.getElementById('tab-visao').innerHTML=fonteInfo()+kpis+split+ch+tbl;
 
   const per=dias.map(d=>agg(GROWS.filter(g=>g.date===d),SALES.filter(s=>s.data===d)));
   mkChart('ch-dia','bar',dias.map(fshort),[
     {label:'Tráfego (UTM)',data:per.map(x=>x.vT),backgroundColor:C_TRAF,stack:'v',borderRadius:3},
-    {label:'Orgânico',data:per.map(x=>x.vO),backgroundColor:C_ORG,stack:'v',borderRadius:3},
-    {label:'Influenciadas (Meta)',data:per.map(x=>x.infl),backgroundColor:C_INFL,stack:'i',borderRadius:3}],
+    {label:'Orgânico',data:per.map(x=>x.vO),backgroundColor:C_ORG,stack:'v',borderRadius:3}],
     {scales:{x:{...AX,stacked:true,grid:{display:false}},y:{...AX,stacked:true,beginAtZero:true,ticks:{...AX.ticks,precision:0}}}});
   const og={}; ss.forEach(s=>{ og[s.origem]=(og[s.origem]||0)+1; });
   const oList=Object.entries(og).sort((x,y)=>y[1]-x[1]);
@@ -524,12 +524,12 @@ function groupBy(gr, ss, keyG, keyS){
     if(r.date>=o.last){ o.last=r.date; o.sCamp=r.sCamp; o.sAdset=r.sAdset; o.sAd=r.sAd; if(r.link) o.link=r.link; } });
   ss.forEach(s=>{ const k=keyS(s); if(!k) return; const o=m[k]||(m[k]=blank(k)); o.vUtm++; o.fat+=s.valor; });
   return Object.values(m).map(o=>{ o.ativo=o.last!==''&&!isPaused(o.sAd)&&!isPaused(o.sAdset)&&!isPaused(o.sCamp); o.ctr=o.imp?o.cliques/o.imp*100:0; return o; })
-    .sort((a,b)=>(b.infl+b.vUtm)-(a.infl+a.vUtm)||b.ck-a.ck||b.cliques-a.cliques);
+    .sort((a,b)=>b.vUtm-a.vUtm||b.ck-a.ck||b.cliques-a.cliques);
 }
 function groupTable(title, list, withLink){
   const temInv=list.some(o=>o.inv>0);
-  const rows=list.map(o=>`<tr><td>${withLink&&o.link?`<a href="${esc(o.link)}" target="_blank" rel="noopener" style="color:#ff9a3c;text-decoration:none">${esc(o.name)} ↗</a>`:esc(o.name)}</td><td>${o.last?(o.ativo?'<span class="green">ativo</span>':'<span style="color:rgba(255,255,255,.4)">pausado</span>'):'<span style="color:rgba(255,255,255,.4)">fora do Gerenciador</span>'}</td>${temInv?`<td>${brl(o.inv)}</td>`:''}<td>${int(o.imp)}</td><td>${int(o.cliques)}</td><td>${pct(o.ctr)}</td><td>${int(o.pv)}</td><td>${int(o.ck)}</td><td class="green">${int(o.infl)}</td><td>${int(o.vUtm)}</td><td>${brl(o.fat)}</td></tr>`).join('');
-  return `<div class="sec-title">${title}</div><div class="tbl-wrap"><table><thead><tr><th>Nome</th><th>Status</th>${temInv?'<th>Invest.</th>':''}<th>Impr.</th><th>Cliques</th><th>CTR</th><th>Page View</th><th>Checkout</th><th>Influenciadas (Meta)</th><th>Vendas UTM</th><th>Fat. UTM</th></tr></thead><tbody>${rows||'<tr><td colspan="11" class="empty">Sem dados.</td></tr>'}</tbody></table></div>`;
+  const rows=list.map(o=>`<tr><td>${withLink&&o.link?`<a href="${esc(o.link)}" target="_blank" rel="noopener" style="color:#ff9a3c;text-decoration:none">${esc(o.name)} ↗</a>`:esc(o.name)}</td><td>${o.last?(o.ativo?'<span class="green">ativo</span>':'<span style="color:rgba(255,255,255,.4)">pausado</span>'):'<span style="color:rgba(255,255,255,.4)">fora do Gerenciador</span>'}</td>${temInv?`<td>${brl(o.inv)}</td>`:''}<td>${int(o.imp)}</td><td>${int(o.cliques)}</td><td>${pct(o.ctr)}</td><td>${int(o.pv)}</td><td>${int(o.ck)}</td><td>${int(o.vUtm)}</td><td>${brl(o.fat)}</td></tr>`).join('');
+  return `<div class="sec-title">${title}</div><div class="tbl-wrap"><table><thead><tr><th>Nome</th><th>Status</th>${temInv?'<th>Invest.</th>':''}<th>Impr.</th><th>Cliques</th><th>CTR</th><th>Page View</th><th>Checkout</th><th>Vendas (tráfego)</th><th>Faturamento</th></tr></thead><tbody>${rows||'<tr><td colspan="10" class="empty">Sem dados.</td></tr>'}</tbody></table></div>`;
 }
 
 function renderTrafego(from,to){
@@ -539,21 +539,21 @@ function renderTrafego(from,to){
     ${temInv?kpi('Investimento',brl(a.inv),'orange'):''}
     ${kpi('Impressões',int(a.imp))}${kpi('Alcance',int(a.reach))}${kpi('Cliques no link',int(a.cliques))}
     ${kpi('CTR',pct(a.ctr))}${kpi('Page views',int(a.pv))}${kpi('Checkouts iniciados',int(a.ck))}
-    ${kpi('Compras influenciadas',int(a.infl),'green')}${kpi('Vendas com UTM meta_ads',int(a.vT),'orange',brl(a.fatT))}
-    ${temInv?kpi('CPC',brl(a.cpc))+kpi('Custo por compra infl.',brl(a.cacInfl)):''}
+    ${kpi('Vendas do tráfego',int(a.vT),'orange',brl(a.fatT))}
+    ${temInv?kpi('CPC',brl(a.cpc))+kpi('Custo por venda',brl(a.vT?a.inv/a.vT:0)):''}
   </div>`;
-  const steps=[['Cliques no link',a.cliques],['Page views',a.pv],['Checkouts iniciados',a.ck],['Compras influenciadas',a.infl]];
+  const steps=[['Cliques no link',a.cliques],['Page views',a.pv],['Checkouts iniciados',a.ck],['Vendas do tráfego',a.vT]];
   const top=Math.max(...steps.map(s=>s[1]),1);
   const bars=steps.map(([l,v])=>`<div class="funil-bar-wrap"><div class="funil-label"><span>${l}</span><span style="font-family:'DM Mono',monospace">${nf(v)}</span></div><div class="funil-bar-bg"><div class="funil-bar-fill" style="width:${Math.max(v/top*100,v?2:0)}%"></div></div></div>`).join('');
   const rate=(n,d)=>d?nf(n/d*100,1)+'%':'—';
-  const taxas=[['Clique → Page view',rate(a.pv,a.cliques)],['Page view → Checkout',rate(a.ck,a.pv)],['Checkout → Compra',rate(a.infl,a.ck)],['Clique → Compra',rate(a.infl,a.cliques)]]
+  const taxas=[['Clique → Page view',rate(a.pv,a.cliques)],['Page view → Checkout',rate(a.ck,a.pv)],['Checkout → Venda',rate(a.vT,a.ck)],['Clique → Venda',rate(a.vT,a.cliques)]]
     .map(([l,v])=>`<div class="taxa-item"><span>${l}</span><span class="taxa-val">${v}</span></div>`).join('');
   const funil=`<div class="sec-title">Funil — Meta Ads (Gerenciador)</div><div class="funil-section"><div>${bars}</div><div class="taxa-grid">${taxas}</div></div>`;
   const tS=ss.filter(s=>s.isTrafego);
   const cri=groupTable('Criativos',groupBy(gr,tS,r=>r.ad,s=>s.criativo),true);
   const pub=groupTable('Públicos (conjuntos)',groupBy(gr,tS,r=>r.adset,s=>s.publico),false);
   const camp=groupTable('Campanhas',groupBy(gr,tS,r=>r.campaign,s=>s.campanha||'(sem campanha)'),false);
-  const nota=tS.some(s=>!s.ncaCamp)?`<div class="ob-info">ℹ️ ${tS.filter(s=>!s.ncaCamp).length} venda(s) de tráfego chegaram por anúncios de <b>outras campanhas</b> (ex.: Detox/SOS) — aparecem em "Vendas UTM" com o nome da campanha de origem.</div>`:'';
+  const nota=tS.some(s=>!s.ncaCamp)?`<div class="ob-info">ℹ️ ${tS.filter(s=>!s.ncaCamp).length} venda(s) de tráfego chegaram por anúncios de <b>outras campanhas</b> (ex.: Detox/SOS) — aparecem nas tabelas abaixo com o nome da campanha de origem.</div>`:'';
   document.getElementById('tab-trafego').innerHTML=kpis+funil+nota+camp+pub+cri;
 }
 
