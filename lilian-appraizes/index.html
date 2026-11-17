@@ -320,7 +320,7 @@ const CONFIG = {
   // ── Planilha (abas lidas pelo GID, não pelo nome) ────────────────
   SHEET_ID:         '1r88hg8IumqL6rrQ2WZSVgCZ-Bo7ZVAtuyupuEYBrgD0', // JGTCL0049 - Lilian Pizzol | APP
   GERENCIADOR_GID:  '0',          // aba Meta_Ads  (gestão de tráfego)
-  WEBHOOK_GID:      '567700713',  // aba "Weebhook " (vendas Eduzz)
+  WEBHOOK_GID:      '567700713',  // aba "Weebhook_Make" (vendas Eduzz via Make)
   DATA_MINIMA:      '2026-11-09', // início da campanha [JGT] [APP] PP091126 (09/11/2026)
 
   // ── Produto principal (vendas) ───────────────────────────────────
@@ -392,6 +392,13 @@ function findCol(hdr, names){
   return -1;
 }
 
+// Só aceita nome de coluna exato (evita confundir colunas parecidas)
+function findColExact(hdr, names){
+  const h = hdr.map(normStr);
+  for(const n of names){ const i=h.indexOf(normStr(n)); if(i>=0) return i; }
+  return -1;
+}
+
 // Método 1: CSV via fetch (funciona no domínio publicado)
 async function fetchCSVRows(gid, label){
   const url = `https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/gviz/tq?tqx=out:csv&gid=${gid}`;
@@ -423,7 +430,13 @@ function fetchJSONPRows(gid, label){
       if(!resp||resp.status!=='ok'||!resp.table){ reject(new Error('resposta inválida')); return; }
       const t=resp.table;
       const rows=[t.cols.map(c=>c.label||'')];
-      for(const r of t.rows) rows.push(r.c.map(c=>c?(c.f!=null?c.f:(c.v==null?'':String(c.v))):''));
+      // Número exibido em notação científica (ex.: telefone "5,56E+12"): usa o valor completo
+      const cell=c=>{
+        if(!c) return '';
+        if(typeof c.v==='number' && c.f!=null && /e[+-]?\d/i.test(c.f)) return Number.isInteger(c.v)?c.v.toFixed(0):String(c.v);
+        return c.f!=null?c.f:(c.v==null?'':String(c.v));
+      };
+      for(const r of t.rows) rows.push(r.c.map(cell));
       resolve(rows);
     };
     s.onerror=()=>{ cleanup(); reject(new Error('falha ao carregar script')); };
@@ -432,6 +445,21 @@ function fetchJSONPRows(gid, label){
   });
 }
 async function fetchRows(gid, label){
+  let csvRows=null;
+  try{ csvRows=await fetchCSVRows(gid,label); }
+  catch(e1){
+    try{ return await fetchJSONPRows(gid,label); }
+    catch(e2){
+      throw new Error(`Não consegui ler a aba "${label}" (${e1.message}; ${e2.message}). Verifique se a planilha está compartilhada como "qualquer pessoa com o link" e se há conexão.`);
+    }
+  }
+  // O CSV traz números longos (telefones) já cortados em notação científica; nesse caso relê pela via que traz o valor completo
+  if(csvRows.some(r=>r.some(x=>/^\d+(,\d+)?E\+\d+$/i.test(String(x).trim())))){
+    try{ return await fetchJSONPRows(gid,label); }catch(e){ /* mantém o CSV */ }
+  }
+  return csvRows;
+}
+async function fetchRowsLegacy(gid, label){
   try{ return await fetchCSVRows(gid,label); }
   catch(e1){
     try{ return await fetchJSONPRows(gid,label); }
@@ -462,7 +490,7 @@ async function loadData(){
   try{
     const [gt,wt] = await Promise.all([
       fetchRows(CONFIG.GERENCIADOR_GID,'Meta_Ads'),
-      fetchRows(CONFIG.WEBHOOK_GID,'Weebhook')
+      fetchRows(CONFIG.WEBHOOK_GID,'Weebhook_Make')
     ]);
     GROWS = processGerenciador(gt);
     const s = processSales(wt);
@@ -517,8 +545,12 @@ const RX_PEND = /pendente|pending|aguardando|aberta|waiting/;
 const RX_IGN  = /commission|contract|ping|test/;
 // Valida telefone brasileiro: 10 dígitos (fixo) ou 11 (celular com 9), com DDD válido
 function validarFone(raw){
-  let d=String(raw==null?'':raw).replace(/\D/g,'');
+  const txt=String(raw==null?'':raw).trim();
+  // Coluna formatada como número na planilha: vem "5,57E+12" ou arredondado (5565000000000)
+  if(/e\+/i.test(txt)) return {raw:txt,fmt:txt,ok:false,motivo:'número cortado na planilha',cortado:true};
+  let d=txt.replace(/\D/g,'');
   if(!d) return {raw:'',fmt:'',ok:false,motivo:'sem telefone'};
+  if(d.length>=12 && /0{6,}$/.test(d)) return {raw:d,fmt:d,ok:false,motivo:'número cortado na planilha',cortado:true};
   if(d.startsWith('55') && (d.length===12||d.length===13)) d=d.slice(2);
   const ddd=parseInt(d.slice(0,2),10);
   if(d.length===8||d.length===9) return {raw:d,fmt:d,ok:false,motivo:'sem DDD'};
@@ -536,23 +568,25 @@ function processSales(rows){
   if(rows.length<2) return {sales:[],diag};
   const hdr=rows[0];
   const C={
-    evento: findCol(hdr,['event_name','event']),
-    data:   findCol(hdr,['trans_paiddate','trans_createdate']),
-    fatura: findCol(hdr,['trans_orderid','trans_cod']),
-    cliente:findCol(hdr,['cus_name']),
-    email:  findCol(hdr,['cus_email']),
-    cel:    findCol(hdr,['cus_cel']),
+    // Aceita a aba nova do Make (Data, Produto, Status, Cliente, Email, Faturado, utm_*)
+    // e o formato antigo da Eduzz (trans_*, cus_*, product_name)
+    evento: findCol(hdr,['status','event_name','event']),
+    data:   findCol(hdr,['data','trans_paiddate','trans_createdate']),
+    fatura: findColExact(hdr,['fatura','trans_orderid','trans_cod']), // só nome exato: "Faturado" é o valor, não o nº da fatura
+    cliente:findCol(hdr,['cliente','cus_name']),
+    email:  findCol(hdr,['email','cus_email']),
+    cel:    findCol(hdr,['contato','telefone','celular','whatsapp','cus_cel']),
     tel:    findCol(hdr,['cus_tel']),
     tel2:   findCol(hdr,['cus_tel2']),
-    produto:findCol(hdr,['product_name']),
-    valor:  findCol(hdr,['trans_value']),
+    produto:findCol(hdr,['produto','product_name']),
+    valor:  findCol(hdr,['faturado','valor total','valor','trans_value']),
     valorIt:findCol(hdr,['trans_items[0].item_value']),
     uSrc:   findCol(hdr,['utm_source','tracker_utm_source']),
     uMed:   findCol(hdr,['utm_medium','tracker_utm_medium']),
-    uCmp:   findCol(hdr,['utm_campaign','tracker_utm_campaign']),
+    uCmp:   findCol(hdr,['utm_campaign','utm_campaing','tracker_utm_campaign']),
     uCnt:   findCol(hdr,['utm_content','tracker_utm_content']),
   };
-  if(C.data<0||C.produto<0) throw new Error('Aba Weebhook: não encontrei as colunas de data/produto da Eduzz.');
+  if(C.data<0||C.produto<0) throw new Error('Aba Weebhook_Make: não encontrei as colunas Data e Produto.');
   const isMain = p => { const n=normStr(p); return CONFIG.PRODUTO_KEYWORDS.some(k=>n.includes(k)); };
   const groups=new Map();
   for(let i=1;i<rows.length;i++){
@@ -593,7 +627,7 @@ function processSales(rows){
     const g=main.g;
     const s={
       data:main.data, nome:g('cliente'), email:g('email'), produto:main.produto, plano:planoOf(main.produto), fatura:key,
-      fone:validarFone(g('cel')||g('tel')||g('tel2')),
+      fone:(C.cel<0&&C.tel<0&&C.tel2<0)?{raw:'',fmt:'',ok:true,semColuna:true}:validarFone(g('cel')||g('tel')||g('tel2')),
       fatTotal, fatPrincipal, fatOB, temOB:fatOB>0.01,
       utmSource:g('uSrc'), utmMedium:g('uMed'), utmCampaign:g('uCmp'), utmContent:g('uCnt'),
     };
@@ -773,7 +807,9 @@ function renderTrafego({t,sales}){
 
   // avisos de diagnóstico
   const msgs=[];
-  const foneRuim=sales.filter(s=>!s.fone.ok).length;
+  const foneCortado=sales.filter(s=>s.fone.cortado).length;
+  const foneRuim=sales.filter(s=>!s.fone.ok&&!s.fone.semColuna&&!s.fone.cortado).length;
+  if(foneCortado) msgs.push(`⚠️ <b>${foneCortado} telefone(s)</b> chegaram cortados (ex.: 5,57E+12). Na aba Weebhook_Make, formate a coluna <b>Contato</b> como texto sem formatação e envie o telefone como texto no Make.`);
   const semUtm=sales.filter(s=>!s.utmSource).length;
   if(semUtm) msgs.push(`⚠️ <b>${semUtm} venda(s)</b> chegaram da Eduzz sem UTM e entram como orgânicas. Confira se os links dos anúncios levam <b>utm_source=meta_ads</b> até o checkout.`);
   if(foneRuim) msgs.push(`⚠️ <b>${foneRuim} venda(s)</b> com telefone inválido ou ausente (veja o aviso no card da venda).`);
@@ -801,7 +837,7 @@ function renderTrafego({t,sales}){
       <div class="sale-val">${fmtBRL(s.fatTotal)}</div>
       <div class="sale-ob" style="color:rgba(255,255,255,.55)">📱 Plano ${esc(s.plano)}</div>
       ${s.temOB?`<div class="sale-ob">🛒 OB: ${fmtBRL(s.fatOB)}</div>`:''}
-      <div class="sale-meta">${fmtDate(s.data)}<br>📞 ${s.fone.raw?esc(s.fone.fmt)+(s.fone.ok?' <span class="green">✓ válido</span>':' <span class="yellow">⚠ '+esc(s.fone.motivo)+'</span>'):'<span class="yellow">⚠ sem telefone</span>'}<br>Criativo: ${esc(s.utmContent||'—')}<br>Público: ${esc(s.utmMedium||'—')}<br>Origem: ${esc(origem)}</div>
+      <div class="sale-meta">${fmtDate(s.data)}<br>${s.fone.semColuna?'':'📞 '+(s.fone.raw?esc(s.fone.fmt)+(s.fone.ok?' <span class="green">✓ válido</span>':' <span class="yellow">⚠ '+esc(s.fone.motivo)+'</span>'):'<span class="yellow">⚠ sem telefone</span>')+'<br>'}Criativo: ${esc(s.utmContent||'—')}<br>Público: ${esc(s.utmMedium||'—')}<br>Origem: ${esc(origem)}</div>
     </div>`;
   }).join(''):'<div class="empty">Nenhuma venda no período.</div>';
 }
