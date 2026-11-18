@@ -583,6 +583,7 @@ function showTab(id,el){
 // ───────────── helpers de UI ─────────────
 const kpi=(label,value,cls='',sub='')=>`<div class="kpi-card"><div class="kpi-label">${label}</div><div class="kpi-value ${cls}">${value}</div>${sub?`<div class="kpi-sub">${sub}</div>`:''}</div>`;
 const obTxt=n=>n?`+${n} OB`:'';
+const HAS_INV=()=>GROWS.some(g=>g.inv>0);  // investimento só aparece quando a coluna de gasto existir no Gerenciador
 function mkChart(id,type,labels,datasets,opts={}){
   if(charts[id]){ charts[id].destroy(); delete charts[id]; }
   const cv=document.getElementById(id); if(!cv||typeof Chart==='undefined') return;
@@ -614,20 +615,17 @@ function renderTrafego(from,to){
   const nPl=SALES.filter(s=>s.fonte==='planilha').length, nWb=SALES.filter(s=>s.fonte==='webhook').length;
   const info=`<div class="ob-info">📌 <b>Regra de fonte das vendas:</b> até <b>${corteTxt}</b> as vendas vêm da aba <b>"${esc(CONFIG.VENDAS_SHEET)}"</b> (${nPl} venda${nPl===1?'':'s'}); depois disso vêm da aba <b>"${esc(CONFIG.WEBHOOK_SHEET)}"</b> (${nWb} venda${nWb===1?'':'s'} aprovada${nWb===1?'':'s'}${STATS?` · ${STATS.webhookLinhas} linha${STATS.webhookLinhas===1?'':'s'} lida${STATS.webhookLinhas===1?'':'s'} no webhook`:''}). Venda = produto principal <b>${esc(CONFIG.PRODUTO)}</b> aprovado; e-books aprovados no mesmo checkout entram como <b>order bump</b>. Tráfego = origem <b>meta_ads</b>. Início da contagem: ${fdate(CONFIG.DATA_MINIMA)}. Atualização automática a cada 2 min.</div>`;
   const kpis=`<div class="kpi-grid">
-    ${kpi('Investimento (Meta Ads)',brl(a.inv),'orange')}
+    ${HAS_INV()?kpi('Investimento (Meta Ads)',brl(a.inv),'orange'):''}
     ${kpi('Fat. Tráfego',brl(a.fatT),'green')}
     ${kpi('Fat. Orgânico',brl(a.fatO),'yellow')}
-    ${kpi('ROAS Tráfego',rx(a.roasT),a.roasT>=1?'green':(a.roasT?'red':''))}
+    ${HAS_INV()?kpi('ROAS Tráfego',rx(a.roasT),a.roasT>=1?'green':(a.roasT?'red':'')):''}
     ${kpi('Vendas Tráfego',int(a.vT)||'0','',obTxt(a.obT))}
     ${kpi('Vendas Orgânico',int(a.vO)||'0','',obTxt(a.obO))}
-    ${kpi('Fat. OB Tráfego',brl(a.obFatT))}
-    ${kpi('Fat. OB Orgânico',brl(a.obFatO))}
-    ${kpi('CAC',brl(a.cacT))}
+    ${HAS_INV()?kpi('CAC',brl(a.cacT)):''}
     ${kpi('Ticket Médio',brl(a.ticket))}
     ${kpi('Cliques',int(a.cliques))}
     ${kpi('Impressões',int(a.imp))}
-    ${kpi('CPC',brl(a.cpc))}
-    ${kpi('CPM',brl(a.cpm))}
+    ${HAS_INV()?kpi('CPC',brl(a.cpc))+kpi('CPM',brl(a.cpm)):kpi('CTR',pct(a.ctr))+kpi('Checkouts',int(a.ck))}
   </div>`;
   const steps=[['Cliques',a.cliques],['Page View',a.pv],['Checkouts',a.ck],['Compras (tráfego)',a.vT]];
   const top=steps[0][1]||1;
@@ -654,10 +652,10 @@ function renderVisao(from,to){
   const gr=GROWS.filter(g=>inR(g.date,from,to)), ss=SALES.filter(s=>inR(s.data,from,to));
   const a=agg(gr,ss);
   const kpis=`<div class="kpi-grid">
-    ${kpi('Investimento',brl(a.inv),'orange')}${kpi('Fat. Total',brl(a.fat),'green')}
-    ${kpi('ROAS Total',rx(a.roas),a.roas>=1?'green':(a.roas?'red':''))}
+    ${HAS_INV()?kpi('Investimento',brl(a.inv),'orange'):''}${kpi('Fat. Total',brl(a.fat),'green')}
+    ${HAS_INV()?kpi('ROAS Total',rx(a.roas),a.roas>=1?'green':(a.roas?'red':'')):''}
     ${kpi('Vendas Total',int(a.vendas)||'0')}${kpi('Tráfego',int(a.vT)||'0','',obTxt(a.obT))}${kpi('Orgânicas',int(a.vO)||'0','',obTxt(a.obO))}
-    ${kpi('Ticket Médio',brl(a.ticket))}${kpi('CAC Total',brl(a.cac))}
+    ${kpi('Ticket Médio',brl(a.ticket))}${HAS_INV()?kpi('CAC Total',brl(a.cac)):''}
   </div>`;
   const rows=[...dias].reverse().map(d=>{
     const x=agg(GROWS.filter(g=>g.date===d), SALES.filter(s=>s.data===d));
