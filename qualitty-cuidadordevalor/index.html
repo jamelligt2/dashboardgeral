@@ -225,7 +225,10 @@ const CONFIG = {
   // ── Produto (vendas Kiwify) ──
   PRODUTO_KEYWORDS: ['cuidador'],      // palavras que identificam o produto na coluna Product.product_name
   VALORES_EM_CENTAVOS: true,           // Kiwify envia em centavos
-  TRAFEGO_SOURCES: ['metaads'],        // utm_source (sem espaço/_/-) que conta como tráfego pago
+  // Venda conta como TRÁFEGO PAGO se: utm_source for da Meta (meta_ads, ig, fb...) com utm_medium pago,
+  // OU utm_source = meta_ads, OU utm_medium pago (paid/cpc), OU utm_campaign/utm_content vierem como ID numérico do Meta (parâmetros dinâmicos)
+  TRAFEGO_SOURCES: ['metaads','ig','fb','facebook','instagram','meta','instagramads','facebookads'],
+  TRAFEGO_MEDIUMS: ['paid','cpc','ppc','paidsocial','paidmedia'],
 
   // ── Colunas do Webhook (Kiwify) — por nome de cabeçalho ──
   W: {
@@ -234,7 +237,8 @@ const CONFIG = {
     produto:'Product.product_name', cliente:'Customer.full_name', email:'Customer.email', fone:'Customer.mobile',
     valorBase:'Commissions.product_base_price', valorCobrado:'Commissions.charge_amount',
     utmSource:'TrackingParameters.utm_source', utmMedium:'TrackingParameters.utm_medium',
-    utmCampaign:'TrackingParameters.utm_campaign', utmContent:'TrackingParameters.utm_content'
+    utmCampaign:'TrackingParameters.utm_campaign', utmContent:'TrackingParameters.utm_content',
+    utmTerm:'TrackingParameters.utm_term'
   }
 };
 
@@ -339,18 +343,27 @@ function parseAds(rows){
   const ix = (n,d) => { const i = h.indexOf(norm(n)); return i>=0 ? i : d };
   const c = {date:ix('Date',0),camp:ix('Campaign Name',1),adset:ix('Adset Name',2),ad:ix('Ad Name',3),link:ix('Instagram Permalink URL',4),
     inv:ix('Spend (Cost, Amount Spent)',5),imp:ix('Impressions',6),reach:ix('Reach (Estimated)',7),cl:ix('Action Link Clicks',8),
-    pv:ix('Action Landing Page View',9),ck:ix('Action Omni Initiated Checkout',10),st:ix('Account Status',12)};
+    pv:ix('Action Landing Page View',9),ck:ix('Action Omni Initiated Checkout',10),adId:ix('Ad ID',11),st:ix('Account Status',12)};
   const out = [];
   for(let i=1;i<rows.length;i++){
     const r = rows[i]; const data = parseDate(r[c.date]);
     if(!data || (CONFIG.DATA_MINIMA && data < CONFIG.DATA_MINIMA)) continue;
     out.push({data,camp:r[c.camp]||'',adset:(r[c.adset]||'').trim(),ad:(r[c.ad]||'').replace(/\s+/g,' ').trim(),link:r[c.link]||'',
+      adId:String(r[c.adId]||'').replace(/\D/g,''),
       inv:num(r[c.inv]),imp:num(r[c.imp]),reach:num(r[c.reach]),cl:num(r[c.cl]),pv:num(r[c.pv]),ck:num(r[c.ck]),st:String(r[c.st]||'').toUpperCase()});
   }
   return out;
 }
 
-const isTrafego = s => CONFIG.TRAFEGO_SOURCES.includes(String(s.utmSource||'').toLowerCase().replace(/[\s_-]/g,''));
+const slug = x => String(x||'').toLowerCase().replace(/[\s_\-.]/g,'');
+const isMetaId = x => /^\d{12,}$/.test(String(x||'').trim());
+const isTrafego = s => {
+  const src = slug(s.utmSource), med = slug(s.utmMedium);
+  if(src === 'metaads') return true;                                              // padrão da agência
+  if(CONFIG.TRAFEGO_MEDIUMS.includes(med)) return true;                           // utm_medium=paid (ex.: ig / paid)
+  if(CONFIG.TRAFEGO_SOURCES.includes(src) && (isMetaId(s.utmCampaign) || isMetaId(s.utmContent))) return true; // ig/fb com IDs do Meta
+  return false;
+};
 
 function processSales(rows){
   const diag = {linhas:0,vendas:0,reembolsadas:0,semProduto:0,antesDataMin:0,naoAprovadas:0,produtos:{}};
@@ -381,7 +394,7 @@ function processSales(rows){
     let v = num(g('valorBase')) || num(g('valorCobrado'));   // sempre o valor do produto (sem juro de parcelamento)
     if(CONFIG.VALORES_EM_CENTAVOS) v = v/100;
     const s = {data,nome:g('cliente'),email:g('email'),fone:g('fone'),fatTotal:v,fatPrincipal:v,fatOB:0,
-      utmSource:g('utmSource'),utmMedium:g('utmMedium'),utmCampaign:g('utmCampaign'),utmContent:g('utmContent')};
+      utmSource:g('utmSource'),utmMedium:g('utmMedium'),utmCampaign:g('utmCampaign'),utmContent:g('utmContent'),utmTerm:g('utmTerm')};
     s.trafego = isTrafego(s);
     diag.vendas++; sales.push(s);
   }
@@ -408,23 +421,32 @@ function sumSales(list){
 
 // ── Matching venda → criativo/público via UTM ──────────────────────
 const tok = s => norm(s).replace(/[^a-z0-9]+/g,' ').trim();
-function matchAd(sale, adName){
-  const u = tok(sale.utmContent); if(!u) return false;
-  const a = tok(adName); const code = a.split(' ')[0];
-  return u.includes(a) || a.includes(u) || (code.length>=3 && u.split(' ').includes(code));
+// Quando o UTM vem como ID numérico do Meta (utm_content = ID do anúncio), liga pela coluna "Ad ID" da aba Meta_Ads.
+// Quando vem como nome, liga pelo texto.
+const AD_BY_ID = () => { const m = {}; ADS.forEach(a=>{ if(a.adId) m[a.adId] = a }); return m };
+function matchAd(sale, ent){
+  const u = String(sale.utmContent||'').trim(); if(!u) return false;
+  if(isMetaId(u)) return ent.adIds.has(u);
+  const t = tok(u), a = tok(ent.nome), code = a.split(' ')[0];
+  return t.includes(a) || a.includes(t) || (code.length>=3 && t.split(' ').includes(code));
 }
-function matchAdset(sale, adset){
+function matchAdset(sale, ent){
+  const c = String(sale.utmContent||'').trim();
+  if(isMetaId(c)){ const ad = AD_BY_ID()[c]; return !!ad && ad.adset === ent.nome }   // público do anúncio que gerou a venda
   const u = tok(sale.utmMedium); if(!u) return false;
-  const a = tok(adset);
+  const a = tok(ent.nome);
   return u.includes(a) || a.includes(u);
 }
+function adLabel(sale){ const c = String(sale.utmContent||'').trim(); const ad = isMetaId(c) ? AD_BY_ID()[c] : null; return ad ? ad.ad : c }
+function adsetLabel(sale){ const c = String(sale.utmContent||'').trim(); const ad = isMetaId(c) ? AD_BY_ID()[c] : null; return ad ? ad.adset : (isMetaId(sale.utmMedium)?'':sale.utmMedium) }
 
 function groupBy(list, keyFn, extra){
   const m = new Map();
   list.forEach(a=>{
     const k = keyFn(a); if(!k) return;
-    if(!m.has(k)) m.set(k,{nome:k,inv:0,imp:0,cl:0,pv:0,ck:0,reach:0,link:'',datas:new Set(),vendas:0,fat:0});
+    if(!m.has(k)) m.set(k,{nome:k,inv:0,imp:0,cl:0,pv:0,ck:0,reach:0,link:'',datas:new Set(),adIds:new Set(),vendas:0,fat:0});
     const o = m.get(k); o.inv+=a.inv;o.imp+=a.imp;o.cl+=a.cl;o.pv+=a.pv;o.ck+=a.ck;o.reach+=a.reach;o.datas.add(a.data);
+    if(a.adId) o.adIds.add(a.adId);
     if(a.link) o.link = a.link;
   });
   return [...m.values()];
@@ -467,7 +489,7 @@ function renderTrafego(){
   $('sales-panel').innerHTML = list.length ? `<div class="sales-scroll">${list.map(v=>`
     <div class="sale-card ${v.trafego?'trafego':'organico'}">
       <div class="sale-top"><span>${v.trafego?'✅':'⭐'} ${esc(v.nome||'Sem nome')}</span><span class="sale-val">${fmtR(v.fatTotal)}</span></div>
-      <div class="sale-meta">📅 ${brDate(v.data)}<br>🎯 Criativo: ${esc(v.utmContent||'—')}<br>👥 Público: ${esc(v.utmMedium||'—')}<br>📍 Origem: ${esc(v.utmSource||'—')}</div>
+      <div class="sale-meta">📅 ${brDate(v.data)}<br>🎯 Criativo: ${esc(adLabel(v)||'—')}<br>👥 Público: ${esc(adsetLabel(v)||'—')}<br>📍 Origem: ${esc((v.utmSource||'—')+(v.utmMedium&&!isMetaId(v.utmMedium)?' / '+v.utmMedium:''))}</div>
     </div>`).join('')}</div>` : '<div class="empty">Nenhuma venda registrada no período ainda. As vendas aparecem aqui assim que o webhook gravar na planilha.</div>';
 
   renderWarn(); renderAdmin(t);
@@ -532,7 +554,7 @@ function buildEntities(kind){
   const keyFn = kind==='cri' ? (a=>a.ad) : (a=>a.adset);
   const list = groupBy(ads,keyFn);
   list.forEach(o=>{
-    sales.filter(s=>s.trafego).forEach(s=>{ if(kind==='cri' ? matchAd(s,o.nome) : matchAdset(s,o.nome)){ o.vendas++; o.fat+=s.fatTotal } });
+    sales.filter(s=>s.trafego).forEach(s=>{ if(kind==='cri' ? matchAd(s,o) : matchAdset(s,o)){ o.vendas++; o.fat+=s.fatTotal } });
     o.ativo = o.datas.has(MAXDATE);
     o.ctr = div(o.cl,o.imp)*100; o.cpc = div(o.inv,o.cl); o.roas = div(o.fat,o.inv);
   });
