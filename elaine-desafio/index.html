@@ -181,7 +181,7 @@ const CONFIG = {
   SHEET_ID: '1GXdEm9hQ7v-RJzWA8SJvN1kIbxNzz7LPEj_PWipLjOI',
   GERENCIADOR_SHEET: 'Gerenciador',
   WEBHOOK_SHEET: 'Webhook',
-  DATA_MINIMA: '',            // 'AAAA-MM-DD' (vazio = sem corte; usar a data de início das campanhas quando souber)
+  DATA_MINIMA: '2026-11-03',  // início das campanhas do Desafio (investimento e vendas antes disso ficam de fora)
 
   // ── Produto ───────────────────────────────────────────────────────
   PRODUTO_KEYWORDS: ['corrimento zero', 'desafio corrimento'],
@@ -194,6 +194,13 @@ const CONFIG = {
     { nome: '120 receitas',       valor: 27 },
     { nome: 'Skincare',           valor: 19.9 }
   ],
+
+  // ── Fontes dos order bumps (abas opcionais; a que não existir é ignorada) ──
+  // Aba " Webhook_orderbumps": histórico de 03/11 a 17/11 colado à mão (export da Greenn, linhas 2-22)
+  // + vendas novas gravadas pelo Stract logo abaixo. Lida pelo gid (a leitura por nome erra colunas de tipo misto).
+  BUMPS_TABS: [{nome: ' Webhook_orderbumps', gid: '2078614432'}],
+  // venda do Desafio (código Greenn) -> linha histórica manual da planilha Webhook
+  BUMPS_ALIAS: { '10576891': 'hist-20261116-58', '10576895': 'hist-20261116-59' },
 
   // ── Meta de custo por ingresso vendido ────────────────────────────
   META_VERDE: 35,             // até 35 = verde
@@ -293,6 +300,14 @@ async function fetchSheetCSV(sheetName) {
   }
 }
 
+async function fetchSheetGid(gid, nomeReserva) {
+  try {
+    const resp = await fetch(`https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/export?format=csv&gid=${gid}`);
+    if (resp.ok) { const t = await resp.text(); if (!/Signin|accounts\.google/.test(t.slice(0, 2000))) return t; }
+  } catch (e) {}
+  return fetchSheetCSV(nomeReserva);   // reserva: leitura por nome (gviz)
+}
+
 // ───────────────────────── processamento ─────────────────────────
 let GROWS = [], SALES = [], DIAS = [], DIAG = {};
 const isTrafego = s => CONFIG.TRAFEGO_SOURCES.includes((s.utmSource || '').toLowerCase().replace(/[\s_-]/g, ''));
@@ -377,14 +392,16 @@ function processSales(rows) {
     if (!data) { diag.semData++; continue; }
     if (CONFIG.DATA_MINIMA && data < CONFIG.DATA_MINIMA) { diag.antesDataMin++; continue; }
     if (!main && produto) { diag.semProduto++; continue; }
-    const total = grp.hist ? CONFIG.PRODUTO_PRECO_BASE : money(g('fatTotal') || g('fatAlt'));
+    let total = grp.hist ? CONFIG.PRODUTO_PRECO_BASE : money(g('fatTotal') || g('fatAlt'));
+    // sem coluna "Valor Inicial", os bumps vêm das abas de bumps: o ingresso vale o preço base (acima disso é juro de parcelamento)
+    if (W.fatInicial < 0 && !grp.hist && total > CONFIG.PRODUTO_PRECO_BASE) total = CONFIG.PRODUTO_PRECO_BASE;
     if (CONFIG.IGNORAR_VALOR_ZERO && total <= 0) { diag.valorZero++; continue; }
     const inicialRaw = g('fatInicial');
     const inicial = inicialRaw ? money(inicialRaw) : total;
     const fatOB = Math.max(0, inicial - CONFIG.PRODUTO_PRECO_BASE);
     const temOB = fatOB > 0.01;
     const s = {
-      data, nome: g('cliente'), email: g('email'), fatura: g('fatura'),
+      data, chave: key, nome: g('cliente'), email: g('email'), fatura: g('fatura'),
       fatTotal: total, fatPrincipal: total - fatOB, fatOB, temOB, bumps: inferirBumps(fatOB),
       utmSource: g('utmSource'), utmMedium: g('utmMedium'), utmCampaign: g('utmCampaign'), utmContent: g('utmContent')
     };
@@ -399,6 +416,76 @@ function processSales(rows) {
     sales.push(s);
   }
   return {sales, diag};
+}
+
+// ───────────────────────── order bumps ─────────────────────────
+let BUMPS_STAT = null;
+const BUMP_COLS = {
+  codigo: 'sale.id|Código da venda', data: 'sale.paid_at|Data de pagamento', produto: 'product.name|Produto',
+  valor: 'Valor bruto|sale.total|sale.amount', email: 'client.email|E-mail|Email', status: 'currentStatus|Status',
+  vinculada: 'Venda Desafio vinculada', desafioDia: 'Desafio pagas no dia'
+};
+const BUMP_KW = [['skincare', 'Skincare'], ['120 receitas', '120 receitas'], ['receitas preciosas', '120 receitas'], ['gravacao vitalicia', 'Gravação vitalícia']];
+const nomeBump = prod => { const p = norm(prod); const k = BUMP_KW.find(([kw]) => p.includes(kw)); return k ? k[1] : ''; };
+const limpaId = v => String(v == null ? '' : v).trim().replace(/\.0+$/, '').replace(/[^\d]/g, '');
+
+// lê a aba de bumps. Cada linha pode estar em um de dois layouts:
+//  (a) histórico colado do export da Greenn: A=data, B=código da venda, C=produto, F=valor, H=status, J=e-mail, L=venda do Desafio, M=Desafio pagas no dia
+//  (b) Stract (webhook): colunas pelo nome do cabeçalho (sale.id, product.name, sale.total, client.email, sale.paid_at, currentStatus)
+function parseBumps(rows) {
+  if (!rows || rows.length < 2) return null;
+  const hdr = rows[0], C = {};
+  for (const [k, n] of Object.entries(BUMP_COLS)) C[k] = findCol(hdr, n);
+  const hdrOk = C.codigo >= 0 && C.produto >= 0 && C.valor >= 0 && C.data >= 0;
+  const out = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i]; if (!r.some(x => String(x).trim())) continue;
+    const t = j => String(r[j] == null ? '' : r[j]).trim();
+    let rec = null;
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(t(0)) && nomeBump(t(2))) {
+      rec = {data: t(0), codigo: t(1), produto: t(2), valor: t(5), status: t(7), email: t(9), vinc: t(11), dia: t(12)};
+    } else if (hdrOk) {
+      const g = k => C[k] >= 0 ? t(C[k]) : '';
+      rec = {data: g('data'), codigo: g('codigo'), produto: g('produto'), valor: g('valor'), status: g('status'), email: g('email'), vinc: g('vinculada'), dia: g('desafioDia')};
+    } else continue;
+    const nome = nomeBump(rec.produto); if (!nome) continue;
+    const st = norm(rec.status).replace(/[_.\-]+/g, ' ');
+    if (st && (RX_NEG.test(st) || RX_PEND.test(st) || !RX_POS.test(st))) continue;
+    const data = parseDate(rec.data), valor = money(rec.valor);
+    if (!data || valor <= 0) continue;
+    out.push({codigo: limpaId(rec.codigo), data, nome, valor, email: norm(rec.email), vinc: limpaId(rec.vinc), dia: parseInt(rec.dia, 10) || 0});
+  }
+  return (out.length || hdrOk) ? out : null;
+}
+
+// soma cada bump à venda do Desafio que o originou (herda a origem/UTM dela)
+function anexarBumps(sales, bumps) {
+  const st = {lidos: bumps.length, somados: 0, valorSomado: 0, porDia: 0, valorPorDia: 0, valorOrgEst: 0, avulsos: 0, valorAvulsos: 0, semOrigem: 0, valorSemOrigem: 0, jaNoValorInicial: 0, repetidos: 0};
+  const seen = new Set(), byFat = new Map(), byChave = new Map(), rr = {};
+  sales.forEach(s => { if (s.fatura) byFat.set(limpaId(s.fatura), s); byChave.set(s.chave, s); });
+  const add = (s, b, v) => { s.fatOB += v; s.fatTotal += v; s.temOB = true; if (!s.bumps.includes(b.nome)) s.bumps.push(b.nome); (s.bumpsDet = s.bumpsDet || []).push({nome: b.nome, valor: v}); };
+  for (const b of bumps) {
+    if (b.codigo) { if (seen.has(b.codigo)) { st.repetidos++; continue; } seen.add(b.codigo); }
+    let s = null;
+    if (b.vinc) { const al = CONFIG.BUMPS_ALIAS[b.vinc]; s = byFat.get(b.vinc) || (al ? byChave.get(al) : null) || null; }
+    else if (b.email) s = sales.find(x => x.email && norm(x.email) === b.email && x.data === b.data) || null;
+    if (s) {
+      if (s.fatOB > 0.01 && !s.bumpsDet) { st.jaNoValorInicial++; continue; }
+      add(s, b, b.valor); st.somados++; st.valorSomado += b.valor; continue;
+    }
+    if (b.vinc) {
+      // venda do Desafio sem linha própria (histórico por dia, antes do webhook): usa o tráfego do dia
+      const H = sales.filter(x => String(x.chave).startsWith('hist-') && x.data === b.data && x.trafego);
+      if (H.length) {
+        const p = Math.min(1, H.length / (b.dia || H.length));
+        rr[b.data] = (rr[b.data] || 0); const alvo = H[rr[b.data] % H.length]; rr[b.data]++;
+        add(alvo, b, b.valor * p); st.porDia++; st.valorPorDia += b.valor * p; st.valorOrgEst += b.valor * (1 - p); continue;
+      }
+      st.semOrigem++; st.valorSemOrigem += b.valor; continue;
+    }
+    st.avulsos++; st.valorAvulsos += b.valor;
+  }
+  return st;
 }
 
 // ───────────────────────── agregações ─────────────────────────
@@ -419,6 +506,7 @@ function agg(from, to) {
   const liq = 1 - (CONFIG.IMPOSTO_PCT || 0) / 100;
   a.roas = div(a.fatT * liq, a.inv);
   a.roasTotal = div(a.fat * liq, a.inv);
+  a.roasIng = div((a.fatT - a.obT) * liq, a.inv);
   a.custoIng = div(a.inv, a.nT);
   a.custoIngTotal = div(a.inv, a.n);
   a.ticket = div(a.fatT, a.nT);
@@ -506,7 +594,7 @@ function renderTrafego(from, to) {
   h += `<div class="kpi-grid">` +
     kpi('Investimento (Meta Ads)', fmtBRL(a.inv), 'orange') +
     kpi('Fat. Tráfego', fmtBRL(a.fatT), 'green', 'ingressos + order bumps') +
-    kpi('ROAS Tráfego', fmtX(a.roas), a.roas >= 1 ? 'green' : (a.roas ? 'red' : '')) +
+    kpi('ROAS Tráfego', fmtX(a.roas), a.roas >= 1 ? 'green' : (a.roas ? 'red' : ''), 'com order bumps · só ingresso: ' + fmtX(a.roasIng)) +
     kpi('Custo por ingresso', fmtBRL(a.custoIng), cls(a.custoIng), 'meta: verde ≤ 35 · amarelo ≤ 38') +
     kpi('Vendas Tráfego', fmtInt(a.nT) + (a.nTob ? ` <span style="font-size:12px;color:#f1c40f">+${a.nTob} OB</span>` : ''), 'orange', 'ingressos vendidos') +
     kpi('Vendas Orgânico', fmtInt(a.nO) + (a.nOob ? ` <span style="font-size:12px;color:#f1c40f">+${a.nOob} OB</span>` : ''), '') +
@@ -534,8 +622,8 @@ function renderTrafego(from, to) {
   const T = SALES.filter(x => inRange(x.data, from, to) && x.trafego);
   const nIng = T.length;
   h += `<div class="sec-title">Order bumps (vendas de tráfego)</div><div class="tbl-wrap"><table><thead><tr><th>Order bump</th><th>Preço</th><th>Vendidos</th><th>Take rate</th><th>Faturamento</th></tr></thead><tbody>` +
-    CONFIG.ORDER_BUMPS.map(b => { const n = T.filter(x => x.bumps.includes(b.nome)).length; return `<tr><td>${esc(b.nome)}</td><td>${fmtBRL(b.valor)}</td><td>${fmtInt(n)}</td><td>${nIng ? fmtPct(n / nIng * 100) : '—'}</td><td>${fmtBRL(n * b.valor)}</td></tr>`; }).join('') +
-    `</tbody></table></div>`;
+    CONFIG.ORDER_BUMPS.map(b => { const n = T.filter(x => x.bumps.includes(b.nome)).length; const fat = T.reduce((t, x) => t + (x.bumpsDet ? x.bumpsDet.filter(d => d.nome === b.nome).reduce((u, d) => u + d.valor, 0) : (x.bumps.includes(b.nome) ? b.valor : 0)), 0); return `<tr><td>${esc(b.nome)}</td><td>${fmtBRL(b.valor)}</td><td>${fmtInt(n)}</td><td>${nIng ? fmtPct(n / nIng * 100) : '—'}</td><td>${fmtBRL(fat)}</td></tr>`; }).join('') +
+    `</tbody></table></div>` + notaBumps();
 
   // compradores
   const buy = SALES.filter(x => inRange(x.data, from, to)).sort((x, y) => y.data.localeCompare(x.data)).slice(0, 60);
@@ -548,9 +636,19 @@ function renderTrafego(from, to) {
   h += `<button class="diag-btn" onclick="toggleDiag()">ⓘ Diagnóstico da leitura de vendas</button><div class="diag" id="diag-box">${esc(diagTexto())}</div>`;
   $('tab-trafego').innerHTML = h;
 }
+function notaBumps() {
+  const b = BUMPS_STAT; if (!b || !b.lidos) return `<div class="ob-info">Order bumps: nenhuma venda de bump encontrada na aba Webhook_orderbumps. O faturamento mostrado é só de ingressos.</div>`;
+  const m = v => fmtBRL0(v);
+  let t = `Order bumps somados ao faturamento: <b>${b.somados + b.porDia}</b> (${m(b.valorSomado + b.valorPorDia)}), cada um herdando a origem da venda do Desafio.`;
+  if (b.porDia) t += ` ${b.porDia} de dias sem webhook (antes de 12/11) foram atribuídos ao tráfego do dia por estimativa.`;
+  if (b.valorOrgEst > 0.01) t += ` ${m(b.valorOrgEst)} dessas vendas foram considerados orgânicos e não entram no ROAS.`;
+  if (b.avulsos) t += ` ${b.avulsos} bump(s) sem venda do Desafio (${m(b.valorAvulsos)}) não foram somados.`;
+  if (b.semOrigem) t += ` ${b.semOrigem} bump(s) sem origem identificada (${m(b.valorSemOrigem)}) não foram somados.`;
+  return `<div class="ob-info">${t}</div>`;
+}
 function diagTexto() {
   const d = DIAG; if (!d.linhas && d.linhas !== 0) return '';
-  return `Linhas lidas: ${d.linhas} · Vendas válidas: ${d.vendas}\nReembolsadas/canceladas: ${d.reembolsadas} · Não aprovadas: ${d.naoAprovadas} · Outro produto: ${d.semProduto} · Valor zero: ${d.valorZero} · Antes da data mínima: ${d.antesDataMin} · Sem data: ${d.semData}\nEventos: ${JSON.stringify(d.eventos)}\nProdutos: ${JSON.stringify(d.produtos)}\nOrigens (UTM Source): ${JSON.stringify(d.fontes)}`;
+  return `Linhas lidas: ${d.linhas} · Vendas válidas: ${d.vendas}\nReembolsadas/canceladas: ${d.reembolsadas} · Não aprovadas: ${d.naoAprovadas} · Outro produto: ${d.semProduto} · Valor zero: ${d.valorZero} · Antes da data mínima: ${d.antesDataMin} · Sem data: ${d.semData}\nEventos: ${JSON.stringify(d.eventos)}\nProdutos: ${JSON.stringify(d.produtos)}\nOrigens (UTM Source): ${JSON.stringify(d.fontes)}` + (BUMPS_STAT ? `\nOrder bumps: ${JSON.stringify(BUMPS_STAT)}` : '');
 }
 function toggleDiag() { const b = $('diag-box'); b.style.display = b.style.display === 'block' ? 'none' : 'block'; }
 
@@ -661,7 +759,11 @@ async function loadData() {
     $('loading-msg').textContent = 'Carregando vendas...';
     const w = parseCSV(await fetchSheetCSV(CONFIG.WEBHOOK_SHEET));
     GROWS = processGerenciador(g);
-    const r = processSales(w); SALES = r.sales.sort((a, b) => b.data.localeCompare(a.data)); DIAG = r.diag;
+    const r = processSales(w);
+    $('loading-msg').textContent = 'Carregando order bumps...';
+    const bumpRows = (await Promise.all(CONFIG.BUMPS_TABS.map(async tb => { try { return parseBumps(parseCSV(await fetchSheetGid(tb.gid, tb.nome))); } catch (e) { return null; } }))).filter(Boolean).flat();
+    BUMPS_STAT = anexarBumps(r.sales, bumpRows);
+    SALES = r.sales.sort((a, b) => b.data.localeCompare(a.data)); DIAG = r.diag;
     DIAS = diasTable('', '');
     const keep = $('dateFrom').value && $('dateTo').value && document.querySelector('.preset-btn.active') === null;
     if (!keep) setPreset('all', $('btn-all')); else renderAll();
