@@ -327,6 +327,8 @@ const CONFIG = {
   // Linhas do webhook cujo nome do produto contém uma dessas palavras (sem acento, minúsculas)
   PRODUTO_KEYWORDS: ['raizes devocional'],
   IGNORAR_VALOR_ZERO: true,
+  // Vendas que o Make gravou SEM data (campo trans_createdate vazio): data real conferida nas execuções do Make
+  DATAS_MANUAIS: { 'financeiro.ipservice@hotmail.com':'2026-11-20' },
 
   // ── Investimento ─────────────────────────────────────────────────
   INVESTIMENTO_META:   1000,   // meta inicial (flexível na tela, botão "Padrão" volta para este valor)
@@ -594,9 +596,12 @@ function processSales(rows){
     if(!r.some(x=>String(x).trim())) continue;
     diag.linhas++;
     const g=k=>C[k]>=0?String(r[C[k]]==null?'':r[C[k]]).trim():'';
-    const txt=normStr(g('evento')).replace(/[_.\-]+/g,' ');
+    let txt=normStr(g('evento')).replace(/[_.\-]+/g,' ');
+    // Status numérico da Eduzz: 3=paga; 1/2/11/15=em aberto/aguardando; 4/6/7/9/10=cancelada/reembolso/estorno
+    if(/^\d+$/.test(txt)){ const n=+txt; txt = n===3 ? 'paga' : [4,6,7,9,10].includes(n) ? 'cancelada' : 'aberta'; }
     if(RX_IGN.test(txt)) continue;
-    const data=parseDate(g('data'));
+    let data=parseDate(g('data'));
+    if(!data){ const m=(CONFIG.DATAS_MANUAIS||{})[normStr(g('email'))]; if(m) data=m; else if(g('email')) diag.semData++; }
     const key=g('fatura')||(normStr(g('email'))+'|'+data);
     if(!groups.has(key)) groups.set(key,{rows:[],neg:false});
     const grp=groups.get(key);
@@ -610,7 +615,9 @@ function processSales(rows){
     if(grp.neg){ diag.reembolsadas++; continue; }
     const main=grp.rows.find(x=>isMain(x.produto));
     if(!main){ if(grp.rows.length) diag.semProduto++; continue; }
-    if(!main.data){ diag.semData++; continue; }
+    if(!main.data){ // sem data na planilha: conta mesmo assim, na data mais recente conhecida, e avisa
+      main.data = new Date().toISOString().slice(0,10);
+    }
     if(CONFIG.DATA_MINIMA && main.data<CONFIG.DATA_MINIMA){ diag.antesDataMin++; continue; }
     // Order bump = outros produtos distintos dentro da mesma fatura/pedido
     const seen=new Set([normStr(main.produto)]);
@@ -810,6 +817,7 @@ function renderTrafego({t,sales}){
   const foneCortado=sales.filter(s=>s.fone.cortado).length;
   const foneRuim=sales.filter(s=>!s.fone.ok&&!s.fone.semColuna&&!s.fone.cortado).length;
   if(foneCortado) msgs.push(`⚠️ <b>${foneCortado} telefone(s)</b> chegaram cortados (ex.: 5,57E+12). Na aba Weebhook_Make, formate a coluna <b>Contato</b> como texto sem formatação e envie o telefone como texto no Make.`);
+  if(DIAG && DIAG.semData) msgs.push(`⚠️ <b>${DIAG.semData} venda(s)</b> vieram da Eduzz <b>sem data</b> na planilha (campo trans_createdate vazio no Make) e foram contadas com a data de hoje. Corrija o mapeamento da coluna Data no Make.`);
   const semUtm=sales.filter(s=>!s.utmSource).length;
   if(semUtm) msgs.push(`⚠️ <b>${semUtm} venda(s)</b> chegaram da Eduzz sem UTM e entram como orgânicas. Confira se os links dos anúncios levam <b>utm_source=meta_ads</b> até o checkout.`);
   if(foneRuim) msgs.push(`⚠️ <b>${foneRuim} venda(s)</b> com telefone inválido ou ausente (veja o aviso no card da venda).`);
