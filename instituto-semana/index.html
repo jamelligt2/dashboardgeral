@@ -120,7 +120,14 @@ td.wrap{white-space:normal;min-width:180px;max-width:320px}
     </div>
   </div>
   <div class="period-bar">
-    <label>Período</label>
+    <label for="date-from">Período</label>
+    <input type="date" class="date-input" id="date-from" aria-label="Data inicial">
+    <span class="period-sep">→</span>
+    <input type="date" class="date-input" id="date-to" aria-label="Data final">
+    <button class="preset-btn" id="btn-7" onclick="setPreset(7,this)">7d</button>
+    <button class="preset-btn" id="btn-14" onclick="setPreset(14,this)">14d</button>
+    <button class="preset-btn" id="btn-30" onclick="setPreset(30,this)">30d</button>
+    <button class="preset-btn" id="btn-all" onclick="setPreset('all',this)">Tudo</button>
     <span class="range-info" id="range-info">—</span>
   </div>
   <div>
@@ -334,7 +341,9 @@ function gvizToRows(data){
 // ────────────────────────────────────────────────────────────────────
 // ESTADO
 // ────────────────────────────────────────────────────────────────────
-let ROWS = [];
+let ROWS = [];       // linhas do período selecionado (tudo o que é exibido)
+let ALL_ROWS = [];   // todas as linhas da planilha
+let DATA_MIN = '', DATA_MAX = '';
 let COLS = {};
 let HAS = {};
 let detailMode = 'adset';
@@ -351,7 +360,8 @@ async function loadData(){
     msg.textContent = 'Processando dados...';
     processRows(rows);
     if(!ROWS.length){ showEmpty(rows); return; }
-    renderAll();
+    ALL_ROWS = ROWS.slice().sort((a,b)=> (a.data||'').localeCompare(b.data||''));
+    initPeriod();
   }catch(e){
     console.error(e);
     stopSpinner();
@@ -487,10 +497,51 @@ function cplClass(cpl, med){
 // ────────────────────────────────────────────────────────────────────
 // RENDER
 // ────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────
+// FILTRO DE PERÍODO
+// ────────────────────────────────────────────────────────────────────
+function isoAddDays(iso, n){
+  const d = new Date(iso + 'T12:00:00');
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0,10);
+}
+function initPeriod(){
+  const ds = ALL_ROWS.map(r=>r.data).filter(Boolean);
+  DATA_MIN = ds[0] || '';
+  DATA_MAX = ds[ds.length-1] || '';
+  const fi = document.getElementById('date-from'), ti = document.getElementById('date-to');
+  [fi, ti].forEach(el=>{ el.min = DATA_MIN; el.max = DATA_MAX; el.disabled = !DATA_MIN; });
+  const onManual = ()=>{ markPreset(null); applyFilter(); };
+  fi.addEventListener('change', onManual);
+  ti.addEventListener('change', onManual);
+  setPreset('all', document.getElementById('btn-all'));
+}
+function markPreset(btn){
+  document.querySelectorAll('.preset-btn[id^="btn-"]').forEach(b=>b.classList.toggle('active', b===btn));
+}
+// Atalhos contam a partir do último dia com dados na planilha
+function setPreset(p, btn){
+  let from = DATA_MIN, to = DATA_MAX;
+  if(p !== 'all' && DATA_MAX){
+    from = isoAddDays(DATA_MAX, -(p-1));
+    if(from < DATA_MIN) from = DATA_MIN;
+  }
+  document.getElementById('date-from').value = from;
+  document.getElementById('date-to').value = to;
+  markPreset(btn);
+  applyFilter();
+}
+function applyFilter(){
+  let from = document.getElementById('date-from').value || DATA_MIN;
+  let to = document.getElementById('date-to').value || DATA_MAX;
+  if(from && to && from > to){ const t = from; from = to; to = t;
+    document.getElementById('date-from').value = from; document.getElementById('date-to').value = to; }
+  ROWS = ALL_ROWS.filter(r => !r.data || ((!from || r.data >= from) && (!to || r.data <= to)));
+  document.getElementById('range-info').textContent = (from && to) ? `${fmtDate(from)} → ${fmtDate(to)}` : 'Período completo';
+  renderAll();
+}
+
 function renderAll(){
-  ROWS.sort((a,b)=> (a.data||'').localeCompare(b.data||''));
-  const datas = ROWS.map(r=>r.data).filter(Boolean).sort();
-  document.getElementById('range-info').textContent = datas.length ? `${fmtDate(datas[0])} → ${fmtDate(datas[datas.length-1])}` : 'Período completo';
   renderNotice();
   const T = agg(ROWS);
   renderKPIs(T);
@@ -512,6 +563,7 @@ function renderNotice(){
   if(!HAS.placement) faltam.push('<b>Posicionamento</b> (Feed vs Stories fica em branco)');
   if(!HAS.link) faltam.push('<b>Link</b> (sem link dos anúncios)');
   const n = document.getElementById('notice');
+  if(!ROWS.length){ n.innerHTML = '<b>Sem dados no período selecionado.</b> Escolha outras datas ou clique em Tudo.'; n.style.display='block'; return; }
   if(faltam.length){ n.innerHTML = 'Colunas que ainda não estão na planilha: ' + faltam.join(' · '); n.style.display='block'; }
   else n.style.display='none';
 }
