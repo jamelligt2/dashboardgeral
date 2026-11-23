@@ -285,7 +285,8 @@ const CONFIG = {
 
   // ── Produto ───────────────────────────────────────────────────────
   // Stories Maternos 2.0 · Assinatura mensal = produto 3131872 no Eduzz (R$ 19,90/mês)
-  PRODUTO_IDS:               ["3131872"],   // ID do produto no Eduzz (o mais confiável)
+  PRODUTO_IDS:               ["3131872","3151032","3152265"],   // mensal, anual e "- mensal"
+  WEBHOOK_GID:               "1712820316",   // aba "Vendas SM 2.0" lida pela exportação exata (o gviz apaga células)   // ID do produto no Eduzz (o mais confiável)
   PRODUTO_KEYWORDS:          ["stories maternos 2.0"],
   PRODUTO_KEYWORDS_FALLBACK: [],
   IGNORAR_VALOR_ZERO: true,
@@ -424,8 +425,10 @@ const fDM  = d => d?d.slice(8,10)+'/'+d.slice(5,7):'—';
 const div  = (a,b)=> b? a/b : 0;
 
 // ── fetch ───────────────────────────────────────────────────────────
-async function fetchSheetCSV(sheetName){
-  const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+async function fetchSheetCSV(sheetName,gid){
+  const url=gid
+    ? `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}&_=${Date.now()}`
+    : `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
   const controller=new AbortController();
   const timeout=setTimeout(()=>controller.abort(),20000);
   try{
@@ -501,29 +504,38 @@ function isTrafego(s){ return CONFIG.TRAFEGO_SOURCES.includes(normKey(s.utmSourc
 const hasOB=s=>!!(s.temOB||s.fatOB>0);
 const firstName=n=>norm(String(n||'').split(/\s+/)[0]);
 
-// ── realinha o webhook bruto da Eduzz ───────────────────────────────
-// 1) O gviz junta o 1º payload (ping) ao cabeçalho: "event ping" → usa só a 1ª palavra.
-// 2) Linhas com UTM têm 4 colunas a mais logo após "data.offer.name"; aqui elas voltam para o lugar
-//    e viram colunas próprias data.utm.source/campaign/medium/content no fim da linha.
-const RX_ISO=/^\d{4}-\d{2}-\d{2}T/;
+// ── lê o webhook bruto da Eduzz pelo CONTEÚDO de cada célula ──────────
+// A Eduzz manda campos diferentes em cada venda, então a mesma informação cai em colunas diferentes.
+// Cada linha é lida assim (colunas A–V são fixas; o resto é achado pelo conteúdo):
+//  · evento = B, fatura = C, status = D, cliente = F, e-mail = H
+//  · a 1ª data/hora depois da coluna V é a data de criação; se ela não está em Y, a linha tem as
+//    4 colunas de UTM abertas a partir de X (source, campaign, medium, content) e o resto anda junto
+//  · valor pago = coluna AD + esse deslocamento
+//  · produto = célula com "Stories Maternos …" fora da UTM; o ID do produto é a célula logo antes
+//  · data da venda = a ÚLTIMA data/hora da linha (envio do webhook = pagamento), no fuso de Brasília
+const RX_ISO=/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+function isoToBR(iso){
+  const d=new Date(/Z$/.test(iso)?iso:iso+'Z'); if(isNaN(d)) return '';
+  return new Date(d.getTime()-3*3600*1000).toISOString().slice(0,10);
+}
 function realignEduzz(rows){
-  if(!rows.length) return rows;
-  const hdr=rows[0].map(h=>String(h||'').trim().split(/\s+/)[0]);
-  const iUtm=hdr.findIndex(h=>norm(h)==='data.utm');
-  const n=hdr.length;
-  const out=[hdr.concat(['data.utm.source','data.utm.campaign','data.utm.medium','data.utm.content'])];
+  const HDR=['event','data.id','data.status','data.buyer.name','data.buyer.email','data.items[0].productId','data.items[0].name',
+             'data.price.paid.value','data.price.value','data.paidAt','data.createdAt',
+             'data.utm.source','data.utm.campaign','data.utm.medium','data.utm.content'];
+  const out=[HDR];
   for(let i=1;i<rows.length;i++){
-    const r=rows[i].slice();
-    let base=r, utm=['','','',''];
-    if(iUtm>=0){
-      const v=String(r[iUtm]||'').trim();
-      if(v && !RX_ISO.test(v)){            // a linha tem UTM aberta em 5 colunas
-        utm=r.slice(iUtm,iUtm+4).map(x=>String(x||'').trim());
-        base=r.slice(0,iUtm).concat([''],r.slice(iUtm+5));
-      }
-    }
-    while(base.length<n) base.push('');
-    out.push(base.slice(0,n).concat(utm));
+    const r=rows[i].map(x=>String(x==null?'':x).trim());
+    if(!r[1]) continue;
+    let first=-1; for(let j=22;j<r.length;j++){ if(RX_ISO.test(r[j])){ first=j; break; } }
+    if(first<0) continue;
+    const sh=first-24;
+    const utm = sh>0 ? r.slice(23,27) : ['','','',''];
+    let iName=-1; for(let j=27;j<r.length;j++){ if(/stories maternos/i.test(r[j]) && !r[j].startsWith('[')){ iName=j; break; } }
+    const isos=r.filter(x=>RX_ISO.test(x)); const last=isos.length?isos[isos.length-1]:'';
+    out.push([r[1], r[2], r[3], r[5], r[7],
+              iName>0 ? r[iName-1] : '', iName>0 ? r[iName] : '',
+              r[29+sh]||'', r[27+sh]||'', last?isoToBR(last):'', '',
+              utm[0],utm[1],utm[2],utm[3]]);
   }
   return out;
 }
@@ -974,7 +986,7 @@ async function loadData(){
   $('spinner').style.display='block'; $('retry-btn').style.display='none';
   $('loading-msg').textContent='Conectando com a planilha...';
   try{
-    const [gCsv,wCsv]=await Promise.all([fetchSheetCSV(GERENCIADOR_SHEET),fetchSheetCSV(WEBHOOK_SHEET)]);
+    const [gCsv,wCsv]=await Promise.all([fetchSheetCSV(GERENCIADOR_SHEET),fetchSheetCSV(WEBHOOK_SHEET,CONFIG.WEBHOOK_GID)]);
     $('loading-msg').textContent='Processando dados...';
     GROWS=processGerenciador(parseCSV(gCsv));
     const r=processSales(parseCSV(wCsv));
