@@ -212,6 +212,37 @@ const CONFIG = {
 
   // ── Tráfego pago: valores de UTM Source aceitos ───────────────────
   TRAFEGO_SOURCES: ['metaads'],   // normalizado (minúsculas, sem espaço/_/-)
+  // Alguns anúncios (campanha [DF-JGT]) mandam na UTM só o ID do anúncio, sem o nome.
+  // Aqui o ID vira nome + campanha + conjunto. Anúncio novo: acrescente uma linha (ID: [nome, campanha, conjunto]).
+  AD_IDS: {
+    "120258464888040339": ["001", "Desafio [CAMPANHAS DE VENDAS] CBO [24/11]", "00 - Alimentação orgânica"],
+    "120258677242810339": ["001", "Desafio [CAMPANHAS DE VENDAS] CBO [ESCALA 2] [24/11]", "00 - Alimentação orgânica"],
+    "120258497924080339": ["001", "Desafio [CAMPANHAS DE VENDAS] CBO [ESCALA 1] [24/11]", "00 - Alimentação orgânica"],
+    "120258764111090339": ["ADV02", "Desafio [CAMPANHAS DE VENDAS] CBO [24/11]", "00 - Alimentação orgânica"],
+    "120258497932530339": ["007", "Desafio [CAMPANHAS DE VENDAS] CBO [ESCALA 1] [24/11]", "00 - Alimentação orgânica"],
+    "120258760905780339": ["ADV05", "Desafio [CAMPANHAS DE VENDAS] CBO [ESCALA 2] [24/11]", "00 - Alimentação orgânica"],
+    "120258677229000339": ["001 - estático todos", "Desafio [CAMPANHAS DE VENDAS] CBO [ESTÁTICO] [24/11]", "00 - Alimentação orgânica"],
+    "120258760765330339": ["ADV04", "Desafio [CAMPANHAS DE VENDAS] CBO [ESCALA 2] [24/11]", "00 - Alimentação orgânica"],
+    "120258497932590339": ["002", "Desafio [CAMPANHAS DE VENDAS] CBO [ESCALA 1] [24/11]", "00 - Alimentação orgânica"],
+    "120258759710380339": ["ADE03", "[DF-JGT] [CAMPANHAS DE VENDAS] [24/11]", "00 - Alimentação orgânica"],
+    "120258497932580339": ["003", "Desafio [CAMPANHAS DE VENDAS] CBO [ESCALA 1] [24/11]", "00 - Alimentação orgânica"],
+    "120258824931050339": ["ADE12", "Desafio [CAMPANHAS DE VENDAS] CBO [ESCALA 2] [24/11]", "00 - Alimentação orgânica"],
+    "120258828329970339": ["ADE15", "[DF-JGT] [CAMPANHAS DE VENDAS] [24/11]", "00 - Alimentação orgânica"],
+    "120258759716800339": ["ADE04", "[DF-JGT] [CAMPANHAS DE VENDAS] [24/11]", "00 - Alimentação orgânica"],
+    "120258759449080339": ["ADE01", "[DF-JGT] [CAMPANHAS DE VENDAS] [24/11]", "00 - Alimentação orgânica"],
+    "120258677242860339": ["003", "Desafio [CAMPANHAS DE VENDAS] CBO [ESCALA 2] [24/11]", "00 - Alimentação orgânica"],
+    "120258824922180339": ["ADE11", "Desafio [CAMPANHAS DE VENDAS] CBO [ESCALA 2] [24/11]", "00 - Alimentação orgânica"],
+    "120258497932540339": ["006", "Desafio [CAMPANHAS DE VENDAS] CBO [ESCALA 1] [24/11]", "00 - Alimentação orgânica"],
+    "120258824827520339": ["ADE09", "Desafio [CAMPANHAS DE VENDAS] CBO [ESCALA 2] [24/11]", "00 - Alimentação orgânica"],
+    "120258759688590339": ["ADE02", "[DF-JGT] [CAMPANHAS DE VENDAS] [24/11]", "00 - Alimentação orgânica"],
+    "120258497932560339": ["005", "Desafio [CAMPANHAS DE VENDAS] CBO [ESCALA 1] [24/11]", "00 - Alimentação orgânica"],
+    "120258824902210339": ["ADE10", "Desafio [CAMPANHAS DE VENDAS] CBO [ESCALA 2] [24/11]", "00 - Alimentação orgânica"],
+    "120258828326460339": ["ADE14", "[DF-JGT] [CAMPANHAS DE VENDAS] [24/11]", "00 - Alimentação orgânica"],
+    "120258497932550339": ["008", "Desafio [CAMPANHAS DE VENDAS] CBO [ESCALA 1] [24/11]", "00 - Alimentação orgânica"],
+    "120258828318910339": ["ADE13", "[DF-JGT] [CAMPANHAS DE VENDAS] [24/11]", "00 - Alimentação orgânica"],
+    "120258870046030339": ["ADV06", "[DF-JGT] [CAMPANHAS DE VENDAS] [24/11]", "00 - Legumes"],
+    "120258870096900339": ["ADV07", "[DF-JGT] [CAMPANHAS DE VENDAS] [24/11]", "00 - Legumes"]
+  },
 
   // ── Colunas do Webhook (por nome de cabeçalho) — schema flat ──────
   W: {
@@ -230,6 +261,7 @@ const CONFIG = {
 
 // ───────────────────────── utilitários ─────────────────────────
 const $ = id => document.getElementById(id);
+const nomeAd = s => { const t = String(s == null ? '' : s).trim(); return /^\d{1,2}$/.test(t) ? t.padStart(3, '0') : t; };
 const norm = s => String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 const fmtBRL = v => (v == null || isNaN(v) || v === 0) ? '—' : 'R$ ' + v.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 const fmtBRL0 = v => (v == null || isNaN(v)) ? '—' : 'R$ ' + v.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -324,7 +356,7 @@ function processGerenciador(rows) {
     const data = parseDate(g('date')); if (!data) continue;
     if (CONFIG.DATA_MINIMA && data < CONFIG.DATA_MINIMA) continue;
     out.push({
-      data, campanha: g('campaign'), adset: g('adset'), ad: g('ad'), link: g('link'),
+      data, campanha: g('campaign'), adset: g('adset'), ad: nomeAd(g('ad')), link: g('link'),
       inv: money(g('inv')), reach: money(g('reach')), imp: money(g('imp')), cliques: money(g('cliques')),
       pv: money(g('pv')), ck: money(g('ck')),
       sCamp: g('statusCampaign'), sSet: g('statusAdset'), sAd: g('statusAd')
@@ -409,8 +441,18 @@ function processSales(rows) {
     // UTMs novas vêm como "nome|id" (e o conteúdo com "::código"): limpa para casar com o Gerenciador
     const rawSrc = s.utmSource, rawCamp = s.utmCampaign;
     const limpa = v => String(v || '').split('::')[0].split('|')[0].trim();
+    const rawMed = s.utmMedium;
     s.utmCampaign = limpa(s.utmCampaign); s.utmMedium = limpa(s.utmMedium); s.utmContent = limpa(s.utmContent);
-    s.trafego = isTrafego(s) || /^fb/i.test(String(rawSrc || '').trim()) || /\|\d{10,}/.test(String(rawCamp || ''));
+    // UTM só com o ID do anúncio: troca pelo nome (e campanha/conjunto) e conta como tráfego pago
+    const idAd = /^\d{12,}$/.test(s.utmContent) ? s.utmContent : '';
+    const ref = idAd && CONFIG.AD_IDS[idAd];
+    if (ref) {
+      s.utmContent = ref[0];
+      if (!s.utmCampaign || /^\d{8,}$/.test(s.utmCampaign)) s.utmCampaign = ref[1];
+      if (!s.utmMedium || /^(paid|\d+)$/i.test(s.utmMedium)) s.utmMedium = ref[2];
+    }
+    s.utmContent = nomeAd(s.utmContent);
+    s.trafego = isTrafego(s) || /^fb/i.test(String(rawSrc || '').trim()) || /\|\d{10,}/.test(String(rawCamp || '')) || !!idAd || /^paid$/i.test(String(rawMed || '').trim());
     diag.fontes[s.utmSource || '(vazio)'] = (diag.fontes[s.utmSource || '(vazio)'] || 0) + 1;
     diag.vendas++;
     sales.push(s);
