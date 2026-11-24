@@ -451,8 +451,9 @@ function processSales(rows) {
       if (!s.utmCampaign || /^\d{8,}$/.test(s.utmCampaign)) s.utmCampaign = ref[1];
       if (!s.utmMedium || /^(paid|\d+)$/i.test(s.utmMedium)) s.utmMedium = ref[2];
     }
+    if (grp.hist) { if (!rawSrc) s.utmSource = 'metaads'; if (!s.utmMedium) s.utmMedium = '00 - Alimentação orgânica'; }
     s.utmContent = nomeAd(s.utmContent);
-    s.trafego = isTrafego(s) || /^fb/i.test(String(rawSrc || '').trim()) || /\|\d{10,}/.test(String(rawCamp || '')) || !!idAd || /^paid$/i.test(String(rawMed || '').trim());
+    s.trafego = !!grp.hist || isTrafego(s) || /^fb/i.test(String(rawSrc || '').trim()) || /\|\d{10,}/.test(String(rawCamp || '')) || !!idAd || /^paid$/i.test(String(rawMed || '').trim());
     diag.fontes[s.utmSource || '(vazio)'] = (diag.fontes[s.utmSource || '(vazio)'] || 0) + 1;
     diag.vendas++;
     sales.push(s);
@@ -797,9 +798,9 @@ async function loadData() {
   try {
     if (!CONFIG.SHEET_ID || CONFIG.SHEET_ID.startsWith('COLE_AQUI')) throw new Error('Falta configurar o ID da planilha (CONFIG.SHEET_ID).');
     $('loading-msg').textContent = 'Carregando Gerenciador...';
-    const g = parseCSV(await fetchSheetCSV(CONFIG.GERENCIADOR_SHEET));
+    const g = parseCSV(await fetchSheetGid('0', CONFIG.GERENCIADOR_SHEET));
     $('loading-msg').textContent = 'Carregando vendas...';
-    const w = parseCSV(await fetchSheetCSV(CONFIG.WEBHOOK_SHEET));
+    const w = parseCSV(await fetchSheetGid('541936916', CONFIG.WEBHOOK_SHEET));
     GROWS = processGerenciador(g);
     const r = processSales(w);
     $('loading-msg').textContent = 'Carregando order bumps...';
