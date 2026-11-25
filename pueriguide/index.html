@@ -571,11 +571,11 @@ function buildCriPubMaps(from,to){
     const ad=(r[G.ad]||'').trim()||'(sem nome)';
     const adset=(r[G.adset]||'').trim()||'(sem conjunto)';
     const link=(r[G.link]||'').trim();
-    const co=cri[ad]=cri[ad]||{nome:ad,adset,link,inv:0,imp:0,reach:0,cliques:0,pv:0,ck:0,vendas:0,fat:0,active:false,quente:false};
+    const co=cri[ad]=cri[ad]||{nome:ad,adset,adsets:{},link,inv:0,imp:0,reach:0,cliques:0,pv:0,ck:0,vendas:0,fat:0,active:false,quente:false};
+    co.adsets[adset]=(co.adsets[adset]||0)+parseBR(r[G.inv]);
     co.inv+=parseBR(r[G.inv]); co.imp+=parseBR(r[G.imp]); co.reach+=parseBR(r[G.reach]); co.cliques+=parseBR(r[G.cliques]); co.pv+=parseBR(r[G.pv]); co.ck+=parseBR(r[G.ck]);
     if(rowActive(r))co.active=true;
     if(link&&!co.link)co.link=link;
-    if(isQuente(adset))co.quente=true;
     const po=pub[adset]=pub[adset]||{nome:adset,inv:0,imp:0,reach:0,cliques:0,pv:0,ck:0,vendas:0,fat:0,active:false,quente:isQuente(adset)};
     po.inv+=parseBR(r[G.inv]); po.imp+=parseBR(r[G.imp]); po.reach+=parseBR(r[G.reach]); po.cliques+=parseBR(r[G.cliques]); po.pv+=parseBR(r[G.pv]); po.ck+=parseBR(r[G.ck]);
     if(rowActive(r))po.active=true;
@@ -585,17 +585,38 @@ function buildCriPubMaps(from,to){
   // Quem bate com a coluna "Anúncio" do Gerenciador é o UTM Term (ex: "ADV11").
   // Para o Público, em vez de tentar casar o UTM Medium (formato inconsistente ao longo do tempo),
   // usamos o Conjunto já vinculado àquele anúncio dentro do próprio Gerenciador — fonte única da verdade.
+  // CORREÇÃO 25/11/2026: o mesmo anúncio (ex.: ADV20) roda em mais de um conjunto.
+  // Antes, a venda ia para o conjunto da PRIMEIRA linha do anúncio no período — por isso
+  // o público mudava conforme o filtro de datas. Agora o público vem do UTM Medium
+  // ("<Conjunto>_<Anúncio>"), que diz exatamente de qual conjunto a venda veio.
+  const pubKeys=Object.keys(pub).sort((a,b)=>b.length-a.length);
+  const adsetFromMedium=med=>{
+    const m=String(med||'').trim(); if(!m||m.includes('{{'))return null;
+    if(pub[m])return m;
+    const ml=m.toLowerCase();
+    return pubKeys.find(k=>ml.startsWith(k.toLowerCase()+'_'))||null;
+  };
   for(const s of sl){
-    const adKey=(s.utmTerm||'').trim();
+    // CORREÇÃO 25/11/2026: quando o UTM Content do anúncio vem sem preencher ("{{ad.name}}"),
+    // tenta pegar o código ADVxx do final do UTM Medium ("..._ADV20").
+    let adKey=(s.utmTerm||'').trim();
+    if(!cri[adKey]){ const mm=String(s.utmMedium||'').match(/_(ADV\d+)(?:_|$)/i); if(mm&&cri[mm[1].toUpperCase()])adKey=mm[1].toUpperCase(); }
     const matched=adKey&&cri[adKey];
-    if(matched){
-      cri[adKey].vendas++; cri[adKey].fat+=s.fatTotal;
-      const adsetName=cri[adKey].adset;
-      if(adsetName&&pub[adsetName]){ pub[adsetName].vendas++; pub[adsetName].fat+=s.fatTotal; }
-    } else if(s.utmMedium&&pub[s.utmMedium]){
-      // fallback para vendas antigas sem UTM Term preenchido
-      pub[s.utmMedium].vendas++; pub[s.utmMedium].fat+=s.fatTotal;
+    if(matched){ cri[adKey].vendas++; cri[adKey].fat+=s.fatTotal; }
+    let adsetName=adsetFromMedium(s.utmMedium);
+    if(!adsetName&&matched){
+      // UTM Medium vazio ou não preenchido ({{adset.name}}): usa o conjunto onde o anúncio mais investiu no período
+      const ads=cri[adKey].adsets; adsetName=Object.keys(ads).sort((a,b)=>ads[b]-ads[a])[0]||null;
     }
+    if(adsetName&&pub[adsetName]){ pub[adsetName].vendas++; pub[adsetName].fat+=s.fatTotal; }
+  }
+  // CORREÇÃO 25/11/2026: temperatura do criativo = conjunto onde ele MAIS investiu no período.
+  // Antes bastava 1 centavo num conjunto quente para o criativo inteiro aparecer como "Quente".
+  for(const k in cri){
+    const c=cri[k], ents=Object.entries(c.adsets).sort((a,b)=>b[1]-a[1]);
+    c.adset=ents.length?ents[0][0]:c.adset; c.quente=isQuente(c.adset);
+    const tot=ents.reduce((a,e)=>a+e[1],0);
+    c.pubSplit=ents.length>1&&tot>0?ents.map(([n,v])=>`${n} ${Math.round(v/tot*100)}%`).join(' · '):'';
   }
   const finish=o=>{ o.ctr=o.imp>0?o.cliques/o.imp*100:0; o.cpc=o.cliques>0?o.inv/o.cliques:0; o.cpm=o.imp>0?o.inv/o.imp*1000:0; o.roas=o.inv>0?o.fat/o.inv:0; o.temp=o.quente?'Quente':'Frio'; return o; };
   return {cri:Object.values(cri).map(finish),pub:Object.values(pub).map(finish)};
@@ -629,10 +650,11 @@ function renderCriativos(){
         <div class="cri-metric"><span class="cri-metric-label">ROAS</span><span class="cri-metric-val">${fmtX(c.roas)}</span></div>
         <div class="cri-metric"><span class="cri-metric-label">Cliques</span><span class="cri-metric-val">${fmtNum(c.cliques)}</span></div>
       </div>
+      <div style="font-size:11px;color:rgba(255,255,255,.45);margin-top:8px">👥 ${c.pubSplit||c.adset}</div>
       ${c.link?`<a class="cri-link" href="${c.link}" target="_blank">🔗 ${c.link}</a>`:''}
     </div>`).join(''):'<div class="empty-msg">Nenhum criativo no período/filtro.</div>';
 
-  document.getElementById('tbl-criativos').innerHTML=`<thead><tr><th>Criativo</th><th>Público</th><th>Status</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Vendas</th><th>Fat.</th><th>ROAS</th></tr></thead><tbody>${arr.map(c=>`<tr><td>${c.nome}</td><td>${c.quente?'🔥 Quente':'❄ Frio'}</td><td>${c.active?'<span class="green">Ativo</span>':'<span style="color:rgba(255,255,255,.4)">Inativo</span>'}</td><td>${fmtBRL(c.inv)}</td><td>${fmtNum(c.imp)}</td><td>${fmtNum(c.cliques)}</td><td>${fmtPct(c.ctr)}</td><td>${fmtBRL(c.cpc)}</td><td>${fmtNum(c.vendas)}</td><td class="green">${fmtBRL(c.fat)}</td><td class="orange">${fmtX(c.roas)}</td></tr>`).join('')||'<tr><td colspan="11" class="empty-msg">Sem dados.</td></tr>'}</tbody>`;
+  document.getElementById('tbl-criativos').innerHTML=`<thead><tr><th>Criativo</th><th>Público</th><th>Status</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Vendas</th><th>Fat.</th><th>ROAS</th></tr></thead><tbody>${arr.map(c=>`<tr><td>${c.nome}</td><td title="${c.pubSplit||c.adset}">${c.quente?'🔥 Quente':'❄ Frio'}</td><td>${c.active?'<span class="green">Ativo</span>':'<span style="color:rgba(255,255,255,.4)">Inativo</span>'}</td><td>${fmtBRL(c.inv)}</td><td>${fmtNum(c.imp)}</td><td>${fmtNum(c.cliques)}</td><td>${fmtPct(c.ctr)}</td><td>${fmtBRL(c.cpc)}</td><td>${fmtNum(c.vendas)}</td><td class="green">${fmtBRL(c.fat)}</td><td class="orange">${fmtX(c.roas)}</td></tr>`).join('')||'<tr><td colspan="11" class="empty-msg">Sem dados.</td></tr>'}</tbody>`;
 }
 
 // ── ABA PÚBLICOS ──
