@@ -116,6 +116,7 @@ tr.total td{font-weight:700;background:rgba(255,107,43,.07);color:#ff6b2b}
 .cri-modal-x{position:absolute;top:4px;right:10px;background:none;border:0;color:#fff;font-size:24px;cursor:pointer;line-height:1}
 .cri-modal-msg{font-size:11px;color:rgba(255,255,255,.6);margin-top:10px;line-height:1.5}
 .cri-modal-msg a{color:#ff8a57}
+#ver-tag{position:fixed;right:8px;bottom:6px;font:10px/1 'DM Mono',monospace;color:rgba(255,255,255,.28);z-index:5;pointer-events:none}
 </style>
 </head>
 <body>
@@ -220,7 +221,8 @@ const CONFIG = {
   LINKS_EXTRA: {
     'ADV02': 'https://www.facebook.com/106433448148900/posts/1580456537460101',
     'ADE13': 'https://www.facebook.com/106433448148900/posts/1584717173700704',
-    'ADE03': 'https://www.facebook.com/106433448148900/posts/1580137814158640'
+    'ADE03': 'https://www.facebook.com/106433448148900/posts/1580137814158640',
+    '006': 'https://www.facebook.com/106433448148900/posts/1562608252578263'
   },
   AD_IDS: {
     "120258464888040339": ["001", "Desafio [CAMPANHAS DE VENDAS] CBO [24/11]", "00 - Alimentação orgânica"],
@@ -351,7 +353,7 @@ async function fetchSheetGid(gid, nomeReserva) {
 // ───────────────────────── processamento ─────────────────────────
 let GROWS = [], SALES = [], DIAS = [], DIAG = {};
 const isTrafego = s => CONFIG.TRAFEGO_SOURCES.includes((s.utmSource || '').toLowerCase().replace(/[\s_-]/g, ''));
-const isPaused = s => String(s || '').toUpperCase().includes('PAUSED');
+const isPaused = s => /PAUSED|DISAPPROVED|ARCHIVED|DELETED/i.test(String(s || ''));   // reprovado/arquivado também não está rodando
 
 function processGerenciador(rows) {
   if (rows.length < 2) return [];
@@ -586,11 +588,11 @@ function groupBy(from, to, rowKey, saleKey) {
   gs.forEach(r => {
     const nome = r[rowKey] || '(sem nome)';
     const k = comp ? r.campanha + '\u0001' + r.adset + '\u0001' + nome : nome;
-    if (!m.has(k)) m.set(k, {nome, camp: r.campanha, set: r.adset, sub: '', inv: 0, imp: 0, cliques: 0, pv: 0, ck: 0, link: '', ativo: false, ultima: '', nV: 0, fat: 0});
+    if (!m.has(k)) m.set(k, {nome, camp: r.campanha, set: r.adset, sub: '', inv: 0, imp: 0, cliques: 0, pv: 0, ck: 0, link: '', ativo: false, reprov: false, ultima: '', nV: 0, fat: 0});
     const o = m.get(k);
     o.inv += r.inv; o.imp += r.imp; o.cliques += r.cliques; o.pv += r.pv; o.ck += r.ck;
     if (r.link && !o.link) o.link = r.link;
-    if (r.data >= o.ultima) { o.ultima = r.data; o.ativo = !isPaused(r.sAd) && !isPaused(r.sSet) && !isPaused(r.sCamp) && (r.sAd || r.sSet || r.sCamp); }
+    if (r.data >= o.ultima) { o.ultima = r.data; o.ativo = !isPaused(r.sAd) && !isPaused(r.sSet) && !isPaused(r.sCamp) && (r.sAd || r.sSet || r.sCamp); o.reprov = /DISAPPROVED/i.test(String(r.sAd || '')); }
   });
   if (comp) m.forEach(o => { if (!o.link) o.link = (CONFIG.LINKS_EXTRA || {})[String(o.nome).trim()] || ''; });
   if (comp) {
@@ -733,7 +735,7 @@ function renderGrupo(tab, state, prefix, rowKey, saleKey, titulo, from, to) {
   h += `<div class="ob-info">Vendas atribuídas pela UTM (${saleKey === 'utmContent' ? 'UTM Content = nome do anúncio' : 'UTM Medium = nome do conjunto'}). ${sem ? `${sem} venda(s) de tráfego sem correspondência com ${titulo} do período.` : (amb ? '' : 'Todas as vendas de tráfego casaram.')}${amb ? ` ${amb} venda(s) de tráfego com criativo de mesmo nome em mais de uma campanha e sem a campanha na UTM (utm_campaign), por isso não foram separadas.` : ''}</div>`;
   if (!list.length) { $(tab).innerHTML = h + `<div class="ob-info">Sem dados no período.</div>`; return; }
   const cards = list.map(o => `<div class="${prefix === 'cri' ? 'cri-card' : 'pub-card'} ${o.ativo ? 'ativo' : ''}">` +
-    `<div class="${prefix === 'cri' ? 'cri-card-header' : 'pub-card-header'}"><div class="${prefix === 'cri' ? 'cri-name' : 'pub-name'}">${esc(o.nome)}${o.sub ? `<div class="cri-sub">${esc(o.sub)}</div>` : ''}</div><span class="cri-badge ${o.ativo ? 'ativo' : 'inativo'}">${o.ativo ? 'Ativo' : 'Inativo'}</span></div>` +
+    `<div class="${prefix === 'cri' ? 'cri-card-header' : 'pub-card-header'}"><div class="${prefix === 'cri' ? 'cri-name' : 'pub-name'}">${esc(o.nome)}${o.sub ? `<div class="cri-sub">${esc(o.sub)}</div>` : ''}</div><span class="cri-badge ${o.ativo ? 'ativo' : 'inativo'}">${o.ativo ? 'Ativo' : (o.reprov ? 'Reprovado' : 'Inativo')}</span></div>` +
     `<div class="cri-metrics">` +
     [['Invest.', fmtBRL(o.inv), ''], ['Vendas', fmtInt(o.nV), ''], ['Custo/ingresso', fmtBRL(o.custo), cls(o.custo)], ['ROAS', fmtX(o.roas), ''], ['CTR', fmtPct(o.ctr), ''], ['CPC', fmtBRL(o.cpc), '']]
       .map(([l, v, c]) => `<div class="cri-metric"><span class="cri-metric-label">${l}</span><span class="cri-metric-val ${c} ${l === 'Custo/ingresso' ? 'hl' : ''}">${v}</span></div>`).join('') + `</div>` +
@@ -741,7 +743,7 @@ function renderGrupo(tab, state, prefix, rowKey, saleKey, titulo, from, to) {
       (prefix === 'cri' ? (igInfo(o.link) ? `<button class="cri-prev" data-link="${esc(o.link)}" onclick="verCriativo(this.dataset.link)">🖼 Ver criativo</button>` : `<a class="cri-prev cri-open" href="${esc(o.link)}" target="_blank" rel="noopener">🖼 Ver criativo</a>`) : '') + `</div>` : '') + `</div>`).join('');
   h += `<div class="${prefix === 'cri' ? 'cri-grid' : 'pub-grid'}">${cards}</div>`;
   h += `<div class="tbl-wrap"><table><thead><tr><th>${titulo}</th><th>Status</th><th>Invest.</th><th>Impr.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>PV</th><th>Checkouts</th><th>Vendas</th><th>Fat.</th><th>Custo/ingresso</th><th>ROAS</th></tr></thead><tbody>` +
-    list.map(o => `<tr><td>${esc(o.nome)}${o.sub ? `<div class="cri-sub">${esc(o.sub)}</div>` : ''}</td><td>${o.ativo ? 'Ativo' : 'Inativo'}</td><td>${fmtBRL(o.inv)}</td><td>${fmtInt(o.imp)}</td><td>${fmtInt(o.cliques)}</td><td>${fmtPct(o.ctr)}</td><td>${fmtBRL(o.cpc)}</td><td>${fmtInt(o.pv)}</td><td>${fmtInt(o.ck)}</td><td>${fmtInt(o.nV)}</td><td>${fmtBRL(o.fat)}</td><td class="${cls(o.custo)}">${fmtBRL(o.custo)}</td><td>${fmtX(o.roas)}</td></tr>`).join('') + `</tbody></table></div>`;
+    list.map(o => `<tr><td>${esc(o.nome)}${o.sub ? `<div class="cri-sub">${esc(o.sub)}</div>` : ''}</td><td>${o.ativo ? 'Ativo' : (o.reprov ? 'Reprovado' : 'Inativo')}</td><td>${fmtBRL(o.inv)}</td><td>${fmtInt(o.imp)}</td><td>${fmtInt(o.cliques)}</td><td>${fmtPct(o.ctr)}</td><td>${fmtBRL(o.cpc)}</td><td>${fmtInt(o.pv)}</td><td>${fmtInt(o.ck)}</td><td>${fmtInt(o.nV)}</td><td>${fmtBRL(o.fat)}</td><td class="${cls(o.custo)}">${fmtBRL(o.custo)}</td><td>${fmtX(o.roas)}</td></tr>`).join('') + `</tbody></table></div>`;
   $(tab).innerHTML = h;
 }
 function igInfo(u) { const m = String(u || '').match(/instagram\.com\/(p|reel|tv)\/([\w-]+)/i); return m ? {t: m[1].toLowerCase(), c: m[2]} : null; }
@@ -828,5 +830,6 @@ async function loadData() {
 document.addEventListener('DOMContentLoaded', () => { document.title = CONFIG.PRODUTO + ' · ' + CONFIG.CLIENTE + ' — Jamelli GT'; loadData(); });
 </script>
 <div id="cri-modal" class="cri-modal" onclick="if(event.target===this)fecharCriativo()"><div class="cri-modal-box"><button class="cri-modal-x" onclick="fecharCriativo()" aria-label="Fechar">×</button><div id="cri-modal-body"></div></div></div>
+<div id="ver-tag">v6 · 27/11/2026</div>
 </body>
 </html>
